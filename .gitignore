@@ -1,0 +1,10 @@
+node_modules/
+*.log
+
+# Skill / tooling working dirs — planning notes, agent scratch, browser
+# captures. Not part of the userscript; keep them local, out of the repo.
+.superpowers/
+docs/superpowers/
+.playwright-mcp/
+
+# the built userscript (openfront-helper.user.js) IS committed

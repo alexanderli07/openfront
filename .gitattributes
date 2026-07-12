@@ -1,0 +1,8 @@
+# Normalize line endings to LF in the repo (stops the CRLF churn warnings).
+* text=auto eol=lf
+
+# The built userscript is generated — don't show it in diffs / language stats.
+openfront-helper.user.js linguist-generated -diff
+
+# Large translation data — skip diffs.
+locales/**/common.json -diff

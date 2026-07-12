@@ -1,0 +1,20 @@
+{
+  "name": "openfront-userscript",
+  "version": "1.9.0",
+  "private": true,
+  "description": "Standalone userscript build of the OpenFront helper (auto-join + in-game overlays + auto-bot).",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:raw": "node build.mjs --raw",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "check:i18n": "node scripts/audit-i18n.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5.7.2"
+  }
+}

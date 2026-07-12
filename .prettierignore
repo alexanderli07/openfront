@@ -1,0 +1,9 @@
+# Vendored game engine (ported JS — kept as-is, not reformatted)
+engine/
+
+# Machine-managed translation data
+locales/
+
+# Build output + deps
+openfront-helper.user.js
+node_modules/
