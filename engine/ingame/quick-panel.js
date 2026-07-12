@@ -66,6 +66,8 @@
     combatSamTracker: ["SAM Tracker Panel", "Show/hide the floating SAM tracker panel listing all hostile SAM Launchers."],
     combatSamShowAll: ["Show All SAMs", "Show SAMs from all players including allies and teammates (spectator mode)."],
     combatSamBuildingOnly: ["Building Only SAMs", "Only show SAMs that are currently under construction, not placed ones."],
+    combatSamOneClickFire: ["One-click Fire", "When enabled, the nuke button fires the recommended atom salvo immediately instead of opening the batch-fire dialog. Shows a toast with the reason when firing isn't possible right now."],
+    combatSamAutoFireBuilding: ["Auto Fire Building", "Automatically nukes enemy SAM Launchers that are still under construction, undefended, and not covered by another SAM's range — only when a shot is guaranteed to land before construction finishes. Capped by \"Max nuke auto fire\"."],
     autoDonateEnabled: ["Enable Troop Donation", "Automatically donate troops to specifically named players (from the recipient list) who are in combat, picking the one with lowest troop percentage."],
     autoDonateGoldEnabled: ["Enable Gold Donation", "Automatically donate gold to specifically named players (from the recipient list) when your gold exceeds threshold, picking the poorest."],
     lastHydrogen: ["Final Shot → Hydrogen", "Convert the last nuke in a batch to a Hydrogen Bomb for maximum damage."],
@@ -78,7 +80,7 @@
     tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
 
     // === Helpers Tab - Toggle Keys (Panels) ===
-    showTopGoldPerMinute: ["Player Stats Panel", "Shows gold-per-minute data for players in a draggable panel at the bottom of the screen."],
+    showTopGoldPerMinute: ["Player Stats Panel", "Sortable table of all players — rank, name, owned tiles, gold, gold/min, and max troops. Click the + button to also show per-player structure counts (City, Port, Factory, Defense Post, SAM Launcher, Missile Silo). Click a column header to sort; hovering a player's row on the map pins it at the bottom. Draggable."],
     showGoldPerMinute: ["Highlight Hovered Player", "Shows a gold-per-minute badge for the player currently under your cursor. Also highlights the hovered player's row in the Player Stats panel with a pinned footer."],
     showTeamBuildStats: ["Team Build Stats", "Lists each team's structure counts (City, Port, Factory, SAM, Silo) with economy stats. Alerts when enemy builds first Missile Silo."],
     showTradeBalances: ["Trade Balances", "Shows trade data when hovering a player: imports, exports, ROI, break-even time, and top 5 trade partners."],
