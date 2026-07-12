@@ -195,7 +195,7 @@
         // Reject ALL requests from regular bots — they spam defensively,
         // blocking attacks against them. Only accept from humans and Nation AI.
         const requestor = req.requestor();
-        if (requestor && isRegularBot(requestor)) {
+        if (requestor && this.isRegularBot(requestor)) {
           req.reject();
           continue;
         }
@@ -297,18 +297,10 @@
 
       // NEVER send alliance requests to regular bots — they spam defensively,
       // blocking attacks against them. Only send to humans and Nation AI.
-      const isAcceptablePlayerType = (p) => {
-        try {
-          if (typeof p.type === "function" && p.type() === "BOT") return false;
-          if (p.data && p.data.playerType === "BOT") return false;
-        } catch (_e) {}
-        return true;
-      };
-
       for (const enemy of borderingEnemies) {
         if (
           this.random.chance(30) &&
-          isAcceptablePlayerType(enemy) &&
+          !this.isRegularBot(enemy) &&
           this.canSendAllianceRequest(enemy) &&
           this.getAllianceDecision(enemy, false)
         ) {

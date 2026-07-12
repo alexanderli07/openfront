@@ -396,6 +396,12 @@
       "  transition:background 0.15s,color 0.15s,border-color 0.15s;",
       "}",
       ".ohss-nuke-btn:hover { background:#cc2200; color:#fff; border-color:#ff4400; }",
+      ".ohss-nuke-track {",
+      "  font-size:9px; color:#ff6644; margin:3px 0 0 0; padding:2px 4px;",
+      "  background:rgba(255,50,0,0.08); border-radius:3px;",
+      "  border-left:2px solid rgba(255,100,50,0.5);",
+      "  line-height:1.3; pointer-events:none; white-space:nowrap;",
+      "}",
       ".ohss-empty { color:rgba(148,163,184,0.72); font-size:10px; text-align:center; padding:5px 0; }",
     ].join("\n");
     (document.head || document.documentElement).appendChild(s);
@@ -660,6 +666,8 @@
       if (content.children[i] !== row) {
         content.insertBefore(row, content.children[i] || null);
       }
+      // Nuke-flight status per row
+      _renderNukeTrack(row, _scanNukesToTile(ctx.game, me, item.tile));
     }
   }
 
@@ -667,6 +675,67 @@
     if (content.children.length !== 1 || !content.querySelector(".ohss-empty")) {
       content.innerHTML = '<div class="ohss-empty">' + _esc(msg) + '</div>';
     }
+  }
+
+  // ---- Nuke-flight tracker (ETA + count per target) ----
+
+  // Scan our nukes in flight towards `tile` (both Atom and Hydrogen). Returns
+  // { count, etaSec } or null. `computeNukeRemainingTicks` is in the shared
+  // engine scope (nuke-prediction.js, concatenated before this file).
+  function _scanNukesToTile(game, myPlayer, tile) {
+    if (!game || !myPlayer || tile == null) return null;
+    var total = 0;
+    var minEta = Infinity;
+    try {
+      var mySid = myPlayer.smallID ? myPlayer.smallID() : -1;
+      var checkType = function(unitType) {
+        var units = myPlayer.units(unitType) || [];
+        for (var i = 0; i < units.length; i++) {
+          var u = units[i];
+          try {
+            var o = u.owner && u.owner();
+            if (o && o.smallID && o.smallID() !== mySid) continue;
+            if (u.targetTile && u.targetTile() === tile) {
+              total++;
+              if (typeof computeNukeRemainingTicks === "function") {
+                var nukeTile = u.tile && u.tile();
+                if (nukeTile != null) {
+                  var eta = computeNukeRemainingTicks(game, nukeTile, tile);
+                  if (eta != null && eta < minEta) minEta = eta;
+                }
+              }
+            }
+          } catch (_e) { /* skip this unit */ }
+        }
+      };
+      checkType("Atom Bomb");
+      checkType("Hydrogen Bomb");
+    } catch (_e) { return null; }
+    if (total === 0) return null;
+    return { count: total, etaSec: minEta === Infinity ? null : (minEta / 10) };
+  }
+
+  // Create or update a compact inline badge on a row showing nuke-flight status.
+  // Removes it when info is null (no nukes in flight).
+  function _renderNukeTrack(row, info) {
+    var el = row.querySelector(".ohss-nuke-track");
+    if (!info) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "ohss-nuke-track";
+      // Append after .ohss-row-inner, before the absolutely-positioned nuke button
+      var inner = row.querySelector(".ohss-row-inner");
+      if (inner && inner.nextSibling) {
+        row.insertBefore(el, inner.nextSibling);
+      } else {
+        row.appendChild(el);
+      }
+    }
+    var etaStr = info.etaSec != null ? " · ⏱" + info.etaSec.toFixed(1) + "s" : "";
+    el.textContent = "🚀×" + info.count + etaStr;
   }
 
   // Failure reasons come from lifecycle.js's recommendQty (path-coverage math,
@@ -1003,6 +1072,7 @@
         });
 
         content.appendChild(row);
+        _renderNukeTrack(row, _scanNukesToTile(ctx.game, me, item.tile));
       })(items[i]);
     }
   }
