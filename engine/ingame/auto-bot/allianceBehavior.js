@@ -181,8 +181,11 @@
     isRegularBot(player) {
       if (!player) return false;
       try {
-        if (typeof player.type === "function" && player.type() === "BOT") return true;
-        if (player.data && player.data.playerType === "BOT") return true;
+        var rawType = typeof player.type === "function" ? player.type() : (player.data && player.data.playerType);
+        if (rawType === "BOT") return true;
+        if (rawType && rawType !== "BOT") {
+          console.log("[Diplo] isRegularBot: unexpected type", rawType, "name:", (function(){try{return safeName(player);}catch(e){return "?"}})());
+        }
       } catch (e) {}
       return false;
     }
@@ -196,6 +199,7 @@
         // blocking attacks against them. Only accept from humans and Nation AI.
         const requestor = req.requestor();
         if (requestor && this.isRegularBot(requestor)) {
+          console.log("[Diplo] handleAllianceRequests: REJECT bot request from", safeName(requestor));
           req.reject();
           continue;
         }
@@ -212,6 +216,7 @@
           continue;
         }
         if (this.getAllianceDecision(requestor, true)) {
+          console.log("[Diplo] handleAllianceRequests: ACCEPT request from", safeName(requestor));
           req.accept();
         } else {
           req.reject();
@@ -298,9 +303,13 @@
       // NEVER send alliance requests to regular bots — they spam defensively,
       // blocking attacks against them. Only send to humans and Nation AI.
       for (const enemy of borderingEnemies) {
+        const isBot = this.isRegularBot(enemy);
+        if (isBot) {
+          console.log("[Diplo] maybeSendAllianceRequests: skip bot", safeName(enemy), "type:", (function(){try{return enemy.type();}catch(e){return "err:"+e}})());
+        }
         if (
           this.random.chance(30) &&
-          !this.isRegularBot(enemy) &&
+          !isBot &&
           this.canSendAllianceRequest(enemy) &&
           this.getAllianceDecision(enemy, false)
         ) {
@@ -313,6 +322,7 @@
           // suppressed. In a populated lobby an accept happens within seconds.
           const ctors = discoverCtors(getEventBus());
           if (ctors.allianceRequest) {
+            console.log("[Diplo] maybeSendAllianceRequests: SENDING to", safeName(enemy));
             emitIntent(
               ctors.allianceRequest,
               this.player.__src ?? this.player,
@@ -442,7 +452,10 @@
     getAllianceDecision(otherPlayer, isResponse) {
       // HARD GATE: NEVER accept alliances with regular bots (type="BOT").
       // Regular bots spam alliance requests defensively, blocking attacks against them.
-      if (this.isRegularBot(otherPlayer)) return false;
+      if (this.isRegularBot(otherPlayer)) {
+        console.log("[Diplo] getAllianceDecision: BLOCK bot", safeName(otherPlayer));
+        return false;
+      }
       // Easy (dumb) nations sometimes get confused and accept/reject randomly (Just like dumb humans do)
       if (this.isConfused()) {
         return this.random.chance(2);
