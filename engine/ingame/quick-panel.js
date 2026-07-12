@@ -63,6 +63,8 @@
     combatSiloShowAll: ["Show All Silos", "Show silos from all players including allies and teammates (spectator mode)."],
     combatSiloBuildingOnly: ["Building Only", "Only show silos that are currently under construction, not placed ones."],
     combatSiloAudioAlert: ["Audio Ping", "Play a sound when a new enemy silo is first detected being placed."],
+    combatSiloOneClickFire: ["One-click Fire", "When enabled, the nuke button fires the recommended atom salvo immediately instead of opening the batch-fire dialog. Shows a toast with the reason when firing isn't possible right now."],
+    combatSiloAutoFireBuilding: ["Auto Fire Building", "Automatically nukes enemy Missile Silos that are still under construction, denying them before they ever fire a nuke. A Silo can't intercept, so — unlike the SAM version — it fires as soon as it's affordable/achievable (same check as one-click fire), with no race against construction time. Capped by \"Max nuke auto fire\"."],
     combatSamTracker: ["SAM Tracker Panel", "Show/hide the floating SAM tracker panel listing all hostile SAM Launchers."],
     combatSamShowAll: ["Show All SAMs", "Show SAMs from all players including allies and teammates (spectator mode)."],
     combatSamBuildingOnly: ["Building Only SAMs", "Only show SAMs that are currently under construction, not placed ones."],
@@ -271,6 +273,11 @@
       var el = els[i];
       if (el.tagName === "STYLE" || el.tagName === "CANVAS" || el.tagName === "SVG") continue;
       if (el.id.indexOf("-layer") !== -1 || el.id.indexOf("-styles") !== -1) continue;
+      // Transparent, pointer-events:none full-viewport overlays (aiming rings,
+      // range previews) are not themed panels — forcing an opaque panel
+      // background onto a position:fixed;inset:0 element blankets the whole
+      // screen. Excluded by id, same as -layer/-styles above.
+      if (el.id.indexOf("-range") !== -1) continue;
       el.style.setProperty("background", bg, "important");
       el.style.setProperty("border-color", border, "important");
     }
@@ -668,6 +675,7 @@
       }
     }
     if (["combatSiloShowAll","combatSiloBuildingOnly","combatSiloAudioAlert",
+         "combatSiloOneClickFire","combatSiloAutoFireBuilding",
          "combatSamBuildingOnly","combatSamShowAll",
          "combatSamOneClickFire","combatSamAutoFireBuilding"].indexOf(key) !== -1) {
       try { if (typeof window.__OFH_updateSiloSamTracker === "function") window.__OFH_updateSiloSamTracker(); } catch(e) {}
@@ -984,6 +992,11 @@
     h.push(_swHtmlWithTip("combatSiloShowAll", _getSetting("combatSiloShowAll", false), false, "Show all (spectator)"));
     h.push(_swHtmlWithTip("combatSiloBuildingOnly", _getSetting("combatSiloBuildingOnly", false), false, "Building only"));
     h.push(_swHtmlWithTip("combatSiloAudioAlert", _getSetting("combatSiloAudioAlert", false), false, "Audio ping on silo"));
+    h.push(_swHtmlWithTip("combatSiloOneClickFire", _getSetting("combatSiloOneClickFire", false), false, "One-click fire"));
+    h.push(_swHtmlWithTip("combatSiloAutoFireBuilding", _getSetting("combatSiloAutoFireBuilding", false), false, "Auto fire building"));
+    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:110px;">' + _tr('Max nuke auto fire') + '</span>');
+    h.push('<input class="ohqp-input" type="number" min="1" step="1" data-qp-input="combatSiloAutoFireMaxQty" value="' + (_getSetting("combatSiloAutoFireMaxQty", 1) || 1) + '" style="flex:1;">');
+    h.push('</div>');
     h.push('</div></div>');
 
     // SAM Tracker — single toggle

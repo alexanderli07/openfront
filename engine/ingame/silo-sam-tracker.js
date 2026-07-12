@@ -12,8 +12,10 @@
   var _knownSiloIds = {};
   var _lastGameObj = null;
   var _lastAudioAlertMs = 0;
-  var _samAutoFiredIds = {}; // unitId -> true (fired) | "pending" (awaiting recommendQty)
-  var _samAutoFireLastGameObj = null;
+  // Auto-fire-building state: firedIds unitId -> true (fired) | "pending" (awaiting
+  // recommendQty); lastGameObj resets firedIds when a new game starts.
+  var _samAutoFireState = { firedIds: {}, lastGameObj: null };
+  var _siloAutoFireState = { firedIds: {}, lastGameObj: null };
   var SAM_AUTO_FIRE_SAFETY_MARGIN_TICKS = 10; // ~1s buffer so the nuke lands well before completion
 
   // ---- Settings bridge (reads from Quick Panel cache, loaded before us) ----
@@ -320,7 +322,8 @@
     s.textContent = [
       // Shared popout panel base
       "#" + SILO_PANEL_ID + ", #" + SAM_PANEL_ID + " {",
-      "  position:fixed; z-index:9000; width:250px; max-height:380px; display:none; flex-direction:column;",
+      "  position:fixed; z-index:9000; width:250px; min-height:140px; display:none; flex-direction:column;",
+      "  resize:vertical; overflow:hidden;",
       "}",
       "  border:1px solid var(--oh-panel-border, rgba(148,163,184,0.34)); border-radius:8px;",
       "  background:var(--oh-panel-bg, rgba(12,18,20,0.92)); color:var(--oh-panel-text, #e2e8f0);",
@@ -353,6 +356,17 @@
       "  font-size:12px; font-weight:800; cursor:pointer; margin-right:2px;",
       "}",
       ".ohss-min-btn:hover { background:var(--oh-accent-soft, rgba(0,255,102,0.15)); }",
+      ".ohss-quick-btn {",
+      "  display:inline-flex; align-items:center; justify-content:center;",
+      "  width:20px; height:20px; border:1px solid var(--oh-panel-border, rgba(148,163,184,0.25));",
+      "  border-radius:6px; background:rgba(15,23,42,0.5); color:var(--oh-panel-text-dim, rgba(148,163,184,0.85));",
+      "  font-size:11px; cursor:pointer; margin-right:2px; opacity:0.6;",
+      "}",
+      ".ohss-quick-btn:hover { opacity:1; background:var(--oh-accent-soft, rgba(0,255,102,0.15)); }",
+      ".ohss-quick-btn.on {",
+      "  opacity:1; color:#fff; background:var(--oh-accent-muted, rgba(0,255,102,0.35));",
+      "  border-color:var(--oh-accent, #00ff66);",
+      "}",
       "#" + SILO_PANEL_ID + "[data-minimized='true'] .ohss-body,",
       "#" + SAM_PANEL_ID + "[data-minimized='true'] .ohss-body { display:none; }",
       ".ohss-body {",
@@ -443,7 +457,8 @@
     inner.appendChild(metaRow);
     row.appendChild(inner);
 
-    // Nuke button — opens atom batch-fire dialog with the enemy silo's tile pre-filled
+    // Nuke button — one-click fire (if enabled) or opens atom batch-fire dialog
+    // with the enemy silo's tile pre-filled
     var nukeBtn = document.createElement("button");
     nukeBtn.className = "ohss-nuke-btn";
     nukeBtn.textContent = "☢";
@@ -451,6 +466,19 @@
     nukeBtn.onclick = function(e) {
       e.stopPropagation();
       if (row._blonTile == null) return;
+      if (_cfg("combatSiloOneClickFire", false)) {
+        if (!window.__OFH_atomBatch || typeof window.__OFH_atomBatch.fireRecommended !== "function") return;
+        window.__OFH_atomBatch.fireRecommended(row._blonTile).then(function(res) {
+          if (res && res.ok) {
+            _toast("🚀 " + _tr("Fired") + " " + res.fired + "/" + res.qty + " " + _tr("atom bomb(s)"), "rgba(0,150,80,0.92)");
+          } else {
+            _toast(_atomFireFailureMessage(res), "rgba(220,40,40,0.92)");
+          }
+        }).catch(function() {
+          _toast(_tr("Cannot fire right now."), "rgba(220,40,40,0.92)");
+        });
+        return;
+      }
       try {
         if (window.__OFH_atomBatch && typeof window.__OFH_atomBatch.openDialog === "function") {
           window.__OFH_atomBatch.openDialog(row._blonTile);
@@ -512,6 +540,7 @@
     }
     _ensureStyles();
     var panel = _ensurePanel(SILO_PANEL_ID, "Silo Tracker", "combatSiloPanel");
+    _syncTrackerQuickButtons(panel);
     var content = panel.querySelector(".ohss-body");
     if (!content) return;
 
@@ -640,7 +669,9 @@
     }
   }
 
-  function _samFireFailureMessage(res) {
+  // Failure reasons come from lifecycle.js's recommendQty (path-coverage math,
+  // not target-type-specific), so this one message set is shared by both trackers.
+  function _atomFireFailureMessage(res) {
     var reason = res && res.reason;
     if (reason === "no-silo") return _tr("Cannot build atom here (no silo / disabled / unreachable).");
     if (reason === "too-slow") return _tr("Too slow — SAMs reload before impact. Lower the Delay in the Atom settings tab.");
@@ -650,55 +681,72 @@
     return _tr("Cannot fire right now.");
   }
 
-  function _samAutoFireAttempt(id, samTile, owner, me, maxQty) {
-    _samAutoFiredIds[id] = "pending";
-    window.__OFH_atomBatch.recommendQty(samTile).then(function(rec) {
+  // Fire-and-forget one auto-fire shot at `tile`, tracked via `state.firedIds[id]`
+  // so it is never re-attempted (pending while recommendQty/fireNow are in flight,
+  // true once fired, deleted again on failure so a later tick can retry).
+  function _autoFireAttempt(state, id, tile, owner, me, maxQty, targetLabel) {
+    state.firedIds[id] = "pending";
+    window.__OFH_atomBatch.recommendQty(tile).then(function(rec) {
       if (!rec || !rec.ok || rec.recommended > maxQty) {
-        delete _samAutoFiredIds[id];
+        delete state.firedIds[id];
         return;
       }
-      return window.__OFH_atomBatch.fireNow(samTile, rec.recommended).then(function(res) {
-        _samAutoFiredIds[id] = true;
+      return window.__OFH_atomBatch.fireNow(tile, rec.recommended).then(function(res) {
+        state.firedIds[id] = true;
         var label = _playerLabel(owner, me);
-        _toast("🚀 " + _tr("Auto-fired") + " " + res.fired + " " + _tr("atom bomb(s)") + " → " + label + "'s SAM", "rgba(0,150,80,0.92)");
+        _toast("🚀 " + _tr("Auto-fired") + " " + res.fired + " " + _tr("atom bomb(s)") + " → " + label + "'s " + targetLabel, "rgba(0,150,80,0.92)");
       });
     }).catch(function() {
-      delete _samAutoFiredIds[id];
+      delete state.firedIds[id];
     });
   }
 
-  function _runSamAutoFireBuilding(ctx) {
-    if (!_cfg("combatSamTracker", false) || !_cfg("combatSamAutoFireBuilding", false)) return;
+  // Shared "auto-nuke hostile structures still under construction" sweep — used by
+  // both the SAM Tracker and the Silo Tracker. Both only ever target structures
+  // still under construction (denying the enemy's investment before it's useful).
+  //
+  // opts.raceConstruction (SAM only) additionally requires the nuke to land BEFORE
+  // construction completes — a SAM Launcher, once active, can intercept, so firing
+  // late risks the shot getting shot down by the very target it was aimed at (or by
+  // this SAM once it can help defend elsewhere). A Missile Silo has no interception
+  // ability of its own, so that race serves no purpose there: whether our nuke lands
+  // before or after the silo finishes building doesn't change whether it survives —
+  // only fireNow's own gold/silos-ready/SAM-coverage-along-the-path check (the same
+  // one one-click fire uses) decides that.
+  function _runAutoFireBuilding(ctx, opts) {
+    if (!_cfg(opts.trackerKey, false) || !_cfg(opts.autoFireKey, false)) return;
     if (!ctx || !ctx.game) return;
     var game = ctx.game;
+    var state = opts.state;
 
-    if (game !== _samAutoFireLastGameObj) {
-      _samAutoFireLastGameObj = game;
-      _samAutoFiredIds = {};
+    if (game !== state.lastGameObj) {
+      state.lastGameObj = game;
+      state.firedIds = {};
       return; // fresh game — re-evaluate from next tick
     }
 
-    if (!window.__OFH_atomBatch || typeof window.__OFH_atomBatch.estimateFlightTicks !== "function") return;
+    if (!window.__OFH_atomBatch || typeof window.__OFH_atomBatch.recommendQty !== "function") return;
+    if (opts.raceConstruction && typeof window.__OFH_atomBatch.estimateFlightTicks !== "function") return;
     var me = game.myPlayer ? game.myPlayer() : null;
     if (!me) return;
 
-    var maxQty = Math.max(1, Math.floor(Number(_cfg("combatSamAutoFireMaxQty", 1))) || 1);
-    var allSams = _getSAMTrackerUnits(game);
+    var maxQty = Math.max(1, Math.floor(Number(_cfg(opts.maxQtyKey, 1))) || 1);
+    var allUnits = opts.getUnits(game);
     var currentTick = typeof game.ticks === "function" ? game.ticks() : 0;
 
-    for (var i = 0; i < allSams.length; i++) {
-      var sam = allSams[i];
-      var isBuilding = typeof sam.isUnderConstruction === "function" && sam.isUnderConstruction();
+    for (var i = 0; i < allUnits.length; i++) {
+      var unit = allUnits[i];
+      var isBuilding = typeof unit.isUnderConstruction === "function" && unit.isUnderConstruction();
       if (!isBuilding) continue;
 
       var id = null;
-      if (typeof sam.id === "function") id = sam.id();
-      else if (sam.id !== void 0) id = sam.id;
-      else if (sam.state && sam.state.id !== void 0) id = sam.state.id;
+      if (typeof unit.id === "function") id = unit.id();
+      else if (unit.id !== void 0) id = unit.id;
+      else if (unit.state && unit.state.id !== void 0) id = unit.state.id;
       if (id === null || id === void 0) continue;
-      if (Object.prototype.hasOwnProperty.call(_samAutoFiredIds, id)) continue;
+      if (Object.prototype.hasOwnProperty.call(state.firedIds, id)) continue;
 
-      var owner = _safeOwner(sam, game);
+      var owner = _safeOwner(unit, game);
       if (!owner) continue;
       try {
         var mySid = me.smallID ? me.smallID() : null;
@@ -711,23 +759,53 @@
         if (isAlly || isSameTeam) continue;
       } catch (e) { continue; }
 
-      var samTile = typeof sam.tile === "function" ? sam.tile() : sam.tile;
-      if (samTile == null) continue;
+      var tile = typeof unit.tile === "function" ? unit.tile() : unit.tile;
+      if (tile == null) continue;
 
-      var buildTicks = 300;
-      try {
-        var info = typeof game.unitInfo === "function" ? game.unitInfo("SAM Launcher") : null;
-        if (info && info.constructionDuration != null) buildTicks = info.constructionDuration;
-      } catch (e) {}
-      var startTick = sam.state && sam.state.constructionStartTick != null ? sam.state.constructionStartTick : null;
-      if (startTick === null) continue;
-      var remainingTicks = Math.max(0, buildTicks - (currentTick - startTick));
+      if (opts.raceConstruction) {
+        var buildTicks = opts.defaultBuildTicks;
+        try {
+          var info = typeof game.unitInfo === "function" ? game.unitInfo(opts.unitInfoName) : null;
+          if (info && info.constructionDuration != null) buildTicks = info.constructionDuration;
+        } catch (e) {}
+        var startTick = unit.state && unit.state.constructionStartTick != null ? unit.state.constructionStartTick : null;
+        if (startTick === null) continue;
+        var remainingTicks = Math.max(0, buildTicks - (currentTick - startTick));
 
-      var flightTicks = window.__OFH_atomBatch.estimateFlightTicks(samTile);
-      if (flightTicks == null || flightTicks >= remainingTicks - SAM_AUTO_FIRE_SAFETY_MARGIN_TICKS) continue;
+        var flightTicks = window.__OFH_atomBatch.estimateFlightTicks(tile);
+        if (flightTicks == null || flightTicks >= remainingTicks - SAM_AUTO_FIRE_SAFETY_MARGIN_TICKS) continue;
+      }
 
-      _samAutoFireAttempt(id, samTile, owner, me, maxQty);
+      _autoFireAttempt(state, id, tile, owner, me, maxQty, opts.targetLabel);
     }
+  }
+
+  function _runSamAutoFireBuilding(ctx) {
+    _runAutoFireBuilding(ctx, {
+      trackerKey: "combatSamTracker",
+      autoFireKey: "combatSamAutoFireBuilding",
+      maxQtyKey: "combatSamAutoFireMaxQty",
+      getUnits: _getSAMTrackerUnits,
+      unitInfoName: "SAM Launcher",
+      defaultBuildTicks: 300,
+      state: _samAutoFireState,
+      targetLabel: "SAM",
+      raceConstruction: true, // must land before it can intercept
+    });
+  }
+
+  function _runSiloAutoFireBuilding(ctx) {
+    _runAutoFireBuilding(ctx, {
+      trackerKey: "combatSiloPanel",
+      autoFireKey: "combatSiloAutoFireBuilding",
+      maxQtyKey: "combatSiloAutoFireMaxQty",
+      getUnits: _getAllSilos,
+      unitInfoName: "Missile Silo",
+      defaultBuildTicks: 100,
+      state: _siloAutoFireState,
+      targetLabel: "Silo",
+      raceConstruction: false, // a Silo can't intercept — fire whenever fireNow allows it
+    });
   }
 
   // ---- SAM panel ----
@@ -740,6 +818,7 @@
     }
     _ensureStyles();
     var panel = _ensurePanel(SAM_PANEL_ID, "SAM Tracker", "combatSamTracker");
+    _syncTrackerQuickButtons(panel);
     var content = panel.querySelector(".ohss-body");
     if (!content) return;
 
@@ -901,7 +980,7 @@
               if (res && res.ok) {
                 _toast("🚀 " + _tr("Fired") + " " + res.fired + "/" + res.qty + " " + _tr("atom bomb(s)"), "rgba(0,150,80,0.92)");
               } else {
-                _toast(_samFireFailureMessage(res), "rgba(220,40,40,0.92)");
+                _toast(_atomFireFailureMessage(res), "rgba(220,40,40,0.92)");
               }
             }).catch(function() {
               _toast(_tr("Cannot fire right now."), "rgba(220,40,40,0.92)");
@@ -925,6 +1004,48 @@
 
         content.appendChild(row);
       })(items[i]);
+    }
+  }
+
+  // ---- Panel header quick-toggles (One-click Fire / Auto Fire Building) ----
+  // Shared by both the SAM Tracker and Silo Tracker panels.
+
+  // Compact header button bound to a Quick Panel boolean setting. Reuses
+  // quick-panel.js's _getSetting/_setAndNotify (shared engine scope) so the
+  // toggle stays in sync with the Quick Panel's own switches and persists
+  // the same way (storage + lobby sync).
+  function _makeTrackerQuickBtn(key, icon, label) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ohss-quick-btn";
+    btn.setAttribute("data-qp-key", key);
+    btn.textContent = icon;
+    btn.title = label;
+    btn.classList.toggle("on", !!_cfg(key, false));
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var cur = !!_cfg(key, false);
+      if (typeof _setAndNotify === "function") _setAndNotify(key, !cur);
+      btn.classList.toggle("on", !cur);
+      // Mirror the Quick Panel's own switch immediately if it's open — otherwise
+      // it stays stale (showing the old state) until the tab is re-opened.
+      try {
+        var qpPanel = document.getElementById("openfront-helper-quick-panel");
+        if (qpPanel && qpPanel.dataset.visible === "true" && typeof _renderActiveTab === "function") {
+          _renderActiveTab();
+        }
+      } catch (err) {}
+    });
+    return btn;
+  }
+
+  // Called each tick from updateSiloPanel/updateSAMTrackerPanel so the buttons
+  // reflect changes made elsewhere (e.g. the Quick Panel's own toggle switches).
+  function _syncTrackerQuickButtons(panel) {
+    var btns = panel.querySelectorAll(".ohss-quick-btn[data-qp-key]");
+    for (var i = 0; i < btns.length; i++) {
+      var key = btns[i].getAttribute("data-qp-key");
+      btns[i].classList.toggle("on", !!_cfg(key, false));
     }
   }
 
@@ -1034,6 +1155,13 @@
     });
 
     hdr.appendChild(titleEl);
+    if (id === SAM_PANEL_ID) {
+      hdr.appendChild(_makeTrackerQuickBtn("combatSamOneClickFire", "⚡", _tr("One-click Fire")));
+      hdr.appendChild(_makeTrackerQuickBtn("combatSamAutoFireBuilding", "🎯", _tr("Auto Fire Building")));
+    } else if (id === SILO_PANEL_ID) {
+      hdr.appendChild(_makeTrackerQuickBtn("combatSiloOneClickFire", "⚡", _tr("One-click Fire")));
+      hdr.appendChild(_makeTrackerQuickBtn("combatSiloAutoFireBuilding", "🎯", _tr("Auto Fire Building")));
+    }
     hdr.appendChild(minBtn);
     hdr.appendChild(xBtn);
 
@@ -1058,6 +1186,11 @@
       // Stored position is applied only when re-opening an existing panel (top of function).
     }
 
+    _applyStoredPanelSize(panel, id);
+    if (window.ResizeObserver) {
+      new ResizeObserver(function() { _savePanelSize(panel, id); }).observe(panel);
+    }
+
     return panel;
   }
 
@@ -1070,6 +1203,23 @@
     } else {
       console.log("[SiloSAM] _removePanel: not found", id);
     }
+  }
+
+  function _applyStoredPanelSize(panel, id) {
+    try {
+      var s = JSON.parse(window.localStorage.getItem(id + "-size") || "null");
+      if (s && Number.isFinite(s.h)) { panel.style.height = s.h + "px"; return; }
+    } catch (e) {}
+    // No stored size yet — same default height the old max-height:380px gave,
+    // but as a real height (not a cap) so the resize handle can go taller too.
+    panel.style.height = "380px";
+  }
+  function _savePanelSize(panel, id) {
+    var h = parseInt(panel.style.height, 10);
+    if (!Number.isFinite(h)) return;
+    try {
+      window.localStorage.setItem(id + "-size", JSON.stringify({ h: h }));
+    } catch (e) {}
   }
 
   // ---- New silo placement detection (audio alert) ----
@@ -1184,6 +1334,7 @@
         updateSiloNotification();
         updateSiloPanel();
         checkSiloPlacements(ctx);
+        _runSiloAutoFireBuilding(ctx);
       }
       if (samTracker) {
         updateSAMTrackerPanel();

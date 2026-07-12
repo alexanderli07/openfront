@@ -622,12 +622,10 @@
       }
       #${ATOM_RANGE_CONTAINER_ID} .atom-rng-h {
         border: 2px dashed rgba(248,113,113,0.9);
-        background: radial-gradient(closest-side, rgba(248,113,113,0.04), rgba(248,113,113,0.12));
         box-shadow: 0 0 20px rgba(248,113,113,0.35), inset 0 0 26px rgba(248,113,113,0.12);
       }
       #${ATOM_RANGE_CONTAINER_ID} .atom-rng-a {
         border: 2px solid rgba(251,191,36,0.95);
-        background: radial-gradient(closest-side, rgba(251,191,36,0.16), rgba(251,191,36,0.05));
         box-shadow: 0 0 16px rgba(251,191,36,0.4), inset 0 0 18px rgba(251,191,36,0.16);
       }
       #${ATOM_RANGE_CONTAINER_ID} .atom-rng-dot {
@@ -1085,7 +1083,6 @@
         dlg.querySelector('[data-role="atom-last-hydro"]')?.checked === true;
       atomSaveCfg(batchSize, delayMs, lastHydrogen); // keep pacing, persist hydrogen choice
       close();
-      atomFireCancel = false;
       atomBanner("☢️ " + atomT("Firing… (Esc to stop)"), "arm");
       // fireAtoms returns the number CONFIRMED in flight (server-accepted), not the
       // intents emitted — so the banner can't claim shots the rate limiter silently ate.
@@ -1120,7 +1117,6 @@
       const cfgNow = atomLoadCfg();
       atomSaveCfg(cfgNow.batchSize, cfgNow.delayMs, wantHydro);
       close();
-      atomFireCancel = false;
       atomBanner("☢️ " + atomT("Firing… (Esc to stop)"), "arm");
       const launched = await fireAtoms(
         ctx,
@@ -1153,6 +1149,11 @@
     if (!myPlayer || !buildMenu || typeof buildMenu.sendBuildOrUpgrade !== "function") {
       return 0;
     }
+    // A stray Esc press ANYWHERE in-game (closing a menu, exiting a mode — not just
+    // during atom aiming) sets this. Every fresh fire must start un-cancelled, or a
+    // single unrelated Esc permanently silences callers that never route through the
+    // dialog's Fire/Force buttons (SAM tracker one-click-fire, auto-fire-building).
+    atomFireCancel = false;
 
     const PER_MIN_CAP = 140; // stay under the 150/min server cap (margin)
     const ROLL_MS = 60000;
