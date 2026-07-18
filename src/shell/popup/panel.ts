@@ -474,6 +474,11 @@ const HELPER_SECTIONS: HelperSection[] = [
     toggles: [
       { name: "hideAds", title: "Hide ads", desc: "Hides ad containers in the game page." },
       {
+        name: "antiAfk",
+        title: "Anti-AFK",
+        desc: "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings.",
+      },
+      {
         name: "roundLogger",
         title: "Round logger",
         desc: "Records match timeline (attacks, nukes, troop changes) to localStorage; export as JSON.",

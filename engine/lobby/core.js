@@ -327,6 +327,19 @@ function syncHideAdsHelper() {
   );
 }
 
+function syncAntiAfkHelper() {
+  window.postMessage(
+    {
+      source: BRIDGE_SOURCE_EXTENSION,
+      type: "SET_ANTI_AFK",
+      payload: {
+        enabled: Boolean(settings.antiAfk),
+      },
+    },
+    "*",
+  );
+}
+
 function syncAttackRatioHotkeyHelper() {
   window.postMessage(
     {
@@ -769,6 +782,7 @@ function syncHelpers() {
   syncAdvisorPanelHelper();
   syncRetaliationHudHelper();
   syncHideAdsHelper();
+  syncAntiAfkHelper();
   syncAttackRatioHotkeyHelper();
   syncRightClickConquestHelper();
   syncRoundLoggerHelper();

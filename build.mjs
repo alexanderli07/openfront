@@ -38,6 +38,7 @@ const LOBBY_FILES = [
 // In-game layer (formerly "page-bridge"): overlays, helper panels, and the
 // auto-bot. Order matters (see the auto-bot README).
 const INGAME_FILES = [
+  "anti-afk.js",
   "runtime.js",
   "ws-hook.js",
   "panel-layout.js",

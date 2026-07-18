@@ -68,6 +68,7 @@
     showAdvisorPanel: false,
     showRetaliationHud: true,
     hideAds: true,
+    antiAfk: true,
     attackRatioHotkey: true,
     rightClickConquest: true,
     roundLogger: false,

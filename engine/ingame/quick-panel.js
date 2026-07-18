@@ -125,6 +125,7 @@
 
     // === Helpers Tab - Toggle Keys (Tools) ===
     hideAds: ["Hide Ads", "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none."],
+    antiAfk: ["Anti-AFK", "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings."],
     roundLogger: ["Round Logger", "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis."],
     networkLogger: ["Network Logger", "Hooks XMLHttpRequest to record network metadata (URL, method, status, timing). Max 500 entries. Does NOT capture response bodies."],
     markBotNationsRed: ["Mark Bot Nations Red", "Draws red glowing dots on the map above AI-controlled nations to distinguish them from human players."],
@@ -617,6 +618,7 @@
       case "showAttackHighlight":    return typeof setAttackHighlightEnabled === "function" ? setAttackHighlightEnabled : null;
       case "showRetaliationHud":     return typeof setRetaliationEnabled === "function" ? setRetaliationEnabled : null;
       case "hideAds":                return typeof setHideAdsEnabled === "function" ? setHideAdsEnabled : null;
+      case "antiAfk":                return typeof setAntiAfkEnabled === "function" ? setAntiAfkEnabled : null;
       case "attackRatioHotkey":      return typeof setAttackRatioHotkeyEnabled === "function" ? setAttackRatioHotkeyEnabled : null;
       case "rightClickConquest":     return typeof setRightClickMenuEnabled === "function" ? setRightClickMenuEnabled : null;
       case "roundLogger":            return typeof setRoundLoggerEnabled === "function" ? setRoundLoggerEnabled : null;
@@ -1179,6 +1181,7 @@
       {
         key: "tools", title: _tr("Tools"), toggles: [
           ["hideAds", _tr("Hide ads")],
+          ["antiAfk", _tr("Anti-AFK")],
           ["roundLogger", _tr("Round logger")],
           ["networkLogger", _tr("Network logger")],
           ["markBotNationsRed", _tr("Mark bot nations red")],

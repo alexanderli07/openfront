@@ -155,6 +155,8 @@
   "Alert when new enemy transport detected heading for your territory. Shows attacker name with 'Focus' button. Auto-dismisses after 9s.": "แจ้งเตือนเมื่อตรวจพบเรือขนส่งศัตรูใหม่กำลังมุ่งหน้ามายังดินแดนของคุณ แสดงชื่อผู้โจมตีพร้อมปุ่ม 'โฟกัส' ปิดอัตโนมัติหลัง 9วิ",
   "Hide Ads": "ซ่อนโฆษณา",
   "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none.": "แทรกแท็กสไตล์เพื่อซ่อนโฆษณาเกม (Google Ads, iframe) โดยใช้ CSS หลายเทคนิค: display:none, visibility:hidden, ขนาดศูนย์ และ pointer-events:none",
+  "Anti-AFK": "ป้องกัน AFK",
+  "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings.": "ป้องกันการตรวจจับ AFK เมื่อแท็บอยู่ในพื้นหลัง ใช้ Web Worker ส่ง ping WebSocket เป็นระยะ",
   "Round Logger": "บันทึกรอบ",
   "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis.": "บันทึกเหตุการณ์เกมเป็นเส้นเวลา JSON ใน localStorage ล้างทุก 5วิ มีประโยชน์สำหรับการดีบักพฤติกรรมบอทและการวิเคราะห์เกม",
   "Network Logger": "บันทึกเครือข่าย",

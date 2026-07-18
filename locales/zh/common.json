@@ -155,6 +155,8 @@
   "Alert when new enemy transport detected heading for your territory. Shows attacker name with 'Focus' button. Auto-dismisses after 9s.": "检测到新的敌方运输船前往您的领土时发出警报。显示攻击者名称和「聚焦」按钮。9秒后自动关闭。",
   "Hide Ads": "隐藏广告",
   "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none.": "注入样式标签以使用多种CSS技术隐藏游戏广告容器（Google Ads、iframe、广告包装器）：display:none、visibility:hidden、零尺寸和pointer-events:none。",
+  "Anti-AFK": "防AFK",
+  "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings.": "防止标签页在后台时被检测为AFK。使用Web Worker定期发送WebSocket心跳。",
   "Round Logger": "回合记录器",
   "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis.": "将游戏事件（比赛开始、大规模部队变化、网络活动）记录为localStorage中的JSON时间线，每5秒刷新一次。用于调试机器人行为和比赛分析。",
   "Network Logger": "网络记录器",

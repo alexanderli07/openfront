@@ -155,6 +155,8 @@
   "Alert when new enemy transport detected heading for your territory. Shows attacker name with 'Focus' button. Auto-dismisses after 9s.": "Alarm bei neuem feindlichen Transport in Richtung Ihres Gebiets. Zeigt Namen mit 'Fokus'-Taste. Schließt nach 9s.",
   "Hide Ads": "Werbung ausblenden",
   "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none.": "Fügt Style-Tag ein, um Werbung auszublenden (Google Ads, iframes) per CSS: display:none, visibility:hidden, Nullgröße, pointer-events:none.",
+  "Anti-AFK": "Anti-AFK",
+  "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings.": "Verhindert AFK-Erkennung bei Hintergrund-Tab. Nutzt Web Worker für periodische WebSocket-Pings.",
   "Round Logger": "Runden-Logger",
   "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis.": "Zeichnet Spielereignisse als JSON-Zeitleiste in localStorage auf, Spülung alle 5s. Für Bot-Debugging und Spielanalyse.",
   "Network Logger": "Netzwerk-Logger",

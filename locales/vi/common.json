@@ -155,6 +155,8 @@
   "Alert when new enemy transport detected heading for your territory. Shows attacker name with 'Focus' button. Auto-dismisses after 9s.": "Cảnh báo khi phát hiện thuyền địch mới đang tiến về lãnh thổ của bạn. Hiển thị tên kẻ tấn công với nút 'Xem nhà'. Tự đóng sau 9 giây.",
   "Hide Ads": "Ẩn Quảng Cáo",
   "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none.": "Chèn thẻ style để ẩn container quảng cáo game (Google Ads, iframe, ad wrappers) bằng nhiều kỹ thuật CSS: display:none, visibility:hidden, zero-sizing, và pointer-events:none.",
+  "Anti-AFK": "Chống AFK",
+  "Prevents AFK detection when tab is in background. Uses Web Worker to send periodic WebSocket pings.": "Ngăn phát hiện AFK khi tab ở nền. Dùng Web Worker gửi ping WebSocket định kỳ.",
   "Round Logger": "Nhật Ký Trận",
   "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis.": "Ghi lại sự kiện game (bắt đầu trận, thay đổi quân lớn, hoạt động mạng) dưới dạng timeline JSON trong localStorage, flush mỗi 5 giây. Hữu ích để gỡ lỗi hành vi bot và phân tích trận đấu.",
   "Network Logger": "Nhật Ký Mạng",

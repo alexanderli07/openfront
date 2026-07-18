@@ -217,6 +217,8 @@ let enemyIntentEnabled = false;
 // Spawn heatmap overlay: colored grid showing spawn quality.
 let spawnHeatmapEnabled = false;
 let spawnMarkersEnabled = false;
+// Anti-AFK: Web Worker keep-alive for background tabs.
+let antiAfkEnabled = false;
 
 const goldTrackers = new Map();
 const incomingGoldTransfers = new Map();

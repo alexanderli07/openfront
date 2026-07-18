@@ -96,6 +96,10 @@
       setHideAdsEnabled(data.payload?.enabled);
     }
 
+    if (data.type === "SET_ANTI_AFK") {
+      setAntiAfkEnabled(data.payload?.enabled);
+    }
+
     if (data.type === "SET_ATTACK_RATIO_HOTKEY") {
       setAttackRatioHotkeyEnabled(data.payload?.enabled);
     }
