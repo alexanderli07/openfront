@@ -26,7 +26,8 @@
     return "rgba(248, 113, 113, 0.85)";
   }
 
-  function computeNukeTrajectoryPath(game, fromTile, toTile) {
+  function computeNukeTrajectoryPath(game, fromTile, toTile, directionUp) {
+    if (directionUp === undefined) directionUp = true;
     try {
       if (
         typeof UniversalPathFinding === "undefined" ||
@@ -42,7 +43,7 @@
       const pf = UniversalPathFinding.Parabola(game, {
         increment: speed,
         distanceBasedHeight: true,
-        directionUp: true,
+        directionUp: directionUp,
       });
       const path = pf.findPath(fromTile, toTile);
       return Array.isArray(path) ? path : null;
@@ -56,6 +57,20 @@
   // or jitters as the nuke advances — it stays put until the nuke lands. This
   // removes the "laggy" step-by-step redraw of a recomputed current→target line.
   const _nukeTrajById = new Map(); // id -> { relation, worldPts }
+
+  // Try to read the player's current rocket-direction toggle from the
+  // game's build-menu UI. Used for the player's OWN nukes only to match
+  // the actual arc they chose (hotkey U flips this). AI nukes always use
+  // true (up). Falls back to true on any failure.
+  function readNukeDirection() {
+    try {
+      var bm = document.querySelector("build-menu");
+      if (bm && bm.uiState && typeof bm.uiState.rocketDirectionUp === "boolean") {
+        return bm.uiState.rocketDirectionUp;
+      }
+    } catch (_e) {}
+    return true;
+  }
 
   function collectNukeTrajectoryScan(game) {
     let units;
@@ -100,7 +115,8 @@
       const worldPts = [];
       let path = null;
       if (NUKE_TRAJ_PARABOLA_TYPES.has(type)) {
-        path = computeNukeTrajectoryPath(game, fromTile, targetTile);
+        var dirUp = relation === "self" ? readNukeDirection() : true;
+        path = computeNukeTrajectoryPath(game, fromTile, targetTile, dirUp);
       }
       if (path && path.length >= 2) {
         const step = Math.max(1, Math.ceil(path.length / NUKE_TRAJ_MAX_POINTS));

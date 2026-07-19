@@ -104,7 +104,15 @@
     showNukePrediction: ["Nuke Prediction", "Landing zone markers for in-flight nukes with crosshairs, nuke type, count, and time-to-impact ETA. Colored by relation."],
     showNukeTrajectory: ["Trajectory Line", "Dashed parabolic flight path from each nuke to its landing tile. Uses exact game physics for accurate arc rendering."],
     showBoatPrediction: ["Boat Prediction", "Landing markers for incoming transport ships with owner name and ETA. Click to pan camera to the boat."],
-    showWarshipRoutes: ["Warship Routes", "Dashed route lines and destination markers for all warships. Colored by relation (blue=self, red=enemy)."],
+    alwaysShowOwnBoatRoutes: ["Own Boat Routes", "Draws your own boat routes without hovering."],
+    alwaysShowTeamBoatRoutes: ["Team Boat Routes", "Draws teammates' boat routes without hovering."],
+    alwaysShowAllyBoatRoutes: ["Ally Boat Routes", "Draws allies' (alliance) boat routes without hovering."],
+    alwaysShowEnemyBoatRoutes: ["Enemy Boat Routes", "Draws enemy boat routes without hovering."],
+    showWarshipRoutes: ["Warship Routes", "Draws warship destinations & routes (blue = you, teal = team, green = allies, red = enemies)."],
+    showWarshipRoutesOwn: ["Own Warships", "Show routes for your own warships."],
+    showWarshipRoutesTeam: ["Team Warships", "Show routes for teammates' warships."],
+    showWarshipRoutesAlly: ["Ally Warships", "Show routes for allies' (alliance) warships."],
+    showWarshipRoutesEnemy: ["Enemy Warships", "Show routes for enemy warships."],
     showEconomyHeatmap: ["Economy Heatmap", "Radial gradient heatmap of economic activity. Intensity based on gold revenue from City, Port, and Factory structures."],
     showExportPartnerHeatmap: ["Export Partner Heatmap", "Shows where your trade exports originate from when hovering a player. Teal-yellow-blue gradient. Mutually exclusive with economy heatmap."],
     showSpawnHeatmap: ["Spawn Heatmap", "Full-screen heatmap scoring every grid cell by spawn quality. Considers land density, player proximity, and spawn intents."],
@@ -114,6 +122,8 @@
     // === Helpers Tab - Toggle Keys (Combat & Automation) ===
     showRetaliationHud: ["Retaliation HUD", "Center-screen alert when enemy nuke targets your territory. Shows attacker name with 'Focus' button to pan camera to launch source."],
     showNukeSuggestions: ["Nuke Suggestions", "Hover-target nuke strike suggestions for optimal targets. Includes economic nuke suggestions and SAM burn logic."],
+    autoNuke: ["Auto Nuke", "Automatically fires nukes at suggested targets."],
+    autoNukeIncludeAllies: ["Include Allies", "Allow auto nuke to target allies."],
     sosDefense: ["SOS Defense", "Auto-sends distress emoji (🆘) to allies/teammates when under attack and marks attackers in allied HUDs. SOS emoji rate-limited to 12s; attacker targeting every 16s."],
     attackRatioHotkey: ["Attack Ratio Hotkey", "Shift+1 through Shift+0 to set attack ratio slider to 10%-100%. Finds the slider in shadow DOM and updates it."],
     rightClickConquest: ["Right-click Conquest", "Right-click context menu near enemy shows capture assessment (easy/moderate/risky), one-click attack, and alliance policy buttons."],
@@ -369,6 +379,9 @@
       "  display:flex; align-items:center; justify-content:space-between;",
       "  padding:2px 4px; gap:8px;",
       "}",
+      ".ohqp-row.ohqp-sub { padding-left:16px; }",
+      ".ohqp-row.ohqp-sub .ohqp-label { font-size:9px; color:var(--oh-panel-text-dim); }",
+      ".ohqp-sw.disabled { opacity:0.35; pointer-events:none; }",
       ".ohqp-row .ohqp-label {",
       "  font-size:10px; color:var(--oh-panel-text); flex:1; overflow:hidden;",
       "  text-overflow:ellipsis; white-space:nowrap;",
@@ -613,6 +626,28 @@
       case "showBoatPrediction":     return typeof setBoatPredictionEnabled === "function" ? setBoatPredictionEnabled : null;
       case "showWarshipRoutes":      return typeof setWarshipRoutesEnabled === "function" ? setWarshipRoutesEnabled : null;
       case "showNukeSuggestions":    return typeof setNukeSuggestionsEnabled === "function" ? setNukeSuggestionsEnabled : null;
+      // Sub-toggles that need to re-send the parent setter with all current
+      // values (boat prediction, warship routes, auto nuke).
+      case "alwaysShowOwnBoatRoutes":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setBoatPredictionEnabled === "function") setBoatPredictionEnabled(s.showBoatPrediction !== false, { alwaysOwnRoutes: v, alwaysTeamRoutes: s.alwaysShowTeamBoatRoutes, alwaysAllyRoutes: s.alwaysShowAllyBoatRoutes, alwaysEnemyRoutes: s.alwaysShowEnemyBoatRoutes }); };
+      case "alwaysShowTeamBoatRoutes":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setBoatPredictionEnabled === "function") setBoatPredictionEnabled(s.showBoatPrediction !== false, { alwaysOwnRoutes: s.alwaysShowOwnBoatRoutes, alwaysTeamRoutes: v, alwaysAllyRoutes: s.alwaysShowAllyBoatRoutes, alwaysEnemyRoutes: s.alwaysShowEnemyBoatRoutes }); };
+      case "alwaysShowAllyBoatRoutes":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setBoatPredictionEnabled === "function") setBoatPredictionEnabled(s.showBoatPrediction !== false, { alwaysOwnRoutes: s.alwaysShowOwnBoatRoutes, alwaysTeamRoutes: s.alwaysShowTeamBoatRoutes, alwaysAllyRoutes: v, alwaysEnemyRoutes: s.alwaysShowEnemyBoatRoutes }); };
+      case "alwaysShowEnemyBoatRoutes":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setBoatPredictionEnabled === "function") setBoatPredictionEnabled(s.showBoatPrediction !== false, { alwaysOwnRoutes: s.alwaysShowOwnBoatRoutes, alwaysTeamRoutes: s.alwaysShowTeamBoatRoutes, alwaysAllyRoutes: s.alwaysShowAllyBoatRoutes, alwaysEnemyRoutes: v }); };
+      case "showWarshipRoutesOwn":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setWarshipRoutesEnabled === "function") setWarshipRoutesEnabled(s.showWarshipRoutes !== false, { own: v, team: s.showWarshipRoutesTeam, ally: s.showWarshipRoutesAlly, enemy: s.showWarshipRoutesEnemy }); };
+      case "showWarshipRoutesTeam":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setWarshipRoutesEnabled === "function") setWarshipRoutesEnabled(s.showWarshipRoutes !== false, { own: s.showWarshipRoutesOwn, team: v, ally: s.showWarshipRoutesAlly, enemy: s.showWarshipRoutesEnemy }); };
+      case "showWarshipRoutesAlly":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setWarshipRoutesEnabled === "function") setWarshipRoutesEnabled(s.showWarshipRoutes !== false, { own: s.showWarshipRoutesOwn, team: s.showWarshipRoutesTeam, ally: v, enemy: s.showWarshipRoutesEnemy }); };
+      case "showWarshipRoutesEnemy":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setWarshipRoutesEnabled === "function") setWarshipRoutesEnabled(s.showWarshipRoutes !== false, { own: s.showWarshipRoutesOwn, team: s.showWarshipRoutesTeam, ally: s.showWarshipRoutesAlly, enemy: v }); };
+      case "autoNuke":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setAutoNukeEnabled === "function") setAutoNukeEnabled(v, s.autoNukeIncludeAllies !== false); };
+      case "autoNukeIncludeAllies":
+        return function(v) { var s = _quickPanelSettingsCache || {}; if (typeof setAutoNukeEnabled === "function") setAutoNukeEnabled(s.autoNuke !== false, v); };
       case "showEconomyHeatmap":     return typeof setEconomyHeatmapEnabled === "function" ? setEconomyHeatmapEnabled : null;
       case "showExportPartnerHeatmap": return typeof setExportPartnerHeatmapEnabled === "function" ? setExportPartnerHeatmapEnabled : null;
       case "showAttackHighlight":    return typeof setAttackHighlightEnabled === "function" ? setAttackHighlightEnabled : null;
@@ -1146,15 +1181,23 @@
       {
         key: "map", title: _tr("Map overlays"), toggles: [
           ["showPlayerMapOverlays", _tr("Player overlays (master)")],
-          ["showMapTroopCounts", _tr("Troop bar")],
-          ["showMapMoney", _tr("Money")],
-          ["showThreatIndicators", _tr("Threat indicators")],
+          ["showMapTroopCounts", _tr("Troop bar"), "showPlayerMapOverlays"],
+          ["showMapMoney", _tr("Money"), "showPlayerMapOverlays"],
+          ["showThreatIndicators", _tr("Threat indicators"), "showPlayerMapOverlays"],
           ["markHoveredAlliesGreen", _tr("Ally markers on hover")],
           ["showAttackHighlight", _tr("Attack highlight")],
           ["showNukePrediction", _tr("Nuke prediction")],
-          ["showNukeTrajectory", _tr("Trajectory line")],
+          ["showNukeTrajectory", _tr("Trajectory line"), "showNukePrediction"],
           ["showBoatPrediction", _tr("Boat prediction")],
+          ["alwaysShowOwnBoatRoutes", _tr("Own boat routes"), "showBoatPrediction"],
+          ["alwaysShowTeamBoatRoutes", _tr("Team boat routes"), "showBoatPrediction"],
+          ["alwaysShowAllyBoatRoutes", _tr("Ally boat routes"), "showBoatPrediction"],
+          ["alwaysShowEnemyBoatRoutes", _tr("Enemy boat routes"), "showBoatPrediction"],
           ["showWarshipRoutes", _tr("Warship routes")],
+          ["showWarshipRoutesOwn", _tr("Own warships"), "showWarshipRoutes"],
+          ["showWarshipRoutesTeam", _tr("Team warships"), "showWarshipRoutes"],
+          ["showWarshipRoutesAlly", _tr("Ally warships"), "showWarshipRoutes"],
+          ["showWarshipRoutesEnemy", _tr("Enemy warships"), "showWarshipRoutes"],
           ["showEconomyHeatmap", _tr("Economy heatmap")],
           ["showExportPartnerHeatmap", _tr("Export partner heatmap")],
           ["showSpawnHeatmap", _tr("Spawn heatmap")],
@@ -1165,6 +1208,8 @@
       {
         key: "combat", title: _tr("Combat & Automation"), toggles: [
           ["showRetaliationHud", _tr("Retaliation HUD")],
+          ["autoNuke", _tr("Auto nuke")],
+          ["autoNukeIncludeAllies", _tr("Include allies"), "autoNuke"],
           ["showNukeSuggestions", _tr("Nuke suggestions")],
           ["sosDefense", _tr("SOS defense")],
           ["attackRatioHotkey", _tr("Attack ratio hotkey")],
@@ -1199,11 +1244,23 @@
       h.push('</div><div class="ohqp-sec-b' + (open ? ' open' : '') + '">');
       for (var j = 0; j < sec.toggles.length; j++) {
         var t = sec.toggles[j];
-        h.push(_swHtmlWithTip(t[0], _getSetting(t[0], false), t[1]));
+        var key = t[0], label = t[1], parentKey = t[2] || null;
+        var rowHtml = _swHtmlWithTip(key, _getSetting(key, false), label);
+        if (parentKey) {
+          rowHtml = rowHtml.replace('class="ohqp-row"', 'class="ohqp-row ohqp-sub"');
+          rowHtml = rowHtml.replace('data-qp-key="' + key + '"', 'data-qp-key="' + key + '" data-qp-parent="' + parentKey + '"');
+        }
+        h.push(rowHtml);
       }
       h.push('</div></div>');
     }
     el.innerHTML = h.join("");
+    // Disable child switches whose parent is currently off.
+    var subSwitches = el.querySelectorAll('.ohqp-sw[data-qp-parent]');
+    for (var si = 0; si < subSwitches.length; si++) {
+      var pkey = subSwitches[si].dataset.qpParent;
+      if (!_getSetting(pkey, false)) subSwitches[si].classList.add('disabled');
+    }
     _bindEvents(el);
   }
 
@@ -1430,13 +1487,18 @@
         var cur = _getSetting(key, false);
         _setAndNotify(key, !cur);
         this.classList.toggle("on", !cur);
+        // When a parent toggle changes, update disabled state of its child
+        // switches immediately (no re-render needed).
+        var childSwitches = document.querySelectorAll('.ohqp-sw[data-qp-parent="' + key + '"]');
+        for (var ci = 0; ci < childSwitches.length; ci++) {
+          childSwitches[ci].classList.toggle("disabled", !cur); // !cur = new parent state
+        }
         // Only re-render when the toggle controls sub-toggles that need to
         // show/hide (e.g. parent toggles in the Actions or Helpers tabs).
         // For other toggles, the visual change is enough.
         var needsSubRefresh = (
           key === "combatSiloIndicator" ||
-          key === "autoDonateEnabled" || key === "autoDonateGoldEnabled" ||
-          key === "showPlayerMapOverlays"
+          key === "autoDonateEnabled" || key === "autoDonateGoldEnabled"
         );
         if (needsSubRefresh) {
           _renderActiveTab();
@@ -1836,6 +1898,13 @@
       _notifySettingChanged("showQuickPanel", true);
       _animateOpen(panel);
     }
+  });
+
+  // Reposition panel when launcher icon is dragged
+  window.addEventListener("ofh-reposition-quick-panel", function() {
+    var panel = document.getElementById(QUICK_PANEL_ID);
+    if (!panel || panel.dataset.visible !== "true" || _qpInTransition) return;
+    _placePanel(panel);
   });
 
   function setQuickPanelEnabled(enabled) {
