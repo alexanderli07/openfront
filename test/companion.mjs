@@ -1589,4 +1589,104 @@ const ENG = [
   assert.equal("donateAllGold" in reEnabled, false, "a still-disabled sibling stays disabled");
 }
 
+// ---- Active-mode spawn hook does not oscillate ------------------------------
+{
+  // companionSpawnCenter is the Active-mode counterpart of the passive spawn
+  // branch tested above (via companionTick). It has its own call site
+  // (nationExecution.js's pickSpawnCenter → doSpawn) and its own guard, so it
+  // needs its own regression cover: doSpawn() only re-emits a spawn intent when
+  // the tile this hook returns CHANGES, so a hook that re-picks on every call
+  // (the bug being fixed here) emits a fresh packet every single tick.
+  const m = loadCompanion(
+    ENG,
+    ["companionSpawnCenter", "companionState", "companionPatchSettings"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} },
+  );
+
+  const W = 100;
+  const bossSpawnTileA = 40 * W + 20; // (20, 40)
+  const owned = new Set();
+  let hasSpawnedFlag = false;
+
+  const boss = {
+    name: () => "EcoMaxer",
+    smallID: () => 1,
+    id: () => "p1",
+    type: () => "HUMAN",
+    isAlive: () => true,
+    state: { spawnTile: bossSpawnTileA },
+  };
+  const me = {
+    name: () => "Slave1",
+    smallID: () => 2,
+    hasSpawned: () => hasSpawnedFlag,
+  };
+  const game = {
+    width: () => W,
+    height: () => W,
+    isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < W,
+    ref: (x, y) => y * W + x,
+    isLand: () => true,
+    hasOwner: (t) => owned.has(t),
+    isBorder: () => false,
+    myPlayer: () => me,
+    players: () => [
+      boss,
+      {
+        name: () => "Slave1",
+        smallID: () => 2,
+        id: () => "p2",
+        type: () => "HUMAN",
+        isAlive: () => true,
+      },
+    ],
+  };
+
+  m.companionPatchSettings({ bossName: "EcoMaxer", mode: "active", autoSpawn: true });
+  m.companionState.enabled = true;
+  m.companionState.paused = false;
+
+  const results = [];
+  for (let i = 0; i < 20; i++) {
+    const tile = m.companionSpawnCenter(game, null);
+    results.push(tile);
+    // Simulate what a real match does the instant a directed spawn lands: our
+    // own territory now owns the tile we were just given (the trigger for the
+    // relinquish/re-conquer bug — SpawnExecution frees whatever we owned before
+    // and claims only the new one), and the player has landed. This has to run
+    // after EVERY call, not just the first: a guard that stops recomputing
+    // altogether never notices, but a guard that only checks "same as the
+    // previous call" would still walk a fresh tile every time this keeps
+    // moving — which is exactly the two-step cycle the fix has to survive.
+    owned.clear();
+    if (tile != null) owned.add(tile);
+    hasSpawnedFlag = true;
+  }
+
+  assert.ok(results[0] != null, "first call picks a tile");
+  const dist0 = Math.hypot((results[0] % W) - 20, Math.floor(results[0] / W) - 40);
+  assert.ok(dist0 >= 12 - 1e-9 && dist0 <= 24 + 1e-9, "first pick sits inside the configured ring");
+
+  for (let i = 1; i < results.length; i++) {
+    assert.equal(
+      results[i],
+      results[1],
+      `call ${i + 1} must return the exact same tile as call 2 — no oscillation`,
+    );
+  }
+
+  // The boss relocating (a fresh boss spawn) must still be tracked — the guard
+  // must not freeze the companion onto a stale tile forever.
+  const bossSpawnTileB = 10 * W + 70; // far enough the two rings never overlap
+  boss.state.spawnTile = bossSpawnTileB;
+  const moved = m.companionSpawnCenter(game, null);
+  assert.ok(moved != null, "boss relocation still yields a tile");
+  assert.notEqual(moved, results[1], "boss relocation is not answered with the frozen tile");
+  const distMoved = Math.hypot((moved % W) - 70, Math.floor(moved / W) - 10);
+  assert.ok(
+    distMoved >= 12 - 1e-9 && distMoved <= 24 + 1e-9,
+    "the new pick sits inside the ring around the boss's NEW spawn tile",
+  );
+}
+
 console.log("COMPANION OK — pure helpers behave");

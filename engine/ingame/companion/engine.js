@@ -186,6 +186,21 @@
   // Hooks called by the auto-bot (Active mode only)
   // ---------------------------------------------------------------------------
 
+  // "We have already taken a spawn." hasSpawned() is the real answer; on a build
+  // where PlayerView does not expose it, fall back to "we already picked a tile",
+  // which is weaker (a rejected spawn is never retried) but still stops the
+  // relinquish/re-conquer loop.
+  function companionSpawnSettled(me) {
+    if (me && typeof me.hasSpawned === "function") {
+      try {
+        return me.hasSpawned() === true;
+      } catch (_error) {
+        /* fall through */
+      }
+    }
+    return companionState.lastSpawnTile != null;
+  }
+
   // Returns a spawn TileRef to force, or null to let the auto-bot decide.
   function companionSpawnCenter(game, _player) {
     // Paused means "stop interfering", including with the auto-bot's own choices.
@@ -202,7 +217,28 @@
     } catch (_error) {
       me = null;
     }
-    return companionPickSpawnTile(g, me, boss, s.spawnMinRadius, s.spawnMaxRadius);
+
+    // Same anti-oscillation rule as the passive branch. Our own territory turns
+    // the tile we just took into `hasOwner`, so re-picking on every call walks
+    // the spawn one tile over, and SpawnExecution relinquishes everything to
+    // follow it — freeing the first tile again so the next call walks back.
+    // Returning the tile we already chose makes doSpawn() compare it against its
+    // own lastSpawnTile and emit nothing.
+    const bossSpawn = boss.state ? boss.state.spawnTile : null;
+    if (
+      companionSpawnSettled(me) &&
+      bossSpawn === companionState.lastBossSpawnTile &&
+      companionState.lastSpawnTile != null
+    ) {
+      return companionState.lastSpawnTile;
+    }
+
+    const tile = companionPickSpawnTile(g, me, boss, s.spawnMinRadius, s.spawnMaxRadius);
+    if (tile != null) {
+      companionState.lastBossSpawnTile = bossSpawn;
+      companionState.lastSpawnTile = tile;
+    }
+    return tile;
   }
 
   // true = block this alliance. Only ever blocks when a boss has actually been
@@ -289,12 +325,6 @@
     }
     if (inSpawn) {
       if (s.mode === "passive" && s.autoSpawn) {
-        let hasSpawned = false;
-        try {
-          hasSpawned = typeof me.hasSpawned === "function" && me.hasSpawned() === true;
-        } catch (_error) {
-          hasSpawned = false;
-        }
         const bossSpawn = boss.state ? boss.state.spawnTile : null;
         // Re-pick only before we have landed, or when the boss itself moves. Without
         // this the bot oscillates: our own territory makes the tile we just took
@@ -302,7 +332,9 @@
         // everything and re-conquers there, which frees the first tile again — a
         // two-step cycle a one-step "same tile as last time" check cannot see.
         // Measured at 28 relocations across a single spawn phase before this guard.
-        if (!hasSpawned || bossSpawn !== companionState.lastBossSpawnTile) {
+        // Same settled-check the Active-mode hook uses (companionSpawnCenter) — the
+        // two paths must never drift apart again.
+        if (!companionSpawnSettled(me) || bossSpawn !== companionState.lastBossSpawnTile) {
           companionState.lastBossSpawnTile = bossSpawn;
           const tile = companionPickSpawnTile(
             game, me, boss, s.spawnMinRadius, s.spawnMaxRadius,
