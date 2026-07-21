@@ -466,11 +466,12 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
 
   // The seen list is bounded so a long game cannot grow it without limit.
   seen = [];
+  assert.equal(m.COMPANION_SEEN_LIMIT, 256, "the dedupe window is 256 entries");
   for (let i = 0; i < m.COMPANION_SEEN_LIMIT + 50; i++) {
     m.companionCollectCommands(
       mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: i }]), 2, B, seen);
   }
-  assert.ok(seen.length <= m.COMPANION_SEEN_LIMIT, "seen list is capped");
+  assert.ok(seen.length <= 256, "seen list is capped");
 }
 
 // ---- unresolved smallID must not match anything -----------------------------
@@ -874,8 +875,9 @@ const ENG = [
 
   // Log is bounded and newest-first.
   m.companionState.log.length = 0;
+  assert.equal(m.COMPANION_LOG_LIMIT, 100, "the log keeps 100 lines");
   for (let i = 0; i < m.COMPANION_LOG_LIMIT + 20; i++) m.companionLog("line " + i);
-  assert.equal(m.companionState.log.length, m.COMPANION_LOG_LIMIT, "log capped");
+  assert.equal(m.companionState.log.length, 100, "log capped");
   assert.ok(String(m.companionState.log[0].text).indexOf("line " + (m.COMPANION_LOG_LIMIT + 19)) !== -1,
     "newest entry first");
 }
