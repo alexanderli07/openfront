@@ -383,6 +383,7 @@
     const on = Boolean(enabled);
     if (companionState.enabled === on) return;
     companionState.enabled = on;
+    companionState.uiSignature = null; // force the banner to appear/disappear now
     if (on) {
       companionResetRunState();
       // Switching the feature on IS a fresh start, so here the pause does clear.
@@ -402,6 +403,38 @@
 
   // The shared helper tick runs at 250ms; the companion wants its own (slower,
   // user-configurable) cadence on top of it.
+  // The panel and the banner are drawn on user actions, but bossStatus, paused and
+  // factoryLevel all change on the tick clock. A banner still saying "no boss"
+  // after the boss has joined is worse than no banner at all.
+  //
+  // Gated on a signature so a quiet tick costs one string compare, and skipped
+  // entirely while the user is typing into the panel — rebuilding it would drop
+  // focus mid-edit.
+  function companionSyncUi() {
+    const sig = companionState.enabled
+      ? [
+          companionState.bossStatus,
+          companionState.paused,
+          companionState.factoryLevel,
+          companionSettings().bossName,
+        ].join("|")
+      : "off";
+    if (sig === companionState.uiSignature) return;
+    companionState.uiSignature = sig;
+    try {
+      if (typeof companionSyncBanner === "function") companionSyncBanner();
+    } catch (_error) {
+      /* ignore */
+    }
+    try {
+      const panelEl = document.getElementById(COMPANION_PANEL_ID);
+      if (panelEl && panelEl.contains(document.activeElement)) return;
+      if (typeof companionBuildPanel === "function") companionBuildPanel();
+    } catch (_error) {
+      /* ignore */
+    }
+  }
+
   function companionTickThrottled() {
     const now = Date.now();
     const period = Number(companionSettings().tickMs) || 2000;
@@ -409,6 +442,7 @@
       // Still drain the queue at full rate so a burst of commands is not stuck
       // behind the slow decision cadence.
       companionDrainQueue(now);
+      companionSyncUi();
       return;
     }
     companionState.lastTickAt = now;
@@ -417,6 +451,7 @@
     } catch (error) {
       companionLog(`⚠ tick: ${error && error.message ? error.message : error}`);
     }
+    companionSyncUi();
   }
 
   function setCompanionPanelVisible(visible) {

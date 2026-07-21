@@ -182,6 +182,7 @@
     lastSpawnTile: null,
     lastGameRef: null,
     autobotWasEnabled: false,
+    uiSignature: null,
   };
 
   function companionLoadSettings() {

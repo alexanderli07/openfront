@@ -354,15 +354,15 @@ style="${grid ? "" : "width:100%;text-align:left;"}margin:1px">${companionEsc(it
     let text;
     if (companionState.paused) {
       bg = "rgba(90,100,110,.95)";
-      text = companionTr("paused");
+      text = "— " + companionTr("paused");
     } else if (companionState.bossStatus === "self") {
       bg = "rgba(90,100,110,.95)";
-      text = companionTr("this tab is the boss");
+      text = "— " + companionTr("this tab is the boss");
     } else if (companionState.bossStatus === "found") {
       text = "→ " + s.bossName;
     } else {
       bg = "rgba(180,50,50,.95)";
-      text = companionTr("no boss");
+      text = "— " + companionTr("no boss");
     }
 
     el.style.cssText = [
