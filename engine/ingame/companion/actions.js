@@ -137,7 +137,16 @@
     if (!game || !boss || !boss.state) return null;
     const bossTile = boss.state.spawnTile;
     if (bossTile == null) return null;
-    if (typeof game.width !== "function" || typeof game.ref !== "function") return null;
+    // isValidCoord is bounds-checking, not an optional nicety: without it a
+    // negative or overflowing x silently wraps into an adjacent row and the bot
+    // spawns on the far side of the map. Bail like the width/ref guards do.
+    if (
+      typeof game.width !== "function" ||
+      typeof game.ref !== "function" ||
+      typeof game.isValidCoord !== "function"
+    ) {
+      return null;
+    }
 
     let width = 0;
     try {
@@ -154,7 +163,7 @@
       const x = origin.x + off.dx;
       const y = origin.y + off.dy;
       try {
-        if (typeof game.isValidCoord === "function" && !game.isValidCoord(x, y)) continue;
+        if (!game.isValidCoord(x, y)) continue;
         const tile = game.ref(x, y);
         if (tile == null) continue;
         if (typeof game.isLand === "function" && !game.isLand(tile)) continue;
@@ -169,6 +178,10 @@
   }
 
   function companionSpawnAt(tile) {
-    if (tile == null || !Number.isFinite(Number(tile))) return false;
-    return companionSend({ type: "spawn", tile: Number(tile) });
+    const t = Number(tile);
+    // A TileRef is a non-negative integer index. The wire schema is a bare
+    // z.number(), so a negative or fractional value would be accepted here and
+    // rejected (silently) further in.
+    if (tile == null || !Number.isInteger(t) || t < 0) return false;
+    return companionSend({ type: "spawn", tile: t });
   }

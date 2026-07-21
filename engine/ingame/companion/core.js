@@ -60,10 +60,21 @@
   // Every integer offset whose distance falls inside the [minR, maxR] annulus,
   // sorted nearest-first so a caller can take the first valid tile and stay as
   // close to the boss as the terrain allows.
+  //
+  // Memoised on (lo, hi): the caller runs this once per tick through the whole
+  // spawn phase while the radii almost never change, and at the top of the legal
+  // range (maxR = 200) the array is ~125k entries costing tens of milliseconds to
+  // rebuild — a real bite out of a 250ms tick. The cached array is treated as
+  // read-only by every caller.
+  let _companionRingCache = null;
+
   function companionRingOffsets(minR, maxR) {
     const lo = Number(minR) || 0;
     const hi = Number(maxR) || 0;
     if (!(hi >= lo) || hi <= 0) return [];
+    if (_companionRingCache && _companionRingCache.lo === lo && _companionRingCache.hi === hi) {
+      return _companionRingCache.out;
+    }
     const out = [];
     const r = Math.ceil(hi);
     for (let dy = -r; dy <= r; dy++) {
@@ -74,7 +85,9 @@
       }
     }
     out.sort((a, b) => a.d - b.d);
-    return out.map((o) => ({ dx: o.dx, dy: o.dy }));
+    const offsets = out.map((o) => ({ dx: o.dx, dy: o.dy }));
+    _companionRingCache = { lo: lo, hi: hi, out: offsets };
+    return offsets;
   }
 
   // ---------------------------------------------------------------------------

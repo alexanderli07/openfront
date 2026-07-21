@@ -671,4 +671,53 @@ const ACTS = [
   assert.equal(sent.length, 1);
 }
 
+// ---- ring offsets are memoised ----------------------------------------------
+{
+  const m = loadCompanion(CORE, ["companionRingOffsets"]);
+  const a = m.companionRingOffsets(12, 24);
+  const b = m.companionRingOffsets(12, 24);
+  assert.strictEqual(a, b, "same radii reuse the cached array");
+  const c = m.companionRingOffsets(5, 9);
+  assert.notStrictEqual(a, c, "different radii recompute");
+  assert.strictEqual(m.companionRingOffsets(5, 9), c, "and then cache the new radii");
+  // Recomputing must still be correct after a cache miss, not just fast.
+  for (const o of c) {
+    const d = Math.hypot(o.dx, o.dy);
+    assert.ok(d >= 5 - 1e-9 && d <= 9 + 1e-9, "recomputed ring still respects its bounds");
+  }
+  assert.deepEqual(m.companionRingOffsets(24, 12), [], "inverted bounds still empty, uncached");
+}
+
+// ---- spawn placement refuses a GameView without bounds checking --------------
+{
+  const sent = [];
+  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"],
+    { sendGamePacket: (o) => { sent.push(o); return true; } });
+
+  const W = 100;
+  // A GameView whose ref() wraps instead of throwing, and which is missing
+  // isValidCoord. Trusting it would place the bot on the far side of the map.
+  const wrapping = {
+    width: () => W,
+    ref: (x, y) => ((y * W + x) % (W * W) + W * W) % (W * W),
+    isLand: () => true,
+    hasOwner: () => false,
+    isBorder: () => false,
+  };
+  assert.equal(
+    m.companionPickSpawnTile(wrapping, {}, { state: { spawnTile: 0 } }, 12, 24),
+    null,
+    "no isValidCoord → refuse to guess rather than wrap across the map",
+  );
+
+  // A negative or fractional tile is not a TileRef and must not go on the wire.
+  sent.length = 0;
+  assert.equal(m.companionSpawnAt(-5), false, "negative tile rejected");
+  assert.equal(m.companionSpawnAt(1.5), false, "fractional tile rejected");
+  assert.equal(m.companionSpawnAt(Number.POSITIVE_INFINITY), false, "Infinity rejected");
+  assert.equal(sent.length, 0, "nothing was sent");
+  assert.equal(m.companionSpawnAt(0), true, "tile 0 is valid");
+  assert.deepEqual(sent[0], { type: "spawn", tile: 0 });
+}
+
 console.log("COMPANION OK — pure helpers behave");
