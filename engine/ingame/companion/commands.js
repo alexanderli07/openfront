@@ -60,6 +60,11 @@
   // Mutates `seen` (the caller owns it, normally companionState.seenEmoji).
   function companionCollectCommands(boss, mySmallID, bindings, seen) {
     const out = [];
+    // Our own smallID must be known. Without this guard Number(null) === 0, which
+    // is TerraNullius's sentinel smallID — an unresolved caller would start
+    // matching messages addressed to nobody. The engine's caller derives this
+    // inside a try/catch that yields null on failure, so the null path is real.
+    if (mySmallID == null) return out;
     if (!boss || !boss.state) return out;
     const feed = boss.state.outgoingEmojis;
     if (!Array.isArray(feed) || feed.length === 0) return out;

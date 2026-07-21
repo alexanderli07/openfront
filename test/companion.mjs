@@ -463,4 +463,41 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   assert.ok(seen.length <= m.COMPANION_SEEN_LIMIT, "seen list is capped");
 }
 
+// ---- unresolved smallID must not match anything -----------------------------
+{
+  const m = loadCompanion(CMDS, [
+    "COMPANION_DEFAULT_BINDINGS", "companionCollectCommands",
+  ]);
+  const B = m.COMPANION_DEFAULT_BINDINGS;
+  const boss = { state: { outgoingEmojis: [
+    { message: "🆘", senderID: 1, recipientID: 0, createdAt: 1 },
+  ] } };
+
+  // Number(null) === 0, and 0 is TerraNullius's sentinel smallID. An unresolved
+  // caller must collect nothing rather than obey messages addressed to nobody.
+  let seen = [];
+  assert.deepEqual(m.companionCollectCommands(boss, null, B, seen), [],
+    "null smallID matches nothing");
+  assert.deepEqual(seen, [], "null smallID does not even record a dedupe key");
+
+  seen = [];
+  assert.deepEqual(m.companionCollectCommands(boss, undefined, B, seen), [],
+    "undefined smallID matches nothing");
+
+  // A broadcast is still ignored while our identity is unknown — acting on an
+  // all-bots order before we know who we are is what the guard prevents.
+  seen = [];
+  const broadcast = { state: { outgoingEmojis: [
+    { message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 1 },
+  ] } };
+  assert.deepEqual(m.companionCollectCommands(broadcast, null, B, seen), [],
+    "broadcast ignored until our smallID is known");
+
+  // A real smallID of 0 is impossible for a player (players start at 1), but the
+  // guard must not break the normal path.
+  seen = [];
+  assert.deepEqual(m.companionCollectCommands(boss, 0, B, seen), ["donateAllGold"],
+    "an explicit 0 still works — only null/undefined are treated as unresolved");
+}
+
 console.log("COMPANION OK — pure helpers behave");
