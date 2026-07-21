@@ -823,4 +823,128 @@ const ACTS = [
   assert.equal(sent.length, 0);
 }
 
+// ---- queue, cooldowns, log --------------------------------------------------
+const ENG = [
+  "engine/ingame/companion/core.js",
+  "engine/ingame/companion/commands.js",
+  "engine/ingame/companion/actions.js",
+  "engine/ingame/companion/engine.js",
+];
+{
+  const m = loadCompanion(ENG,
+    ["companionEnqueue", "companionDrainQueue", "companionCooldownReady",
+     "companionMarkCooldown", "companionLog", "companionState",
+     "COMPANION_MIN_SEND_GAP_MS", "COMPANION_LOG_LIMIT"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  assert.equal(m.COMPANION_MIN_SEND_GAP_MS, 300);
+
+  // One action per drain, spaced by the minimum gap.
+  const ran = [];
+  m.companionState.queue.length = 0;
+  m.companionState.lastSendAt = 0;
+  m.companionEnqueue("a", () => { ran.push("a"); return true; });
+  m.companionEnqueue("b", () => { ran.push("b"); return true; });
+  assert.equal(m.companionState.queue.length, 2, "both queued");
+
+  assert.equal(m.companionDrainQueue(10000), 1, "one action per drain");
+  assert.deepEqual(ran, ["a"]);
+  assert.equal(m.companionDrainQueue(10100), 0, "too soon — 100ms < 300ms gap");
+  assert.deepEqual(ran, ["a"]);
+  assert.equal(m.companionDrainQueue(10400), 1, "gap elapsed");
+  assert.deepEqual(ran, ["a", "b"]);
+  assert.equal(m.companionDrainQueue(20000), 0, "queue empty");
+
+  // A throwing action must not wedge the queue.
+  m.companionState.queue.length = 0;
+  m.companionState.lastSendAt = 0;
+  m.companionEnqueue("boom", () => { throw new Error("nope"); });
+  m.companionEnqueue("after", () => { ran.push("after"); return true; });
+  assert.equal(m.companionDrainQueue(30000), 1);
+  assert.equal(m.companionDrainQueue(30400), 1);
+  assert.deepEqual(ran, ["a", "b", "after"], "queue survived the throw");
+
+  // Cooldowns.
+  m.companionState.cooldowns = {};
+  assert.equal(m.companionCooldownReady("donateGold", 30000, 1000), true, "never run → ready");
+  m.companionMarkCooldown("donateGold", 1000);
+  assert.equal(m.companionCooldownReady("donateGold", 30000, 5000), false, "still cooling");
+  assert.equal(m.companionCooldownReady("donateGold", 30000, 31001), true, "cooled down");
+  assert.equal(m.companionCooldownReady("other", 30000, 5000), true, "independent keys");
+
+  // Log is bounded and newest-first.
+  m.companionState.log.length = 0;
+  for (let i = 0; i < m.COMPANION_LOG_LIMIT + 20; i++) m.companionLog("line " + i);
+  assert.equal(m.companionState.log.length, m.COMPANION_LOG_LIMIT, "log capped");
+  assert.ok(String(m.companionState.log[0].text).indexOf("line " + (m.COMPANION_LOG_LIMIT + 19)) !== -1,
+    "newest entry first");
+}
+
+// ---- auto-bot hooks ---------------------------------------------------------
+{
+  const m = loadCompanion(ENG,
+    ["companionSpawnCenter", "companionAllianceVeto", "companionState",
+     "companionSettings", "companionPatchSettings"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  const W = 100;
+  const game = {
+    width: () => W,
+    height: () => W,
+    isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < W,
+    ref: (x, y) => y * W + x,
+    isLand: () => true,
+    hasOwner: () => false,
+    isBorder: () => false,
+    myPlayer: () => ({ name: () => "Slave1", smallID: () => 2 }),
+    players: () => [
+      { name: () => "EcoMaxer", smallID: () => 1, id: () => "p1", type: () => "HUMAN",
+        isAlive: () => true, state: { spawnTile: 40 * W + 20 } },
+      { name: () => "Slave1", smallID: () => 2, id: () => "p2", type: () => "HUMAN",
+        isAlive: () => true },
+    ],
+  };
+
+  // Disabled → hooks are inert and auto-bot behaves exactly as before.
+  m.companionPatchSettings({
+    bossName: "EcoMaxer", mode: "active", autoSpawn: true, autoAlliance: true,
+  });
+  m.companionState.enabled = false;
+  assert.equal(m.companionSpawnCenter(game, null), null, "disabled → no spawn override");
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false, "disabled → no veto");
+
+  // Enabled + active mode → spawn override returns a tile in the ring.
+  m.companionState.enabled = true;
+  const tile = m.companionSpawnCenter(game, null);
+  assert.ok(tile != null, "active mode overrides the spawn");
+  const d = Math.hypot((tile % W) - 20, Math.floor(tile / W) - 40);
+  assert.ok(d >= 12 - 1e-9 && d <= 24 + 1e-9, "override tile sits in the ring");
+
+  // Passive mode must NOT drive the auto-bot hook (auto-bot is meant to be off).
+  m.companionPatchSettings({ mode: "passive" });
+  assert.equal(m.companionSpawnCenter(game, null), null, "passive → hook stays out");
+
+  // autoSpawn off → no override even in active mode.
+  m.companionPatchSettings({ mode: "active", autoSpawn: false });
+  assert.equal(m.companionSpawnCenter(game, null), null);
+
+  // Alliance veto: allow the boss, block everyone else.
+  m.companionPatchSettings({ mode: "active", autoSpawn: true, autoAlliance: true });
+  m.companionState.bossSmallID = 1;
+  assert.equal(m.companionAllianceVeto({ smallID: () => 1 }), false, "boss is allowed");
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), true, "everyone else vetoed");
+  assert.equal(m.companionAllianceVeto(null), true, "unknown player vetoed");
+
+  // autoAlliance off → companion does not interfere with auto-bot diplomacy.
+  m.companionPatchSettings({ autoAlliance: false });
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false);
+
+  // Boss not yet found → veto nobody, so the auto-bot is never frozen out
+  // just because the boss name is mistyped.
+  m.companionPatchSettings({ autoAlliance: true });
+  m.companionState.bossSmallID = null;
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false,
+    "no boss resolved → no veto");
+}
+
 console.log("COMPANION OK — pure helpers behave");
