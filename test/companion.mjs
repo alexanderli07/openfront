@@ -339,4 +339,128 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.deepEqual(companionHumanPlayers(null), [], "no game → empty list");
 }
 
+// ---- emoji command table ----------------------------------------------------
+const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/commands.js"];
+{
+  const m = loadCompanion(CMDS, [
+    "COMPANION_ACTION_IDS",
+    "COMPANION_DEFAULT_BINDINGS",
+    "companionEmojiKey",
+    "companionCollectCommands",
+    "COMPANION_SEEN_LIMIT",
+  ]);
+
+  assert.deepEqual(
+    m.COMPANION_ACTION_IDS,
+    ["donateAllGold", "donateAllTroops", "breakAlliance", "requestAlliance",
+     "attackBossTarget", "buildFactory", "pause", "resume"],
+    "eight actions in a stable order",
+  );
+  assert.equal(m.COMPANION_DEFAULT_BINDINGS.donateAllGold, "🆘");
+  assert.equal(m.COMPANION_DEFAULT_BINDINGS.breakAlliance, "💔");
+  assert.equal(m.COMPANION_DEFAULT_BINDINGS.pause, "🥱");
+  assert.equal(
+    Object.keys(m.COMPANION_DEFAULT_BINDINGS).length,
+    m.COMPANION_ACTION_IDS.length,
+    "every action has a default emoji",
+  );
+  assert.equal(
+    new Set(Object.values(m.COMPANION_DEFAULT_BINDINGS)).size,
+    m.COMPANION_ACTION_IDS.length,
+    "default emoji are distinct — one emoji cannot mean two things",
+  );
+
+  const key = m.companionEmojiKey({
+    message: "🆘", senderID: 1, recipientID: 2, createdAt: 500,
+  });
+  assert.equal(key, "1:2:🆘:500", "dedupe key covers sender, recipient, emoji and tick");
+
+  const B = m.COMPANION_DEFAULT_BINDINGS;
+  const mkBoss = (emojis) => ({ state: { outgoingEmojis: emojis } });
+
+  // Addressed to me → runs.
+  let seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]), 2, B, seen),
+    ["donateAllGold"],
+  );
+
+  // Same emoji still sitting in the array on the next tick → must NOT repeat.
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]), 2, B, seen),
+    [],
+    "dedupe by createdAt stops the multitab re-fire bug",
+  );
+
+  // Same emoji sent AGAIN later is a new command.
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 99 }]), 2, B, seen),
+    ["donateAllGold"],
+    "a later createdAt is a fresh command",
+  );
+
+  // Addressed to a different bot → ignored.
+  seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 7, createdAt: 1 }]), 2, B, seen),
+    [],
+    "emoji for another slave is not mine",
+  );
+
+  // Broadcast → every bot obeys. (The multitab original skipped AllPlayers.)
+  seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "💔", senderID: 1, recipientID: "AllPlayers", createdAt: 1 }]), 2, B, seen),
+    ["breakAlliance"],
+    "AllPlayers is the all-bots channel",
+  );
+
+  // Unbound emoji → nothing.
+  seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]), 2, B, seen),
+    [],
+  );
+
+  // Remapped binding wins over the default.
+  seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(
+      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]), 2,
+      Object.assign({}, B, { donateAllGold: "😀" }), seen),
+    ["donateAllGold"],
+  );
+
+  // Multiple commands in one tick keep array order.
+  seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(mkBoss([
+      { message: "🥱", senderID: 1, recipientID: 2, createdAt: 1 },
+      { message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 2 },
+    ]), 2, B, seen),
+    ["pause", "donateAllGold"],
+  );
+
+  // Missing / malformed input never throws — the field is optional on the wire.
+  seen = [];
+  assert.deepEqual(m.companionCollectCommands({ state: {} }, 2, B, seen), []);
+  assert.deepEqual(m.companionCollectCommands({}, 2, B, seen), []);
+  assert.deepEqual(m.companionCollectCommands(null, 2, B, seen), []);
+  assert.deepEqual(m.companionCollectCommands(mkBoss([null, 5, "x"]), 2, B, seen), []);
+
+  // The seen list is bounded so a long game cannot grow it without limit.
+  seen = [];
+  for (let i = 0; i < m.COMPANION_SEEN_LIMIT + 50; i++) {
+    m.companionCollectCommands(
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: i }]), 2, B, seen);
+  }
+  assert.ok(seen.length <= m.COMPANION_SEEN_LIMIT, "seen list is capped");
+}
+
 console.log("COMPANION OK — pure helpers behave");
