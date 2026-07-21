@@ -10,6 +10,10 @@
   // Minimum spacing between two outgoing intents. Keeps a burst of emoji commands
   // from looking like a packet flood.
   const COMPANION_MIN_SEND_GAP_MS = 300;
+  // Hard ceiling on pending actions. The drain rate (~2/s) outruns the game's own
+  // 5s-per-recipient emoji cooldown, so this should never bind — but an unbounded
+  // queue would turn any future burst into a growing backlog of minutes-old orders.
+  const COMPANION_QUEUE_LIMIT = 32;
   const COMPANION_LOG_LIMIT = 100;
   const COMPANION_DONATE_TROOPS_COOLDOWN_MS = 10000;
   const COMPANION_DONATE_GOLD_COOLDOWN_MS = 30000;
@@ -31,6 +35,10 @@
   // ---------------------------------------------------------------------------
 
   function companionEnqueue(label, fn) {
+    if (companionState.queue.length >= COMPANION_QUEUE_LIMIT) {
+      companionState.queue.shift();
+      companionLog("⚠ queue full, dropped the oldest action");
+    }
     companionState.queue.push({ label: String(label), fn: fn });
   }
 
@@ -48,6 +56,24 @@
       companionLog(`⚠ ${item.label}: ${error && error.message ? error.message : error}`);
     }
     return 1;
+  }
+
+  // Everything that is only meaningful inside ONE match. A companion left enabled
+  // across a game boundary would otherwise carry its gold baseline, cooldowns and
+  // seen-emoji keys into the next match — measured effect: gold donations dropped
+  // from 10 per 5 minutes to 1, because the stale baseline swallowed the whole new
+  // game's income.
+  function companionResetRunState() {
+    companionState.cooldowns = {};
+    companionState.seenEmoji.length = 0;
+    companionState.queue.length = 0;
+    companionState.lastGoldSnapshot = 0;
+    companionState.lastSpawnTile = null;
+    companionState.factoryLevel = 0;
+    companionState.bossSmallID = null;
+    companionState.bossStatus = "idle";
+    companionState.paused = false;
+    companionState.autobotWasEnabled = false;
   }
 
   function companionCooldownReady(key, ms, now) {
@@ -125,20 +151,26 @@
         companionState.paused = true;
         // In Active mode the auto-bot is what is actually playing, so pausing
         // has to stop it too — otherwise the bot keeps expanding while the user
-        // believes everything has stopped.
+        // believes everything has stopped. Remember what the user had first:
+        // __OFH_autobot.set() persists to localStorage, so a resume that forced
+        // `true` would permanently switch on an auto-bot the user had left off.
         if (s.mode === "active") {
           try {
-            if (window.__OFH_autobot) window.__OFH_autobot.set({ enabled: false });
+            if (window.__OFH_autobot) {
+              companionState.autobotWasEnabled = Boolean(window.__OFH_autobot.get().enabled);
+              window.__OFH_autobot.set({ enabled: false });
+            }
           } catch (_error) { /* ignore */ }
         }
         return true;
       case "resume":
         companionState.paused = false;
-        if (s.mode === "active") {
+        if (s.mode === "active" && companionState.autobotWasEnabled) {
           try {
             if (window.__OFH_autobot) window.__OFH_autobot.set({ enabled: true });
           } catch (_error) { /* ignore */ }
         }
+        companionState.autobotWasEnabled = false;
         return true;
       default:
         return false;
@@ -151,7 +183,8 @@
 
   // Returns a spawn TileRef to force, or null to let the auto-bot decide.
   function companionSpawnCenter(game, _player) {
-    if (!companionState.enabled) return null;
+    // Paused means "stop interfering", including with the auto-bot's own choices.
+    if (!companionState.enabled || companionState.paused) return null;
     const s = companionSettings();
     if (s.mode !== "active" || !s.autoSpawn) return null;
     const g = game || companionGame();
@@ -171,7 +204,9 @@
   // resolved, so a mistyped boss name degrades to "auto-bot behaves normally"
   // instead of "auto-bot can never ally with anyone".
   function companionAllianceVeto(other) {
-    if (!companionState.enabled) return false;
+    // While paused the auto-bot gets its diplomacy back — a veto left standing
+    // would silently block every alliance it tries.
+    if (!companionState.enabled || companionState.paused) return false;
     const s = companionSettings();
     if (s.mode !== "active" || !s.autoAlliance) return false;
     if (companionState.bossSmallID == null) return false;
@@ -197,6 +232,14 @@
     const game = companionGame();
     if (!game) return;
     if (companionIsCatchingUp(game)) return;
+
+    // New match → drop everything that only made sense in the previous one.
+    const gameRef = game.__src || game;
+    if (companionState.lastGameRef !== gameRef) {
+      companionState.lastGameRef = gameRef;
+      companionResetRunState();
+      companionLog("▶ new match");
+    }
 
     let me = null;
     try {
@@ -338,10 +381,7 @@
     if (companionState.enabled === on) return;
     companionState.enabled = on;
     if (on) {
-      companionState.seenEmoji.length = 0;
-      companionState.cooldowns = {};
-      companionState.lastGoldSnapshot = 0;
-      companionState.lastSpawnTile = null;
+      companionResetRunState();
       if (!companionState.tickRegistered && typeof registerHelperTickListener === "function") {
         companionState.tickRegistered = true;
         registerHelperTickListener(companionTickThrottled);
@@ -379,12 +419,14 @@
   }
 
   window.__OFH_companion = {
-    ACTION_IDS: COMPANION_ACTION_IDS,
+    ACTION_IDS: COMPANION_ACTION_IDS.slice(),
     get: function () {
       return Object.assign({}, companionSettings(), {
         enabled: Boolean(companionState.enabled),
         bossStatus: companionState.bossStatus,
-        factories: companionState.factoryLevel,
+        // "factoryLevel", not "factories" — the number is an upgrade level, and
+        // calling it a count is exactly the confusion this feature already had.
+        factoryLevel: companionState.factoryLevel,
       });
     },
     set: function (patch) {
@@ -405,7 +447,7 @@
       bossSmallID: companionState.bossSmallID,
       paused: companionState.paused,
       queued: companionState.queue.length,
-      factories: companionState.factoryLevel,
+      factoryLevel: companionState.factoryLevel,
       gameFound: Boolean(game),
       humans: companionHumanPlayers(game).map(function (p) {
         try { return p.name(); } catch (_e) { return "?"; }

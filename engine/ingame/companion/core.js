@@ -179,6 +179,8 @@
     tickRegistered: false,
     lastTickAt: 0,
     lastSpawnTile: null,
+    lastGameRef: null,
+    autobotWasEnabled: false,
   };
 
   function companionLoadSettings() {

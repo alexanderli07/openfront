@@ -880,6 +880,97 @@ const ENG = [
     "newest entry first");
 }
 
+// ---- the decision tick actually decides --------------------------------------
+{
+  // The brief's other blocks cover the queue, the cooldowns and the hooks — but
+  // companionTick itself could be deleted outright and they would all still pass.
+  // This block pins the loop that decides when a packet goes on the wire.
+  const sent = [];
+  let fakeGame = null;
+  const m = loadCompanion(ENG,
+    ["companionTick", "companionState", "companionPatchSettings", "companionResetRunState"],
+    {
+      sendGamePacket: (o) => { sent.push(o); return true; },
+      registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => (fakeGame ? { game: fakeGame } : null),
+    });
+
+  const boss = {
+    name: () => "Boss", smallID: () => 1, id: () => "p1",
+    type: () => "HUMAN", isAlive: () => true,
+    troops: () => 1000,                       // 10% of max → below the 60% threshold
+    state: { outgoingEmojis: [], outgoingAllianceRequests: [], spawnTile: 500 },
+  };
+  const me = {
+    name: () => "Slave", smallID: () => 2, id: () => "p2",
+    type: () => "HUMAN", isAlive: () => true,
+    troops: () => 5000, gold: () => 1000n,
+    isOnSameTeam: () => true, isAlliedWith: () => true,
+    state: { spawnTile: 777 },
+  };
+  const mkGame = () => ({
+    players: () => [boss, me],
+    myPlayer: () => me,
+    config: () => ({ maxTroops: () => 10000 }),
+    units: () => [],
+    inSpawnPhase: () => false,
+    ticks: () => 1,
+  });
+  // Hold the drain off so these assertions count what the tick QUEUES, not what
+  // the queue happens to have already flushed.
+  const tick = () => { m.companionState.lastSendAt = Date.now(); m.companionTick(); };
+
+  fakeGame = mkGame();
+  m.companionPatchSettings({
+    bossName: "Boss", mode: "passive", autoTroops: true, autoFactory: true,
+    autoGold: false, emojiControl: true, autoSpawn: false, autoAlliance: false,
+  });
+  m.companionResetRunState();
+
+  // Disabled → the tick must not even look at the game.
+  m.companionState.enabled = false;
+  tick();
+  assert.equal(m.companionState.queue.length, 0, "disabled → tick does nothing");
+
+  m.companionState.enabled = true;
+  tick();
+  assert.deepEqual(
+    m.companionState.queue.map((q) => q.label).sort(),
+    ["donateTroops", "factory"],
+    "a needy boss and no factory queue exactly those two actions",
+  );
+
+  // Ticking again while they are still queued must not pile up duplicates —
+  // the cooldown is marked at enqueue time, not at send time.
+  tick();
+  assert.equal(m.companionState.queue.length, 2, "no duplicate work while queued");
+
+  // Paused → nothing new is queued.
+  m.companionResetRunState();
+  m.companionState.paused = true;
+  tick();
+  assert.equal(m.companionState.queue.length, 0, "paused → no new work");
+
+  // A different game object means a new match: per-match state must be dropped.
+  // Without this the stale gold baseline swallows the new game's whole income.
+  m.companionResetRunState();
+  m.companionState.lastGameRef = fakeGame;
+  m.companionState.lastGoldSnapshot = 999999;
+  m.companionState.cooldowns = { donateTroops: Date.now() };
+  fakeGame = mkGame();
+  tick();
+  assert.equal(m.companionState.lastGoldSnapshot, 0, "a new match clears the gold baseline");
+  assert.equal(m.companionState.lastGameRef, fakeGame, "and remembers the new game");
+
+  // No boss → never any work, and the status says why.
+  m.companionResetRunState();
+  m.companionState.lastGameRef = fakeGame;
+  m.companionPatchSettings({ bossName: "Nobody" });
+  tick();
+  assert.equal(m.companionState.queue.length, 0, "no boss → no work");
+  assert.equal(m.companionState.bossStatus, "missing", "and the panel is told why");
+}
+
 // ---- auto-bot hooks ---------------------------------------------------------
 {
   const m = loadCompanion(ENG,
