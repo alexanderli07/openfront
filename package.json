@@ -10,7 +10,7 @@
     "check:i18n": "node scripts/audit-i18n.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs && node test/companion.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

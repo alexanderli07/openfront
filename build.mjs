@@ -99,6 +99,7 @@ const INGAME_FILES = [
   "game-time-alert.js",
   "silo-sam-tracker.js",
   "auto-donate.js",
+  "companion/core.js",
   "quick-panel.js",
   "bootstrap.js",
 ].map((f) => `engine/ingame/${f}`);
