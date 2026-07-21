@@ -153,6 +153,22 @@ Enable and configure it live in-game from the **Auto Bot** popup tab. A status l
 
 ---
 
+### Companion Bot
+
+A "slave" tab that serves a named "boss" account via emoji commands — for players running two accounts side by side. Enable it from the Quick Panel's **Companion** section; a floating panel lets you set the boss's account name (with a live-status dot and a picker listing current human players), then configure what the tab does for the boss: accept its alliance requests, donate troops/gold once its troops or your surplus cross a threshold, keep a factory built up to a configurable level, spawn near it inside a ring radius, and attack whatever it is currently attacking.
+
+Two modes:
+- **Passive** — the tab still plays its own game (manually or via the auto-bot with Companion support off) but performs the boss-support actions above.
+- **Active** — the tab hands spawn placement and alliance decisions to the auto-bot, constrained to the boss's ring and the boss's alliance only.
+
+An **Emoji** tab lets the boss trigger actions on demand (donate everything, break/request alliance, attack the boss's target, build/upgrade the factory, pause/resume) by sending a bound emoji to this tab specifically, or to "All players" to command every companion tab at once.
+
+Because a mistaken click on the wrong tab is the actual failure mode this feature guards against, an **always-on warning banner** is pinned to the top of the screen whenever Companion mode is on for that tab — it cannot be dismissed by closing the panel, and it is `pointer-events: none` so it never blocks clicks on the map underneath it. It reads amber while the boss is found, red if the boss name does not resolve to a live player, and grey while paused or when this tab is itself the named boss.
+
+Run `window.__companionDiag()` in the browser console to verify the wiring.
+
+---
+
 ### Internationalization
 
 The Settings tab has a searchable language picker. Every language falls back to English for untranslated strings, including inside the auto-bot log and all in-game panels.
@@ -177,6 +193,6 @@ After any source change, rebuild and commit both the source and the regenerated 
 
 ## Credits
 
-In-game overlays and helper panels are adapted from **[phil0010-gh/openfront-helper](https://github.com/phil0010-gh/openfront-helper)** by [phil0010-gh](https://github.com/phil0010-gh). Several helper and auto-bot features — spawn scoring/heatmap, the advisor, threat intel, and map overlays — reference **[OpenFront Tactical Assistant](https://greasyfork.org/en/scripts/581664-openfront-tactical-assistant)**. The Quick Panel's silo/SAM tracker, skin unlocker, atom batch-fire, warship smart combat (battle simulation + safe waypoint BFS), low-lag mode, kill shot, and embargo controls reference **[Project Blon Openfront](https://greasyfork.org/en/scripts/580641-project-blon-openfront-cheats)** by [goonertd](https://greasyfork.org/en/users/1607113-goonertd). The auto-bot, macro tools, multi-language UI, and several additional features are original to this project.
+In-game overlays and helper panels are adapted from **[phil0010-gh/openfront-helper](https://github.com/phil0010-gh/openfront-helper)** by [phil0010-gh](https://github.com/phil0010-gh). Several helper and auto-bot features — spawn scoring/heatmap, the advisor, threat intel, and map overlays — reference **[OpenFront Tactical Assistant](https://greasyfork.org/en/scripts/581664-openfront-tactical-assistant)**. The Quick Panel's silo/SAM tracker, skin unlocker, atom batch-fire, warship smart combat (battle simulation + safe waypoint BFS), low-lag mode, kill shot, and embargo controls reference **[Project Blon Openfront](https://greasyfork.org/en/scripts/580641-project-blon-openfront-cheats)** by [goonertd](https://greasyfork.org/en/users/1607113-goonertd). Companion Bot takes its idea and tuning constants from **[Openfront Multitab cheat](https://greasyfork.org/scripts/587654)** by EcoMaxer (MIT), itself built on Project Blon. The auto-bot, macro tools, multi-language UI, and several additional features are original to this project.
 
 Not affiliated with or endorsed by OpenFront.io. Use at your own discretion and in line with the game's rules.
