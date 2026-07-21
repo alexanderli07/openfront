@@ -106,9 +106,9 @@
     troopSendPct: 40,           // how much of OUR troops to send
     autoGold: false,
     goldBuildingPct: 40,        // % of the gold GAINED since last donate, while building
-    goldIdlePct: 100,           // % of total gold once maxFactories is reached
+    goldIdlePct: 100,           // % of total gold once maxFactoryLevel is reached
     autoFactory: true,
-    maxFactories: 20,
+    maxFactoryLevel: 20,
     emojiControl: true,
     emojiBindings: null,        // null → COMPANION_DEFAULT_BINDINGS (commands.js)
     tickMs: 2000,
@@ -125,7 +125,7 @@
   // window.__OFH_companion.set() bridge all funnel through
   // companionCoerceSetting, so this is the single place a bad value is stopped.
   // An unusable value KEEPS the previous one rather than overwriting it: the
-  // panel's number inputs yield NaN when emptied, and a NaN maxFactories would
+  // panel's number inputs yield NaN when emptied, and a NaN maxFactoryLevel would
   // switch auto-factory off silently with nothing on screen to explain it.
   const COMPANION_NUMBER_RANGES = {
     spawnMinRadius: [1, 200],
@@ -134,7 +134,7 @@
     troopSendPct: [1, 100],
     goldBuildingPct: [1, 100],
     goldIdlePct: [1, 100],
-    maxFactories: [0, 100],
+    maxFactoryLevel: [1, 100],
     tickMs: [250, 60000],
   };
 
@@ -173,7 +173,7 @@
     lastSendFailedAt: 0,
     cooldowns: {},
     seenEmoji: [],
-    factoryCount: 0,
+    factoryLevel: 0,
     lastGoldSnapshot: 0,
   };
 

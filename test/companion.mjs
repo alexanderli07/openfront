@@ -135,14 +135,14 @@ const CORE = ["engine/ingame/companion/core.js"];
   const s = m.companionSettings();
   assert.equal(s.bossName, "", "default boss name empty");
   assert.equal(s.mode, "passive", "default mode");
-  assert.equal(s.maxFactories, 20, "default maxFactories");
+  assert.equal(s.maxFactoryLevel, 20, "default maxFactoryLevel");
   assert.strictEqual(m.companionSettings(), s, "settings() is a stable reference");
 
-  m.companionPatchSettings({ bossName: "EcoMaxer", maxFactories: 5 });
+  m.companionPatchSettings({ bossName: "EcoMaxer", maxFactoryLevel: 5 });
   assert.equal(m.companionSettings().bossName, "EcoMaxer", "patch applied");
   const raw = JSON.parse(store.get(m.COMPANION_STORAGE_KEY));
   assert.equal(raw.bossName, "EcoMaxer", "patch persisted");
-  assert.equal(raw.maxFactories, 5, "numeric patch persisted");
+  assert.equal(raw.maxFactoryLevel, 5, "numeric patch persisted");
 }
 
 {
@@ -158,7 +158,7 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.equal(s.bossName, "Boss", "known key restored");
   assert.equal(s.mode, "active", "known key restored");
   assert.equal("somethingRemoved" in s, false, "unknown key dropped");
-  assert.equal(s.maxFactories, 20, "missing key falls back to default");
+  assert.equal(s.maxFactoryLevel, 20, "missing key falls back to default");
 }
 
 {
@@ -187,13 +187,13 @@ const CORE = ["engine/ingame/companion/core.js"];
   ]);
 
   // An emptied number input yields NaN. It must NOT land in settings — a NaN
-  // maxFactories makes `factories < maxFactories` false forever, silently
+  // maxFactoryLevel makes `factories < maxFactoryLevel` false forever, silently
   // switching auto-factory off with nothing on screen to explain it.
-  m.companionPatchSettings({ maxFactories: Number.NaN });
-  assert.equal(m.companionSettings().maxFactories, 20, "NaN keeps the previous value");
+  m.companionPatchSettings({ maxFactoryLevel: Number.NaN });
+  assert.equal(m.companionSettings().maxFactoryLevel, 20, "NaN keeps the previous value");
 
-  m.companionPatchSettings({ maxFactories: "not-a-number" });
-  assert.equal(m.companionSettings().maxFactories, 20, "garbage string keeps previous value");
+  m.companionPatchSettings({ maxFactoryLevel: "not-a-number" });
+  assert.equal(m.companionSettings().maxFactoryLevel, 20, "garbage string keeps previous value");
 
   // Numbers are clamped to their declared range, not rejected.
   m.companionPatchSettings({ troopNeedPct: 500 });
@@ -202,8 +202,9 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.equal(m.companionSettings().troopSendPct, 1, "clamped to min");
   m.companionPatchSettings({ tickMs: 10 });
   assert.equal(m.companionSettings().tickMs, 250, "tick floor");
-  m.companionPatchSettings({ maxFactories: 0 });
-  assert.equal(m.companionSettings().maxFactories, 0, "zero factories is a legal setting");
+  m.companionPatchSettings({ maxFactoryLevel: 0 });
+  assert.equal(m.companionSettings().maxFactoryLevel, 1,
+    "level 0 clamps to 1 — a built factory is always at least level 1");
   m.companionPatchSettings({ spawnMinRadius: 12.7 });
   assert.equal(m.companionSettings().spawnMinRadius, 13, "rounded to an integer");
 
@@ -232,8 +233,8 @@ const CORE = ["engine/ingame/companion/core.js"];
   m.companionPatchSettings({ emojiBindings: null });
   assert.equal(m.companionSettings().emojiBindings, null, "null resets bindings");
 
-  assert.equal(m.companionCoerceSetting("maxFactories", "7"), 7, "numeric string is usable");
-  assert.equal(m.companionCoerceSetting("maxFactories", Number.NaN), undefined);
+  assert.equal(m.companionCoerceSetting("maxFactoryLevel", "7"), 7, "numeric string is usable");
+  assert.equal(m.companionCoerceSetting("maxFactoryLevel", Number.NaN), undefined);
 }
 
 {
@@ -241,11 +242,11 @@ const CORE = ["engine/ingame/companion/core.js"];
   store.clear();
   const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
   store.set(m0.COMPANION_STORAGE_KEY, JSON.stringify({
-    maxFactories: 99999, troopNeedPct: "junk", mode: "nonsense", tickMs: 1,
+    maxFactoryLevel: 99999, troopNeedPct: "junk", mode: "nonsense", tickMs: 1,
   }));
   const m = loadCompanion(CORE, ["companionSettings"]);
   const s = m.companionSettings();
-  assert.equal(s.maxFactories, 100, "stored value clamped on load");
+  assert.equal(s.maxFactoryLevel, 100, "stored value clamped on load");
   assert.equal(s.troopNeedPct, 60, "stored garbage falls back to the default");
   assert.equal(s.mode, "passive", "stored bad enum falls back to the default");
   assert.equal(s.tickMs, 250, "stored value clamped on load");
@@ -724,25 +725,40 @@ const ACTS = [
 {
   const sent = [];
   const m = loadCompanion(ACTS,
-    ["companionCountFactories", "companionFirstFactoryId",
+    ["companionFactoryLevel", "companionFirstFactoryId",
      "companionBuildOrUpgradeFactory", "companionState"],
     { sendGamePacket: (o) => { sent.push(o); return true; } });
 
   const me = { smallID: () => 2, id: () => "p2", state: { spawnTile: 777 } };
-  const mkUnit = (id, ownerSmallID) => ({
+  const mkUnit = (id, ownerSmallID, level) => ({
     id: () => id,
+    level: () => (level === undefined ? 1 : level),
     owner: () => ({ smallID: () => ownerSmallID }),
   });
   const mkGame = (units) => ({ units: () => units });
 
-  assert.equal(m.companionCountFactories(mkGame([]), me), 0, "no factories");
+  assert.equal(m.companionFactoryLevel(mkGame([]), me), 0, "no factory → level 0");
   assert.equal(
-    m.companionCountFactories(mkGame([mkUnit(1, 2), mkUnit(2, 2), mkUnit(3, 9)]), me), 2,
-    "counts only tiles owned by me — the multitab original tracked a local counter "
-    + "that silently drifted from reality",
+    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 4)]), me), 4,
+    "reads the real level off the unit — the multitab original tracked a local "
+    + "counter that silently drifted from reality",
   );
-  assert.equal(m.companionCountFactories(null, me), 0, "no game → 0");
-  assert.equal(m.companionCountFactories(mkGame([]), null), 0, "no me → 0");
+  assert.equal(
+    m.companionFactoryLevel(mkGame([mkUnit(1, 9, 9), mkUnit(2, 2, 3)]), me), 3,
+    "ignores factories owned by someone else",
+  );
+  assert.equal(
+    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 2), mkUnit(2, 2, 7)]), me), 7,
+    "with several of our own, the highest level wins",
+  );
+  assert.equal(
+    m.companionFactoryLevel(mkGame([{ id: () => 1, owner: () => ({ smallID: () => 2 }) }]), me), 1,
+    "a factory with no level() still counts as level 1",
+  );
+  assert.equal(m.companionFactoryLevel(null, me), 0, "no game → 0");
+  assert.equal(m.companionFactoryLevel(mkGame([]), null), 0, "no me → 0");
+  assert.equal(m.companionFactoryLevel({ units: () => ({}) }, me), 0,
+    "a non-array from units() must not throw");
 
   assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 2), mkUnit(8, 2)]), me), 7);
   assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 9)]), me), null, "not mine");

@@ -205,6 +205,10 @@
     } catch (_error) {
       return [];
     }
+    // The for..of below sits outside the try above, so a non-iterable here would
+    // throw straight out of every caller. GameView.units() always returns an
+    // array today; this keeps that from being load-bearing.
+    if (!Array.isArray(units)) return [];
     const out = [];
     for (const u of units) {
       try {
@@ -219,11 +223,26 @@
     return out;
   }
 
-  // Count the factories we ACTUALLY own. The multitab original incremented a
-  // local counter whenever it sent a build packet and never reconciled it, so a
-  // rejected build (or a reload) left the bot convinced it had more than it did.
-  function companionCountFactories(game, me) {
-    return companionOwnedUnits(game, me, "Factory").length;
+  // The level of the factory we ACTUALLY own — 0 when we own none.
+  //
+  // This is the progress counter for the whole factory feature. The multitab
+  // original kept a local counter it bumped on every build packet and never
+  // reconciled, so a rejected build (or a page reload) left the bot convinced it
+  // had progressed further than it had. It also *called* that counter
+  // "factories" while only ever upgrading a single structure — the number is a
+  // LEVEL, not a count, which is why the setting is maxFactoryLevel.
+  function companionFactoryLevel(game, me) {
+    const units = companionOwnedUnits(game, me, "Factory");
+    let best = 0;
+    for (const u of units) {
+      try {
+        const lvl = typeof u.level === "function" ? Number(u.level()) : 1;
+        if (Number.isFinite(lvl) && lvl > best) best = lvl;
+      } catch (_error) {
+        if (best < 1) best = 1; // it exists, so it is at least level 1
+      }
+    }
+    return best;
   }
 
   function companionFirstFactoryId(game, me) {
