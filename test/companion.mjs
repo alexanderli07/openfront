@@ -1038,4 +1038,95 @@ const ENG = [
     "no boss resolved → no veto");
 }
 
+// ---- pause is a real stop, and survives a new match --------------------------
+{
+  const autobotCalls = [];
+  let autobotEnabled = false;
+  fakeWindow.__OFH_autobot = {
+    get: () => ({ enabled: autobotEnabled }),
+    set: (p) => { autobotCalls.push(p); if ("enabled" in p) autobotEnabled = p.enabled; },
+  };
+
+  const m = loadCompanion(ENG,
+    ["companionState", "companionPatchSettings", "companionResetRunState",
+     "companionRunAction", "companionSpawnCenter", "companionAllianceVeto",
+     "companionEnqueue", "COMPANION_QUEUE_LIMIT", "setCompanionEnabled"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  const W = 100;
+  const boss = {
+    name: () => "Boss", smallID: () => 1, id: () => "p1",
+    type: () => "HUMAN", isAlive: () => true, state: { spawnTile: 40 * W + 20 },
+  };
+  const game = {
+    width: () => W, height: () => W,
+    isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < W,
+    ref: (x, y) => y * W + x,
+    isLand: () => true, hasOwner: () => false, isBorder: () => false,
+    players: () => [boss, { name: () => "Me", smallID: () => 2, id: () => "p2",
+      type: () => "HUMAN", isAlive: () => true }],
+    myPlayer: () => ({ name: () => "Me", smallID: () => 2, id: () => "p2" }),
+  };
+
+  m.companionPatchSettings({
+    bossName: "Boss", mode: "active", autoSpawn: true, autoAlliance: true,
+  });
+  m.companionState.enabled = true;
+  m.companionState.bossSmallID = 1;
+
+  // Baseline: while running, the hooks DO interfere.
+  m.companionState.paused = false;
+  assert.ok(m.companionSpawnCenter(game, null) != null, "running → spawn is overridden");
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), true, "running → stranger vetoed");
+
+  // Paused means stop interfering — otherwise a "paused" companion still steals
+  // the auto-bot's spawn and blocks every alliance it tries.
+  m.companionState.paused = true;
+  assert.equal(m.companionSpawnCenter(game, null), null, "paused → no spawn override");
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false, "paused → no veto");
+
+  // Pausing is user intent, not match state. Auto-join can start the next match
+  // on its own; clearing the pause there would let one feature of this script
+  // silently undo the stop button of another.
+  m.companionResetRunState();
+  assert.equal(m.companionState.paused, true, "a new match must NOT clear the pause");
+
+  // Turning the feature on again IS a fresh start, so there the pause does clear.
+  m.companionState.paused = true;
+  m.companionState.enabled = false;
+  m.setCompanionEnabled(true);
+  assert.equal(m.companionState.paused, false, "re-enabling clears the pause");
+
+  // -- pause/resume must not switch on an auto-bot the user turned off ---------
+  m.companionState.enabled = true;
+  m.companionState.paused = false;
+  autobotCalls.length = 0;
+  autobotEnabled = false;                       // the user had it OFF
+  m.companionRunAction("pause", {});
+  m.companionRunAction("resume", {});
+  assert.equal(autobotEnabled, false,
+    "resume must not enable an auto-bot the user had switched off — "
+    + "__OFH_autobot.set() persists to storage, so this would stick");
+
+  autobotEnabled = true;                        // the user had it ON
+  m.companionState.paused = false;
+  m.companionRunAction("pause", {});
+  assert.equal(autobotEnabled, false, "pause stops the auto-bot too");
+  m.companionRunAction("resume", {});
+  assert.equal(autobotEnabled, true, "resume restores what the user had");
+
+  // -- the queue is bounded, dropping the OLDEST -------------------------------
+  m.companionState.queue.length = 0;
+  for (let i = 0; i < m.COMPANION_QUEUE_LIMIT + 40; i++) {
+    m.companionEnqueue("action" + i, () => {});
+  }
+  assert.equal(m.companionState.queue.length, m.COMPANION_QUEUE_LIMIT, "queue is capped");
+  assert.equal(m.companionState.queue[m.companionState.queue.length - 1].label,
+    "action" + (m.COMPANION_QUEUE_LIMIT + 39), "the newest action is kept");
+  assert.equal(m.companionState.queue[0].label, "action40",
+    "and the oldest ones are the ones dropped");
+
+  delete fakeWindow.__OFH_autobot;
+}
+
 console.log("COMPANION OK — pure helpers behave");

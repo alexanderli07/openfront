@@ -63,6 +63,11 @@
   // seen-emoji keys into the next match — measured effect: gold donations dropped
   // from 10 per 5 minutes to 1, because the stale baseline swallowed the whole new
   // game's income.
+  //
+  // `paused` and `autobotWasEnabled` are deliberately NOT reset here. Pausing is
+  // an explicit instruction from the player, not match state, and auto-join can
+  // start the next match on its own — clearing it here would let one feature of
+  // this script silently undo the stop button of another.
   function companionResetRunState() {
     companionState.cooldowns = {};
     companionState.seenEmoji.length = 0;
@@ -72,8 +77,6 @@
     companionState.factoryLevel = 0;
     companionState.bossSmallID = null;
     companionState.bossStatus = "idle";
-    companionState.paused = false;
-    companionState.autobotWasEnabled = false;
   }
 
   function companionCooldownReady(key, ms, now) {
@@ -382,6 +385,9 @@
     companionState.enabled = on;
     if (on) {
       companionResetRunState();
+      // Switching the feature on IS a fresh start, so here the pause does clear.
+      companionState.paused = false;
+      companionState.autobotWasEnabled = false;
       if (!companionState.tickRegistered && typeof registerHelperTickListener === "function") {
         companionState.tickRegistered = true;
         registerHelperTickListener(companionTickThrottled);
