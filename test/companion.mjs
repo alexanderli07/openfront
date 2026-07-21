@@ -720,4 +720,91 @@ const ACTS = [
   assert.deepEqual(sent[0], { type: "spawn", tile: 0 });
 }
 
+// ---- factories --------------------------------------------------------------
+{
+  const sent = [];
+  const m = loadCompanion(ACTS,
+    ["companionCountFactories", "companionFirstFactoryId",
+     "companionBuildOrUpgradeFactory", "companionState"],
+    { sendGamePacket: (o) => { sent.push(o); return true; } });
+
+  const me = { smallID: () => 2, id: () => "p2", state: { spawnTile: 777 } };
+  const mkUnit = (id, ownerSmallID) => ({
+    id: () => id,
+    owner: () => ({ smallID: () => ownerSmallID }),
+  });
+  const mkGame = (units) => ({ units: () => units });
+
+  assert.equal(m.companionCountFactories(mkGame([]), me), 0, "no factories");
+  assert.equal(
+    m.companionCountFactories(mkGame([mkUnit(1, 2), mkUnit(2, 2), mkUnit(3, 9)]), me), 2,
+    "counts only tiles owned by me — the multitab original tracked a local counter "
+    + "that silently drifted from reality",
+  );
+  assert.equal(m.companionCountFactories(null, me), 0, "no game → 0");
+  assert.equal(m.companionCountFactories(mkGame([]), null), 0, "no me → 0");
+
+  assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 2), mkUnit(8, 2)]), me), 7);
+  assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 9)]), me), null, "not mine");
+
+  // Zero factories → build one at my spawn tile.
+  sent.length = 0;
+  assert.equal(m.companionBuildOrUpgradeFactory(mkGame([]), me), true);
+  assert.deepEqual(sent[0], { type: "build_unit", unit: "Factory", tile: 777 });
+
+  // Already own one → upgrade it instead.
+  sent.length = 0;
+  assert.equal(m.companionBuildOrUpgradeFactory(mkGame([mkUnit(7, 2)]), me), true);
+  assert.deepEqual(sent[0], { type: "upgrade_structure", unit: "Factory", unitId: 7 });
+
+  // No spawn tile and nothing to upgrade → do nothing rather than guess.
+  sent.length = 0;
+  assert.equal(m.companionBuildOrUpgradeFactory(mkGame([]), { smallID: () => 2, state: {} }), false);
+  assert.equal(sent.length, 0);
+}
+
+// ---- attack the boss's target ----------------------------------------------
+{
+  const sent = [];
+  const m = loadCompanion(ACTS, ["companionBossTargetId", "companionAttackBossTarget"],
+    { sendGamePacket: (o) => { sent.push(o); return true; } });
+
+  const enemy = { id: () => "p9", smallID: () => 9 };
+  const game = { playerBySmallID: (sid) => (sid === 9 ? enemy : null) };
+
+  // outgoingAttacks entries are PLAIN objects with fields, not methods.
+  const boss = { state: { outgoingAttacks: [
+    { troops: 10, attackerID: 1, targetID: 9, retreating: false },
+  ] } };
+  assert.equal(m.companionBossTargetId(game, boss), "p9");
+
+  // The most recent non-retreating attack wins.
+  const boss2 = { state: { outgoingAttacks: [
+    { troops: 10, attackerID: 1, targetID: 5, retreating: false },
+    { troops: 10, attackerID: 1, targetID: 9, retreating: false },
+  ] } };
+  assert.equal(m.companionBossTargetId(game, boss2), "p9", "latest attack wins");
+
+  // Retreating attacks are ignored.
+  const boss3 = { state: { outgoingAttacks: [
+    { troops: 10, attackerID: 1, targetID: 9, retreating: true },
+  ] } };
+  assert.equal(m.companionBossTargetId(game, boss3), null);
+
+  assert.equal(m.companionBossTargetId(game, { state: {} }), null);
+  assert.equal(m.companionBossTargetId(game, null), null);
+  assert.equal(m.companionBossTargetId(null, boss), null);
+
+  // Full action: matches AttackIntentSchema (targetID, not target).
+  sent.length = 0;
+  const me = { troops: () => 5000 };
+  assert.equal(m.companionAttackBossTarget(game, me, boss, 50), true);
+  assert.deepEqual(sent[0], { type: "attack", targetID: "p9", troops: 2500 });
+
+  // Boss is not attacking anyone → no packet.
+  sent.length = 0;
+  assert.equal(m.companionAttackBossTarget(game, me, { state: {} }, 50), false);
+  assert.equal(sent.length, 0);
+}
+
 console.log("COMPANION OK — pure helpers behave");

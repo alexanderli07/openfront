@@ -185,3 +185,109 @@
     if (tile == null || !Number.isInteger(t) || t < 0) return false;
     return companionSend({ type: "spawn", tile: t });
   }
+
+  // ---------------------------------------------------------------------------
+  // Factories
+  // ---------------------------------------------------------------------------
+
+  function companionOwnedUnits(game, me, unitType) {
+    if (!game || !me || typeof game.units !== "function") return [];
+    let mySmall;
+    try {
+      mySmall = me.smallID ? me.smallID() : null;
+    } catch (_error) {
+      return [];
+    }
+    if (mySmall == null) return [];
+    let units;
+    try {
+      units = game.units(unitType) || [];
+    } catch (_error) {
+      return [];
+    }
+    const out = [];
+    for (const u of units) {
+      try {
+        const owner = u && typeof u.owner === "function" ? u.owner() : null;
+        if (owner && typeof owner.smallID === "function" && owner.smallID() === mySmall) {
+          out.push(u);
+        }
+      } catch (_error) {
+        /* skip */
+      }
+    }
+    return out;
+  }
+
+  // Count the factories we ACTUALLY own. The multitab original incremented a
+  // local counter whenever it sent a build packet and never reconciled it, so a
+  // rejected build (or a reload) left the bot convinced it had more than it did.
+  function companionCountFactories(game, me) {
+    return companionOwnedUnits(game, me, "Factory").length;
+  }
+
+  function companionFirstFactoryId(game, me) {
+    const units = companionOwnedUnits(game, me, "Factory");
+    if (units.length === 0) return null;
+    try {
+      return units[0].id();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  // Build the first factory at our own spawn tile; after that, upgrade the one we
+  // have. The server validates affordability, so no client-side cost ladder is
+  // needed (the original hard-coded 125k/250k/500k/1M, which is a guess that
+  // drifts the moment the game rebalances).
+  function companionBuildOrUpgradeFactory(game, me) {
+    const existingId = companionFirstFactoryId(game, me);
+    if (existingId != null) {
+      return companionSend({
+        type: "upgrade_structure",
+        unit: "Factory",
+        unitId: existingId,
+      });
+    }
+    const tile = me && me.state ? me.state.spawnTile : null;
+    if (tile == null) return false;
+    return companionSend({ type: "build_unit", unit: "Factory", tile: Number(tile) });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Follow the boss into a fight
+  // ---------------------------------------------------------------------------
+
+  // outgoingAttacks entries are plain {troops, attackerID, targetID, retreating}
+  // objects — fields, not methods.
+  function companionBossTargetId(game, boss) {
+    if (!game || !boss || !boss.state) return null;
+    const attacks = boss.state.outgoingAttacks;
+    if (!Array.isArray(attacks) || attacks.length === 0) return null;
+    for (let i = attacks.length - 1; i >= 0; i--) {
+      const a = attacks[i];
+      if (!a || a.retreating) continue;
+      if (a.targetID == null) continue;
+      try {
+        const target = game.playerBySmallID ? game.playerBySmallID(Number(a.targetID)) : null;
+        if (target && typeof target.id === "function") return target.id();
+      } catch (_error) {
+        /* try the next one */
+      }
+    }
+    return null;
+  }
+
+  function companionAttackBossTarget(game, me, boss, pct) {
+    const targetID = companionBossTargetId(game, boss);
+    if (!targetID || !me || typeof me.troops !== "function") return false;
+    let troops;
+    try {
+      troops = me.troops();
+    } catch (_error) {
+      return false;
+    }
+    const amount = companionPercentAmount(troops, pct);
+    if (amount <= 0) return false;
+    return companionSend({ type: "attack", targetID: targetID, troops: amount });
+  }
