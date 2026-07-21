@@ -75,6 +75,17 @@
 </select></div>`;
   }
 
+  // Clone of the RAW stored emojiBindings (as opposed to companionBindings(),
+  // which resolves defaults and drops disabled ids). Any patch that writes back
+  // to settings must start from this, not from companionBindings() — the latter
+  // has already stripped out every disabled id, so patching from it would erase
+  // the `null` markers of every OTHER disabled action the moment any one binding
+  // changes.
+  function companionRawEmojiBindings() {
+    const raw = companionSettings().emojiBindings;
+    return raw && typeof raw === "object" ? Object.assign({}, raw) : {};
+  }
+
   function companionSwitch(key, label, sub) {
     const on = Boolean(companionSettings()[key]);
     return `<div class="ohcp-row${sub ? " sub" : ""}"><span class="ohcp-label">${companionEsc(label)}</span>
@@ -137,9 +148,12 @@ value="${companionEsc(s.bossName)}" placeholder="${companionEsc(companionTr("Bos
       resume: companionTr("Resume"),
     };
     const rows = COMPANION_ACTION_IDS.map(function (id) {
+      const on = Object.prototype.hasOwnProperty.call(bindings, id);
+      const emoji = on ? bindings[id] : COMPANION_DEFAULT_BINDINGS[id];
       return `<div class="ohcp-row"><button class="ohcp-input" data-cp-emoji="${id}"
-style="width:34px">${companionEsc(bindings[id])}</button>
-<span class="ohcp-label">${companionEsc(labels[id] || id)}</span></div>`;
+style="width:34px">${companionEsc(emoji)}</button>
+<span class="ohcp-label">${companionEsc(labels[id] || id)}</span>
+<div class="ohcp-sw${on ? " on" : ""}" data-cp-emoji-toggle="${id}"></div></div>`;
     }).join("");
     return rows + `<div class="ohcp-row sub">${companionEsc(
       companionTr("Emoji to one bot targets it; emoji to All players targets every bot."))}</div>`;
@@ -305,11 +319,22 @@ style="width:34px">${companionEsc(bindings[id])}</button>
           ? emojiTable : null;
         if (!table) return;
         companionShowPicker(panel, table.flat(), function (emoji) {
-          const bindings = companionBindings();
-          bindings[el.dataset.cpEmoji] = emoji;
-          companionPatchSettings({ emojiBindings: bindings });
+          const patch = companionRawEmojiBindings();
+          patch[el.dataset.cpEmoji] = emoji;
+          companionPatchSettings({ emojiBindings: patch });
           companionBuildPanel();
         }, true);
+      });
+    });
+
+    panel.querySelectorAll("[data-cp-emoji-toggle]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        const id = el.dataset.cpEmojiToggle;
+        const on = Object.prototype.hasOwnProperty.call(companionBindings(), id);
+        const patch = companionRawEmojiBindings();
+        patch[id] = on ? null : COMPANION_DEFAULT_BINDINGS[id];
+        companionPatchSettings({ emojiBindings: patch });
+        companionBuildPanel();
       });
     });
   }
@@ -360,6 +385,12 @@ style="${grid ? "" : "width:100%;text-align:left;"}margin:1px">${companionEsc(it
       text = "— " + companionTr("this tab is the boss");
     } else if (companionState.bossStatus === "found") {
       text = "→ " + s.bossName;
+    } else if (companionState.bossStatus === "idle") {
+      // Enabled but no boss name typed in yet — there is nothing to have failed
+      // to find, so this must not read like the "missing" (typo'd/not joined) red
+      // state below.
+      bg = "rgba(90,100,110,.95)";
+      text = "— " + companionTr("No boss set");
     } else {
       bg = "rgba(180,50,50,.95)";
       text = "— " + companionTr("no boss");

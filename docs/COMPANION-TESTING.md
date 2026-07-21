@@ -70,10 +70,7 @@ chú lại console log / ảnh chụp màn hình trước khi báo cáo.
 - [ ] **11.** Bấm chuột và kéo (drag) tại vị trí **xuyên qua** dải cảnh báo (ví
       dụ kéo camera bản đồ ngay dưới dải) — thao tác vẫn điều khiển được game
       bình thường, xác nhận dải cảnh báo có `pointer-events: none`.
-- [ ] **12.** Dải cảnh báo đổi màu đúng theo trạng thái:
-      - **hổ phách (amber)** khi boss được tìm thấy (`bossStatus === "found"`);
-      - **đỏ** khi tên boss gõ sai / không tìm thấy (`bossStatus === "missing"`);
-      - **xám** khi bấm nút tạm dừng 🥱 (paused).
+- [ ] **12.** Dải cảnh báo đổi màu đúng theo trạng thái: - **hổ phách (amber)** khi boss được tìm thấy (`bossStatus === "found"`); - **đỏ** khi tên boss gõ sai / không tìm thấy (`bossStatus === "missing"`); - **xám** khi bấm nút tạm dừng 🥱 (paused).
 - [ ] **13.** Tab A (không bật Companion mode) **hoàn toàn không có** dải cảnh
       báo nào hiển thị.
 - [ ] **14.** Bật lại `Companion mode` = **OFF** trên tab B → `window.__autoBotDiag()`

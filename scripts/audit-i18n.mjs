@@ -26,8 +26,14 @@ function walk(dir) {
 const FILES = walk(path.join(root, "engine"));
 
 const keys = new Set();
-const reDq = /\b(?:t|tr)\("((?:[^"\\]|\\.)+)"\)/g;
-const reTl = /\b(?:t|tr)\(`([^`]*)`\)/g;
+// Every call-site spelling used across the engine: the lobby layer's t()/tr(),
+// the Quick Panel's local _tr(), and the Companion panel's local companionTr().
+// A leading \b before "t"/"tr" would reject "_tr(" and "companionTr(" outright
+// (no word-boundary between "_"/"n" and the following letter), so this instead
+// requires the character before the call to be a non-identifier character (or
+// string start) via a negative lookbehind.
+const reDq = /(?<![\w$])(?:companionTr|_tr|tr|t)\("((?:[^"\\]|\\.)+)"\)/g;
+const reTl = /(?<![\w$])(?:companionTr|_tr|tr|t)\(`([^`]*)`\)/g;
 for (const f of FILES) {
   let s;
   try {

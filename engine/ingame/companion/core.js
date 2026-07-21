@@ -180,6 +180,7 @@
     tickRegistered: false,
     lastTickAt: 0,
     lastSpawnTile: null,
+    lastBossSpawnTile: null,
     lastGameRef: null,
     autobotWasEnabled: false,
     uiSignature: null,

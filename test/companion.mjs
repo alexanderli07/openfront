@@ -67,8 +67,11 @@ const CORE = ["engine/ingame/companion/core.js"];
 
   // The multitab original split the DIGITS of the tile id in half, which is only
   // ever right by accident. Guard the correct arithmetic against regressions.
-  assert.deepEqual(companionTileToXY(4523, 137), { x: 4523 % 137, y: Math.floor(4523 / 137) },
-    "non-round map width");
+  assert.deepEqual(
+    companionTileToXY(4523, 137),
+    { x: 4523 % 137, y: Math.floor(4523 / 137) },
+    "non-round map width",
+  );
 
   assert.equal(companionTileFromXY(123, 22, 200), 4523, "round-trip back to ref");
   for (const ref of [0, 1, 199, 200, 4523, 39999]) {
@@ -92,8 +95,11 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.equal(companionPercentAmount(3, 10), 1, "floor never drops below 1 for positive value");
   assert.equal(companionPercentAmount(Number.NaN, 50), 0, "NaN → 0");
   // 2^53 territory: gold can exceed Number.MAX_SAFE_INTEGER in long games.
-  assert.equal(companionPercentAmount(10n ** 18n, 50), Number(10n ** 18n / 2n),
-    "huge bigint stays finite");
+  assert.equal(
+    companionPercentAmount(10n ** 18n, 50),
+    Number(10n ** 18n / 2n),
+    "huge bigint stays finite",
+  );
   // A fractional percent must not make the two branches disagree.
   assert.equal(
     companionPercentAmount(1000, 33.6),
@@ -186,7 +192,9 @@ const CORE = ["engine/ingame/companion/core.js"];
 {
   store.clear();
   const m = loadCompanion(CORE, [
-    "companionSettings", "companionPatchSettings", "companionCoerceSetting",
+    "companionSettings",
+    "companionPatchSettings",
+    "companionCoerceSetting",
     "COMPANION_STORAGE_KEY",
   ]);
 
@@ -207,8 +215,11 @@ const CORE = ["engine/ingame/companion/core.js"];
   m.companionPatchSettings({ tickMs: 10 });
   assert.equal(m.companionSettings().tickMs, 250, "tick floor");
   m.companionPatchSettings({ maxFactoryLevel: 0 });
-  assert.equal(m.companionSettings().maxFactoryLevel, 1,
-    "level 0 clamps to 1 — a built factory is always at least level 1");
+  assert.equal(
+    m.companionSettings().maxFactoryLevel,
+    1,
+    "level 0 clamps to 1 — a built factory is always at least level 1",
+  );
   m.companionPatchSettings({ spawnMinRadius: 12.7 });
   assert.equal(m.companionSettings().spawnMinRadius, 13, "rounded to an integer");
 
@@ -245,9 +256,15 @@ const CORE = ["engine/ingame/companion/core.js"];
   // A stored blob written by an older build cannot inject out-of-range values.
   store.clear();
   const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
-  store.set(m0.COMPANION_STORAGE_KEY, JSON.stringify({
-    maxFactoryLevel: 99999, troopNeedPct: "junk", mode: "nonsense", tickMs: 1,
-  }));
+  store.set(
+    m0.COMPANION_STORAGE_KEY,
+    JSON.stringify({
+      maxFactoryLevel: 99999,
+      troopNeedPct: "junk",
+      mode: "nonsense",
+      tickMs: 1,
+    }),
+  );
   const m = loadCompanion(CORE, ["companionSettings"]);
   const s = m.companionSettings();
   assert.equal(s.maxFactoryLevel, 100, "stored value clamped on load");
@@ -273,24 +290,35 @@ const CORE = ["engine/ingame/companion/core.js"];
   // numeric setting and forgetting its range entry would silently coerce it to
   // true/false at runtime with nothing to show for it.
   const m = loadCompanion(CORE, [
-    "COMPANION_DEFAULTS", "COMPANION_NUMBER_RANGES", "COMPANION_ENUMS",
+    "COMPANION_DEFAULTS",
+    "COMPANION_NUMBER_RANGES",
+    "COMPANION_ENUMS",
     "companionCoerceSetting",
   ]);
   const explicit = new Set([
     ...Object.keys(m.COMPANION_NUMBER_RANGES),
     ...Object.keys(m.COMPANION_ENUMS),
-    "bossName", "emojiBindings", "pos",
+    "bossName",
+    "emojiBindings",
+    "pos",
   ]);
   const unhandled = Object.keys(m.COMPANION_DEFAULTS).filter(
     (k) => typeof m.COMPANION_DEFAULTS[k] !== "boolean" && !explicit.has(k),
   );
-  assert.deepEqual(unhandled, [],
-    `these non-boolean settings have no coercion branch and would be forced to a `
-    + `boolean: ${unhandled.join(", ")}`);
+  assert.deepEqual(
+    unhandled,
+    [],
+    `these non-boolean settings have no coercion branch and would be forced to a ` +
+      `boolean: ${unhandled.join(", ")}`,
+  );
 
   // And the converse: every key claiming an explicit branch actually exists.
   const missing = [...explicit].filter((k) => !(k in m.COMPANION_DEFAULTS));
-  assert.deepEqual(missing, [], `coercion branches for keys that do not exist: ${missing.join(", ")}`);
+  assert.deepEqual(
+    missing,
+    [],
+    `coercion branches for keys that do not exist: ${missing.join(", ")}`,
+  );
 }
 
 // ---- boss resolution --------------------------------------------------------
@@ -315,28 +343,49 @@ const CORE = ["engine/ingame/companion/core.js"];
   const bot = mkPlayer("Bot4", 4, "BOT");
   const game = { players: () => [boss, me, nation, bot], myPlayer: () => me };
 
-  assert.deepEqual(companionResolveBoss(game, ""), { status: "idle", boss: null },
-    "empty name → idle");
-  assert.deepEqual(companionResolveBoss(game, "   "), { status: "idle", boss: null },
-    "whitespace-only name → idle");
+  assert.deepEqual(
+    companionResolveBoss(game, ""),
+    { status: "idle", boss: null },
+    "empty name → idle",
+  );
+  assert.deepEqual(
+    companionResolveBoss(game, "   "),
+    { status: "idle", boss: null },
+    "whitespace-only name → idle",
+  );
 
   const found = companionResolveBoss(game, "EcoMaxer");
   assert.equal(found.status, "found");
   assert.equal(found.boss.smallID(), 1);
 
-  assert.equal(companionResolveBoss(game, "ecomaxer").status, "found",
-    "name match is case-insensitive");
-  assert.equal(companionResolveBoss(game, " EcoMaxer ").status, "found",
-    "name match trims whitespace");
+  assert.equal(
+    companionResolveBoss(game, "ecomaxer").status,
+    "found",
+    "name match is case-insensitive",
+  );
+  assert.equal(
+    companionResolveBoss(game, " EcoMaxer ").status,
+    "found",
+    "name match trims whitespace",
+  );
 
   assert.deepEqual(companionResolveBoss(game, "Nobody"), { status: "missing", boss: null });
-  assert.equal(companionResolveBoss(game, "France").status, "missing",
-    "a Nation is never the boss");
-  assert.equal(companionResolveBoss(game, "Bot4").status, "missing",
-    "a regular bot is never the boss");
+  assert.equal(
+    companionResolveBoss(game, "France").status,
+    "missing",
+    "a Nation is never the boss",
+  );
+  assert.equal(
+    companionResolveBoss(game, "Bot4").status,
+    "missing",
+    "a regular bot is never the boss",
+  );
 
-  assert.deepEqual(companionResolveBoss(game, "Slave1"), { status: "self", boss: null },
-    "this tab IS the boss → self");
+  assert.deepEqual(
+    companionResolveBoss(game, "Slave1"),
+    { status: "self", boss: null },
+    "this tab IS the boss → self",
+  );
 
   // A dead boss is not a usable boss.
   const deadBoss = mkPlayer("Ghost", 5, "HUMAN", false);
@@ -348,8 +397,11 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.deepEqual(companionResolveBoss({}, "EcoMaxer"), { status: "missing", boss: null });
 
   const humans = companionHumanPlayers(game);
-  assert.deepEqual(humans.map((p) => p.name()), ["EcoMaxer", "Slave1"],
-    "dropdown lists live humans only");
+  assert.deepEqual(
+    humans.map((p) => p.name()),
+    ["EcoMaxer", "Slave1"],
+    "dropdown lists live humans only",
+  );
   assert.deepEqual(companionHumanPlayers(null), [], "no game → empty list");
 }
 
@@ -366,8 +418,16 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
 
   assert.deepEqual(
     m.COMPANION_ACTION_IDS,
-    ["donateAllGold", "donateAllTroops", "breakAlliance", "requestAlliance",
-     "attackBossTarget", "buildFactory", "pause", "resume"],
+    [
+      "donateAllGold",
+      "donateAllTroops",
+      "breakAlliance",
+      "requestAlliance",
+      "attackBossTarget",
+      "buildFactory",
+      "pause",
+      "resume",
+    ],
     "eight actions in a stable order",
   );
   assert.equal(m.COMPANION_DEFAULT_BINDINGS.donateAllGold, "🆘");
@@ -385,7 +445,10 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   );
 
   const key = m.companionEmojiKey({
-    message: "🆘", senderID: 1, recipientID: 2, createdAt: 500,
+    message: "🆘",
+    senderID: 1,
+    recipientID: 2,
+    createdAt: 500,
   });
   assert.equal(key, "1:2:🆘:500", "dedupe key covers sender, recipient, emoji and tick");
 
@@ -396,14 +459,22 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   let seen = [];
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]), 2, B, seen),
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]),
+      2,
+      B,
+      seen,
+    ),
     ["donateAllGold"],
   );
 
   // Same emoji still sitting in the array on the next tick → must NOT repeat.
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]), 2, B, seen),
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 10 }]),
+      2,
+      B,
+      seen,
+    ),
     [],
     "dedupe by createdAt stops the multitab re-fire bug",
   );
@@ -411,7 +482,11 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   // Same emoji sent AGAIN later is a new command.
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 99 }]), 2, B, seen),
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: 99 }]),
+      2,
+      B,
+      seen,
+    ),
     ["donateAllGold"],
     "a later createdAt is a fresh command",
   );
@@ -420,7 +495,11 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   seen = [];
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "🆘", senderID: 1, recipientID: 7, createdAt: 1 }]), 2, B, seen),
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 7, createdAt: 1 }]),
+      2,
+      B,
+      seen,
+    ),
     [],
     "emoji for another slave is not mine",
   );
@@ -429,7 +508,11 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   seen = [];
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "💔", senderID: 1, recipientID: "AllPlayers", createdAt: 1 }]), 2, B, seen),
+      mkBoss([{ message: "💔", senderID: 1, recipientID: "AllPlayers", createdAt: 1 }]),
+      2,
+      B,
+      seen,
+    ),
     ["breakAlliance"],
     "AllPlayers is the all-bots channel",
   );
@@ -438,7 +521,11 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   seen = [];
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]), 2, B, seen),
+      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]),
+      2,
+      B,
+      seen,
+    ),
     [],
   );
 
@@ -446,18 +533,26 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   seen = [];
   assert.deepEqual(
     m.companionCollectCommands(
-      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]), 2,
-      Object.assign({}, B, { donateAllGold: "😀" }), seen),
+      mkBoss([{ message: "😀", senderID: 1, recipientID: 2, createdAt: 1 }]),
+      2,
+      Object.assign({}, B, { donateAllGold: "😀" }),
+      seen,
+    ),
     ["donateAllGold"],
   );
 
   // Multiple commands in one tick keep array order.
   seen = [];
   assert.deepEqual(
-    m.companionCollectCommands(mkBoss([
-      { message: "🥱", senderID: 1, recipientID: 2, createdAt: 1 },
-      { message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 2 },
-    ]), 2, B, seen),
+    m.companionCollectCommands(
+      mkBoss([
+        { message: "🥱", senderID: 1, recipientID: 2, createdAt: 1 },
+        { message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 2 },
+      ]),
+      2,
+      B,
+      seen,
+    ),
     ["pause", "donateAllGold"],
   );
 
@@ -473,46 +568,62 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   assert.equal(m.COMPANION_SEEN_LIMIT, 256, "the dedupe window is 256 entries");
   for (let i = 0; i < m.COMPANION_SEEN_LIMIT + 50; i++) {
     m.companionCollectCommands(
-      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: i }]), 2, B, seen);
+      mkBoss([{ message: "🆘", senderID: 1, recipientID: 2, createdAt: i }]),
+      2,
+      B,
+      seen,
+    );
   }
   assert.ok(seen.length <= 256, "seen list is capped");
 }
 
 // ---- unresolved smallID must not match anything -----------------------------
 {
-  const m = loadCompanion(CMDS, [
-    "COMPANION_DEFAULT_BINDINGS", "companionCollectCommands",
-  ]);
+  const m = loadCompanion(CMDS, ["COMPANION_DEFAULT_BINDINGS", "companionCollectCommands"]);
   const B = m.COMPANION_DEFAULT_BINDINGS;
-  const boss = { state: { outgoingEmojis: [
-    { message: "🆘", senderID: 1, recipientID: 0, createdAt: 1 },
-  ] } };
+  const boss = {
+    state: { outgoingEmojis: [{ message: "🆘", senderID: 1, recipientID: 0, createdAt: 1 }] },
+  };
 
   // Number(null) === 0, and 0 is TerraNullius's sentinel smallID. An unresolved
   // caller must collect nothing rather than obey messages addressed to nobody.
   let seen = [];
-  assert.deepEqual(m.companionCollectCommands(boss, null, B, seen), [],
-    "null smallID matches nothing");
+  assert.deepEqual(
+    m.companionCollectCommands(boss, null, B, seen),
+    [],
+    "null smallID matches nothing",
+  );
   assert.deepEqual(seen, [], "null smallID does not even record a dedupe key");
 
   seen = [];
-  assert.deepEqual(m.companionCollectCommands(boss, undefined, B, seen), [],
-    "undefined smallID matches nothing");
+  assert.deepEqual(
+    m.companionCollectCommands(boss, undefined, B, seen),
+    [],
+    "undefined smallID matches nothing",
+  );
 
   // A broadcast is still ignored while our identity is unknown — acting on an
   // all-bots order before we know who we are is what the guard prevents.
   seen = [];
-  const broadcast = { state: { outgoingEmojis: [
-    { message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 1 },
-  ] } };
-  assert.deepEqual(m.companionCollectCommands(broadcast, null, B, seen), [],
-    "broadcast ignored until our smallID is known");
+  const broadcast = {
+    state: {
+      outgoingEmojis: [{ message: "🆘", senderID: 1, recipientID: "AllPlayers", createdAt: 1 }],
+    },
+  };
+  assert.deepEqual(
+    m.companionCollectCommands(broadcast, null, B, seen),
+    [],
+    "broadcast ignored until our smallID is known",
+  );
 
   // A real smallID of 0 is impossible for a player (players start at 1), but the
   // guard must not break the normal path.
   seen = [];
-  assert.deepEqual(m.companionCollectCommands(boss, 0, B, seen), ["donateAllGold"],
-    "an explicit 0 still works — only null/undefined are treated as unresolved");
+  assert.deepEqual(
+    m.companionCollectCommands(boss, 0, B, seen),
+    ["donateAllGold"],
+    "an explicit 0 still works — only null/undefined are treated as unresolved",
+  );
 }
 
 // ---- actions: donate + alliance ---------------------------------------------
@@ -526,10 +637,22 @@ const ACTS = [
   let sendResult = true;
   const m = loadCompanion(
     ACTS,
-    ["companionSend", "companionDonateGold", "companionDonateTroops",
-     "companionRequestAlliance", "companionBreakAlliance",
-     "companionBossNeedsTroops", "companionIsAlliedWithBoss", "companionState"],
-    { sendGamePacket: (o) => { sent.push(o); return sendResult; } },
+    [
+      "companionSend",
+      "companionDonateGold",
+      "companionDonateTroops",
+      "companionRequestAlliance",
+      "companionBreakAlliance",
+      "companionBossNeedsTroops",
+      "companionIsAlliedWithBoss",
+      "companionState",
+    ],
+    {
+      sendGamePacket: (o) => {
+        sent.push(o);
+        return sendResult;
+      },
+    },
   );
 
   const boss = { id: () => "p1", smallID: () => 1, name: () => "EcoMaxer" };
@@ -579,29 +702,52 @@ const ACTS = [
 
 // ---- boss need + alliance predicates ----------------------------------------
 {
-  const m = loadCompanion(ACTS,
-    ["companionBossNeedsTroops", "companionIsAlliedWithBoss"],
-    { sendGamePacket: () => true });
+  const m = loadCompanion(ACTS, ["companionBossNeedsTroops", "companionIsAlliedWithBoss"], {
+    sendGamePacket: () => true,
+  });
 
   const game = { config: () => ({ maxTroops: () => 10000 }) };
-  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 5000 }, 60), true,
-    "50% of max is below the 60% threshold");
-  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 9000 }, 60), false,
-    "90% of max is above the threshold");
-  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 6000 }, 60), true,
-    "exactly at the threshold still counts as needing");
-  assert.equal(m.companionBossNeedsTroops(null, { troops: () => 1 }, 60), false,
-    "no game → false, never throw");
-  assert.equal(m.companionBossNeedsTroops({ config: () => ({ maxTroops: () => 0 }) },
-    { troops: () => 1 }, 60), false, "zero max troops → false, no divide-by-zero");
+  assert.equal(
+    m.companionBossNeedsTroops(game, { troops: () => 5000 }, 60),
+    true,
+    "50% of max is below the 60% threshold",
+  );
+  assert.equal(
+    m.companionBossNeedsTroops(game, { troops: () => 9000 }, 60),
+    false,
+    "90% of max is above the threshold",
+  );
+  assert.equal(
+    m.companionBossNeedsTroops(game, { troops: () => 6000 }, 60),
+    true,
+    "exactly at the threshold still counts as needing",
+  );
+  assert.equal(
+    m.companionBossNeedsTroops(null, { troops: () => 1 }, 60),
+    false,
+    "no game → false, never throw",
+  );
+  assert.equal(
+    m.companionBossNeedsTroops({ config: () => ({ maxTroops: () => 0 }) }, { troops: () => 1 }, 60),
+    false,
+    "zero max troops → false, no divide-by-zero",
+  );
 
   const boss = { smallID: () => 1 };
-  assert.equal(m.companionIsAlliedWithBoss(
-    { isOnSameTeam: () => true, isAlliedWith: () => false }, boss), true, "same team counts");
-  assert.equal(m.companionIsAlliedWithBoss(
-    { isOnSameTeam: () => false, isAlliedWith: () => true }, boss), true, "allied counts");
-  assert.equal(m.companionIsAlliedWithBoss(
-    { isOnSameTeam: () => false, isAlliedWith: () => false }, boss), false);
+  assert.equal(
+    m.companionIsAlliedWithBoss({ isOnSameTeam: () => true, isAlliedWith: () => false }, boss),
+    true,
+    "same team counts",
+  );
+  assert.equal(
+    m.companionIsAlliedWithBoss({ isOnSameTeam: () => false, isAlliedWith: () => true }, boss),
+    true,
+    "allied counts",
+  );
+  assert.equal(
+    m.companionIsAlliedWithBoss({ isOnSameTeam: () => false, isAlliedWith: () => false }, boss),
+    false,
+  );
   assert.equal(m.companionIsAlliedWithBoss({}, boss), false, "missing methods → false");
   assert.equal(m.companionIsAlliedWithBoss(null, null), false);
 }
@@ -609,8 +755,12 @@ const ACTS = [
 // ---- spawn near boss --------------------------------------------------------
 {
   const sent = [];
-  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"],
-    { sendGamePacket: (o) => { sent.push(o); return true; } });
+  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"], {
+    sendGamePacket: (o) => {
+      sent.push(o);
+      return true;
+    },
+  });
 
   // 100×100 map. Land everywhere except a water column at x=50.
   // Tiles owned by someone: the 3×3 block around the boss.
@@ -629,7 +779,7 @@ const ACTS = [
     isBorder: () => false,
   });
 
-  const bossTile = 40 * W + 20;        // (20, 40)
+  const bossTile = 40 * W + 20; // (20, 40)
   const boss = { state: { spawnTile: bossTile } };
   const me = {};
 
@@ -637,8 +787,10 @@ const ACTS = [
   assert.ok(tile != null, "found a spawn tile");
   const p = { x: tile % W, y: Math.floor(tile / W) };
   const dist = Math.hypot(p.x - 20, p.y - 40);
-  assert.ok(dist >= 12 - 1e-9 && dist <= 24 + 1e-9,
-    `spawn ${dist.toFixed(2)} tiles from the boss, inside the ring`);
+  assert.ok(
+    dist >= 12 - 1e-9 && dist <= 24 + 1e-9,
+    `spawn ${dist.toFixed(2)} tiles from the boss, inside the ring`,
+  );
   assert.notEqual(p.x, 50, "never picks a water tile");
 
   // Nearest-first: with open terrain the pick should sit at the inner edge.
@@ -656,8 +808,11 @@ const ACTS = [
   owned.clear();
 
   // No valid tile anywhere → null, never a bogus tile.
-  assert.equal(m.companionPickSpawnTile(mkGame({ allWater: true }), me, boss, 12, 24), null,
-    "all water → null");
+  assert.equal(
+    m.companionPickSpawnTile(mkGame({ allWater: true }), me, boss, 12, 24),
+    null,
+    "all water → null",
+  );
 
   // Boss has not spawned yet → null (nothing to anchor to).
   assert.equal(m.companionPickSpawnTile(mkGame(), me, { state: {} }, 12, 24), null);
@@ -697,15 +852,19 @@ const ACTS = [
 // ---- spawn placement refuses a GameView without bounds checking --------------
 {
   const sent = [];
-  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"],
-    { sendGamePacket: (o) => { sent.push(o); return true; } });
+  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"], {
+    sendGamePacket: (o) => {
+      sent.push(o);
+      return true;
+    },
+  });
 
   const W = 100;
   // A GameView whose ref() wraps instead of throwing, and which is missing
   // isValidCoord. Trusting it would place the bot on the far side of the map.
   const wrapping = {
     width: () => W,
-    ref: (x, y) => ((y * W + x) % (W * W) + W * W) % (W * W),
+    ref: (x, y) => (((y * W + x) % (W * W)) + W * W) % (W * W),
     isLand: () => true,
     hasOwner: () => false,
     isBorder: () => false,
@@ -729,10 +888,21 @@ const ACTS = [
 // ---- factories --------------------------------------------------------------
 {
   const sent = [];
-  const m = loadCompanion(ACTS,
-    ["companionFactoryLevel", "companionFirstFactoryId",
-     "companionBuildOrUpgradeFactory", "companionState"],
-    { sendGamePacket: (o) => { sent.push(o); return true; } });
+  const m = loadCompanion(
+    ACTS,
+    [
+      "companionFactoryLevel",
+      "companionFirstFactoryId",
+      "companionBuildOrUpgradeFactory",
+      "companionState",
+    ],
+    {
+      sendGamePacket: (o) => {
+        sent.push(o);
+        return true;
+      },
+    },
+  );
 
   const me = { smallID: () => 2, id: () => "p2", state: { spawnTile: 777 } };
   const mkUnit = (id, ownerSmallID, level) => ({
@@ -744,26 +914,33 @@ const ACTS = [
 
   assert.equal(m.companionFactoryLevel(mkGame([]), me), 0, "no factory → level 0");
   assert.equal(
-    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 4)]), me), 4,
-    "reads the real level off the unit — the multitab original tracked a local "
-    + "counter that silently drifted from reality",
+    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 4)]), me),
+    4,
+    "reads the real level off the unit — the multitab original tracked a local " +
+      "counter that silently drifted from reality",
   );
   assert.equal(
-    m.companionFactoryLevel(mkGame([mkUnit(1, 9, 9), mkUnit(2, 2, 3)]), me), 3,
+    m.companionFactoryLevel(mkGame([mkUnit(1, 9, 9), mkUnit(2, 2, 3)]), me),
+    3,
     "ignores factories owned by someone else",
   );
   assert.equal(
-    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 2), mkUnit(2, 2, 7)]), me), 7,
+    m.companionFactoryLevel(mkGame([mkUnit(1, 2, 2), mkUnit(2, 2, 7)]), me),
+    7,
     "with several of our own, the highest level wins",
   );
   assert.equal(
-    m.companionFactoryLevel(mkGame([{ id: () => 1, owner: () => ({ smallID: () => 2 }) }]), me), 1,
+    m.companionFactoryLevel(mkGame([{ id: () => 1, owner: () => ({ smallID: () => 2 }) }]), me),
+    1,
     "a factory with no level() still counts as level 1",
   );
   assert.equal(m.companionFactoryLevel(null, me), 0, "no game → 0");
   assert.equal(m.companionFactoryLevel(mkGame([]), null), 0, "no me → 0");
-  assert.equal(m.companionFactoryLevel({ units: () => ({}) }, me), 0,
-    "a non-array from units() must not throw");
+  assert.equal(
+    m.companionFactoryLevel({ units: () => ({}) }, me),
+    0,
+    "a non-array from units() must not throw",
+  );
 
   assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 2), mkUnit(8, 2)]), me), 7);
   assert.equal(m.companionFirstFactoryId(mkGame([mkUnit(7, 9)]), me), null, "not mine");
@@ -780,36 +957,47 @@ const ACTS = [
 
   // No spawn tile and nothing to upgrade → do nothing rather than guess.
   sent.length = 0;
-  assert.equal(m.companionBuildOrUpgradeFactory(mkGame([]), { smallID: () => 2, state: {} }), false);
+  assert.equal(
+    m.companionBuildOrUpgradeFactory(mkGame([]), { smallID: () => 2, state: {} }),
+    false,
+  );
   assert.equal(sent.length, 0);
 }
 
 // ---- attack the boss's target ----------------------------------------------
 {
   const sent = [];
-  const m = loadCompanion(ACTS, ["companionBossTargetId", "companionAttackBossTarget"],
-    { sendGamePacket: (o) => { sent.push(o); return true; } });
+  const m = loadCompanion(ACTS, ["companionBossTargetId", "companionAttackBossTarget"], {
+    sendGamePacket: (o) => {
+      sent.push(o);
+      return true;
+    },
+  });
 
   const enemy = { id: () => "p9", smallID: () => 9 };
   const game = { playerBySmallID: (sid) => (sid === 9 ? enemy : null) };
 
   // outgoingAttacks entries are PLAIN objects with fields, not methods.
-  const boss = { state: { outgoingAttacks: [
-    { troops: 10, attackerID: 1, targetID: 9, retreating: false },
-  ] } };
+  const boss = {
+    state: { outgoingAttacks: [{ troops: 10, attackerID: 1, targetID: 9, retreating: false }] },
+  };
   assert.equal(m.companionBossTargetId(game, boss), "p9");
 
   // The most recent non-retreating attack wins.
-  const boss2 = { state: { outgoingAttacks: [
-    { troops: 10, attackerID: 1, targetID: 5, retreating: false },
-    { troops: 10, attackerID: 1, targetID: 9, retreating: false },
-  ] } };
+  const boss2 = {
+    state: {
+      outgoingAttacks: [
+        { troops: 10, attackerID: 1, targetID: 5, retreating: false },
+        { troops: 10, attackerID: 1, targetID: 9, retreating: false },
+      ],
+    },
+  };
   assert.equal(m.companionBossTargetId(game, boss2), "p9", "latest attack wins");
 
   // Retreating attacks are ignored.
-  const boss3 = { state: { outgoingAttacks: [
-    { troops: 10, attackerID: 1, targetID: 9, retreating: true },
-  ] } };
+  const boss3 = {
+    state: { outgoingAttacks: [{ troops: 10, attackerID: 1, targetID: 9, retreating: true }] },
+  };
   assert.equal(m.companionBossTargetId(game, boss3), null);
 
   assert.equal(m.companionBossTargetId(game, { state: {} }), null);
@@ -836,11 +1024,20 @@ const ENG = [
   "engine/ingame/companion/engine.js",
 ];
 {
-  const m = loadCompanion(ENG,
-    ["companionEnqueue", "companionDrainQueue", "companionCooldownReady",
-     "companionMarkCooldown", "companionLog", "companionState",
-     "COMPANION_MIN_SEND_GAP_MS", "COMPANION_LOG_LIMIT"],
-    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+  const m = loadCompanion(
+    ENG,
+    [
+      "companionEnqueue",
+      "companionDrainQueue",
+      "companionCooldownReady",
+      "companionMarkCooldown",
+      "companionLog",
+      "companionState",
+      "COMPANION_MIN_SEND_GAP_MS",
+      "COMPANION_LOG_LIMIT",
+    ],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} },
+  );
 
   assert.equal(m.COMPANION_MIN_SEND_GAP_MS, 300);
 
@@ -848,8 +1045,14 @@ const ENG = [
   const ran = [];
   m.companionState.queue.length = 0;
   m.companionState.lastSendAt = 0;
-  m.companionEnqueue("a", () => { ran.push("a"); return true; });
-  m.companionEnqueue("b", () => { ran.push("b"); return true; });
+  m.companionEnqueue("a", () => {
+    ran.push("a");
+    return true;
+  });
+  m.companionEnqueue("b", () => {
+    ran.push("b");
+    return true;
+  });
   assert.equal(m.companionState.queue.length, 2, "both queued");
 
   assert.equal(m.companionDrainQueue(10000), 1, "one action per drain");
@@ -863,8 +1066,13 @@ const ENG = [
   // A throwing action must not wedge the queue.
   m.companionState.queue.length = 0;
   m.companionState.lastSendAt = 0;
-  m.companionEnqueue("boom", () => { throw new Error("nope"); });
-  m.companionEnqueue("after", () => { ran.push("after"); return true; });
+  m.companionEnqueue("boom", () => {
+    throw new Error("nope");
+  });
+  m.companionEnqueue("after", () => {
+    ran.push("after");
+    return true;
+  });
   assert.equal(m.companionDrainQueue(30000), 1);
   assert.equal(m.companionDrainQueue(30400), 1);
   assert.deepEqual(ran, ["a", "b", "after"], "queue survived the throw");
@@ -882,8 +1090,10 @@ const ENG = [
   assert.equal(m.COMPANION_LOG_LIMIT, 100, "the log keeps 100 lines");
   for (let i = 0; i < m.COMPANION_LOG_LIMIT + 20; i++) m.companionLog("line " + i);
   assert.equal(m.companionState.log.length, 100, "log capped");
-  assert.ok(String(m.companionState.log[0].text).indexOf("line " + (m.COMPANION_LOG_LIMIT + 19)) !== -1,
-    "newest entry first");
+  assert.ok(
+    String(m.companionState.log[0].text).indexOf("line " + (m.COMPANION_LOG_LIMIT + 19)) !== -1,
+    "newest entry first",
+  );
 }
 
 // ---- the decision tick actually decides --------------------------------------
@@ -893,25 +1103,38 @@ const ENG = [
   // This block pins the loop that decides when a packet goes on the wire.
   const sent = [];
   let fakeGame = null;
-  const m = loadCompanion(ENG,
+  const m = loadCompanion(
+    ENG,
     ["companionTick", "companionState", "companionPatchSettings", "companionResetRunState"],
     {
-      sendGamePacket: (o) => { sent.push(o); return true; },
+      sendGamePacket: (o) => {
+        sent.push(o);
+        return true;
+      },
       registerHelperTickListener: () => {},
       getOpenFrontGameContext: () => (fakeGame ? { game: fakeGame } : null),
-    });
+    },
+  );
 
   const boss = {
-    name: () => "Boss", smallID: () => 1, id: () => "p1",
-    type: () => "HUMAN", isAlive: () => true,
-    troops: () => 1000,                       // 10% of max → below the 60% threshold
+    name: () => "Boss",
+    smallID: () => 1,
+    id: () => "p1",
+    type: () => "HUMAN",
+    isAlive: () => true,
+    troops: () => 1000, // 10% of max → below the 60% threshold
     state: { outgoingEmojis: [], outgoingAllianceRequests: [], spawnTile: 500 },
   };
   const me = {
-    name: () => "Slave", smallID: () => 2, id: () => "p2",
-    type: () => "HUMAN", isAlive: () => true,
-    troops: () => 5000, gold: () => 1000n,
-    isOnSameTeam: () => true, isAlliedWith: () => true,
+    name: () => "Slave",
+    smallID: () => 2,
+    id: () => "p2",
+    type: () => "HUMAN",
+    isAlive: () => true,
+    troops: () => 5000,
+    gold: () => 1000n,
+    isOnSameTeam: () => true,
+    isAlliedWith: () => true,
     state: { spawnTile: 777 },
   };
   const mkGame = () => ({
@@ -924,12 +1147,21 @@ const ENG = [
   });
   // Hold the drain off so these assertions count what the tick QUEUES, not what
   // the queue happens to have already flushed.
-  const tick = () => { m.companionState.lastSendAt = Date.now(); m.companionTick(); };
+  const tick = () => {
+    m.companionState.lastSendAt = Date.now();
+    m.companionTick();
+  };
 
   fakeGame = mkGame();
   m.companionPatchSettings({
-    bossName: "Boss", mode: "passive", autoTroops: true, autoFactory: true,
-    autoGold: false, emojiControl: true, autoSpawn: false, autoAlliance: false,
+    bossName: "Boss",
+    mode: "passive",
+    autoTroops: true,
+    autoFactory: true,
+    autoGold: false,
+    emojiControl: true,
+    autoSpawn: false,
+    autoAlliance: false,
   });
   m.companionResetRunState();
 
@@ -979,10 +1211,17 @@ const ENG = [
 
 // ---- auto-bot hooks ---------------------------------------------------------
 {
-  const m = loadCompanion(ENG,
-    ["companionSpawnCenter", "companionAllianceVeto", "companionState",
-     "companionSettings", "companionPatchSettings"],
-    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+  const m = loadCompanion(
+    ENG,
+    [
+      "companionSpawnCenter",
+      "companionAllianceVeto",
+      "companionState",
+      "companionSettings",
+      "companionPatchSettings",
+    ],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} },
+  );
 
   const W = 100;
   const game = {
@@ -995,16 +1234,30 @@ const ENG = [
     isBorder: () => false,
     myPlayer: () => ({ name: () => "Slave1", smallID: () => 2 }),
     players: () => [
-      { name: () => "EcoMaxer", smallID: () => 1, id: () => "p1", type: () => "HUMAN",
-        isAlive: () => true, state: { spawnTile: 40 * W + 20 } },
-      { name: () => "Slave1", smallID: () => 2, id: () => "p2", type: () => "HUMAN",
-        isAlive: () => true },
+      {
+        name: () => "EcoMaxer",
+        smallID: () => 1,
+        id: () => "p1",
+        type: () => "HUMAN",
+        isAlive: () => true,
+        state: { spawnTile: 40 * W + 20 },
+      },
+      {
+        name: () => "Slave1",
+        smallID: () => 2,
+        id: () => "p2",
+        type: () => "HUMAN",
+        isAlive: () => true,
+      },
     ],
   };
 
   // Disabled → hooks are inert and auto-bot behaves exactly as before.
   m.companionPatchSettings({
-    bossName: "EcoMaxer", mode: "active", autoSpawn: true, autoAlliance: true,
+    bossName: "EcoMaxer",
+    mode: "active",
+    autoSpawn: true,
+    autoAlliance: true,
   });
   m.companionState.enabled = false;
   assert.equal(m.companionSpawnCenter(game, null), null, "disabled → no spawn override");
@@ -1040,8 +1293,7 @@ const ENG = [
   // just because the boss name is mistyped.
   m.companionPatchSettings({ autoAlliance: true });
   m.companionState.bossSmallID = null;
-  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false,
-    "no boss resolved → no veto");
+  assert.equal(m.companionAllianceVeto({ smallID: () => 5 }), false, "no boss resolved → no veto");
 }
 
 // ---- pause is a real stop, and survives a new match --------------------------
@@ -1050,32 +1302,63 @@ const ENG = [
   let autobotEnabled = false;
   fakeWindow.__OFH_autobot = {
     get: () => ({ enabled: autobotEnabled }),
-    set: (p) => { autobotCalls.push(p); if ("enabled" in p) autobotEnabled = p.enabled; },
+    set: (p) => {
+      autobotCalls.push(p);
+      if ("enabled" in p) autobotEnabled = p.enabled;
+    },
   };
 
-  const m = loadCompanion(ENG,
-    ["companionState", "companionPatchSettings", "companionResetRunState",
-     "companionRunAction", "companionSpawnCenter", "companionAllianceVeto",
-     "companionEnqueue", "COMPANION_QUEUE_LIMIT", "setCompanionEnabled"],
-    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+  const m = loadCompanion(
+    ENG,
+    [
+      "companionState",
+      "companionPatchSettings",
+      "companionResetRunState",
+      "companionRunAction",
+      "companionSpawnCenter",
+      "companionAllianceVeto",
+      "companionEnqueue",
+      "COMPANION_QUEUE_LIMIT",
+      "setCompanionEnabled",
+    ],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} },
+  );
 
   const W = 100;
   const boss = {
-    name: () => "Boss", smallID: () => 1, id: () => "p1",
-    type: () => "HUMAN", isAlive: () => true, state: { spawnTile: 40 * W + 20 },
+    name: () => "Boss",
+    smallID: () => 1,
+    id: () => "p1",
+    type: () => "HUMAN",
+    isAlive: () => true,
+    state: { spawnTile: 40 * W + 20 },
   };
   const game = {
-    width: () => W, height: () => W,
+    width: () => W,
+    height: () => W,
     isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < W,
     ref: (x, y) => y * W + x,
-    isLand: () => true, hasOwner: () => false, isBorder: () => false,
-    players: () => [boss, { name: () => "Me", smallID: () => 2, id: () => "p2",
-      type: () => "HUMAN", isAlive: () => true }],
+    isLand: () => true,
+    hasOwner: () => false,
+    isBorder: () => false,
+    players: () => [
+      boss,
+      {
+        name: () => "Me",
+        smallID: () => 2,
+        id: () => "p2",
+        type: () => "HUMAN",
+        isAlive: () => true,
+      },
+    ],
     myPlayer: () => ({ name: () => "Me", smallID: () => 2, id: () => "p2" }),
   };
 
   m.companionPatchSettings({
-    bossName: "Boss", mode: "active", autoSpawn: true, autoAlliance: true,
+    bossName: "Boss",
+    mode: "active",
+    autoSpawn: true,
+    autoAlliance: true,
   });
   m.companionState.enabled = true;
   m.companionState.bossSmallID = 1;
@@ -1107,14 +1390,17 @@ const ENG = [
   m.companionState.enabled = true;
   m.companionState.paused = false;
   autobotCalls.length = 0;
-  autobotEnabled = false;                       // the user had it OFF
+  autobotEnabled = false; // the user had it OFF
   m.companionRunAction("pause", {});
   m.companionRunAction("resume", {});
-  assert.equal(autobotEnabled, false,
-    "resume must not enable an auto-bot the user had switched off — "
-    + "__OFH_autobot.set() persists to storage, so this would stick");
+  assert.equal(
+    autobotEnabled,
+    false,
+    "resume must not enable an auto-bot the user had switched off — " +
+      "__OFH_autobot.set() persists to storage, so this would stick",
+  );
 
-  autobotEnabled = true;                        // the user had it ON
+  autobotEnabled = true; // the user had it ON
   m.companionState.paused = false;
   m.companionRunAction("pause", {});
   assert.equal(autobotEnabled, false, "pause stops the auto-bot too");
@@ -1130,10 +1416,16 @@ const ENG = [
   // says" — the latter stays green no matter what the constant is changed to.
   assert.equal(m.COMPANION_QUEUE_LIMIT, 32, "the cap is 32");
   assert.equal(m.companionState.queue.length, 32, "queue is capped at 32");
-  assert.equal(m.companionState.queue[m.companionState.queue.length - 1].label,
-    "action" + (m.COMPANION_QUEUE_LIMIT + 39), "the newest action is kept");
-  assert.equal(m.companionState.queue[0].label, "action40",
-    "and the oldest ones are the ones dropped");
+  assert.equal(
+    m.companionState.queue[m.companionState.queue.length - 1].label,
+    "action" + (m.COMPANION_QUEUE_LIMIT + 39),
+    "the newest action is kept",
+  );
+  assert.equal(
+    m.companionState.queue[0].label,
+    "action40",
+    "and the oldest ones are the ones dropped",
+  );
 
   delete fakeWindow.__OFH_autobot;
 }
@@ -1149,18 +1441,22 @@ const ENG = [
   let activeEl = null;
   const panelNode = { contains: (el) => el === panelNode.child, child: {} };
 
-  const m = loadCompanion(ENG,
-    ["companionSyncUi", "companionState", "companionPatchSettings"],
-    {
-      sendGamePacket: () => true,
-      registerHelperTickListener: () => {},
-      companionSyncBanner: () => { bannerCalls++; },
-      companionBuildPanel: () => { panelCalls++; },
-      document: {
-        getElementById: () => panelNode,
-        get activeElement() { return activeEl; },
+  const m = loadCompanion(ENG, ["companionSyncUi", "companionState", "companionPatchSettings"], {
+    sendGamePacket: () => true,
+    registerHelperTickListener: () => {},
+    companionSyncBanner: () => {
+      bannerCalls++;
+    },
+    companionBuildPanel: () => {
+      panelCalls++;
+    },
+    document: {
+      getElementById: () => panelNode,
+      get activeElement() {
+        return activeEl;
       },
-    });
+    },
+  });
 
   m.companionPatchSettings({ bossName: "Boss" });
   m.companionState.enabled = true;
@@ -1212,16 +1508,20 @@ const ENG = [
   // dropping the call from companionTickThrottled — which is the one path that
   // actually runs in a match. Go through the real entry point for both of its
   // branches.
-  const viaTick = loadCompanion(ENG,
+  const viaTick = loadCompanion(
+    ENG,
     ["companionTickThrottled", "companionState", "companionPatchSettings"],
     {
       sendGamePacket: () => true,
       registerHelperTickListener: () => {},
-      getOpenFrontGameContext: () => null,   // no game → tick bails early
-      companionSyncBanner: () => { tickBannerCalls++; },
+      getOpenFrontGameContext: () => null, // no game → tick bails early
+      companionSyncBanner: () => {
+        tickBannerCalls++;
+      },
       companionBuildPanel: () => {},
       document: { getElementById: () => null, activeElement: null },
-    });
+    },
+  );
   viaTick.companionPatchSettings({ bossName: "Boss", tickMs: 2000 });
   viaTick.companionState.enabled = true;
   viaTick.companionState.uiSignature = null;
@@ -1237,8 +1537,56 @@ const ENG = [
   viaTick.companionState.lastTickAt = Date.now();
   viaTick.companionState.paused = true;
   viaTick.companionTickThrottled();
-  assert.equal(tickBannerCalls, afterDue + 1,
-    "the not-yet-due branch syncs the banner too");
+  assert.equal(tickBannerCalls, afterDue + 1, "the not-yet-due branch syncs the banner too");
+}
+
+// ---- per-command emoji switches: emojiBindings[id] === null disables it -----
+{
+  // A disabled action must not be reachable by ANY emoji, while every other
+  // action keeps working — companionBindings() drives both the panel's switch
+  // state and the byEmoji lookup companionCollectCommands builds, so this pins
+  // the contract between the two rather than re-deriving one from the other.
+  store.clear();
+  const m = loadCompanion(CMDS, [
+    "companionBindings",
+    "companionPatchSettings",
+    "companionCollectCommands",
+  ]);
+
+  m.companionPatchSettings({ emojiBindings: { pause: null } });
+  const bindings = m.companionBindings();
+  assert.equal(
+    "pause" in bindings,
+    false,
+    "a disabled action id is absent from companionBindings()'s output",
+  );
+  // Ground truth from commands.js's COMPANION_DEFAULT_BINDINGS, spelled out here
+  // (not read back from the module) so this cannot pass merely because both
+  // sides pulled the same possibly-wrong constant.
+  assert.equal(bindings.donateAllGold, "🆘", "an untouched action keeps its default emoji");
+  assert.equal(bindings.breakAlliance, "💔", "and so does another untouched one");
+
+  const boss = {
+    state: {
+      outgoingEmojis: [
+        { message: "🥱", senderID: 1, recipientID: 2, createdAt: 1 }, // disabled action's emoji
+        { message: "🆘", senderID: 1, recipientID: 2, createdAt: 2 }, // still-enabled action
+      ],
+    },
+  };
+  const seen = [];
+  assert.deepEqual(
+    m.companionCollectCommands(boss, 2, bindings, seen),
+    ["donateAllGold"],
+    "the disabled action's emoji (🥱) yields no command; the enabled one (🆘) still fires",
+  );
+
+  // Re-enabling restores the default emoji as a live trigger again, and doing so
+  // must not resurrect an unrelated action that is still disabled.
+  m.companionPatchSettings({ emojiBindings: { pause: "🥱", donateAllGold: null } });
+  const reEnabled = m.companionBindings();
+  assert.equal(reEnabled.pause, "🥱", "re-enabling restores the emoji as a live trigger");
+  assert.equal("donateAllGold" in reEnabled, false, "a still-disabled sibling stays disabled");
 }
 
 console.log("COMPANION OK — pure helpers behave");

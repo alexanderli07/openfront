@@ -33,13 +33,20 @@
   // Bound so a long match cannot grow the dedupe list without limit.
   const COMPANION_SEEN_LIMIT = 256;
 
+  // `emojiBindings[id] === null` means that action id is DISABLED: it is left out
+  // of the returned object entirely, so companionCollectCommands' byEmoji lookup
+  // (built from `bindings[id]`) never sees it and no emoji can trigger it.
   function companionBindings() {
     const saved = companionSettings().emojiBindings;
-    if (!saved || typeof saved !== "object") {
-      return Object.assign({}, COMPANION_DEFAULT_BINDINGS);
-    }
     const out = Object.assign({}, COMPANION_DEFAULT_BINDINGS);
+    if (!saved || typeof saved !== "object") {
+      return out;
+    }
     for (const id of COMPANION_ACTION_IDS) {
+      if (saved[id] === null) {
+        delete out[id];
+        continue;
+      }
       if (typeof saved[id] === "string" && saved[id] !== "") out[id] = saved[id];
     }
     return out;

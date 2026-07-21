@@ -74,9 +74,11 @@
     companionState.queue.length = 0;
     companionState.lastGoldSnapshot = 0;
     companionState.lastSpawnTile = null;
+    companionState.lastBossSpawnTile = null;
     companionState.factoryLevel = 0;
     companionState.bossSmallID = null;
     companionState.bossStatus = "idle";
+    companionState.lastSendFailedAt = 0;
   }
 
   function companionCooldownReady(key, ms, now) {
@@ -287,14 +289,30 @@
     }
     if (inSpawn) {
       if (s.mode === "passive" && s.autoSpawn) {
-        const tile = companionPickSpawnTile(
-          game, me, boss, s.spawnMinRadius, s.spawnMaxRadius,
-        );
-        if (tile != null && tile !== companionState.lastSpawnTile) {
-          companionState.lastSpawnTile = tile;
-          companionEnqueue("spawn", function () {
-            if (companionSpawnAt(tile)) companionLog("🏁 Spawned near boss");
-          });
+        let hasSpawned = false;
+        try {
+          hasSpawned = typeof me.hasSpawned === "function" && me.hasSpawned() === true;
+        } catch (_error) {
+          hasSpawned = false;
+        }
+        const bossSpawn = boss.state ? boss.state.spawnTile : null;
+        // Re-pick only before we have landed, or when the boss itself moves. Without
+        // this the bot oscillates: our own territory makes the tile we just took
+        // `hasOwner`, the picker moves one tile over, SpawnExecution relinquishes
+        // everything and re-conquers there, which frees the first tile again — a
+        // two-step cycle a one-step "same tile as last time" check cannot see.
+        // Measured at 28 relocations across a single spawn phase before this guard.
+        if (!hasSpawned || bossSpawn !== companionState.lastBossSpawnTile) {
+          companionState.lastBossSpawnTile = bossSpawn;
+          const tile = companionPickSpawnTile(
+            game, me, boss, s.spawnMinRadius, s.spawnMaxRadius,
+          );
+          if (tile != null && tile !== companionState.lastSpawnTile) {
+            companionState.lastSpawnTile = tile;
+            companionEnqueue("spawn", function () {
+              if (companionSpawnAt(tile)) companionLog("🏁 Spawned near boss");
+            });
+          }
         }
       }
       return;
@@ -334,9 +352,13 @@
 
     // 5. Factory — build one, then keep upgrading it until it reaches the cap.
     //    Level 0 means we own none yet, so the same call covers both cases.
+    //    Passive mode only — in Active mode the auto-bot's own structureBehavior
+    //    already handles building/upgrading, and running both here would fight it
+    //    for gold and double up on upgrade_structure calls. The 🏭 emoji command
+    //    still works in both modes: it goes through companionRunAction, not here.
     const factoryLevel = companionFactoryLevel(game, me);
     companionState.factoryLevel = factoryLevel;
-    if (s.autoFactory && factoryLevel < s.maxFactoryLevel
+    if (s.mode === "passive" && s.autoFactory && factoryLevel < s.maxFactoryLevel
         && companionCooldownReady("factory", COMPANION_FACTORY_COOLDOWN_MS, now)) {
       companionMarkCooldown("factory", now);
       companionEnqueue("factory", function () {
