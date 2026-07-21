@@ -103,6 +103,20 @@ function syncGoldPerMinuteHelper() {
   );
 }
 
+function syncCompanionHelper() {
+  window.postMessage(
+    {
+      source: BRIDGE_SOURCE_EXTENSION,
+      type: "SET_COMPANION",
+      payload: {
+        panel: Boolean(settings.showCompanionPanel),
+        enabled: Boolean(settings.companionEnabled),
+      },
+    },
+    "*",
+  );
+}
+
 function syncTopGoldPerMinuteHelper() {
   window.postMessage(
     {
@@ -680,6 +694,9 @@ window.addEventListener("ofh-quick-panel-setting", function(e) {
     if (key === "showAutoBotPanel") {
       syncQuickPanelSettings();
     }
+    if (key === "showCompanionPanel" || key === "companionEnabled") {
+      syncQuickPanelSettings();
+    }
   }
 });
 
@@ -806,6 +823,7 @@ function syncHelpers() {
   syncEconomyHeatmapHelper();
   syncExportPartnerHeatmapHelper();
   syncQuickPanelHelper();
+  syncCompanionHelper();
 }
 
 async function loadSettings() {

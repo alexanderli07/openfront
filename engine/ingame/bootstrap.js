@@ -226,6 +226,15 @@
       }
     }
 
+    if (data.type === "SET_COMPANION") {
+      if (typeof setCompanionPanelVisible === "function") {
+        setCompanionPanelVisible(Boolean(data.payload?.panel));
+      }
+      if (typeof setCompanionEnabled === "function") {
+        setCompanionEnabled(Boolean(data.payload?.enabled));
+      }
+    }
+
     if (data.type === "SHOW_QUICK_PANEL") {
       if (typeof setQuickPanelEnabled === "function") {
         setQuickPanelEnabled(data.payload?.enabled);
