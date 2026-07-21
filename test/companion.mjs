@@ -81,6 +81,13 @@ const CORE = ["engine/ingame/companion/core.js"];
   // 2^53 territory: gold can exceed Number.MAX_SAFE_INTEGER in long games.
   assert.equal(companionPercentAmount(10n ** 18n, 50), Number(10n ** 18n / 2n),
     "huge bigint stays finite");
+  // A fractional percent must not make the two branches disagree.
+  assert.equal(
+    companionPercentAmount(1000, 33.6),
+    companionPercentAmount(1000n, 33.6),
+    "fractional pct behaves the same for number and bigint",
+  );
+  assert.equal(companionPercentAmount(1000, 33.6), 340, "fractional pct rounds to 34%");
 }
 
 // ---- companionRingOffsets ---------------------------------------------------

@@ -43,10 +43,13 @@
   function companionPercentAmount(value, percent) {
     let pct = Number(percent);
     if (!Number.isFinite(pct)) pct = 0;
-    pct = Math.max(1, Math.min(100, pct));
+    // Round ONCE, before either branch, so a fractional percent cannot make the
+    // bigint path and the number path disagree (the panel's number inputs do not
+    // constrain step, so 33.6 is reachable).
+    pct = Math.round(Math.max(1, Math.min(100, pct)));
     if (typeof value === "bigint") {
       if (value <= 0n) return 0;
-      const out = (value * BigInt(Math.round(pct))) / 100n;
+      const out = (value * BigInt(pct)) / 100n;
       return Number(out > 0n ? out : 1n);
     }
     const n = Number(value);
