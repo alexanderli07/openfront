@@ -109,4 +109,64 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.deepEqual(companionRingOffsets(24, 12), [], "inverted bounds → empty");
 }
 
+// ---- settings blob ----------------------------------------------------------
+{
+  store.clear();
+  const m = loadCompanion(CORE, [
+    "COMPANION_DEFAULTS",
+    "companionSettings",
+    "companionSaveSettings",
+    "companionPatchSettings",
+    "COMPANION_STORAGE_KEY",
+  ]);
+
+  // Lazy init: nothing was read at load time.
+  assert.equal(store.size, 0, "no storage access at load time");
+
+  const s = m.companionSettings();
+  assert.equal(s.bossName, "", "default boss name empty");
+  assert.equal(s.mode, "passive", "default mode");
+  assert.equal(s.maxFactories, 20, "default maxFactories");
+  assert.strictEqual(m.companionSettings(), s, "settings() is a stable reference");
+
+  m.companionPatchSettings({ bossName: "EcoMaxer", maxFactories: 5 });
+  assert.equal(m.companionSettings().bossName, "EcoMaxer", "patch applied");
+  const raw = JSON.parse(store.get(m.COMPANION_STORAGE_KEY));
+  assert.equal(raw.bossName, "EcoMaxer", "patch persisted");
+  assert.equal(raw.maxFactories, 5, "numeric patch persisted");
+}
+
+{
+  // Whitelist: unknown keys in storage are dropped, defaults fill the gaps.
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(
+    m0.COMPANION_STORAGE_KEY,
+    JSON.stringify({ bossName: "Boss", somethingRemoved: 1, mode: "active" }),
+  );
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  const s = m.companionSettings();
+  assert.equal(s.bossName, "Boss", "known key restored");
+  assert.equal(s.mode, "active", "known key restored");
+  assert.equal("somethingRemoved" in s, false, "unknown key dropped");
+  assert.equal(s.maxFactories, 20, "missing key falls back to default");
+}
+
+{
+  // A corrupt blob must never throw — it would kill every later engine feature.
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(m0.COMPANION_STORAGE_KEY, "{not json");
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  assert.equal(m.companionSettings().mode, "passive", "corrupt blob → defaults");
+}
+
+{
+  // companionState starts empty and is a single shared object.
+  const m = loadCompanion(CORE, ["companionState"]);
+  assert.equal(m.companionState.bossStatus, "idle");
+  assert.deepEqual(m.companionState.log, []);
+  assert.equal(m.companionState.paused, false);
+}
+
 console.log("COMPANION OK — pure helpers behave");

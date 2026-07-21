@@ -76,3 +76,93 @@
     out.sort((a, b) => a.d - b.d);
     return out.map((o) => ({ dx: o.dx, dy: o.dy }));
   }
+
+  // ---------------------------------------------------------------------------
+  // Settings
+  // ---------------------------------------------------------------------------
+
+  const COMPANION_DEFAULTS = {
+    bossName: "",
+    mode: "passive",            // "passive" | "active"
+    autoSpawn: true,
+    spawnMinRadius: 12,
+    spawnMaxRadius: 24,
+    autoAlliance: true,
+    autoTroops: true,
+    troopNeedPct: 60,           // donate once the boss drops to/below this % of max
+    troopSendPct: 40,           // how much of OUR troops to send
+    autoGold: false,
+    goldBuildingPct: 40,        // % of the gold GAINED since last donate, while building
+    goldIdlePct: 100,           // % of total gold once maxFactories is reached
+    autoFactory: true,
+    maxFactories: 20,
+    emojiControl: true,
+    emojiBindings: null,        // null → COMPANION_DEFAULT_BINDINGS (commands.js)
+    tickMs: 2000,
+    hidden: false,
+    activeTab: "control",
+    pos: null,
+  };
+
+  // Only these keys survive a reload. Anything else in an old blob is dropped, so
+  // a stale saved value can never mask a new default.
+  const COMPANION_PERSISTED_KEYS = Object.keys(COMPANION_DEFAULTS);
+
+  const companionState = {
+    settings: null,
+    bossSmallID: null,
+    bossStatus: "idle",   // "idle" | "found" | "missing" | "self"
+    paused: false,
+    log: [],
+    queue: [],
+    lastSendAt: 0,
+    lastSendFailedAt: 0,
+    cooldowns: {},
+    seenEmoji: [],
+    factoryCount: 0,
+    lastGoldSnapshot: 0,
+  };
+
+  function companionLoadSettings() {
+    const s = JSON.parse(JSON.stringify(COMPANION_DEFAULTS));
+    try {
+      const raw = window.localStorage.getItem(COMPANION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        for (const k of COMPANION_PERSISTED_KEYS) {
+          if (parsed[k] !== undefined) s[k] = parsed[k];
+        }
+      }
+    } catch (error) {
+      console.warn("[Companion] failed to load settings:", error);
+    }
+    return s;
+  }
+
+  // Lazy accessor — see the file header for why nothing runs at load time.
+  function companionSettings() {
+    if (companionState.settings === null) {
+      companionState.settings = companionLoadSettings();
+    }
+    return companionState.settings;
+  }
+
+  function companionSaveSettings() {
+    try {
+      window.localStorage.setItem(
+        COMPANION_STORAGE_KEY,
+        JSON.stringify(companionSettings()),
+      );
+    } catch (error) {
+      console.warn("[Companion] failed to save settings:", error);
+    }
+  }
+
+  function companionPatchSettings(patch) {
+    if (!patch || typeof patch !== "object") return;
+    const s = companionSettings();
+    for (const k of COMPANION_PERSISTED_KEYS) {
+      if (patch[k] !== undefined) s[k] = patch[k];
+    }
+    companionSaveSettings();
+  }
