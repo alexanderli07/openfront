@@ -1145,6 +1145,7 @@ const ENG = [
   // signature gate that drives it gets its own regression cover.
   let bannerCalls = 0;
   let panelCalls = 0;
+  let tickBannerCalls = 0;
   let activeEl = null;
   const panelNode = { contains: (el) => el === panelNode.child, child: {} };
 
@@ -1206,6 +1207,38 @@ const ENG = [
   const afterDisable = bannerCalls;
   m.companionSyncUi();
   assert.equal(bannerCalls, afterDisable, "disabled is a stable signature");
+
+  // Reaching companionSyncUi only by calling it directly would not catch someone
+  // dropping the call from companionTickThrottled — which is the one path that
+  // actually runs in a match. Go through the real entry point for both of its
+  // branches.
+  const viaTick = loadCompanion(ENG,
+    ["companionTickThrottled", "companionState", "companionPatchSettings"],
+    {
+      sendGamePacket: () => true,
+      registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => null,   // no game → tick bails early
+      companionSyncBanner: () => { tickBannerCalls++; },
+      companionBuildPanel: () => {},
+      document: { getElementById: () => null, activeElement: null },
+    });
+  viaTick.companionPatchSettings({ bossName: "Boss", tickMs: 2000 });
+  viaTick.companionState.enabled = true;
+  viaTick.companionState.uiSignature = null;
+
+  // Due branch.
+  viaTick.companionState.lastTickAt = 0;
+  viaTick.companionTickThrottled();
+  assert.ok(tickBannerCalls >= 1, "the due branch of the tick syncs the banner");
+
+  // Not-yet-due branch: the banner must still follow state that changed elsewhere
+  // (an emoji command can pause the bot between two decision ticks).
+  const afterDue = tickBannerCalls;
+  viaTick.companionState.lastTickAt = Date.now();
+  viaTick.companionState.paused = true;
+  viaTick.companionTickThrottled();
+  assert.equal(tickBannerCalls, afterDue + 1,
+    "the not-yet-due branch syncs the banner too");
 }
 
 console.log("COMPANION OK — pure helpers behave");
