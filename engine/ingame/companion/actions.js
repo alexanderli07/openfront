@@ -121,3 +121,54 @@
     }
     return false;
   }
+
+  // ---------------------------------------------------------------------------
+  // Spawn
+  // ---------------------------------------------------------------------------
+
+  // Nearest valid land tile inside the [minR, maxR] ring around the boss's spawn.
+  //
+  // The multitab original built its candidate by splitting the tile id's digit
+  // string in half to get (x, y) and then jumping to a random point on a circle —
+  // arithmetic that only lands correctly when the map width is a power of ten.
+  // Here the ring is enumerated properly and every candidate is validated against
+  // the same rules the game enforces, nearest-first so the bot hugs the boss.
+  function companionPickSpawnTile(game, me, boss, minR, maxR) {
+    if (!game || !boss || !boss.state) return null;
+    const bossTile = boss.state.spawnTile;
+    if (bossTile == null) return null;
+    if (typeof game.width !== "function" || typeof game.ref !== "function") return null;
+
+    let width = 0;
+    try {
+      width = Number(game.width());
+    } catch (_error) {
+      return null;
+    }
+    if (!Number.isFinite(width) || width <= 0) return null;
+
+    const origin = companionTileToXY(bossTile, width);
+    const offsets = companionRingOffsets(minR, maxR);
+
+    for (const off of offsets) {
+      const x = origin.x + off.dx;
+      const y = origin.y + off.dy;
+      try {
+        if (typeof game.isValidCoord === "function" && !game.isValidCoord(x, y)) continue;
+        const tile = game.ref(x, y);
+        if (tile == null) continue;
+        if (typeof game.isLand === "function" && !game.isLand(tile)) continue;
+        if (typeof game.hasOwner === "function" && game.hasOwner(tile)) continue;
+        if (typeof game.isBorder === "function" && game.isBorder(tile)) continue;
+        return tile;
+      } catch (_error) {
+        /* skip this candidate */
+      }
+    }
+    return null;
+  }
+
+  function companionSpawnAt(tile) {
+    if (tile == null || !Number.isFinite(Number(tile))) return false;
+    return companionSend({ type: "spawn", tile: Number(tile) });
+  }

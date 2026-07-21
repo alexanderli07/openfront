@@ -600,4 +600,75 @@ const ACTS = [
   assert.equal(m.companionIsAlliedWithBoss(null, null), false);
 }
 
+// ---- spawn near boss --------------------------------------------------------
+{
+  const sent = [];
+  const m = loadCompanion(ACTS, ["companionPickSpawnTile", "companionSpawnAt"],
+    { sendGamePacket: (o) => { sent.push(o); return true; } });
+
+  // 100×100 map. Land everywhere except a water column at x=50.
+  // Tiles owned by someone: the 3×3 block around the boss.
+  const W = 100;
+  const H = 100;
+  const owned = new Set();
+  const mkGame = (opts) => ({
+    width: () => W,
+    height: () => H,
+    isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < H,
+    ref: (x, y) => y * W + x,
+    x: (t) => t % W,
+    y: (t) => Math.floor(t / W),
+    isLand: (t) => (opts && opts.allWater ? false : t % W !== 50),
+    hasOwner: (t) => owned.has(t),
+    isBorder: () => false,
+  });
+
+  const bossTile = 40 * W + 20;        // (20, 40)
+  const boss = { state: { spawnTile: bossTile } };
+  const me = {};
+
+  const tile = m.companionPickSpawnTile(mkGame(), me, boss, 12, 24);
+  assert.ok(tile != null, "found a spawn tile");
+  const p = { x: tile % W, y: Math.floor(tile / W) };
+  const dist = Math.hypot(p.x - 20, p.y - 40);
+  assert.ok(dist >= 12 - 1e-9 && dist <= 24 + 1e-9,
+    `spawn ${dist.toFixed(2)} tiles from the boss, inside the ring`);
+  assert.notEqual(p.x, 50, "never picks a water tile");
+
+  // Nearest-first: with open terrain the pick should sit at the inner edge.
+  assert.ok(dist < 14, "prefers the closest valid tile in the ring");
+
+  // Owned tiles are skipped.
+  owned.clear();
+  for (let dy = -14; dy <= 14; dy++) {
+    for (let dx = -14; dx <= 14; dx++) owned.add((40 + dy) * W + (20 + dx));
+  }
+  const tile2 = m.companionPickSpawnTile(mkGame(), me, boss, 12, 24);
+  assert.ok(tile2 != null, "still finds a tile further out");
+  const p2 = { x: tile2 % W, y: Math.floor(tile2 / W) };
+  assert.ok(Math.hypot(p2.x - 20, p2.y - 40) > 14, "skipped the owned block");
+  owned.clear();
+
+  // No valid tile anywhere → null, never a bogus tile.
+  assert.equal(m.companionPickSpawnTile(mkGame({ allWater: true }), me, boss, 12, 24), null,
+    "all water → null");
+
+  // Boss has not spawned yet → null (nothing to anchor to).
+  assert.equal(m.companionPickSpawnTile(mkGame(), me, { state: {} }, 12, 24), null);
+  assert.equal(m.companionPickSpawnTile(mkGame(), me, null, 12, 24), null);
+  assert.equal(m.companionPickSpawnTile(null, me, boss, 12, 24), null);
+
+  // Ring that falls entirely off the map → null, no crash.
+  const edgeBoss = { state: { spawnTile: 0 } };
+  const t3 = m.companionPickSpawnTile(mkGame(), me, edgeBoss, 12, 24);
+  assert.ok(t3 === null || (t3 >= 0 && t3 < W * H), "on-map or null, never out of range");
+
+  // The emitted intent matches SpawnIntentSchema.
+  sent.length = 0;
+  assert.equal(m.companionSpawnAt(1234), true);
+  assert.deepEqual(sent[0], { type: "spawn", tile: 1234 });
+  assert.equal(m.companionSpawnAt(null), false, "no tile → no packet");
+  assert.equal(sent.length, 1);
+}
+
 console.log("COMPANION OK — pure helpers behave");
