@@ -101,6 +101,7 @@ const INGAME_FILES = [
   "auto-donate.js",
   "companion/core.js",
   "companion/commands.js",
+  "companion/actions.js",
   "quick-panel.js",
   "bootstrap.js",
 ].map((f) => `engine/ingame/${f}`);

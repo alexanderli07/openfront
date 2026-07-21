@@ -26,16 +26,25 @@ const fakeWindow = { localStorage: fakeLocalStorage, dispatchEvent() {}, addEven
  * Concatenate engine files and return the named top-level declarations.
  * @param {string[]} files repo-relative paths
  * @param {string[]} names top-level names to return
+ * @param {Object} stubs optional function stubs to inject into the scope
  */
-function loadCompanion(files, names) {
+function loadCompanion(files, names, stubs) {
   const src = files.map((f) => fs.readFileSync(path.join(ROOT, f), "utf8")).join("\n");
+  const stubEntries = Object.entries(stubs || {});
+  const stubNames = stubEntries.map(([k]) => k);
   const factory = new Function(
     "window",
     "localStorage",
     "document",
+    ...stubNames,
     `${src}\nreturn { ${names.join(", ")} };`,
   );
-  return factory(fakeWindow, fakeLocalStorage, { getElementById: () => null });
+  return factory(
+    fakeWindow,
+    fakeLocalStorage,
+    { getElementById: () => null },
+    ...stubEntries.map(([, v]) => v),
+  );
 }
 
 const CORE = ["engine/ingame/companion/core.js"];
@@ -498,6 +507,97 @@ const CMDS = ["engine/ingame/companion/core.js", "engine/ingame/companion/comman
   seen = [];
   assert.deepEqual(m.companionCollectCommands(boss, 0, B, seen), ["donateAllGold"],
     "an explicit 0 still works — only null/undefined are treated as unresolved");
+}
+
+// ---- actions: donate + alliance ---------------------------------------------
+const ACTS = [
+  "engine/ingame/companion/core.js",
+  "engine/ingame/companion/commands.js",
+  "engine/ingame/companion/actions.js",
+];
+{
+  const sent = [];
+  let sendResult = true;
+  const m = loadCompanion(
+    ACTS,
+    ["companionSend", "companionDonateGold", "companionDonateTroops",
+     "companionRequestAlliance", "companionBreakAlliance",
+     "companionBossNeedsTroops", "companionIsAlliedWithBoss", "companionState"],
+    { sendGamePacket: (o) => { sent.push(o); return sendResult; } },
+  );
+
+  const boss = { id: () => "p1", smallID: () => 1, name: () => "EcoMaxer" };
+
+  // -- gold: bigint in, plain Number on the wire (schema is z.number()) --------
+  sent.length = 0;
+  const me = { gold: () => 1000n, troops: () => 5000, id: () => "p2", smallID: () => 2 };
+  assert.equal(m.companionDonateGold(me, boss, 40), true);
+  assert.deepEqual(sent[0], { type: "donate_gold", recipient: "p1", gold: 400 });
+  assert.equal(typeof sent[0].gold, "number", "gold must not be a bigint on the wire");
+
+  // recipient is the string PlayerID, never smallID
+  assert.equal(sent[0].recipient, "p1");
+
+  // -- troops -----------------------------------------------------------------
+  sent.length = 0;
+  assert.equal(m.companionDonateTroops(me, boss, 40), true);
+  assert.deepEqual(sent[0], { type: "donate_troops", recipient: "p1", troops: 2000 });
+
+  // -- nothing to give → no packet -------------------------------------------
+  sent.length = 0;
+  assert.equal(m.companionDonateGold({ gold: () => 0n }, boss, 40), false);
+  assert.equal(m.companionDonateTroops({ troops: () => 0 }, boss, 40), false);
+  assert.equal(sent.length, 0, "never send an empty donation");
+
+  // -- alliance ---------------------------------------------------------------
+  sent.length = 0;
+  assert.equal(m.companionRequestAlliance(boss), true);
+  assert.deepEqual(sent[0], { type: "allianceRequest", recipient: "p1" });
+  sent.length = 0;
+  assert.equal(m.companionBreakAlliance(boss), true);
+  assert.deepEqual(sent[0], { type: "breakAlliance", recipient: "p1" });
+
+  // -- no boss → never send ---------------------------------------------------
+  sent.length = 0;
+  assert.equal(m.companionRequestAlliance(null), false);
+  assert.equal(m.companionDonateGold(me, null, 40), false);
+  assert.equal(sent.length, 0);
+
+  // -- a failed send is recorded so the panel can show it ---------------------
+  sendResult = false;
+  m.companionState.lastSendFailedAt = 0;
+  assert.equal(m.companionSend({ type: "donate_gold", recipient: "p1", gold: 1 }), false);
+  assert.ok(m.companionState.lastSendFailedAt > 0, "failure timestamped");
+  sendResult = true;
+}
+
+// ---- boss need + alliance predicates ----------------------------------------
+{
+  const m = loadCompanion(ACTS,
+    ["companionBossNeedsTroops", "companionIsAlliedWithBoss"],
+    { sendGamePacket: () => true });
+
+  const game = { config: () => ({ maxTroops: () => 10000 }) };
+  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 5000 }, 60), true,
+    "50% of max is below the 60% threshold");
+  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 9000 }, 60), false,
+    "90% of max is above the threshold");
+  assert.equal(m.companionBossNeedsTroops(game, { troops: () => 6000 }, 60), true,
+    "exactly at the threshold still counts as needing");
+  assert.equal(m.companionBossNeedsTroops(null, { troops: () => 1 }, 60), false,
+    "no game → false, never throw");
+  assert.equal(m.companionBossNeedsTroops({ config: () => ({ maxTroops: () => 0 }) },
+    { troops: () => 1 }, 60), false, "zero max troops → false, no divide-by-zero");
+
+  const boss = { smallID: () => 1 };
+  assert.equal(m.companionIsAlliedWithBoss(
+    { isOnSameTeam: () => true, isAlliedWith: () => false }, boss), true, "same team counts");
+  assert.equal(m.companionIsAlliedWithBoss(
+    { isOnSameTeam: () => false, isAlliedWith: () => true }, boss), true, "allied counts");
+  assert.equal(m.companionIsAlliedWithBoss(
+    { isOnSameTeam: () => false, isAlliedWith: () => false }, boss), false);
+  assert.equal(m.companionIsAlliedWithBoss({}, boss), false, "missing methods → false");
+  assert.equal(m.companionIsAlliedWithBoss(null, null), false);
 }
 
 console.log("COMPANION OK — pure helpers behave");
