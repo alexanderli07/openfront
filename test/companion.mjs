@@ -30,7 +30,11 @@ const fakeWindow = { localStorage: fakeLocalStorage, dispatchEvent() {}, addEven
  */
 function loadCompanion(files, names, stubs) {
   const src = files.map((f) => fs.readFileSync(path.join(ROOT, f), "utf8")).join("\n");
-  const stubEntries = Object.entries(stubs || {});
+  // `document` is a fixed parameter (below), not one of the injected stubs, so
+  // pull it out of stubs here rather than passing it through stubNames/stubEntries
+  // — otherwise it would shadow the "document" parameter under a different name.
+  const { document: documentStub, ...restStubs } = stubs || {};
+  const stubEntries = Object.entries(restStubs);
   const stubNames = stubEntries.map(([k]) => k);
   const factory = new Function(
     "window",
@@ -42,7 +46,7 @@ function loadCompanion(files, names, stubs) {
   return factory(
     fakeWindow,
     fakeLocalStorage,
-    { getElementById: () => null },
+    documentStub || { getElementById: () => null },
     ...stubEntries.map(([, v]) => v),
   );
 }
@@ -1132,6 +1136,76 @@ const ENG = [
     "and the oldest ones are the ones dropped");
 
   delete fakeWindow.__OFH_autobot;
+}
+
+// ---- the warning banner keeps up with the tick -------------------------------
+{
+  // The banner exists so a player with several tabs open can tell at a glance
+  // which one is a bot. A banner that goes stale defeats the whole point, so the
+  // signature gate that drives it gets its own regression cover.
+  let bannerCalls = 0;
+  let panelCalls = 0;
+  let activeEl = null;
+  const panelNode = { contains: (el) => el === panelNode.child, child: {} };
+
+  const m = loadCompanion(ENG,
+    ["companionSyncUi", "companionState", "companionPatchSettings"],
+    {
+      sendGamePacket: () => true,
+      registerHelperTickListener: () => {},
+      companionSyncBanner: () => { bannerCalls++; },
+      companionBuildPanel: () => { panelCalls++; },
+      document: {
+        getElementById: () => panelNode,
+        get activeElement() { return activeEl; },
+      },
+    });
+
+  m.companionPatchSettings({ bossName: "Boss" });
+  m.companionState.enabled = true;
+  m.companionState.bossStatus = "missing";
+  m.companionState.uiSignature = null;
+
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 1, "first call renders the banner");
+  assert.equal(panelCalls, 1, "and the panel");
+
+  // A quiet tick must cost nothing — this runs every 250ms for the whole match.
+  m.companionSyncUi();
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 1, "an unchanged tick does not touch the DOM");
+  assert.equal(panelCalls, 1, "for the panel either");
+
+  // The boss turning up mid-match must move the banner off its red state.
+  m.companionState.bossStatus = "found";
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 2, "a status change re-renders the banner");
+
+  // Pausing and the factory level are part of what the UI shows.
+  m.companionState.paused = true;
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 3, "pausing re-renders");
+  m.companionState.factoryLevel = 4;
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 4, "a factory level change re-renders");
+
+  // While the user is typing into the panel, the banner still updates but the
+  // panel must NOT be rebuilt — a rebuild would drop focus mid-edit.
+  const panelBefore = panelCalls;
+  activeEl = panelNode.child;
+  m.companionState.bossStatus = "missing";
+  m.companionSyncUi();
+  assert.equal(bannerCalls, 5, "banner still updates while the user types");
+  assert.equal(panelCalls, panelBefore, "but the panel is left alone");
+  activeEl = null;
+
+  // Disabling collapses the signature to a single value so the banner is torn
+  // down exactly once, not on every following tick.
+  m.companionState.enabled = false;
+  m.companionSyncUi();
+  const afterDisable = bannerCalls;
+  m.companionSyncUi();
+  assert.equal(bannerCalls, afterDisable, "disabled is a stable signature");
 }
 
 console.log("COMPANION OK — pure helpers behave");

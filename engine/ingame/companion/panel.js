@@ -148,7 +148,7 @@ style="width:34px">${companionEsc(bindings[id])}</button>
   function companionRenderLog() {
     const sockOk = typeof isSocketConnected === "function" ? isSocketConnected() : null;
     const head = `<div class="ohcp-row"><span class="ohcp-label">${companionEsc(companionTr("Socket"))}</span>
-<span class="${sockOk === false ? "ohcp-warn" : ""}">${sockOk === null ? "?" : sockOk ? "OK" : companionTr("disconnected")}</span></div>`;
+<span class="${sockOk === false ? "ohcp-warn" : ""}">${companionEsc(sockOk === null ? "?" : sockOk ? "OK" : companionTr("disconnected"))}</span></div>`;
     const fail = companionState.lastSendFailedAt
       ? `<div class="ohcp-row ohcp-warn">${companionEsc(companionTr("Last send failed"))}: ${
           new Date(companionState.lastSendFailedAt).toLocaleTimeString()}</div>`
