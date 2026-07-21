@@ -1120,7 +1120,10 @@ const ENG = [
   for (let i = 0; i < m.COMPANION_QUEUE_LIMIT + 40; i++) {
     m.companionEnqueue("action" + i, () => {});
   }
-  assert.equal(m.companionState.queue.length, m.COMPANION_QUEUE_LIMIT, "queue is capped");
+  // Pin the constant itself, not just "the queue caps to whatever the constant
+  // says" — the latter stays green no matter what the constant is changed to.
+  assert.equal(m.COMPANION_QUEUE_LIMIT, 32, "the cap is 32");
+  assert.equal(m.companionState.queue.length, 32, "queue is capped at 32");
   assert.equal(m.companionState.queue[m.companionState.queue.length - 1].label,
     "action" + (m.COMPANION_QUEUE_LIMIT + 39), "the newest action is kept");
   assert.equal(m.companionState.queue[0].label, "action40",
