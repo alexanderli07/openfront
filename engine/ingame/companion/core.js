@@ -15,6 +15,7 @@
 
   const COMPANION_STORAGE_KEY = "openfront-helper-companion-v1";
   const COMPANION_PANEL_ID = "openfront-helper-companion-panel";
+  const COMPANION_BANNER_ID = "openfront-helper-companion-banner";
   const COMPANION_STYLE_ID = "openfront-helper-companion-styles";
   const COMPANION_PANEL_POS_KEY = "openfront-helper-companion-pos";
 
