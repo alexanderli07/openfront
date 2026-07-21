@@ -169,4 +169,86 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.equal(m.companionState.paused, false);
 }
 
+// ---- settings validation ----------------------------------------------------
+{
+  store.clear();
+  const m = loadCompanion(CORE, [
+    "companionSettings", "companionPatchSettings", "companionCoerceSetting",
+    "COMPANION_STORAGE_KEY",
+  ]);
+
+  // An emptied number input yields NaN. It must NOT land in settings — a NaN
+  // maxFactories makes `factories < maxFactories` false forever, silently
+  // switching auto-factory off with nothing on screen to explain it.
+  m.companionPatchSettings({ maxFactories: Number.NaN });
+  assert.equal(m.companionSettings().maxFactories, 20, "NaN keeps the previous value");
+
+  m.companionPatchSettings({ maxFactories: "not-a-number" });
+  assert.equal(m.companionSettings().maxFactories, 20, "garbage string keeps previous value");
+
+  // Numbers are clamped to their declared range, not rejected.
+  m.companionPatchSettings({ troopNeedPct: 500 });
+  assert.equal(m.companionSettings().troopNeedPct, 100, "clamped to max");
+  m.companionPatchSettings({ troopSendPct: -5 });
+  assert.equal(m.companionSettings().troopSendPct, 1, "clamped to min");
+  m.companionPatchSettings({ tickMs: 10 });
+  assert.equal(m.companionSettings().tickMs, 250, "tick floor");
+  m.companionPatchSettings({ maxFactories: 0 });
+  assert.equal(m.companionSettings().maxFactories, 0, "zero factories is a legal setting");
+  m.companionPatchSettings({ spawnMinRadius: 12.7 });
+  assert.equal(m.companionSettings().spawnMinRadius, 13, "rounded to an integer");
+
+  // Enums reject anything not in the list.
+  m.companionPatchSettings({ mode: 12345 });
+  assert.equal(m.companionSettings().mode, "passive", "bad enum keeps previous value");
+  m.companionPatchSettings({ mode: "active" });
+  assert.equal(m.companionSettings().mode, "active", "valid enum applies");
+  m.companionPatchSettings({ activeTab: "nope" });
+  assert.equal(m.companionSettings().activeTab, "control", "bad tab keeps previous value");
+
+  // Strings and flags.
+  m.companionPatchSettings({ bossName: "  EcoMaxer  " });
+  assert.equal(m.companionSettings().bossName, "EcoMaxer", "boss name is trimmed");
+  m.companionPatchSettings({ bossName: 42 });
+  assert.equal(m.companionSettings().bossName, "EcoMaxer", "non-string keeps previous value");
+  m.companionPatchSettings({ autoGold: 1 });
+  assert.equal(m.companionSettings().autoGold, true, "flags coerce to boolean");
+  assert.strictEqual(m.companionSettings().autoGold, true, "flag is a real boolean, not 1");
+
+  // Objects.
+  m.companionPatchSettings({ emojiBindings: { pause: "😀" } });
+  assert.deepEqual(m.companionSettings().emojiBindings, { pause: "😀" });
+  m.companionPatchSettings({ emojiBindings: "nope" });
+  assert.deepEqual(m.companionSettings().emojiBindings, { pause: "😀" }, "bad object rejected");
+  m.companionPatchSettings({ emojiBindings: null });
+  assert.equal(m.companionSettings().emojiBindings, null, "null resets bindings");
+
+  assert.equal(m.companionCoerceSetting("maxFactories", "7"), 7, "numeric string is usable");
+  assert.equal(m.companionCoerceSetting("maxFactories", Number.NaN), undefined);
+}
+
+{
+  // A stored blob written by an older build cannot inject out-of-range values.
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(m0.COMPANION_STORAGE_KEY, JSON.stringify({
+    maxFactories: 99999, troopNeedPct: "junk", mode: "nonsense", tickMs: 1,
+  }));
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  const s = m.companionSettings();
+  assert.equal(s.maxFactories, 100, "stored value clamped on load");
+  assert.equal(s.troopNeedPct, 60, "stored garbage falls back to the default");
+  assert.equal(s.mode, "passive", "stored bad enum falls back to the default");
+  assert.equal(s.tickMs, 250, "stored value clamped on load");
+}
+
+{
+  // JSON.parse("null") must not throw during load.
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(m0.COMPANION_STORAGE_KEY, "null");
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  assert.equal(m.companionSettings().mode, "passive", "null blob → defaults, no throw");
+}
+
 console.log("COMPANION OK — pure helpers behave");

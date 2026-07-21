@@ -108,6 +108,47 @@
   // a stale saved value can never mask a new default.
   const COMPANION_PERSISTED_KEYS = Object.keys(COMPANION_DEFAULTS);
 
+  // Per-key validation. The panel, the loader and the public
+  // window.__OFH_companion.set() bridge all funnel through
+  // companionCoerceSetting, so this is the single place a bad value is stopped.
+  // An unusable value KEEPS the previous one rather than overwriting it: the
+  // panel's number inputs yield NaN when emptied, and a NaN maxFactories would
+  // switch auto-factory off silently with nothing on screen to explain it.
+  const COMPANION_NUMBER_RANGES = {
+    spawnMinRadius: [1, 200],
+    spawnMaxRadius: [1, 200],
+    troopNeedPct: [1, 100],
+    troopSendPct: [1, 100],
+    goldBuildingPct: [1, 100],
+    goldIdlePct: [1, 100],
+    maxFactories: [0, 100],
+    tickMs: [250, 60000],
+  };
+
+  const COMPANION_ENUMS = {
+    mode: ["passive", "active"],
+    activeTab: ["control", "emoji", "log"],
+  };
+
+  // Sanitised value, or undefined when the input is unusable.
+  function companionCoerceSetting(key, value) {
+    const range = COMPANION_NUMBER_RANGES[key];
+    if (range) {
+      const n = Math.round(Number(value));
+      if (!Number.isFinite(n)) return undefined;
+      return Math.max(range[0], Math.min(range[1], n));
+    }
+    const allowed = COMPANION_ENUMS[key];
+    if (allowed) return allowed.indexOf(value) === -1 ? undefined : value;
+    if (key === "bossName") return typeof value === "string" ? value.trim() : undefined;
+    if (key === "emojiBindings" || key === "pos") {
+      if (value === null) return null;
+      return value && typeof value === "object" ? value : undefined;
+    }
+    // Every remaining key in COMPANION_DEFAULTS is a boolean flag.
+    return Boolean(value);
+  }
+
   const companionState = {
     settings: null,
     bossSmallID: null,
@@ -129,8 +170,18 @@
       const raw = window.localStorage.getItem(COMPANION_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        for (const k of COMPANION_PERSISTED_KEYS) {
-          if (parsed[k] !== undefined) s[k] = parsed[k];
+        // Explicit shape check: JSON.parse("null") returns null, and indexing it
+        // would throw. The catch below would swallow that, but only by accident —
+        // and a later refactor that narrows the try block would turn it into a
+        // load-time throw, which kills every engine feature concatenated after us.
+        if (parsed && typeof parsed === "object") {
+          for (const k of COMPANION_PERSISTED_KEYS) {
+            if (parsed[k] === undefined) continue;
+            // Same gate as companionPatchSettings: a blob written by an older
+            // build (or hand-edited) cannot inject an out-of-range value.
+            const v = companionCoerceSetting(k, parsed[k]);
+            if (v !== undefined) s[k] = v;
+          }
         }
       }
     } catch (error) {
@@ -162,7 +213,10 @@
     if (!patch || typeof patch !== "object") return;
     const s = companionSettings();
     for (const k of COMPANION_PERSISTED_KEYS) {
-      if (patch[k] !== undefined) s[k] = patch[k];
+      if (patch[k] === undefined) continue;
+      const v = companionCoerceSetting(k, patch[k]);
+      if (v === undefined) continue; // unusable — keep the previous value
+      s[k] = v;
     }
     companionSaveSettings();
   }
