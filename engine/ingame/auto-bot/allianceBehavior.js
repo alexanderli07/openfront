@@ -276,6 +276,17 @@
         const human = this.resolveEventPlayer(ev);
         if (!human || !human.isPlayer || !human.isPlayer()) continue;
 
+        // DIVERGENCE: Companion mode only allies with the boss — also vetoes
+        // renewing an alliance already held with a non-boss player (formed
+        // before companion mode was enabled, or before the boss was resolved).
+        // Placed before getAllianceDecision() below (no this.random.* call
+        // precedes it in this function), so when the veto fires it skips that
+        // call's RNG draws entirely — same placement rationale as the
+        // handleAllianceRequests() guard above.
+        if (typeof companionAllianceVeto === "function" && companionAllianceVeto(human)) {
+          continue;
+        }
+
         if (!this.getAllianceDecision(human, true)) continue;
 
         // src: this.game.addExecution(new AllianceExtensionExecution(this.player,
@@ -307,6 +318,10 @@
         if (
           this.random.chance(30) &&
           // DIVERGENCE: Companion mode only allies with the boss.
+          // When this veto fires, the RNG draws inside getAllianceDecision()
+          // below are short-circuited and never made. This random stream is
+          // a client-local bot-decision PRNG (not the synced game simulation),
+          // so skipping draws here causes no cross-client desync.
           !(typeof companionAllianceVeto === "function" && companionAllianceVeto(enemy)) &&
           !this.isRegularBot(enemy) &&
           this.canSendAllianceRequest(enemy) &&
