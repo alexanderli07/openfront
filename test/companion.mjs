@@ -251,4 +251,32 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.equal(m.companionSettings().mode, "passive", "null blob → defaults, no throw");
 }
 
+// ---- coercion covers every non-boolean default ------------------------------
+{
+  // companionCoerceSetting's last branch assumes "anything left is a boolean
+  // flag". That assumption is only safe while every non-boolean key in
+  // COMPANION_DEFAULTS has an explicit branch. Without this test, adding a new
+  // numeric setting and forgetting its range entry would silently coerce it to
+  // true/false at runtime with nothing to show for it.
+  const m = loadCompanion(CORE, [
+    "COMPANION_DEFAULTS", "COMPANION_NUMBER_RANGES", "COMPANION_ENUMS",
+    "companionCoerceSetting",
+  ]);
+  const explicit = new Set([
+    ...Object.keys(m.COMPANION_NUMBER_RANGES),
+    ...Object.keys(m.COMPANION_ENUMS),
+    "bossName", "emojiBindings", "pos",
+  ]);
+  const unhandled = Object.keys(m.COMPANION_DEFAULTS).filter(
+    (k) => typeof m.COMPANION_DEFAULTS[k] !== "boolean" && !explicit.has(k),
+  );
+  assert.deepEqual(unhandled, [],
+    `these non-boolean settings have no coercion branch and would be forced to a `
+    + `boolean: ${unhandled.join(", ")}`);
+
+  // And the converse: every key claiming an explicit branch actually exists.
+  const missing = [...explicit].filter((k) => !(k in m.COMPANION_DEFAULTS));
+  assert.deepEqual(missing, [], `coercion branches for keys that do not exist: ${missing.join(", ")}`);
+}
+
 console.log("COMPANION OK — pure helpers behave");
