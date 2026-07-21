@@ -199,6 +199,12 @@
           req.reject();
           continue;
         }
+        // DIVERGENCE: Companion mode only allies with the boss. Vetoes nothing
+        // unless companion is enabled, in Active mode, AND a boss was resolved.
+        if (typeof companionAllianceVeto === "function" && companionAllianceVeto(requestor)) {
+          req.reject();
+          continue;
+        }
         // Alliance Request intents created during the spawn phase are executed on
         // the first tick post-spawn phase. With the following condition we reject
         // all requests created during the spawn phase.
@@ -300,6 +306,8 @@
       for (const enemy of borderingEnemies) {
         if (
           this.random.chance(30) &&
+          // DIVERGENCE: Companion mode only allies with the boss.
+          !(typeof companionAllianceVeto === "function" && companionAllianceVeto(enemy)) &&
           !this.isRegularBot(enemy) &&
           this.canSendAllianceRequest(enemy) &&
           this.getAllianceDecision(enemy, false)
@@ -425,6 +433,8 @@
 
       // Spread outreach across the far field rather than always picking the same one.
       const target = this.random.randElement(candidates);
+      // DIVERGENCE: Companion mode only allies with the boss.
+      if (typeof companionAllianceVeto === "function" && companionAllianceVeto(target)) return;
       emitIntent(
         ctors.allianceRequest,
         this.player.__src ?? this.player,
