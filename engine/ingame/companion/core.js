@@ -220,3 +220,77 @@
     }
     companionSaveSettings();
   }
+
+  // ---------------------------------------------------------------------------
+  // Boss resolution
+  // ---------------------------------------------------------------------------
+
+  function companionPlayerType(p) {
+    try {
+      return String(p.type ? p.type() : "");
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  // Live human players, for the panel's boss picker.
+  function companionHumanPlayers(game) {
+    if (!game || typeof game.players !== "function") return [];
+    try {
+      return game.players().filter(function (p) {
+        if (!p || typeof p.name !== "function") return false;
+        if (companionPlayerType(p) !== "HUMAN") return false;
+        try {
+          return p.isAlive ? p.isAlive() !== false : true;
+        } catch (_error) {
+          return true;
+        }
+      });
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  // Resolve the configured boss name against the live game.
+  //   idle    — no name configured yet
+  //   self    — the name is THIS tab; the companion must stay out of the way
+  //   found   — a live human with that name exists
+  //   missing — configured but not present (typo, not joined, or dead)
+  //
+  // The multitab original called targetPlayer.id() BEFORE its null check, so a
+  // mistyped boss name threw a TypeError on every single tick. Order matters.
+  function companionResolveBoss(game, bossName) {
+    const wanted = String(bossName == null ? "" : bossName).trim().toLowerCase();
+    if (wanted === "") return { status: "idle", boss: null };
+    if (!game || typeof game.players !== "function") {
+      return { status: "missing", boss: null };
+    }
+
+    let me = null;
+    try {
+      me = game.myPlayer ? game.myPlayer() : null;
+    } catch (_error) {
+      me = null;
+    }
+    if (me && typeof me.name === "function") {
+      try {
+        if (String(me.name()).trim().toLowerCase() === wanted) {
+          return { status: "self", boss: null };
+        }
+      } catch (_error) {
+        /* fall through */
+      }
+    }
+
+    const candidates = companionHumanPlayers(game);
+    for (const p of candidates) {
+      try {
+        if (String(p.name()).trim().toLowerCase() === wanted) {
+          return { status: "found", boss: p };
+        }
+      } catch (_error) {
+        /* skip */
+      }
+    }
+    return { status: "missing", boss: null };
+  }

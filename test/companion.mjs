@@ -279,4 +279,64 @@ const CORE = ["engine/ingame/companion/core.js"];
   assert.deepEqual(missing, [], `coercion branches for keys that do not exist: ${missing.join(", ")}`);
 }
 
+// ---- boss resolution --------------------------------------------------------
+{
+  const { companionResolveBoss, companionHumanPlayers } = loadCompanion(CORE, [
+    "companionResolveBoss",
+    "companionHumanPlayers",
+  ]);
+
+  const mkPlayer = (name, smallID, type, alive = true) => ({
+    name: () => name,
+    smallID: () => smallID,
+    id: () => `p${smallID}`,
+    type: () => type,
+    isAlive: () => alive,
+    isPlayer: () => true,
+  });
+
+  const me = mkPlayer("Slave1", 2, "HUMAN");
+  const boss = mkPlayer("EcoMaxer", 1, "HUMAN");
+  const nation = mkPlayer("France", 3, "NATION");
+  const bot = mkPlayer("Bot4", 4, "BOT");
+  const game = { players: () => [boss, me, nation, bot], myPlayer: () => me };
+
+  assert.deepEqual(companionResolveBoss(game, ""), { status: "idle", boss: null },
+    "empty name → idle");
+  assert.deepEqual(companionResolveBoss(game, "   "), { status: "idle", boss: null },
+    "whitespace-only name → idle");
+
+  const found = companionResolveBoss(game, "EcoMaxer");
+  assert.equal(found.status, "found");
+  assert.equal(found.boss.smallID(), 1);
+
+  assert.equal(companionResolveBoss(game, "ecomaxer").status, "found",
+    "name match is case-insensitive");
+  assert.equal(companionResolveBoss(game, " EcoMaxer ").status, "found",
+    "name match trims whitespace");
+
+  assert.deepEqual(companionResolveBoss(game, "Nobody"), { status: "missing", boss: null });
+  assert.equal(companionResolveBoss(game, "France").status, "missing",
+    "a Nation is never the boss");
+  assert.equal(companionResolveBoss(game, "Bot4").status, "missing",
+    "a regular bot is never the boss");
+
+  assert.deepEqual(companionResolveBoss(game, "Slave1"), { status: "self", boss: null },
+    "this tab IS the boss → self");
+
+  // A dead boss is not a usable boss.
+  const deadBoss = mkPlayer("Ghost", 5, "HUMAN", false);
+  const g2 = { players: () => [me, deadBoss], myPlayer: () => me };
+  assert.equal(companionResolveBoss(g2, "Ghost").status, "missing", "dead boss → missing");
+
+  // Never throws on a broken/absent game.
+  assert.deepEqual(companionResolveBoss(null, "EcoMaxer"), { status: "missing", boss: null });
+  assert.deepEqual(companionResolveBoss({}, "EcoMaxer"), { status: "missing", boss: null });
+
+  const humans = companionHumanPlayers(game);
+  assert.deepEqual(humans.map((p) => p.name()), ["EcoMaxer", "Slave1"],
+    "dropdown lists live humans only");
+  assert.deepEqual(companionHumanPlayers(null), [], "no game → empty list");
+}
+
 console.log("COMPANION OK — pure helpers behave");
