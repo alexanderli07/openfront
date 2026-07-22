@@ -187,6 +187,7 @@
     seenEmoji: [],
     factoryLevel: 0,
     lastGoldSnapshot: 0,
+    goldAtFactoryLevel: 0,
     enabled: false,
     tickRegistered: false,
     lastTickAt: 0,

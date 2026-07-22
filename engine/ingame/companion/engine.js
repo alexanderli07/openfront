@@ -15,7 +15,11 @@
   // queue would turn any future burst into a growing backlog of minutes-old orders.
   const COMPANION_QUEUE_LIMIT = 32;
   const COMPANION_LOG_LIMIT = 100;
-  const COMPANION_DONATE_TROOPS_COOLDOWN_MS = 10000;
+  // Server rejects any donation to a recipient within donateCooldown (100 ticks =
+  // 10s) of the previous one, TROOPS AND GOLD SHARE this window (PlayerImpl
+  // sentDonations). So both go through one shared "donateAny" gap; 11s = server
+  // 10s + 1s margin for tick granularity + latency.
+  const COMPANION_DONATE_MIN_GAP_MS = 11000;
   const COMPANION_DONATE_GOLD_COOLDOWN_MS = 30000;
   const COMPANION_FACTORY_COOLDOWN_MS = 5000;
 
@@ -73,6 +77,7 @@
     companionState.seenEmoji.length = 0;
     companionState.queue.length = 0;
     companionState.lastGoldSnapshot = 0;
+    companionState.goldAtFactoryLevel = 0;
     companionState.lastSpawnTile = null;
     companionState.lastBossSpawnTile = null;
     companionState.factoryLevel = 0;
@@ -444,11 +449,13 @@
 
     const allied = companionIsAlliedWithBoss(me, boss);
 
-    // 4. Donate troops when the boss is running low.
+    // 4. Donate troops when the boss is running low. Troops and gold share one
+    //    "donateAny" gap because the server rejects a second donation (either
+    //    kind) to the same recipient within its 10s cooldown.
     if (s.autoTroops && allied
-        && companionCooldownReady("donateTroops", COMPANION_DONATE_TROOPS_COOLDOWN_MS, now)
+        && companionCooldownReady("donateAny", COMPANION_DONATE_MIN_GAP_MS, now)
         && companionBossNeedsTroops(game, boss, s.troopNeedPct)) {
-      companionMarkCooldown("donateTroops", now);
+      companionMarkCooldown("donateAny", now);
       companionEnqueue("donateTroops", function () {
         if (companionDonateTroops(me, boss, s.troopSendPct)) companionLog("🎖 Troops → boss");
       });
@@ -470,10 +477,24 @@
       });
     }
 
-    // 6. Donate gold. While we are still building factories only the gold GAINED
-    //    since the last donation is shared, so the bot keeps enough capital to
-    //    finish its build-out; once the cap is reached everything goes to the boss.
-    if (s.autoGold && allied
+    // 6. Donate gold. Gated three ways:
+    //    - the shared donateAny gap (so it never lands inside the server's donate
+    //      cooldown that troops just used);
+    //    - a gold-only 30s throttle (from the last GOLD donation, not reset by troops);
+    //    - an interleave gate that only applies while COMPANION ITSELF is building
+    //      factories (passive + autoFactory, below the cap): gold is allowed only
+    //      after the factory has actually risen a level since the last gold donation
+    //      (goldAtFactoryLevel, starting at 0). That both saves capital for the
+    //      first factory (level 0 → never > 0) and forces 1:1 gold↔upgrade
+    //      alternation. It reads the REAL level, so a build the server rejects for
+    //      lack of gold does not advance it and gold stays blocked.
+    const companionBuildsFactory = s.mode === "passive" && s.autoFactory;
+    let goldInterleaveOk = true;
+    if (companionBuildsFactory && factoryLevel < s.maxFactoryLevel) {
+      goldInterleaveOk = factoryLevel > companionState.goldAtFactoryLevel;
+    }
+    if (s.autoGold && allied && goldInterleaveOk
+        && companionCooldownReady("donateAny", COMPANION_DONATE_MIN_GAP_MS, now)
         && companionCooldownReady("donateGold", COMPANION_DONATE_GOLD_COOLDOWN_MS, now)) {
       let goldNow = 0;
       try { goldNow = Number(me.gold()); } catch (_error) { goldNow = 0; }
@@ -486,8 +507,12 @@
       }
       const amount = companionPercentAmount(amountSource, pct);
       if (amount > 0) {
+        companionMarkCooldown("donateAny", now);
         companionMarkCooldown("donateGold", now);
         companionState.lastGoldSnapshot = building ? goldNow : 0;
+        if (companionBuildsFactory && factoryLevel < s.maxFactoryLevel) {
+          companionState.goldAtFactoryLevel = factoryLevel;
+        }
         companionEnqueue("donateGold", function () {
           const recipient = (function () {
             try { return boss.id(); } catch (_e) { return null; }

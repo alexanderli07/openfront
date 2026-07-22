@@ -2099,4 +2099,181 @@ const ENG = [
   delete fakeWindow.__OFH_autobot;
 }
 
+// ---- donate logic: min-gap, factory-first, gold/factory interleave ----------
+{
+  // A fake game where the boss is allied, low on troops, and we have some gold.
+  // factoryLevel is injected directly onto companionState so each sub-case can
+  // set it. The tick queues work; we assert on the QUEUE (labels), not on sends,
+  // so the 300ms drain gap never hides anything.
+  function makeDonateModule() {
+    const W = 100;
+    const boss = {
+      name: () => "Boss", smallID: () => 1, id: () => "p1",
+      type: () => "HUMAN", isAlive: () => true,
+      troops: () => 1000,                       // 10% of max → needs troops
+      state: { outgoingEmojis: [], outgoingAllianceRequests: [], spawnTile: 500 },
+    };
+    const me = {
+      name: () => "Me", smallID: () => 2, id: () => "p2",
+      type: () => "HUMAN", isAlive: () => true,
+      troops: () => 5000, gold: () => 0n,
+      isOnSameTeam: () => true, isAlliedWith: () => true,
+      state: { spawnTile: 777 },
+    };
+    const game = {
+      players: () => [boss, me], myPlayer: () => me,
+      config: () => ({ maxTroops: () => 10000 }),
+      units: () => [],                          // companionFactoryLevel reads this; we override level below
+      inSpawnPhase: () => false, ticks: () => 1,
+    };
+    const m = loadCompanion(ENG,
+      ["companionTick", "companionState", "companionPatchSettings",
+       "COMPANION_DONATE_MIN_GAP_MS"],
+      {
+        sendGamePacket: () => true, registerHelperTickListener: () => {},
+        getOpenFrontGameContext: () => ({ game: game }),
+      });
+    m._game = game;
+    // Freeze factoryLevel: companionTick calls companionFactoryLevel(game, me),
+    // which reads game.units("Factory"). Simpler: after each tick the tick sets
+    // companionState.factoryLevel from that read (0, since units() is empty). We
+    // instead drive behaviour by setting companionState.factoryLevel BEFORE the
+    // read is used for gold — but the tick recomputes it. So units() must return
+    // a factory at the desired level. Provide a settable level:
+    let level = 0;
+    m._setLevel = (v) => { level = v; };
+    game.units = () => (level > 0
+      ? [{ id: () => 7, level: () => level, owner: () => ({ smallID: () => 2 }) }]
+      : []);
+    // Gold accumulates in the real game; the "building%" branch donates the gold
+    // GAINED since the last donation, so a constant mock would read 0 gained right
+    // after the first donation and block gold on amount, not on the interleave
+    // gate we mean to test. A growing pool keeps `amount > 0` so the interleave
+    // gate is the only thing that can block.
+    let goldPool = 1000000n;
+    me.gold = () => goldPool;
+    m._addGold = (n) => { goldPool += BigInt(n); };
+    return m;
+  }
+
+  const labels = (m) => m.companionState.queue.map((q) => q.label).sort();
+
+  assert.equal(makeDonateModule().COMPANION_DONATE_MIN_GAP_MS, 11000, "min-gap is 11s");
+
+  // -- min-gap: troops and gold share one donate window ----------------------
+  {
+    const m = makeDonateModule();
+    m.companionPatchSettings({
+      bossName: "Boss", mode: "passive",
+      autoTroops: true, autoGold: true, autoFactory: false,  // autoFactory off → interleave gate inert
+    });
+    m.companionState.enabled = true;
+    m._setLevel(3);
+
+    // Same tick: boss needs troops → troops queued; gold must NOT queue because
+    // troops just marked the shared donateAny gap.
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};             // both ready
+    m.companionTick();
+    assert.deepEqual(labels(m), ["donateTroops"], "troops queued, gold yields in the same tick");
+
+    // donateAny was marked; simulate "still inside the gap" deterministically by
+    // pointing it just under 11s ago. Gold (and troops) must stay blocked.
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns.donateAny = Date.now() - 5000;   // 5s ago < 11s
+    m.companionState.cooldowns.donateGold = Date.now() - 40000; // gold throttle itself is ready
+    m.companionTick();
+    assert.equal(labels(m).indexOf("donateGold"), -1, "gold blocked while inside the min-gap");
+
+    // Past the gap (and troops now satisfied so it does not re-mark donateAny in
+    // this tick): turn troops off, put donateAny 12s ago → gold flows.
+    m.companionPatchSettings({ autoTroops: false });
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns.donateAny = Date.now() - 12000;  // 12s ago > 11s
+    m.companionState.cooldowns.donateGold = Date.now() - 40000;
+    m.companionTick();
+    assert.ok(labels(m).indexOf("donateGold") !== -1, "gold flows once the min-gap has elapsed");
+  }
+
+  // -- problem 1: no gold while building the first factory -------------------
+  {
+    const m = makeDonateModule();
+    m.companionPatchSettings({
+      bossName: "Boss", mode: "passive",
+      autoTroops: false, autoGold: true, autoFactory: true,
+    });
+    m.companionState.enabled = true;
+    m._setLevel(0);                              // no factory yet
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};             // everything ready
+    m.companionTick();
+    assert.equal(labels(m).indexOf("donateGold"), -1,
+      "factoryLevel 0 + autoFactory → no gold (save for the first factory)");
+    // factory itself SHOULD be queued (passive builds it)
+    assert.ok(labels(m).indexOf("factory") !== -1, "but the factory build is queued");
+  }
+
+  // -- problem 3: gold/factory interleave by real level ----------------------
+  {
+    const m = makeDonateModule();
+    m.companionPatchSettings({
+      bossName: "Boss", mode: "passive",
+      autoTroops: false, autoGold: true, autoFactory: true,
+    });
+    m.companionState.enabled = true;
+
+    // Level 1: gold allowed once (1 > 0), then goldAtFactoryLevel becomes 1.
+    m._setLevel(1);
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};
+    m.companionTick();
+    assert.ok(labels(m).indexOf("donateGold") !== -1, "level 1 → gold allowed once");
+    assert.equal(m.companionState.goldAtFactoryLevel, 1, "mark advanced to 1");
+
+    // Still level 1: gold blocked (1 > 1 false) — must upgrade first. Gold has
+    // grown so amount>0; only the interleave gate can block it here.
+    m._addGold(1000000);
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};             // cooldowns ready, but interleave blocks
+    m.companionTick();
+    assert.equal(labels(m).indexOf("donateGold"), -1, "same level → gold blocked (interleave)");
+
+    // Level 2: gold allowed again (2 > 1). Gold grew again so amount>0.
+    m._setLevel(2);
+    m._addGold(1000000);
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};
+    m.companionTick();
+    assert.ok(labels(m).indexOf("donateGold") !== -1, "level 2 → gold allowed again");
+    assert.equal(m.companionState.goldAtFactoryLevel, 2, "mark advanced to 2");
+  }
+
+  // -- active mode / not-building: interleave does NOT apply -----------------
+  {
+    const m = makeDonateModule();
+    m.companionPatchSettings({
+      bossName: "Boss", mode: "active",          // auto-bot builds, companion does not
+      autoTroops: false, autoGold: true, autoFactory: true,
+    });
+    m.companionState.enabled = true;
+    m._setLevel(0);                              // even at level 0
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};
+    m.companionTick();
+    assert.ok(labels(m).indexOf("donateGold") !== -1,
+      "active mode → interleave gate does not apply, gold flows");
+  }
+}
+
+// ---- companionResetRunState zeroes goldAtFactoryLevel -----------------------
+{
+  const m = loadCompanion(ENG,
+    ["companionResetRunState", "companionState"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+  m.companionState.goldAtFactoryLevel = 7;
+  m.companionResetRunState();
+  assert.equal(m.companionState.goldAtFactoryLevel, 0,
+    "a new match resets the gold/factory interleave mark");
+}
+
 console.log("COMPANION OK — pure helpers behave");
