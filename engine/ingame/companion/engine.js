@@ -607,6 +607,11 @@
       if (!patch || typeof patch !== "object") return;
       companionPatchSettings(patch);
       if ("enabled" in patch) setCompanionEnabled(Boolean(patch.enabled));
+      // Changing mode must re-sync the auto-bot policy the same way the panel's
+      // Mode dropdown does — otherwise a scripted set({mode}) leaves the auto-bot
+      // in the wrong state. setCompanionEnabled already syncs, so skip if enabled
+      // was in the patch (it just ran sync).
+      else if ("mode" in patch) companionSyncAutobot();
       if (typeof companionRefreshPanel === "function") companionRefreshPanel();
     },
   };

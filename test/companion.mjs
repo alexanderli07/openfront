@@ -2070,4 +2070,33 @@ const ENG = [
   );
 }
 
+// ---- public bridge set({mode}) re-syncs the auto-bot ------------------------
+{
+  let autobotEnabled = true;
+  const calls = [];
+  fakeWindow.__OFH_autobot = {
+    get: () => ({ enabled: autobotEnabled }),
+    set: (p) => { calls.push(p); if ("enabled" in p) autobotEnabled = p.enabled; },
+  };
+  const m = loadCompanion(ENG, ["companionState"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  // Enable companion in active mode first (no suppression yet).
+  m.companionState.enabled = true;
+  autobotEnabled = true;
+  calls.length = 0;
+
+  // Scripting the public bridge to switch to passive must stop the auto-bot,
+  // just like the panel's Mode dropdown does.
+  fakeWindow.__OFH_companion.set({ mode: "passive" });
+  assert.equal(autobotEnabled, false, "set({mode:'passive'}) stops the auto-bot");
+  assert.equal(m.companionState.autobotSuppressed, true, "and marks it suppressed");
+
+  // Back to active restores it.
+  fakeWindow.__OFH_companion.set({ mode: "active" });
+  assert.equal(autobotEnabled, true, "set({mode:'active'}) restores the auto-bot");
+
+  delete fakeWindow.__OFH_autobot;
+}
+
 console.log("COMPANION OK — pure helpers behave");
