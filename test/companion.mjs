@@ -1768,4 +1768,86 @@ const ENG = [
   );
 }
 
+// ---- companionSyncAutobot: passive suppresses the auto-bot, active restores --
+{
+  const calls = [];
+  let autobotEnabled = true;               // the user's own auto-bot setting
+  fakeWindow.__OFH_autobot = {
+    get: () => ({ enabled: autobotEnabled }),
+    set: (p) => { calls.push(p); if ("enabled" in p) autobotEnabled = p.enabled; },
+  };
+
+  const m = loadCompanion(ENG,
+    ["companionSyncAutobot", "companionState", "companionPatchSettings"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  // Companion off → never touches the auto-bot.
+  calls.length = 0;
+  m.companionState.enabled = false;
+  m.companionSyncAutobot();
+  assert.equal(calls.length, 0, "companion off → no auto-bot calls");
+
+  // Enable + passive → remember the user's ON and switch the auto-bot OFF.
+  m.companionState.enabled = true;
+  m.companionPatchSettings({ mode: "passive" });
+  autobotEnabled = true;
+  calls.length = 0;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, false, "passive turns the auto-bot off");
+  assert.equal(m.companionState.autobotSuppressed, true, "marked as suppressed");
+  assert.equal(m.companionState.autobotWasEnabled, true, "remembered the user had it on");
+  assert.deepEqual(calls, [{ enabled: false }], "one set call, enabled:false");
+
+  // Idempotent: calling again while already suppressed does nothing.
+  calls.length = 0;
+  m.companionSyncAutobot();
+  assert.equal(calls.length, 0, "already suppressed → no redundant set");
+
+  // Passive → Active restores exactly what the user had (on).
+  m.companionPatchSettings({ mode: "active" });
+  calls.length = 0;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, true, "active restores the auto-bot to on");
+  assert.equal(m.companionState.autobotSuppressed, false, "no longer suppressed");
+  assert.deepEqual(calls, [{ enabled: true }], "one set call, enabled:true");
+
+  // Active, not paused → companion does NOT force the auto-bot either way.
+  calls.length = 0;
+  m.companionSyncAutobot();
+  assert.equal(calls.length, 0, "active + not paused → no coercion");
+
+  // The user had the auto-bot OFF: passive remembers OFF, active restores OFF.
+  autobotEnabled = false;
+  m.companionState.autobotSuppressed = false;
+  m.companionPatchSettings({ mode: "passive" });
+  calls.length = 0;
+  m.companionSyncAutobot();
+  assert.equal(m.companionState.autobotWasEnabled, false, "remembered OFF");
+  assert.equal(autobotEnabled, false, "still off");
+  m.companionPatchSettings({ mode: "active" });
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, false, "restored to OFF, not force-enabled");
+
+  // Active + paused → suppress; unpause → restore.
+  autobotEnabled = true;
+  m.companionState.autobotSuppressed = false;
+  m.companionState.paused = true;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, false, "paused suppresses the auto-bot in active mode");
+  m.companionState.paused = false;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, true, "unpausing restores it");
+
+  // Disabling companion while suppressed restores the auto-bot.
+  m.companionState.paused = true;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, false, "suppressed again");
+  m.companionState.enabled = false;
+  m.companionSyncAutobot();
+  assert.equal(autobotEnabled, true, "disabling companion restores the auto-bot");
+  assert.equal(m.companionState.autobotSuppressed, false);
+
+  delete fakeWindow.__OFH_autobot;
+}
+
 console.log("COMPANION OK — pure helpers behave");

@@ -134,6 +134,57 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Auto-bot policy
+  // ---------------------------------------------------------------------------
+
+  // Companion only ever FORCES the auto-bot off; it never switches it on except
+  // to hand back exactly the state it took. __OFH_autobot.set() persists to
+  // localStorage, so a policy that forced `true` would permanently enable an
+  // auto-bot the user had left off.
+  //
+  //   suppress = companion on AND (passive mode OR paused)
+  //     suppress && !suppressed → remember current enabled, set off, mark suppressed
+  //    !suppress &&  suppressed → set back to remembered value, clear the mark
+  //
+  // Called from setCompanionEnabled, the panel's Mode change, and pause/resume.
+  function companionSyncAutobot() {
+    let bridge = null;
+    try {
+      bridge = window.__OFH_autobot || null;
+    } catch (_error) {
+      bridge = null;
+    }
+    if (!bridge || typeof bridge.set !== "function") return;
+
+    const s = companionSettings();
+    const suppress =
+      companionState.enabled && (s.mode === "passive" || companionState.paused);
+
+    if (suppress && !companionState.autobotSuppressed) {
+      let wasOn = false;
+      try {
+        wasOn = typeof bridge.get === "function" && Boolean(bridge.get().enabled);
+      } catch (_error) {
+        wasOn = false;
+      }
+      companionState.autobotWasEnabled = wasOn;
+      companionState.autobotSuppressed = true;
+      try {
+        bridge.set({ enabled: false });
+      } catch (_error) {
+        /* ignore */
+      }
+    } else if (!suppress && companionState.autobotSuppressed) {
+      companionState.autobotSuppressed = false;
+      try {
+        bridge.set({ enabled: companionState.autobotWasEnabled });
+      } catch (_error) {
+        /* ignore */
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Emoji-driven actions
   // ---------------------------------------------------------------------------
 
@@ -154,28 +205,11 @@
         return companionBuildOrUpgradeFactory(ctx.game, ctx.me);
       case "pause":
         companionState.paused = true;
-        // In Active mode the auto-bot is what is actually playing, so pausing
-        // has to stop it too — otherwise the bot keeps expanding while the user
-        // believes everything has stopped. Remember what the user had first:
-        // __OFH_autobot.set() persists to localStorage, so a resume that forced
-        // `true` would permanently switch on an auto-bot the user had left off.
-        if (s.mode === "active") {
-          try {
-            if (window.__OFH_autobot) {
-              companionState.autobotWasEnabled = Boolean(window.__OFH_autobot.get().enabled);
-              window.__OFH_autobot.set({ enabled: false });
-            }
-          } catch (_error) { /* ignore */ }
-        }
+        companionSyncAutobot();
         return true;
       case "resume":
         companionState.paused = false;
-        if (s.mode === "active" && companionState.autobotWasEnabled) {
-          try {
-            if (window.__OFH_autobot) window.__OFH_autobot.set({ enabled: true });
-          } catch (_error) { /* ignore */ }
-        }
-        companionState.autobotWasEnabled = false;
+        companionSyncAutobot();
         return true;
       default:
         return false;
@@ -452,6 +486,7 @@
       companionState.queue.length = 0;
       companionLog("⏹ Companion disabled");
     }
+    companionSyncAutobot();
     if (typeof companionRefreshPanel === "function") companionRefreshPanel();
   }
 
