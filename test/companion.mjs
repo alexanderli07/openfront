@@ -2263,6 +2263,29 @@ const ENG = [
     assert.ok(labels(m).indexOf("donateGold") !== -1,
       "active mode → interleave gate does not apply, gold flows");
   }
+
+  // -- at cap: interleave does NOT apply, gold flows even if the mark is stale -
+  {
+    const m = makeDonateModule();
+    m.companionPatchSettings({
+      bossName: "Boss", mode: "passive",
+      autoTroops: false, autoGold: true, autoFactory: true, maxFactoryLevel: 3,
+    });
+    m.companionState.enabled = true;
+    m._setLevel(3);                              // factoryLevel === maxFactoryLevel → at cap
+    // Establish the game reference so the first tick does NOT reset goldAtFactoryLevel.
+    m.companionState.lastGameRef = m._game;
+    // Poison the interleave mark: if the gate were (wrongly) still applied at cap,
+    // 3 > 3 would be false and gold would be blocked. It must NOT be applied here.
+    m.companionState.goldAtFactoryLevel = 999;
+    m.companionState.queue.length = 0;
+    m.companionState.cooldowns = {};
+    m.companionTick();
+    assert.ok(labels(m).indexOf("donateGold") !== -1,
+      "at cap → interleave gate inert, idle gold flows");
+    // And it should NOT try to build a factory at the cap.
+    assert.equal(labels(m).indexOf("factory"), -1, "no factory build at the cap");
+  }
 }
 
 // ---- companionResetRunState zeroes goldAtFactoryLevel -----------------------
