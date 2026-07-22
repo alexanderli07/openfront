@@ -303,6 +303,13 @@
     }
 
     pickSpawnCenter() {
+      // DIVERGENCE: Companion mode pins the spawn next to the configured boss.
+      // Returns null unless companion is enabled AND in Active mode, so with the
+      // feature off this is a single typeof check and the port is unchanged.
+      if (typeof companionSpawnCenter === "function") {
+        const companionTile = companionSpawnCenter(this.mg, this.player);
+        if (companionTile != null) return companionTile;
+      }
       const g = this.mg;
       const W = g.width();
       const H = g.height();

@@ -80,6 +80,7 @@
     combat: ["Combat & Automation", "Toggle combat features: retaliation HUD, nuke suggestions, SOS defense, attack hotkey, right-click conquest, enemy intent."],
     alerts: ["Alerts", "Toggle alert notifications: game-time alert, incoming boat warning."],
     tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
+    companion: ["Companion", "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack)."],
 
     // === Helpers Tab - Toggle Keys (Panels) ===
     showTopGoldPerMinute: ["Player Stats Panel", "Sortable table of all players — rank, name, owned tiles, gold, gold/min, and max troops. Click the + button to also show per-player structure counts (City, Port, Factory, Defense Post, SAM Launcher, Missile Silo). Click a column header to sort; hovering a player's row on the map pins it at the bottom. Draggable."],
@@ -139,6 +140,10 @@
     roundLogger: ["Round Logger", "Records game events (match start, large troop changes, network activity) as a JSON timeline in localStorage, flushed every 5s. Useful for debugging bot behavior and match analysis."],
     networkLogger: ["Network Logger", "Hooks XMLHttpRequest to record network metadata (URL, method, status, timing). Max 500 entries. Does NOT capture response bodies."],
     markBotNationsRed: ["Mark Bot Nations Red", "Draws red glowing dots on the map above AI-controlled nations to distinguish them from human players."],
+
+    // === Helpers Tab - Toggle Keys (Companion) ===
+    showCompanionPanel: ["Companion Panel", "Floating panel for a slave tab: set the boss account name, watch its emoji command queue and action log."],
+    companionEnabled: ["Companion Mode", "When active, this tab automatically executes the boss's commands (donate gold/troops, alliance requests, spawn near boss, follow-attack) with an always-on warning banner."],
 
     // === Config Tab - Section Headers ===
     "Theme": ["Theme Settings", "Customize panel colors with presets (green, blue, red, etc.) or custom hex/HSL. Adjusts accent color, opacity, and rainbow mode."],
@@ -670,6 +675,8 @@
       case "showMapMoney":           return typeof setMapMoneyEnabled === "function" ? setMapMoneyEnabled : null;
       case "skinUnlocker":           return typeof _setSkinUnlockerEnabled === "function" ? _setSkinUnlockerEnabled : null;
       case "warnIncomingBoats":      return typeof setBoatIncomingWarningEnabled === "function" ? setBoatIncomingWarningEnabled : null;
+      case "showCompanionPanel":     return typeof setCompanionPanelVisible === "function" ? setCompanionPanelVisible : null;
+      case "companionEnabled":       return typeof setCompanionEnabled === "function" ? setCompanionEnabled : null;
     }
     return null;
   }
@@ -1230,6 +1237,12 @@
           ["roundLogger", _tr("Round logger")],
           ["networkLogger", _tr("Network logger")],
           ["markBotNationsRed", _tr("Mark bot nations red")],
+        ]
+      },
+      {
+        key: "companion", title: _tr("Companion"), toggles: [
+          ["showCompanionPanel", _tr("Companion bot panel")],
+          ["companionEnabled", _tr("Companion mode")],
         ]
       },
     ];

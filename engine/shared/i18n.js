@@ -355,6 +355,83 @@
     "When under attack, sends an SOS emoji to allies/teammates and marks the attacker for your team. Works with or without the auto-bot.":
       "When under attack, sends an SOS emoji to allies/teammates and marks the attacker for your team. Works with or without the auto-bot.",
 
+    // ---- Companion Bot (engine/ingame/companion/*) ----
+    "Companion": "Companion",
+    "Companion bot panel": "Companion bot panel",
+    "Companion mode": "Companion mode",
+    "Mode": "Mode",
+    "Passive": "Passive",
+    "Active": "Active",
+    "Boss": "Boss",
+    "Boss name": "Boss name",
+    "Boss found": "Boss found",
+    "Boss not found": "Boss not found",
+    "This tab is the boss": "This tab is the boss",
+    "No boss set": "No boss set",
+    "No human players found": "No human players found",
+    "Support": "Support",
+    "Spawn near boss": "Spawn near boss",
+    "Min radius": "Min radius",
+    "Max radius": "Max radius",
+    "Accept boss alliance": "Accept boss alliance",
+    "Donate troops": "Donate troops",
+    "Boss below %": "Boss below %",
+    "Send %": "Send %",
+    "Donate gold": "Donate gold",
+    "While building %": "While building %",
+    "When done %": "When done %",
+    "Economy": "Economy",
+    "Auto factory": "Auto factory",
+    "Max factory level": "Max factory level",
+    "Current level": "Current level",
+    "Advanced": "Advanced",
+    "Emoji commands": "Emoji commands",
+    "Tick (ms)": "Tick (ms)",
+    "Control": "Control",
+    "Emoji": "Emoji",
+    "Log": "Log",
+    "Socket": "Socket",
+    "disconnected": "disconnected",
+    "Last send failed": "Last send failed",
+    "Send all gold": "Send all gold",
+    "Send all troops": "Send all troops",
+    "Break alliance": "Break alliance",
+    "Request alliance": "Request alliance",
+    "Attack boss's target": "Attack boss's target",
+    "Build/upgrade factory": "Build/upgrade factory",
+    "Pause": "Pause",
+    "Resume": "Resume",
+    "COMPANION": "COMPANION",
+    "no boss": "no boss found",
+    "this tab is the boss": "this tab is the boss",
+    "paused": "paused",
+    "Emoji to one bot targets it; emoji to All players targets every bot.":
+      "Emoji to one bot targets it; emoji to All players targets every bot.",
+    "Spawn type": "Spawn type",
+    "Hug boss": "Hug boss",
+    "Auto-bot optimal": "Auto-bot optimal",
+    "Spawn next to the boss during the spawn phase.": "Spawn next to the boss during the spawn phase.",
+    "Active mode: hug the boss, or let the auto-bot pick the best spot.": "Active mode: hug the boss, or let the auto-bot pick the best spot.",
+    "Accept (and request) an alliance only with the boss.": "Accept (and request) an alliance only with the boss.",
+    "Donate troops to the boss when the boss runs low.": "Donate troops to the boss when the boss runs low.",
+    "Donate gold to the boss.": "Donate gold to the boss.",
+    "Build a factory, then keep upgrading it toward the level cap.": "Build a factory, then keep upgrading it toward the level cap.",
+    "Let the boss command this bot with emoji.": "Let the boss command this bot with emoji.",
+    "How often the bot re-evaluates, in milliseconds.": "How often the bot re-evaluates, in milliseconds.",
+
+    // Quick Panel tooltip popovers for Companion (QP_FEATURE_TIPS in
+    // quick-panel.js). These go through the shared _tr() alias rather than a
+    // literal t(...)/tr(...) call, so scripts/audit-i18n.mjs cannot see them —
+    // tracked here by hand.
+    "Companion Panel": "Companion Panel",
+    "Companion Mode": "Companion Mode",
+    "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack).":
+      "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack).",
+    "Floating panel for a slave tab: set the boss account name, watch its emoji command queue and action log.":
+      "Floating panel for a slave tab: set the boss account name, watch its emoji command queue and action log.",
+    "When active, this tab automatically executes the boss's commands (donate gold/troops, alliance requests, spawn near boss, follow-attack) with an always-on warning banner.":
+      "When active, this tab automatically executes the boss's commands (donate gold/troops, alliance requests, spawn near boss, follow-attack) with an always-on warning banner.",
+
   };
 
   const LANGUAGE_NAME_OVERRIDES = {

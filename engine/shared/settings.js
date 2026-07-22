@@ -142,6 +142,9 @@
     autoDonateGoldEnabled: false,
     autoDonateGoldThreshold: 5000000,
     autoDonateGoldPercentage: 25,
+    // Companion Bot — a slave tab that serves a named "boss" account.
+    showCompanionPanel: false,
+    companionEnabled: false,
     autoDonateGoldTargets: "",
     // Theme & Appearance
     guiAccentColor: "#00ff66",

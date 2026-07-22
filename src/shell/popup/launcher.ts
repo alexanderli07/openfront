@@ -2,7 +2,6 @@
 // (position persisted in localStorage). The icon is an inline <svg> (no <img>,
 // so the page's data:-free img-src CSP is irrelevant).
 
-import { openPanel } from "./panel";
 import { POPUP_CSS, POPUP_STYLE_ID } from "./styles";
 
 const ICON_ID = "openfront-helper-launcher";
