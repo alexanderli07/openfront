@@ -22,6 +22,57 @@ const fakeLocalStorage = {
 };
 const fakeWindow = { localStorage: fakeLocalStorage, dispatchEvent() {}, addEventListener() {} };
 
+// Minimal identity-preserving DOM for the panel drag/refresh tests. Enough to
+// exercise createElement/appendChild/innerHTML(children)/querySelector(.class).
+function makeFakeDom() {
+  const byId = {};
+  function el(tag) {
+    const node = {
+      tagName: tag, id: "", className: "", _children: [], _html: "",
+      style: {}, dataset: {}, parentNode: null,
+      classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); node.className = [...this._set].join(" "); },
+        remove(c) { this._set.delete(c); node.className = [...this._set].join(" "); },
+        toggle(c, on) { on ? this.add(c) : this.remove(c); },
+        contains(c) { return this._set.has(c); },
+      },
+      setAttribute(k, v) { if (k === "id") { node.id = v; byId[v] = node; } },
+      getAttribute() { return null; },
+      appendChild(child) { child.parentNode = node; node._children.push(child); if (child.id) byId[child.id] = child; return child; },
+      remove() { if (node.parentNode) node.parentNode._children = node.parentNode._children.filter((c) => c !== node); },
+      addEventListener() {},
+      set innerHTML(v) { node._html = v; node._children = []; },
+      get innerHTML() { return node._html; },
+      set textContent(v) { node._html = String(v); },
+      querySelector(sel) { return node._find(sel); },
+      querySelectorAll() { return []; },
+      _find(sel) {
+        // Only supports ".class" — enough for .ohcp-head / .ohcp-body / .ohcp-tabs.
+        const cls = sel.replace(/^\./, "");
+        const has = (c) => ((c.className || "").split(/\s+/).indexOf(cls) !== -1)
+          || (c.classList && c.classList.contains(cls));
+        const walk = (n) => {
+          for (const c of n._children) {
+            if (has(c)) return c;
+            const hit = walk(c);
+            if (hit) return hit;
+          }
+          return null;
+        };
+        return walk(node);
+      },
+    };
+    return node;
+  }
+  const doc = {
+    body: el("body"), head: el("head"),
+    createElement: (t) => el(t),
+    getElementById: (id) => byId[id] || null,
+  };
+  return doc;
+}
+
 /**
  * Concatenate engine files and return the named top-level declarations.
  * @param {string[]} files repo-relative paths
@@ -1917,6 +1968,44 @@ const ENG = [
   assert.equal(calls.length, 0, "already on → no redundant auto-bot set");
 
   delete fakeWindow.__OFH_autobot;
+}
+
+// ---- panel drag survives a refresh ------------------------------------------
+{
+  const doc = makeFakeDom();
+  let dragCalls = 0;
+  let dragHead = null;
+  const m = loadCompanion(
+    ["engine/ingame/companion/core.js", "engine/ingame/companion/commands.js",
+     "engine/ingame/companion/engine.js", "engine/ingame/companion/panel.js"],
+    ["companionBuildPanel", "companionRenderBody", "companionState", "companionPatchSettings"],
+    {
+      document: doc,
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      makeGoldStatPanelDraggable: (panel, head) => { dragCalls++; dragHead = head; },
+      applyStoredGoldStatPanelPosition: () => {},
+      isSocketConnected: () => true,
+    });
+
+  m.companionState.enabled = true;
+  m.companionPatchSettings({ bossName: "Boss" });
+
+  m.companionBuildPanel();
+  const headAfterBuild = doc.getElementById("openfront-helper-companion-panel")._find(".ohcp-head");
+  assert.ok(headAfterBuild, "panel has a header");
+  assert.equal(dragCalls, 1, "drag wired exactly once on first build");
+
+  // Refresh several times (tab switches, tick syncs). Drag must NOT be re-wired,
+  // and the header node the drag was attached to must be the SAME object.
+  m.companionPatchSettings({ activeTab: "emoji" });
+  m.companionRenderBody(doc.getElementById("openfront-helper-companion-panel"));
+  m.companionPatchSettings({ activeTab: "log" });
+  m.companionRenderBody(doc.getElementById("openfront-helper-companion-panel"));
+
+  assert.equal(dragCalls, 1, "drag stays wired once across refreshes (the bug: it was lost)");
+  const headNow = doc.getElementById("openfront-helper-companion-panel")._find(".ohcp-head");
+  assert.strictEqual(headNow, headAfterBuild, "header node is preserved, not replaced");
+  assert.strictEqual(dragHead, headAfterBuild, "drag was attached to that surviving node");
 }
 
 console.log("COMPANION OK — pure helpers behave");

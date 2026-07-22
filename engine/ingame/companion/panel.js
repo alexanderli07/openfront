@@ -173,6 +173,15 @@ style="width:34px">${companionEsc(emoji)}</button>
     return head + fail + `<div class="ohcp-log">${lines}</div>`;
   }
 
+  // Build the panel chrome (header + tabs + empty body) exactly once, then only
+  // ever rewrite .ohcp-body. The old code re-set the whole panel.innerHTML on
+  // every refresh, which destroyed the header the drag handler was attached to —
+  // so the panel could not be dragged after the first tab switch or tick sync.
+  //
+  // The three chrome nodes (head / tabs / body) are built with createElement so
+  // each is a stable object: the head the drag handler attaches to is never
+  // replaced, and rewriting the body cannot touch it. (The head's OWN inner
+  // markup is set once via head.innerHTML — that never changes after creation.)
   function companionBuildPanel() {
     companionEnsureStyles();
     let panel = document.getElementById(COMPANION_PANEL_ID);
@@ -184,66 +193,94 @@ style="width:34px">${companionEsc(emoji)}</button>
     if (!panel) {
       panel = document.createElement("div");
       panel.id = COMPANION_PANEL_ID;
+
+      const head = document.createElement("div");
+      head.className = "ohcp-head";
+      head.innerHTML = `<span class="ohcp-dot"></span>
+<span class="ohcp-title">🤝 ${companionEsc(companionTr("Companion"))}</span>
+<button class="ohcp-close" data-cp-close>✕</button>`;
+      panel.appendChild(head);
+
+      const tabsEl = document.createElement("div");
+      tabsEl.className = "ohcp-tabs";
+      panel.appendChild(tabsEl);
+
+      const bodyEl = document.createElement("div");
+      bodyEl.className = "ohcp-body";
+      panel.appendChild(bodyEl);
+
       document.body.appendChild(panel);
+
+      // Drag is wired to the head node ONCE; that node is never replaced again.
       if (typeof makeGoldStatPanelDraggable === "function") {
-        // The header is created below, so wire drag after the first render.
-        setTimeout(function () {
-          const head = panel.querySelector(".ohcp-head");
-          if (head && typeof makeGoldStatPanelDraggable === "function") {
-            makeGoldStatPanelDraggable(panel, head, COMPANION_PANEL_POS_KEY);
-          }
-          if (typeof applyStoredGoldStatPanelPosition === "function") {
-            applyStoredGoldStatPanelPosition(panel, COMPANION_PANEL_POS_KEY);
-          }
-        }, 0);
+        makeGoldStatPanelDraggable(panel, head, COMPANION_PANEL_POS_KEY);
+      }
+      if (typeof applyStoredGoldStatPanelPosition === "function") {
+        applyStoredGoldStatPanelPosition(panel, COMPANION_PANEL_POS_KEY);
+      }
+
+      // Close button lives in the fixed chrome, wired once.
+      const close = head.querySelector("[data-cp-close]");
+      if (close) {
+        close.addEventListener("click", function () {
+          companionPatchSettings({ hidden: true });
+          panel.remove();
+          try {
+            window.dispatchEvent(new CustomEvent("ofh-quick-panel-setting", {
+              detail: { key: "showCompanionPanel", value: false },
+            }));
+          } catch (_error) { /* ignore */ }
+        });
       }
     }
 
-    const tab = s.activeTab || "control";
-    const body = tab === "emoji" ? companionRenderEmoji()
-      : tab === "log" ? companionRenderLog()
-      : companionRenderControl();
-
-    panel.innerHTML = `
-<div class="ohcp-head">
-  <span class="ohcp-dot ${companionEsc(companionState.bossStatus)}"></span>
-  <span class="ohcp-title">🤝 ${companionEsc(companionTr("Companion"))}</span>
-  <button class="ohcp-close" data-cp-close>✕</button>
-</div>
-<div class="ohcp-tabs">
-  <div class="ohcp-tab${tab === "control" ? " on" : ""}" data-cp-tab="control">${companionEsc(companionTr("Control"))}</div>
-  <div class="ohcp-tab${tab === "emoji" ? " on" : ""}" data-cp-tab="emoji">${companionEsc(companionTr("Emoji"))}</div>
-  <div class="ohcp-tab${tab === "log" ? " on" : ""}" data-cp-tab="log">${companionEsc(companionTr("Log"))}</div>
-</div>
-<div class="ohcp-body">${body}</div>`;
-
-    companionBindPanelEvents(panel);
+    companionRenderTabs(panel);
+    companionRenderBody(panel);
+    companionUpdateChrome(panel);
     return panel;
   }
 
-  function companionBindPanelEvents(panel) {
-    panel.querySelectorAll("[data-cp-tab]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        companionPatchSettings({ activeTab: el.dataset.cpTab });
-        companionBuildPanel();
-      });
-    });
-
-    const close = panel.querySelector("[data-cp-close]");
-    if (close) {
-      close.addEventListener("click", function () {
-        companionPatchSettings({ hidden: true });
-        panel.remove();
-        // Keep the Quick Panel's toggle in sync — same handshake the auto-bot
-        // panel uses (auto-bot/panel.js:496-507).
-        try {
-          window.dispatchEvent(new CustomEvent("ofh-quick-panel-setting", {
-            detail: { key: "showCompanionPanel", value: false },
-          }));
-        } catch (_error) { /* ignore */ }
+  // The tab strip is fixed chrome too; build it once, then only toggle `on`.
+  function companionRenderTabs(panel) {
+    const tabsEl = panel.querySelector(".ohcp-tabs");
+    if (!tabsEl) return;
+    if (!tabsEl.innerHTML) {
+      const defs = [["control", "Control"], ["emoji", "Emoji"], ["log", "Log"]];
+      tabsEl.innerHTML = defs.map(function (d) {
+        return `<div class="ohcp-tab" data-cp-tab="${d[0]}">${companionEsc(companionTr(d[1]))}</div>`;
+      }).join("");
+      tabsEl.querySelectorAll("[data-cp-tab]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          companionPatchSettings({ activeTab: el.dataset.cpTab });
+          companionRenderBody(panel);
+          companionUpdateChrome(panel);
+        });
       });
     }
+  }
 
+  // Cheap, non-destructive updates to the fixed chrome (dot colour, active tab).
+  function companionUpdateChrome(panel) {
+    const dot = panel.querySelector(".ohcp-dot");
+    if (dot) dot.className = "ohcp-dot " + companionEsc(companionState.bossStatus);
+    const active = (companionSettings().activeTab) || "control";
+    panel.querySelectorAll("[data-cp-tab]").forEach(function (el) {
+      el.classList.toggle("on", el.dataset.cpTab === active);
+    });
+  }
+
+  // Rewrite ONLY the body for the active tab, and wire the body's own controls.
+  function companionRenderBody(panel) {
+    const bodyEl = panel.querySelector(".ohcp-body");
+    if (!bodyEl) return;
+    const tab = (companionSettings().activeTab) || "control";
+    bodyEl.innerHTML = tab === "emoji" ? companionRenderEmoji()
+      : tab === "log" ? companionRenderLog()
+      : companionRenderControl();
+    companionBindBodyEvents(panel);
+  }
+
+  function companionBindBodyEvents(panel) {
     const enabled = panel.querySelector("[data-cp-enabled]");
     if (enabled) {
       enabled.addEventListener("click", function () {
@@ -254,7 +291,8 @@ style="width:34px">${companionEsc(emoji)}</button>
             detail: { key: "companionEnabled", value: next },
           }));
         } catch (_error) { /* ignore */ }
-        companionBuildPanel();
+        companionRenderBody(panel);
+        companionUpdateChrome(panel);
       });
     }
 
@@ -264,7 +302,7 @@ style="width:34px">${companionEsc(emoji)}</button>
         const patch = {};
         patch[key] = !companionSettings()[key];
         companionPatchSettings(patch);
-        companionBuildPanel();
+        companionRenderBody(panel);
       });
     });
 
@@ -280,7 +318,8 @@ style="width:34px">${companionEsc(emoji)}</button>
     if (bossInput) {
       bossInput.addEventListener("change", function () {
         companionPatchSettings({ bossName: bossInput.value });
-        companionBuildPanel();
+        companionRenderBody(panel);
+        companionUpdateChrome(panel);
       });
     }
 
@@ -289,7 +328,8 @@ style="width:34px">${companionEsc(emoji)}</button>
       mode.addEventListener("change", function () {
         companionPatchSettings({ mode: mode.value });
         if (typeof companionSyncAutobot === "function") companionSyncAutobot();
-        companionBuildPanel();
+        companionRenderBody(panel);
+        companionUpdateChrome(panel);
       });
     }
 
@@ -304,12 +344,13 @@ style="width:34px">${companionEsc(emoji)}</button>
         if (names.length === 0) {
           companionLog(companionTr("No human players found"));
           companionPatchSettings({ activeTab: "log" });
-          companionBuildPanel();
+          companionRenderBody(panel);
+          companionUpdateChrome(panel);
           return;
         }
         companionShowPicker(panel, names, function (name) {
           companionPatchSettings({ bossName: name });
-          companionBuildPanel();
+          companionRenderBody(panel);
         });
       });
     }
@@ -323,7 +364,7 @@ style="width:34px">${companionEsc(emoji)}</button>
           const patch = companionRawEmojiBindings();
           patch[el.dataset.cpEmoji] = emoji;
           companionPatchSettings({ emojiBindings: patch });
-          companionBuildPanel();
+          companionRenderBody(panel);
         }, true);
       });
     });
@@ -335,7 +376,7 @@ style="width:34px">${companionEsc(emoji)}</button>
         const patch = companionRawEmojiBindings();
         patch[id] = on ? null : COMPANION_DEFAULT_BINDINGS[id];
         companionPatchSettings({ emojiBindings: patch });
-        companionBuildPanel();
+        companionRenderBody(panel);
       });
     });
   }

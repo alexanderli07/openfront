@@ -555,7 +555,13 @@
     }
     try {
       const panelEl = document.getElementById(COMPANION_PANEL_ID);
-      if (panelEl && panelEl.contains(document.activeElement)) return;
+      if (panelEl && typeof panelEl.contains === "function"
+          && panelEl.contains(document.activeElement)) {
+        // Still refresh the fixed chrome (dot colour), just not the body the user
+        // may be typing into.
+        if (typeof companionUpdateChrome === "function") companionUpdateChrome(panelEl);
+        return;
+      }
       if (typeof companionBuildPanel === "function") companionBuildPanel();
     } catch (_error) {
       /* ignore */
