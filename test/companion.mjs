@@ -299,6 +299,7 @@ const CORE = ["engine/ingame/companion/core.js"];
     ...Object.keys(m.COMPANION_NUMBER_RANGES),
     ...Object.keys(m.COMPANION_ENUMS),
     "bossName",
+    "collapsedSections",
     "emojiBindings",
     "pos",
   ]);
@@ -1687,6 +1688,69 @@ const ENG = [
     distMoved >= 12 - 1e-9 && distMoved <= 24 + 1e-9,
     "the new pick sits inside the ring around the boss's NEW spawn tile",
   );
+}
+
+// ---- v2 settings: spawnStrategy + collapsedSections -------------------------
+{
+  store.clear();
+  const m = loadCompanion(CORE, [
+    "COMPANION_DEFAULTS", "companionSettings", "companionPatchSettings",
+    "companionCoerceSetting", "companionState",
+  ]);
+
+  // Defaults.
+  assert.equal(m.companionSettings().spawnStrategy, "boss", "default spawn strategy is boss");
+  assert.deepEqual(
+    m.companionSettings().collapsedSections,
+    { support: false, economy: true, advanced: true },
+    "default: support open, economy/advanced collapsed",
+  );
+  assert.equal(m.companionState.autobotSuppressed, false, "autobotSuppressed starts false");
+
+  // spawnStrategy is an enum: garbage keeps the previous value.
+  m.companionPatchSettings({ spawnStrategy: "auto" });
+  assert.equal(m.companionSettings().spawnStrategy, "auto", "valid enum applies");
+  m.companionPatchSettings({ spawnStrategy: "nonsense" });
+  assert.equal(m.companionSettings().spawnStrategy, "auto", "bad enum keeps previous value");
+  m.companionPatchSettings({ spawnStrategy: 5 });
+  assert.equal(m.companionSettings().spawnStrategy, "auto", "non-string keeps previous value");
+
+  // collapsedSections coercion: an object of booleans; unknown keys dropped,
+  // values forced to boolean, non-object rejected.
+  assert.deepEqual(
+    m.companionCoerceSetting("collapsedSections", { support: true, junk: 1 }),
+    { support: true },
+    "keeps known section keys as booleans, drops unknown keys",
+  );
+  assert.deepEqual(
+    m.companionCoerceSetting("collapsedSections", { economy: 0, advanced: "x" }),
+    { economy: false, advanced: true },
+    "values coerce to real booleans",
+  );
+  assert.equal(m.companionCoerceSetting("collapsedSections", "nope"), undefined,
+    "a non-object is rejected");
+  assert.equal(m.companionCoerceSetting("collapsedSections", [1, 2]), undefined,
+    "an array is rejected");
+  assert.equal(m.companionCoerceSetting("collapsedSections", null), undefined,
+    "null is rejected (there is always a default object)");
+
+  // Patch merges section flags rather than replacing the whole object, so
+  // toggling one accordion does not wipe the others.
+  m.companionPatchSettings({ collapsedSections: { economy: false } });
+  assert.deepEqual(
+    m.companionSettings().collapsedSections,
+    { support: false, economy: false, advanced: true },
+    "patching one section flag preserves the rest",
+  );
+}
+
+{
+  // A stored blob with an out-of-range spawnStrategy falls back to the default.
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(m0.COMPANION_STORAGE_KEY, JSON.stringify({ spawnStrategy: "sideways" }));
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  assert.equal(m.companionSettings().spawnStrategy, "boss", "bad stored enum → default");
 }
 
 console.log("COMPANION OK — pure helpers behave");

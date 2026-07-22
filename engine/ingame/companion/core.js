@@ -115,6 +115,8 @@
     tickMs: 2000,
     hidden: false,
     activeTab: "control",
+    spawnStrategy: "boss",      // Active mode only: "boss" (hug boss) | "auto" (auto-bot decides)
+    collapsedSections: { support: false, economy: true, advanced: true },
     pos: null,
   };
 
@@ -142,6 +144,7 @@
   const COMPANION_ENUMS = {
     mode: ["passive", "active"],
     activeTab: ["control", "emoji", "log"],
+    spawnStrategy: ["boss", "auto"],
   };
 
   // Sanitised value, or undefined when the input is unusable.
@@ -155,6 +158,14 @@
     const allowed = COMPANION_ENUMS[key];
     if (allowed) return allowed.indexOf(value) === -1 ? undefined : value;
     if (key === "bossName") return typeof value === "string" ? value.trim() : undefined;
+    if (key === "collapsedSections") {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+      const out = {};
+      for (const sec of ["support", "economy", "advanced"]) {
+        if (sec in value) out[sec] = Boolean(value[sec]);
+      }
+      return out;
+    }
     if (key === "emojiBindings" || key === "pos") {
       if (value === null) return null;
       return value && typeof value === "object" ? value : undefined;
@@ -183,6 +194,7 @@
     lastBossSpawnTile: null,
     lastGameRef: null,
     autobotWasEnabled: false,
+    autobotSuppressed: false,
     uiSignature: null,
   };
 
@@ -238,7 +250,12 @@
       if (patch[k] === undefined) continue;
       const v = companionCoerceSetting(k, patch[k]);
       if (v === undefined) continue; // unusable — keep the previous value
-      s[k] = v;
+      // collapsedSections merges (toggle one accordion, keep the others).
+      if (k === "collapsedSections") {
+        s.collapsedSections = Object.assign({}, s.collapsedSections, v);
+      } else {
+        s[k] = v;
+      }
     }
     companionSaveSettings();
   }
