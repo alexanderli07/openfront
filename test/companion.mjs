@@ -2008,4 +2008,66 @@ const ENG = [
   assert.strictEqual(dragHead, headAfterBuild, "drag was attached to that surviving node");
 }
 
+// ---- compact panel: accordion sections + Active-mode spawn dropdown ---------
+{
+  const PANEL = [
+    "engine/ingame/companion/core.js", "engine/ingame/companion/commands.js",
+    "engine/ingame/companion/engine.js", "engine/ingame/companion/panel.js",
+  ];
+
+  // Passive mode: three accordion sections, no spawn-strategy dropdown.
+  store.clear();
+  const doc1 = makeFakeDom();
+  const m1 = loadCompanion(
+    PANEL,
+    ["companionBuildPanel", "companionState", "companionPatchSettings"],
+    {
+      document: doc1,
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      makeGoldStatPanelDraggable: () => {}, applyStoredGoldStatPanelPosition: () => {},
+      isSocketConnected: () => true,
+    });
+
+  m1.companionState.enabled = true;
+  m1.companionPatchSettings({ bossName: "Boss", mode: "passive" });
+  assert.doesNotThrow(() => m1.companionBuildPanel(), "passive mode builds without throwing");
+
+  const body1 = doc1.getElementById("openfront-helper-companion-panel")._find(".ohcp-body");
+  assert.ok(body1, "body node exists");
+  assert.ok(body1.innerHTML.includes("data-cp-section"), "passive body has accordion sections");
+  assert.equal(
+    (body1.innerHTML.match(/data-cp-section=/g) || []).length,
+    3,
+    "exactly three accordion sections (Support/Economy/Advanced)",
+  );
+  assert.ok(
+    !body1.innerHTML.includes("data-cp-spawnstrategy"),
+    "passive mode keeps the plain 'Spawn near boss' toggle, not the dropdown",
+  );
+
+  // Active mode: same three sections, PLUS the spawn-strategy dropdown.
+  store.clear();
+  const doc2 = makeFakeDom();
+  const m2 = loadCompanion(
+    PANEL,
+    ["companionBuildPanel", "companionState", "companionPatchSettings"],
+    {
+      document: doc2,
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      makeGoldStatPanelDraggable: () => {}, applyStoredGoldStatPanelPosition: () => {},
+      isSocketConnected: () => true,
+    });
+
+  m2.companionState.enabled = true;
+  m2.companionPatchSettings({ bossName: "Boss", mode: "active" });
+  assert.doesNotThrow(() => m2.companionBuildPanel(), "active mode builds without throwing");
+
+  const body2 = doc2.getElementById("openfront-helper-companion-panel")._find(".ohcp-body");
+  assert.ok(body2.innerHTML.includes("data-cp-section"), "active body has accordion sections");
+  assert.ok(
+    body2.innerHTML.includes("data-cp-spawnstrategy"),
+    "active mode shows the 'Kiểu spawn' strategy dropdown",
+  );
+}
+
 console.log("COMPANION OK — pure helpers behave");

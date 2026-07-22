@@ -62,6 +62,17 @@
 #${COMPANION_PANEL_ID} .ohcp-grid button{background:rgba(0,0,0,.25);border:1px solid transparent;
   border-radius:4px;cursor:pointer;font-size:15px;padding:2px}
 #${COMPANION_PANEL_ID} .ohcp-warn{color:#fbbf24}
+#${COMPANION_PANEL_ID} .ohcp-sec-h{display:flex;align-items:center;gap:4px;cursor:pointer;
+  margin-top:6px;padding:3px 0;font-weight:600;opacity:.9;border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.28))}
+#${COMPANION_PANEL_ID} .ohcp-chev{width:10px;display:inline-block;text-align:center;opacity:.7}
+#${COMPANION_PANEL_ID} .ohcp-sec-b{display:none;padding-left:2px}
+#${COMPANION_PANEL_ID} .ohcp-sec-b.open{display:block}
+#${COMPANION_PANEL_ID} .ohcp-tip{width:13px;height:13px;flex:none;border-radius:50%;
+  border:1px solid var(--oh-panel-border,rgba(148,163,184,.5));font-size:9px;line-height:12px;
+  text-align:center;opacity:.6;cursor:help}
+#${COMPANION_PANEL_ID} .ohcp-row{padding:2px 0}
+#${COMPANION_PANEL_ID} .ohcp-select{background:rgba(0,0,0,.3);color:inherit;
+  border:1px solid var(--oh-panel-border,rgba(148,163,184,.34));border-radius:4px;padding:2px 4px}
 `;
     document.head.appendChild(style);
   }
@@ -75,6 +86,38 @@
 </select></div>`;
   }
 
+  // Accordion section: a clickable header (chevron + title + one ?) over a body
+  // that is shown/hidden by collapsedSections[key].
+  function companionSection(key, title, tipKey, bodyHtml) {
+    const collapsed = Boolean((companionSettings().collapsedSections || {})[key]);
+    return `<div class="ohcp-sec-h" data-cp-section="${key}">
+<span class="ohcp-chev">${collapsed ? "▸" : "▾"}</span>
+<span class="ohcp-label">${companionEsc(companionTr(title))}</span>${companionTip(tipKey)}
+</div><div class="ohcp-sec-b${collapsed ? "" : " open"}">${bodyHtml}</div>`;
+  }
+
+  // The spawn row differs by mode: passive keeps the "Spawn near boss" toggle;
+  // active shows the strategy dropdown, and radius only when hugging the boss.
+  function companionSpawnRows() {
+    const s = companionSettings();
+    if (s.mode !== "active") {
+      return companionSwitch("autoSpawn", companionTr("Spawn near boss"))
+        + companionNumber("spawnMinRadius", companionTr("Min radius"))
+        + companionNumber("spawnMaxRadius", companionTr("Max radius"));
+    }
+    const strat = s.spawnStrategy === "auto" ? "auto" : "boss";
+    let html = `<div class="ohcp-row"><span class="ohcp-label">${companionEsc(companionTr("Spawn type"))}${companionTip("spawnStrategy")}</span>
+<select class="ohcp-select" data-cp-spawnstrategy>
+<option value="boss"${strat === "boss" ? " selected" : ""}>${companionEsc(companionTr("Hug boss"))}</option>
+<option value="auto"${strat === "auto" ? " selected" : ""}>${companionEsc(companionTr("Auto-bot optimal"))}</option>
+</select></div>`;
+    if (strat === "boss") {
+      html += companionNumber("spawnMinRadius", companionTr("Min radius"))
+        + companionNumber("spawnMaxRadius", companionTr("Max radius"));
+    }
+    return html;
+  }
+
   // Clone of the RAW stored emojiBindings (as opposed to companionBindings(),
   // which resolves defaults and drops disabled ids). Any patch that writes back
   // to settings must start from this, not from companionBindings() — the latter
@@ -86,15 +129,34 @@
     return raw && typeof raw === "object" ? Object.assign({}, raw) : {};
   }
 
-  function companionSwitch(key, label, sub) {
+  function companionSwitch(key, label, sub, tipKey) {
     const on = Boolean(companionSettings()[key]);
-    return `<div class="ohcp-row${sub ? " sub" : ""}"><span class="ohcp-label">${companionEsc(label)}</span>
+    return `<div class="ohcp-row${sub ? " sub" : ""}"><span class="ohcp-label">${companionEsc(label)}${companionTip(tipKey || key)}</span>
 <div class="ohcp-sw${on ? " on" : ""}" data-cp-toggle="${key}"></div></div>`;
   }
 
   function companionNumber(key, label) {
     return `<div class="ohcp-row sub"><span class="ohcp-label">${companionEsc(label)}</span>
 <input class="ohcp-input" type="number" data-cp-num="${key}" value="${Number(companionSettings()[key])}"></div>`;
+  }
+
+  // Hover text for the "?" icon on each row. Keys are setting keys; values go
+  // through companionTr() so they translate. A row with no entry gets no icon.
+  const COMPANION_TIPS = {
+    autoSpawn: "Spawn next to the boss during the spawn phase.",
+    spawnStrategy: "Active mode: hug the boss, or let the auto-bot pick the best spot.",
+    autoAlliance: "Accept (and request) an alliance only with the boss.",
+    autoTroops: "Donate troops to the boss when the boss runs low.",
+    autoGold: "Donate gold to the boss.",
+    autoFactory: "Build a factory, then keep upgrading it toward the level cap.",
+    emojiControl: "Let the boss command this bot with emoji.",
+    tickMs: "How often the bot re-evaluates, in milliseconds.",
+  };
+
+  function companionTip(key) {
+    const text = COMPANION_TIPS[key];
+    if (!text) return "";
+    return ` <span class="ohcp-tip" title="${companionEsc(companionTr(text))}">?</span>`;
   }
 
   function companionRenderControl() {
@@ -104,7 +166,8 @@
       : st === "missing" ? companionTr("Boss not found")
       : st === "self" ? companionTr("This tab is the boss")
       : companionTr("No boss set");
-    return [
+
+    const core = [
       `<div class="ohcp-row"><span class="ohcp-label">${companionEsc(companionTr("Companion mode"))}</span>
 <div class="ohcp-sw${companionState.enabled ? " on" : ""}" data-cp-enabled></div></div>`,
       companionModeRow(),
@@ -113,26 +176,29 @@
 value="${companionEsc(s.bossName)}" placeholder="${companionEsc(companionTr("Boss name"))}"></div>`,
       `<div class="ohcp-row"><span class="ohcp-label ${st === "missing" ? "ohcp-warn" : ""}">${companionEsc(statusText)}</span>
 <button class="ohcp-input" data-cp-pick>▾</button></div>`,
-      `<div class="ohcp-sec">${companionEsc(companionTr("Support"))}</div>`,
-      companionSwitch("autoSpawn", companionTr("Spawn near boss")),
-      companionNumber("spawnMinRadius", companionTr("Min radius")),
-      companionNumber("spawnMaxRadius", companionTr("Max radius")),
-      companionSwitch("autoAlliance", companionTr("Accept boss alliance")),
-      companionSwitch("autoTroops", companionTr("Donate troops")),
-      companionNumber("troopNeedPct", companionTr("Boss below %")),
-      companionNumber("troopSendPct", companionTr("Send %")),
-      companionSwitch("autoGold", companionTr("Donate gold")),
-      companionNumber("goldBuildingPct", companionTr("While building %")),
-      companionNumber("goldIdlePct", companionTr("When done %")),
-      `<div class="ohcp-sec">${companionEsc(companionTr("Economy"))}</div>`,
-      companionSwitch("autoFactory", companionTr("Auto factory")),
-      companionNumber("maxFactoryLevel", companionTr("Max factory level")),
-      `<div class="ohcp-row sub"><span class="ohcp-label">${companionEsc(companionTr("Current level"))}</span>
-<span>${companionState.factoryLevel}</span></div>`,
-      `<div class="ohcp-sec">${companionEsc(companionTr("Advanced"))}</div>`,
-      companionSwitch("emojiControl", companionTr("Emoji commands")),
-      companionNumber("tickMs", companionTr("Tick (ms)")),
     ].join("");
+
+    const support = companionSpawnRows()
+      + companionSwitch("autoAlliance", companionTr("Accept boss alliance"))
+      + companionSwitch("autoTroops", companionTr("Donate troops"))
+      + companionNumber("troopNeedPct", companionTr("Boss below %"))
+      + companionNumber("troopSendPct", companionTr("Send %"))
+      + companionSwitch("autoGold", companionTr("Donate gold"))
+      + companionNumber("goldBuildingPct", companionTr("While building %"))
+      + companionNumber("goldIdlePct", companionTr("When done %"));
+
+    const economy = companionSwitch("autoFactory", companionTr("Auto factory"))
+      + companionNumber("maxFactoryLevel", companionTr("Max factory level"))
+      + `<div class="ohcp-row sub"><span class="ohcp-label">${companionEsc(companionTr("Current level"))}</span>
+<span>${companionState.factoryLevel}</span></div>`;
+
+    const advanced = companionSwitch("emojiControl", companionTr("Emoji commands"))
+      + companionNumber("tickMs", companionTr("Tick (ms)"));
+
+    return core
+      + companionSection("support", "Support", "autoAlliance", support)
+      + companionSection("economy", "Economy", "autoFactory", economy)
+      + companionSection("advanced", "Advanced", "emojiControl", advanced);
   }
 
   function companionRenderEmoji() {
@@ -330,6 +396,25 @@ style="width:34px">${companionEsc(emoji)}</button>
         if (typeof companionSyncAutobot === "function") companionSyncAutobot();
         companionRenderBody(panel);
         companionUpdateChrome(panel);
+      });
+    }
+
+    panel.querySelectorAll("[data-cp-section]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        const key = el.dataset.cpSection;
+        const cur = (companionSettings().collapsedSections || {})[key];
+        const patch = { collapsedSections: {} };
+        patch.collapsedSections[key] = !cur;
+        companionPatchSettings(patch);
+        companionRenderBody(panel);
+      });
+    });
+
+    const spawnStrat = panel.querySelector("[data-cp-spawnstrategy]");
+    if (spawnStrat) {
+      spawnStrat.addEventListener("change", function () {
+        companionPatchSettings({ spawnStrategy: spawnStrat.value });
+        companionRenderBody(panel);
       });
     }
 
