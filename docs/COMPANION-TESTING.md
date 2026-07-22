@@ -83,6 +83,23 @@ chú lại console log / ảnh chụp màn hình trước khi báo cáo.
       boss, mode, các switch/số đã chỉnh, emoji bindings) **còn nguyên**, không
       bị reset về mặc định.
 
+## v2 — panel + hành vi mới
+
+**Panel:**
+
+- [ ] **V2.1.** Kéo panel Companion đi nơi khác → thả. Đổi tab (Control/Emoji/Log) rồi kéo lại → **VẪN** kéo được (bug cũ: sau khi đổi tab thì không kéo được).
+- [ ] **V2.2.** Để yên vài giây cho panel tự refresh theo tick, rồi kéo lại → vẫn kéo được.
+- [ ] **V2.3.** Bấm header nhóm "Kinh tế" / "Nâng cao" → đóng/mở được; reload trang → nhớ đúng trạng thái đóng/mở.
+- [ ] **V2.4.** Rê chuột lên icon `?` mỗi dòng → hiện tooltip giải thích.
+
+**Hành vi:**
+
+- [ ] **V2.5.** Bật Companion + chọn **Passive** → auto-bot bị **TẮT** tự động (kiểm panel Auto-Bot: công tắc off).
+- [ ] **V2.6.** Đang **Passive** (auto-bot đã tắt), chuyển sang **Active** → auto-bot được **BẬT LẠI** đúng trạng thái trước khi bật Companion.
+- [ ] **V2.7.** Tắt Companion khi đang Passive → auto-bot khôi phục trạng thái gốc.
+- [ ] **V2.8.** **Active mode** → xuất hiện dropdown "Kiểu spawn". Chọn "Bám boss" → bot spawn cạnh boss; chọn "Auto-bot tối ưu" → bot spawn theo vị trí auto-bot tính (không bám boss), và feature spawn của auto-bot được bật.
+- [ ] **V2.9.** Ở **Active**, gõ tên boss vào ô Boss trong lúc panel đang tự refresh → không bị mất chữ giữa chừng.
+
 ## Sau khi kiểm tra xong
 
 Ghi lại kết quả (mục nào pass, mục nào fail kèm mô tả) vào

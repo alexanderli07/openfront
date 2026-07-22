@@ -407,6 +407,17 @@
     "paused": "paused",
     "Emoji to one bot targets it; emoji to All players targets every bot.":
       "Emoji to one bot targets it; emoji to All players targets every bot.",
+    "Spawn type": "Spawn type",
+    "Hug boss": "Hug boss",
+    "Auto-bot optimal": "Auto-bot optimal",
+    "Spawn next to the boss during the spawn phase.": "Spawn next to the boss during the spawn phase.",
+    "Active mode: hug the boss, or let the auto-bot pick the best spot.": "Active mode: hug the boss, or let the auto-bot pick the best spot.",
+    "Accept (and request) an alliance only with the boss.": "Accept (and request) an alliance only with the boss.",
+    "Donate troops to the boss when the boss runs low.": "Donate troops to the boss when the boss runs low.",
+    "Donate gold to the boss.": "Donate gold to the boss.",
+    "Build a factory, then keep upgrading it toward the level cap.": "Build a factory, then keep upgrading it toward the level cap.",
+    "Let the boss command this bot with emoji.": "Let the boss command this bot with emoji.",
+    "How often the bot re-evaluates, in milliseconds.": "How often the bot re-evaluates, in milliseconds.",
 
     // Quick Panel tooltip popovers for Companion (QP_FEATURE_TIPS in
     // quick-panel.js). These go through the shared _tr() alias rather than a
