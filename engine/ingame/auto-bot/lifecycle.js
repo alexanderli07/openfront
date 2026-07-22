@@ -1718,6 +1718,7 @@ window.__OFH_autobot = {
       enabled: Boolean(s.enabled),
       difficulty: s.difficulty,
       winFixes: Boolean(s.winFixes),
+      smartSpawn: Boolean(s.smartSpawn),
       tickMs: s.tickMs,
       hidden: Boolean(s.hidden),
       features: { ...s.features },
@@ -1734,6 +1735,7 @@ window.__OFH_autobot = {
       const ms = Number(patch.tickMs);
       if (Number.isFinite(ms) && ms > 0) s.tickMs = ms;
     }
+    if ("smartSpawn" in patch) s.smartSpawn = Boolean(patch.smartSpawn);
     if (patch.features && typeof patch.features === "object") {
       Object.assign(s.features, patch.features);
     }

@@ -235,12 +235,50 @@
     return companionState.lastSpawnTile != null;
   }
 
+  // Ensure the auto-bot's own spawn logic is active, without writing to
+  // localStorage on every tick — only set what is not already set.
+  function companionForceAutobotSpawn() {
+    let bridge = null;
+    try {
+      bridge = window.__OFH_autobot || null;
+    } catch (_error) {
+      bridge = null;
+    }
+    if (!bridge || typeof bridge.set !== "function") return;
+    let cur = null;
+    try {
+      cur = typeof bridge.get === "function" ? bridge.get() : null;
+    } catch (_error) {
+      cur = null;
+    }
+    const patch = {};
+    const spawnOn = cur && cur.features && cur.features.spawn === true;
+    if (!spawnOn) patch.features = { spawn: true };
+    if (!cur || cur.smartSpawn !== true) patch.smartSpawn = true;
+    if (patch.features || "smartSpawn" in patch) {
+      try {
+        bridge.set(patch);
+      } catch (_error) {
+        /* ignore */
+      }
+    }
+  }
+
   // Returns a spawn TileRef to force, or null to let the auto-bot decide.
+  // Active mode is governed by spawnStrategy, NOT by autoSpawn (that toggle only
+  // applies to the passive-mode branch in companionTick).
   function companionSpawnCenter(game, _player) {
     // Paused means "stop interfering", including with the auto-bot's own choices.
     if (!companionState.enabled || companionState.paused) return null;
     const s = companionSettings();
-    if (s.mode !== "active" || !s.autoSpawn) return null;
+    if (s.mode !== "active") return null;
+
+    // "auto" — hand spawn back to the auto-bot, and make sure its spawn is on.
+    if (s.spawnStrategy === "auto") {
+      companionForceAutobotSpawn();
+      return null;
+    }
+
     const g = game || companionGame();
     if (!g) return null;
     const boss = companionRefreshBoss(g);

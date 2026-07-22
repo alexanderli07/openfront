@@ -1275,9 +1275,11 @@ const ENG = [
   m.companionPatchSettings({ mode: "passive" });
   assert.equal(m.companionSpawnCenter(game, null), null, "passive → hook stays out");
 
-  // autoSpawn off → no override even in active mode.
-  m.companionPatchSettings({ mode: "active", autoSpawn: false });
-  assert.equal(m.companionSpawnCenter(game, null), null);
+  // Active mode is governed by spawnStrategy now, not autoSpawn. "auto" hands the
+  // decision back to the auto-bot, so the hook returns null.
+  m.companionPatchSettings({ mode: "active", spawnStrategy: "auto" });
+  assert.equal(m.companionSpawnCenter(game, null), null, "spawnStrategy auto → no override");
+  m.companionPatchSettings({ spawnStrategy: "boss" }); // restore for later assertions
 
   // Alliance veto: allow the boss, block everyone else.
   m.companionPatchSettings({ mode: "active", autoSpawn: true, autoAlliance: true });
@@ -1846,6 +1848,73 @@ const ENG = [
   m.companionSyncAutobot();
   assert.equal(autobotEnabled, true, "disabling companion restores the auto-bot");
   assert.equal(m.companionState.autobotSuppressed, false);
+
+  delete fakeWindow.__OFH_autobot;
+}
+
+// ---- companionSpawnCenter honours spawnStrategy -----------------------------
+{
+  const calls = [];
+  let features = { spawn: false };
+  let smartSpawn = false;
+  fakeWindow.__OFH_autobot = {
+    get: () => ({ enabled: true, features: Object.assign({}, features), smartSpawn: smartSpawn }),
+    set: (p) => {
+      calls.push(p);
+      if (p.features) Object.assign(features, p.features);
+      if ("smartSpawn" in p) smartSpawn = p.smartSpawn;
+    },
+  };
+
+  const W = 100;
+  const boss = {
+    name: () => "Boss", smallID: () => 1, id: () => "p1",
+    type: () => "HUMAN", isAlive: () => true, state: { spawnTile: 40 * W + 20 },
+  };
+  const game = {
+    width: () => W, height: () => W,
+    isValidCoord: (x, y) => x >= 0 && y >= 0 && x < W && y < W,
+    ref: (x, y) => y * W + x,
+    isLand: () => true, hasOwner: () => false, isBorder: () => false,
+    players: () => [boss, { name: () => "Me", smallID: () => 2, id: () => "p2",
+      type: () => "HUMAN", isAlive: () => true }],
+    myPlayer: () => ({ name: () => "Me", smallID: () => 2, id: () => "p2" }),
+  };
+
+  const m = loadCompanion(ENG,
+    ["companionSpawnCenter", "companionState", "companionPatchSettings"],
+    {
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => ({ game: game }),
+    });
+
+  m.companionPatchSettings({ bossName: "Boss", mode: "active" });
+  m.companionState.enabled = true;
+  m.companionState.bossSmallID = 1;
+
+  // spawnStrategy "boss" → returns a tile in the ring, never touches the auto-bot.
+  m.companionPatchSettings({ spawnStrategy: "boss" });
+  calls.length = 0;
+  const tile = m.companionSpawnCenter(game, null);
+  assert.ok(tile != null, "boss strategy overrides the spawn");
+  const d = Math.hypot((tile % W) - 20, Math.floor(tile / W) - 40);
+  assert.ok(d >= 12 - 1e-9 && d <= 24 + 1e-9, "override tile sits in the ring");
+  assert.equal(calls.length, 0, "boss strategy does not poke the auto-bot's spawn settings");
+
+  // spawnStrategy "auto" → returns null AND forces the auto-bot's spawn on.
+  m.companionPatchSettings({ spawnStrategy: "auto" });
+  features = { spawn: false };
+  smartSpawn = false;
+  calls.length = 0;
+  assert.equal(m.companionSpawnCenter(game, null), null,
+    "auto strategy hands the decision to the auto-bot");
+  assert.equal(features.spawn, true, "forced features.spawn on");
+  assert.equal(smartSpawn, true, "forced smartSpawn on");
+
+  // Idempotent: already on → no redundant set (localStorage churn).
+  calls.length = 0;
+  assert.equal(m.companionSpawnCenter(game, null), null);
+  assert.equal(calls.length, 0, "already on → no redundant auto-bot set");
 
   delete fakeWindow.__OFH_autobot;
 }
