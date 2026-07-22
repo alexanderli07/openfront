@@ -288,6 +288,7 @@ style="width:34px">${companionEsc(emoji)}</button>
     if (mode) {
       mode.addEventListener("change", function () {
         companionPatchSettings({ mode: mode.value });
+        if (typeof companionSyncAutobot === "function") companionSyncAutobot();
         companionBuildPanel();
       });
     }
