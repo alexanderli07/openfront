@@ -22,6 +22,7 @@
   const COMPANION_DONATE_MIN_GAP_MS = 11000;
   const COMPANION_DONATE_GOLD_COOLDOWN_MS = 30000;
   const COMPANION_FACTORY_COOLDOWN_MS = 5000;
+  const COMPANION_RENEW_COOLDOWN_MS = 5000;
 
   // ---------------------------------------------------------------------------
   // Log
@@ -388,6 +389,20 @@
           companionLog((ok ? "✅ " : "❌ ") + actionId);
         });
       }
+    }
+
+    // Renew the alliance with the boss before it expires — keeps donations
+    // flowing (canDonate* need isFriendly). Runs even while paused, because
+    // holding the alliance is maintenance, not an intervention; and in both
+    // modes. Throttled so we don't spam the extension window before the boss
+    // confirms. allianceExtension is not a donation, so no donate min-gap.
+    if (companionIsAlliedWithBoss(me, boss)
+        && companionCooldownReady("renew", COMPANION_RENEW_COOLDOWN_MS, now)
+        && companionAllianceNeedsRenew(me, boss)) {
+      companionMarkCooldown("renew", now);
+      companionEnqueue("renew", function () {
+        if (companionRenewAlliance(boss)) companionLog("🔁 Renew alliance with boss");
+      });
     }
 
     if (companionState.paused) return;

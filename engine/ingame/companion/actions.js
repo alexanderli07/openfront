@@ -82,6 +82,12 @@
     return companionSend({ type: "breakAlliance", recipient: recipient });
   }
 
+  function companionRenewAlliance(boss) {
+    const recipient = companionPlayerId(boss);
+    if (!recipient) return false;
+    return companionSend({ type: "allianceExtension", recipient: recipient });
+  }
+
   // ---------------------------------------------------------------------------
   // Predicates
   // ---------------------------------------------------------------------------
@@ -118,6 +124,32 @@
       if (typeof me.isAlliedWith === "function" && me.isAlliedWith(boss)) return true;
     } catch (_error) {
       /* fall through */
+    }
+    return false;
+  }
+
+  // True when an alliance WITH THE BOSS is in its extension window (about to
+  // expire). hasExtensionRequest on the client is expiresAt <= now + promptOffset,
+  // i.e. "renewable now" — both sides see it, so both send and the alliance
+  // extends. Reads me.alliances() defensively (may be absent on some builds).
+  function companionAllianceNeedsRenew(me, boss) {
+    if (!me || !boss || typeof me.alliances !== "function") return false;
+    let bossId = null;
+    try {
+      bossId = typeof boss.id === "function" ? boss.id() : null;
+    } catch (_error) {
+      return false;
+    }
+    if (bossId == null) return false;
+    let alliances = null;
+    try {
+      alliances = me.alliances();
+    } catch (_error) {
+      return false;
+    }
+    if (!Array.isArray(alliances)) return false;
+    for (const a of alliances) {
+      if (a && a.other === bossId && a.hasExtensionRequest === true) return true;
     }
     return false;
   }

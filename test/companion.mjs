@@ -2276,4 +2276,104 @@ const ENG = [
     "a new match resets the gold/factory interleave mark");
 }
 
+// ---- alliance renew: send extension when the boss alliance is expiring ------
+{
+  const sent = [];
+  const m = loadCompanion(
+    ["engine/ingame/companion/core.js", "engine/ingame/companion/commands.js",
+     "engine/ingame/companion/actions.js"],
+    ["companionRenewAlliance", "companionAllianceNeedsRenew"],
+    { sendGamePacket: (o) => { sent.push(o); return true; } });
+
+  const boss = { id: () => "p1", smallID: () => 1 };
+
+  // companionRenewAlliance sends the extension intent to the boss's PlayerID.
+  assert.equal(m.companionRenewAlliance(boss), true);
+  assert.deepEqual(sent[0], { type: "allianceExtension", recipient: "p1" });
+  assert.equal(m.companionRenewAlliance(null), false, "no boss → no send");
+  assert.equal(m.companionRenewAlliance({}), false, "no id() → no send");
+
+  // companionAllianceNeedsRenew: true only when an alliance WITH THE BOSS is in
+  // the extension window (hasExtensionRequest).
+  const mkMe = (alliances) => ({ alliances: () => alliances });
+  assert.equal(
+    m.companionAllianceNeedsRenew(
+      mkMe([{ id: 1, other: "p1", hasExtensionRequest: true }]), boss),
+    true, "boss alliance expiring → needs renew");
+  assert.equal(
+    m.companionAllianceNeedsRenew(
+      mkMe([{ id: 1, other: "p1", hasExtensionRequest: false }]), boss),
+    false, "boss alliance not expiring → no renew");
+  assert.equal(
+    m.companionAllianceNeedsRenew(
+      mkMe([{ id: 2, other: "p9", hasExtensionRequest: true }]), boss),
+    false, "some OTHER alliance expiring → not our concern");
+  assert.equal(m.companionAllianceNeedsRenew(mkMe([]), boss), false, "no alliances → false");
+  // Never throws on a broken me / missing alliances().
+  assert.equal(m.companionAllianceNeedsRenew({}, boss), false, "no alliances() → false, no throw");
+  assert.equal(m.companionAllianceNeedsRenew(null, boss), false);
+  assert.equal(m.companionAllianceNeedsRenew(mkMe([]), null), false, "no boss → false");
+}
+
+// ---- alliance renew is queued from the tick, throttled, even while paused ---
+{
+  const boss = {
+    name: () => "Boss", smallID: () => 1, id: () => "p1",
+    type: () => "HUMAN", isAlive: () => true, troops: () => 9000,
+    state: { outgoingEmojis: [], outgoingAllianceRequests: [], spawnTile: 500 },
+  };
+  const me = {
+    name: () => "Me", smallID: () => 2, id: () => "p2",
+    type: () => "HUMAN", isAlive: () => true,
+    troops: () => 5000, gold: () => 0n,
+    isOnSameTeam: () => true, isAlliedWith: () => true,
+    alliances: () => [{ id: 1, other: "p1", hasExtensionRequest: true }],
+    state: { spawnTile: 777 },
+  };
+  const game = {
+    players: () => [boss, me], myPlayer: () => me,
+    config: () => ({ maxTroops: () => 10000 }),
+    units: () => [], inSpawnPhase: () => false, ticks: () => 1,
+  };
+  const m = loadCompanion(ENG,
+    ["companionTick", "companionState", "companionPatchSettings"],
+    {
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => ({ game: game }),
+    });
+  const labels = () => m.companionState.queue.map((q) => q.label).sort();
+
+  m.companionPatchSettings({
+    bossName: "Boss", mode: "passive",
+    autoTroops: false, autoGold: false, autoFactory: false, autoAlliance: false,
+  });
+  m.companionState.enabled = true;
+
+  // Expiring boss alliance → renew queued.
+  m.companionState.queue.length = 0;
+  m.companionState.cooldowns = {};
+  m.companionTick();
+  assert.ok(labels().indexOf("renew") !== -1, "expiring boss alliance → renew queued");
+
+  // Throttled: cooldown just marked → not queued again this soon.
+  m.companionState.queue.length = 0;
+  m.companionTick();
+  assert.equal(labels().indexOf("renew"), -1, "renew throttled within 5s");
+
+  // Still fires while PAUSED (keeping the alliance is maintenance, like emoji).
+  m.companionState.queue.length = 0;
+  m.companionState.cooldowns = {};
+  m.companionState.paused = true;
+  m.companionTick();
+  assert.ok(labels().indexOf("renew") !== -1, "renew runs even while paused");
+
+  // Not expiring → no renew.
+  m.companionState.paused = false;
+  m.companionState.queue.length = 0;
+  m.companionState.cooldowns = {};
+  me.alliances = () => [{ id: 1, other: "p1", hasExtensionRequest: false }];
+  m.companionTick();
+  assert.equal(labels().indexOf("renew"), -1, "alliance not expiring → no renew");
+}
+
 console.log("COMPANION OK — pure helpers behave");
