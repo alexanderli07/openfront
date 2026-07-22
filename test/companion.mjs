@@ -1753,4 +1753,19 @@ const ENG = [
   assert.equal(m.companionSettings().spawnStrategy, "boss", "bad stored enum → default");
 }
 
+// ---- collapsedSections merges onto defaults on load too ---------------------
+{
+  // A stored blob that only remembers ONE section flag must keep the other
+  // sections at their defaults, not drop them (panel would render wrong).
+  store.clear();
+  const m0 = loadCompanion(CORE, ["COMPANION_STORAGE_KEY"]);
+  store.set(m0.COMPANION_STORAGE_KEY, JSON.stringify({ collapsedSections: { economy: false } }));
+  const m = loadCompanion(CORE, ["companionSettings"]);
+  assert.deepEqual(
+    m.companionSettings().collapsedSections,
+    { support: false, economy: false, advanced: true },
+    "a partial stored blob keeps the missing sections at their defaults",
+  );
+}
+
 console.log("COMPANION OK — pure helpers behave");

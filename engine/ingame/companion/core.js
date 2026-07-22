@@ -214,7 +214,14 @@
             // Same gate as companionPatchSettings: a blob written by an older
             // build (or hand-edited) cannot inject an out-of-range value.
             const v = companionCoerceSetting(k, parsed[k]);
-            if (v !== undefined) s[k] = v;
+            if (v === undefined) continue;
+            // collapsedSections merges onto the defaults too — a stored blob
+            // missing a section key must keep that section's default, not drop it.
+            if (k === "collapsedSections") {
+              s.collapsedSections = Object.assign({}, s.collapsedSections, v);
+            } else {
+              s[k] = v;
+            }
           }
         }
       }
