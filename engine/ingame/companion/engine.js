@@ -17,12 +17,19 @@
   const COMPANION_LOG_LIMIT = 100;
   // Server rejects any donation to a recipient within donateCooldown (100 ticks =
   // 10s) of the previous one, TROOPS AND GOLD SHARE this window (PlayerImpl
-  // sentDonations). So both go through one shared "donateAny" gap; 11s = server
-  // 10s + 1s margin for tick granularity + latency.
-  const COMPANION_DONATE_MIN_GAP_MS = 11000;
+  // sentDonations). Rather than guess that window on the wall clock, we read the
+  // server's own canDonateGold/canDonateTroops truth through a background actions()
+  // cache — see COMPANION_ACTIONS_REFRESH_MS below and companionApplyBossActions.
   const COMPANION_DONATE_GOLD_COOLDOWN_MS = 30000;
   const COMPANION_FACTORY_COOLDOWN_MS = 5000;
   const COMPANION_RENEW_COOLDOWN_MS = 5000;
+  const COMPANION_SPAWN_TICK_MS = 300;
+  const COMPANION_ACTIONS_REFRESH_MS = 1000;
+  const COMPANION_ACTIONS_TIMEOUT_MS = 1500;
+  // How long to wait for the server to reflect an optimistic donate before we
+  // assume it never landed (socket drop / dropped from a full queue / rejected)
+  // and resync — the server donate cooldown is 10s, so 12s leaves a 2s margin.
+  const COMPANION_DONATE_CONFIRM_TIMEOUT_MS = 12000;
 
   // ---------------------------------------------------------------------------
   // Log
@@ -85,6 +92,12 @@
     companionState.bossSmallID = null;
     companionState.bossStatus = "idle";
     companionState.lastSendFailedAt = 0;
+    companionState.bossCanDonateGold = false;
+    companionState.bossCanDonateTroops = false;
+    companionState.actionsInFlight = false;
+    companionState.lastActionsAt = 0;
+    companionState.bossDonateConfirmed = true;
+    companionState.donateUnconfirmedSince = 0;
   }
 
   function companionCooldownReady(key, ms, now) {
@@ -137,6 +150,85 @@
       }
     }
     return res.boss;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boss canDonate cache
+  // ---------------------------------------------------------------------------
+
+  // The server's donate cooldown is not exposed on the client, but
+  // PlayerView.actions(bossTile).interaction carries canDonateGold/canDonateTroops
+  // (the same server truth that greys out the game's donate buttons). actions() is
+  // async, so we refresh a cache in the background and read the cache in the tick.
+
+  // Apply a fresh actions() result through the round-trip confirm gate. After we
+  // send a donation the server still reports canDonate=true until it processes our
+  // intent; `bossDonateConfirmed` stays false until we've seen it flip to false at
+  // least once, so a refresh that lands early cannot pull the flags back to true.
+  function companionApplyBossActions(serverGold, serverTroops) {
+    const g = Boolean(serverGold);
+    const t = Boolean(serverTroops);
+    if (!companionState.bossDonateConfirmed) {
+      if (!g || !t) {
+        companionState.bossDonateConfirmed = true;
+      } else if (
+        Date.now() - (companionState.donateUnconfirmedSince || 0)
+          > COMPANION_DONATE_CONFIRM_TIMEOUT_MS
+      ) {
+        // Self-heal: waited past the server cooldown and it still shows both
+        // donates available — our optimistic donate never reached the server.
+        // Resync instead of staying stuck (no gold AND no troops) all match.
+        companionState.bossDonateConfirmed = true;
+      } else {
+        return; // server hasn't reflected our donation yet — keep the false cache
+      }
+    }
+    companionState.bossCanDonateGold = g;
+    companionState.bossCanDonateTroops = t;
+  }
+
+  // Optimistic: a donation blocks BOTH gold and troops to the boss for the server
+  // cooldown. Reflect it immediately so we don't fire twice before the refresh
+  // catches up, and drop confirm so an early refresh can't undo it.
+  function companionMarkDonated() {
+    companionState.bossCanDonateGold = false;
+    companionState.bossCanDonateTroops = false;
+    companionState.bossDonateConfirmed = false;
+    companionState.donateUnconfirmedSince = Date.now();
+  }
+
+  // Fire a throttled background actions() fetch for the boss and feed the result
+  // through companionApplyBossActions. Never throws into the tick.
+  function companionRefreshBossActions(game, me, boss) {
+    const now = Date.now();
+    if (companionState.actionsInFlight) return;
+    if (now - (companionState.lastActionsAt || 0) < COMPANION_ACTIONS_REFRESH_MS) return;
+    if (!me || typeof me.actions !== "function") return;
+    let bossTile = null;
+    try {
+      const loc = boss && typeof boss.nameLocation === "function" ? boss.nameLocation() : null;
+      if (loc && game && typeof game.ref === "function") bossTile = game.ref(loc.x, loc.y);
+    } catch (_error) {
+      bossTile = null;
+    }
+    if (bossTile == null) return;
+    companionState.actionsInFlight = true;
+    companionState.lastActionsAt = now;
+    try {
+      const raw = me.actions(bossTile, null);
+      const p = typeof withTimeout === "function"
+        ? withTimeout(raw, COMPANION_ACTIONS_TIMEOUT_MS, null)
+        : Promise.resolve(raw);
+      Promise.resolve(p).then(function (a) {
+        if (a && a.interaction) {
+          companionApplyBossActions(a.interaction.canDonateGold, a.interaction.canDonateTroops);
+        }
+      }).catch(function () {}).finally(function () {
+        companionState.actionsInFlight = false;
+      });
+    } catch (_error) {
+      companionState.actionsInFlight = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -464,52 +556,26 @@
 
     const allied = companionIsAlliedWithBoss(me, boss);
 
-    // 4. Donate troops when the boss is running low. Troops and gold share one
-    //    "donateAny" gap because the server rejects a second donation (either
-    //    kind) to the same recipient within its 10s cooldown.
-    if (s.autoTroops && allied
-        && companionCooldownReady("donateAny", COMPANION_DONATE_MIN_GAP_MS, now)
-        && companionBossNeedsTroops(game, boss, s.troopNeedPct)) {
-      companionMarkCooldown("donateAny", now);
-      companionEnqueue("donateTroops", function () {
-        if (companionDonateTroops(me, boss, s.troopSendPct)) companionLog("🎖 Troops → boss");
-      });
+    // Keep the "can I donate to the boss right now?" cache fresh (background,
+    // async). We read the cache below instead of guessing a wall-clock cooldown.
+    if (allied && (s.autoTroops || s.autoGold)) {
+      companionRefreshBossActions(game, me, boss);
     }
 
-    // 5. Factory — build one, then keep upgrading it until it reaches the cap.
-    //    Level 0 means we own none yet, so the same call covers both cases.
-    //    Passive mode only — in Active mode the auto-bot's own structureBehavior
-    //    already handles building/upgrading, and running both here would fight it
-    //    for gold and double up on upgrade_structure calls. The 🏭 emoji command
-    //    still works in both modes: it goes through companionRunAction, not here.
+    // factoryLevel feeds the gold gate, which now runs BEFORE troops.
     const factoryLevel = companionFactoryLevel(game, me);
     companionState.factoryLevel = factoryLevel;
-    if (s.mode === "passive" && s.autoFactory && factoryLevel < s.maxFactoryLevel
-        && companionCooldownReady("factory", COMPANION_FACTORY_COOLDOWN_MS, now)) {
-      companionMarkCooldown("factory", now);
-      companionEnqueue("factory", function () {
-        if (companionBuildOrUpgradeFactory(game, me)) companionLog("🏭 Factory");
-      });
-    }
 
-    // 6. Donate gold. Gated three ways:
-    //    - the shared donateAny gap (so it never lands inside the server's donate
-    //      cooldown that troops just used);
-    //    - a gold-only 30s throttle (from the last GOLD donation, not reset by troops);
-    //    - an interleave gate that only applies while COMPANION ITSELF is building
-    //      factories (passive + autoFactory, below the cap): gold is allowed only
-    //      after the factory has actually risen a level since the last gold donation
-    //      (goldAtFactoryLevel, starting at 0). That both saves capital for the
-    //      first factory (level 0 → never > 0) and forces 1:1 gold↔upgrade
-    //      alternation. It reads the REAL level, so a build the server rejects for
-    //      lack of gold does not advance it and gold stays blocked.
+    // 4. Donate GOLD first. Gold has its own 30s throttle so it only claims a slot
+    //    occasionally; running it before troops keeps troops (which wants a slot
+    //    almost every cooldown) from starving it. companionMarkDonated then makes
+    //    troops yield the same tick. Gated on the real canDonate flag + interleave.
     const companionBuildsFactory = s.mode === "passive" && s.autoFactory;
     let goldInterleaveOk = true;
     if (companionBuildsFactory && factoryLevel < s.maxFactoryLevel) {
       goldInterleaveOk = factoryLevel > companionState.goldAtFactoryLevel;
     }
-    if (s.autoGold && allied && goldInterleaveOk
-        && companionCooldownReady("donateAny", COMPANION_DONATE_MIN_GAP_MS, now)
+    if (companionState.bossCanDonateGold && s.autoGold && allied && goldInterleaveOk
         && companionCooldownReady("donateGold", COMPANION_DONATE_GOLD_COOLDOWN_MS, now)) {
       let goldNow = 0;
       try { goldNow = Number(me.gold()); } catch (_error) { goldNow = 0; }
@@ -522,12 +588,12 @@
       }
       const amount = companionPercentAmount(amountSource, pct);
       if (amount > 0) {
-        companionMarkCooldown("donateAny", now);
         companionMarkCooldown("donateGold", now);
         companionState.lastGoldSnapshot = building ? goldNow : 0;
         if (companionBuildsFactory && factoryLevel < s.maxFactoryLevel) {
           companionState.goldAtFactoryLevel = factoryLevel;
         }
+        companionMarkDonated();
         companionEnqueue("donateGold", function () {
           const recipient = (function () {
             try { return boss.id(); } catch (_e) { return null; }
@@ -538,6 +604,26 @@
           }
         });
       }
+    }
+
+    // 5. Donate TROOPS when the boss is low — unless gold just took the slot
+    //    (companionMarkDonated cleared bossCanDonateTroops).
+    if (companionState.bossCanDonateTroops && s.autoTroops && allied
+        && companionBossNeedsTroops(game, boss, s.troopNeedPct)) {
+      companionMarkDonated();
+      companionEnqueue("donateTroops", function () {
+        if (companionDonateTroops(me, boss, s.troopSendPct)) companionLog("🎖 Troops → boss");
+      });
+    }
+
+    // 6. Factory — build one, then upgrade toward the cap. Passive only; in Active
+    //    mode the auto-bot's structureBehavior handles it.
+    if (s.mode === "passive" && s.autoFactory && factoryLevel < s.maxFactoryLevel
+        && companionCooldownReady("factory", COMPANION_FACTORY_COOLDOWN_MS, now)) {
+      companionMarkCooldown("factory", now);
+      companionEnqueue("factory", function () {
+        if (companionBuildOrUpgradeFactory(game, me)) companionLog("🏭 Factory");
+      });
     }
   }
 
@@ -610,7 +696,17 @@
 
   function companionTickThrottled() {
     const now = Date.now();
-    const period = Number(companionSettings().tickMs) || 2000;
+    let period = Number(companionSettings().tickMs) || 2000;
+    // In the spawn phase, follow the boss fast — a 2s cadence misses quick boss
+    // re-clicks before the phase ends and the bot lands somewhere stale.
+    try {
+      const g = companionGame();
+      if (g && typeof g.inSpawnPhase === "function" && g.inSpawnPhase()) {
+        period = Math.min(period, COMPANION_SPAWN_TICK_MS);
+      }
+    } catch (_error) {
+      /* keep the normal period */
+    }
     if (now - (companionState.lastTickAt || 0) < period) {
       // Still drain the queue at full rate so a burst of commands is not stuck
       // behind the slow decision cadence.

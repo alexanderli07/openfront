@@ -197,6 +197,12 @@
     autobotWasEnabled: false,
     autobotSuppressed: false,
     uiSignature: null,
+    bossCanDonateGold: false,
+    bossCanDonateTroops: false,
+    actionsInFlight: false,
+    lastActionsAt: 0,
+    bossDonateConfirmed: true,
+    donateUnconfirmedSince: 0,
   };
 
   function companionLoadSettings() {

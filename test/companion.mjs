@@ -1222,6 +1222,14 @@ const ENG = [
   tick();
   assert.equal(m.companionState.queue.length, 0, "disabled → tick does nothing");
 
+  // Boss must actually permit a donation right now — mirrors the real game's
+  // canDonate gate (see the "boss canDonate cache" tests below). autoGold is off
+  // in this block, so only the troops flag matters for the expectations here.
+  // Pre-establish lastGameRef too: otherwise this first real tick treats fakeGame
+  // as a new match and companionResetRunState() clears the flag right back to
+  // false before the donate section ever sees it.
+  m.companionState.lastGameRef = fakeGame;
+  m.companionState.bossCanDonateTroops = true;
   m.companionState.enabled = true;
   tick();
   assert.deepEqual(
@@ -2127,13 +2135,17 @@ const ENG = [
       inSpawnPhase: () => false, ticks: () => 1,
     };
     const m = loadCompanion(ENG,
-      ["companionTick", "companionState", "companionPatchSettings",
-       "COMPANION_DONATE_MIN_GAP_MS"],
+      ["companionTick", "companionState", "companionPatchSettings"],
       {
         sendGamePacket: () => true, registerHelperTickListener: () => {},
         getOpenFrontGameContext: () => ({ game: game }),
       });
     m._game = game;
+    // Establish the game reference up front: companionTick's own "new match"
+    // detection (lastGameRef !== gameRef) calls companionResetRunState() on
+    // whichever tick first sees this game object, which would otherwise wipe the
+    // canDonate cache defaults set below before any sub-case's first tick runs.
+    m.companionState.lastGameRef = m._game;
     // Freeze factoryLevel: companionTick calls companionFactoryLevel(game, me),
     // which reads game.units("Factory"). Simpler: after each tick the tick sets
     // companionState.factoryLevel from that read (0, since units() is empty). We
@@ -2153,46 +2165,68 @@ const ENG = [
     let goldPool = 1000000n;
     me.gold = () => goldPool;
     m._addGold = (n) => { goldPool += BigInt(n); };
+    m._boss = boss;
+    // Donate now gates on the real canDonate cache; default it to "allowed" so
+    // the interleave/throttle sub-cases below exercise their own gate, not this.
+    m.companionState.bossCanDonateGold = true;
+    m.companionState.bossCanDonateTroops = true;
+    m.companionState.bossDonateConfirmed = true;
     return m;
   }
 
   const labels = (m) => m.companionState.queue.map((q) => q.label).sort();
 
-  assert.equal(makeDonateModule().COMPANION_DONATE_MIN_GAP_MS, 11000, "min-gap is 11s");
-
-  // -- min-gap: troops and gold share one donate window ----------------------
+  // -- canDonate gate + gold-before-troops + optimistic clear -----------------
   {
     const m = makeDonateModule();
     m.companionPatchSettings({
       bossName: "Boss", mode: "passive",
-      autoTroops: true, autoGold: true, autoFactory: false,  // autoFactory off → interleave gate inert
+      autoTroops: true, autoGold: true, autoFactory: false,  // autoFactory off → interleave inert
     });
     m.companionState.enabled = true;
     m._setLevel(3);
 
-    // Same tick: boss needs troops → troops queued; gold must NOT queue because
-    // troops just marked the shared donateAny gap.
+    // Server says we cannot donate right now → nothing queues, even though the
+    // boss needs troops and gold is off cooldown.
+    m.companionState.bossCanDonateGold = false;
+    m.companionState.bossCanDonateTroops = false;
     m.companionState.queue.length = 0;
-    m.companionState.cooldowns = {};             // both ready
+    m.companionState.cooldowns = {};
     m.companionTick();
-    assert.deepEqual(labels(m), ["donateTroops"], "troops queued, gold yields in the same tick");
+    assert.deepEqual(labels(m), [], "canDonate false → nothing donates");
 
-    // donateAny was marked; simulate "still inside the gap" deterministically by
-    // pointing it just under 11s ago. Gold (and troops) must stay blocked.
+    // Both allowed, boss needs troops, gold throttle ready: GOLD wins the slot
+    // (runs first), and the optimistic clear makes troops yield the same tick.
+    m.companionState.bossCanDonateGold = true;
+    m.companionState.bossCanDonateTroops = true;
+    m.companionState.bossDonateConfirmed = true;
+    m._addGold(1000000);
     m.companionState.queue.length = 0;
-    m.companionState.cooldowns.donateAny = Date.now() - 5000;   // 5s ago < 11s
-    m.companionState.cooldowns.donateGold = Date.now() - 40000; // gold throttle itself is ready
+    m.companionState.cooldowns = {};
     m.companionTick();
-    assert.equal(labels(m).indexOf("donateGold"), -1, "gold blocked while inside the min-gap");
+    assert.deepEqual(labels(m), ["donateGold"], "gold takes the slot, troops yields");
+    // Optimistic: both flags cleared, confirm dropped.
+    assert.equal(m.companionState.bossCanDonateGold, false, "gold flag cleared after donate");
+    assert.equal(m.companionState.bossCanDonateTroops, false, "troops flag cleared too (shared cooldown)");
+    assert.equal(m.companionState.bossDonateConfirmed, false, "confirm dropped");
 
-    // Past the gap (and troops now satisfied so it does not re-mark donateAny in
-    // this tick): turn troops off, put donateAny 12s ago → gold flows.
-    m.companionPatchSettings({ autoTroops: false });
+    // Next tick: gold on its 30s throttle now, troops flag is false (optimistic)
+    // → nothing until the background refresh restores the flags.
     m.companionState.queue.length = 0;
-    m.companionState.cooldowns.donateAny = Date.now() - 12000;  // 12s ago > 11s
-    m.companionState.cooldowns.donateGold = Date.now() - 40000;
     m.companionTick();
-    assert.ok(labels(m).indexOf("donateGold") !== -1, "gold flows once the min-gap has elapsed");
+    assert.deepEqual(labels(m), [], "flags false → nothing donates next tick");
+
+    // Boss no longer needs troops, gold throttle ready, gold allowed → gold only.
+    m.companionState.bossCanDonateGold = true;
+    m.companionState.bossCanDonateTroops = true;
+    m.companionState.bossDonateConfirmed = true;
+    m._addGold(1000000);
+    m.companionState.cooldowns = {};      // gold throttle ready
+    m._boss.troops = () => 9000;          // 90% → not needy
+    m.companionState.queue.length = 0;
+    m.companionTick();
+    assert.deepEqual(labels(m), ["donateGold"], "boss not needy → gold flows alone");
+    m._boss.troops = () => 1000;          // restore for later
   }
 
   // -- problem 1: no gold while building the first factory -------------------
@@ -2231,8 +2265,11 @@ const ENG = [
     assert.equal(m.companionState.goldAtFactoryLevel, 1, "mark advanced to 1");
 
     // Still level 1: gold blocked (1 > 1 false) — must upgrade first. Gold has
-    // grown so amount>0; only the interleave gate can block it here.
+    // grown so amount>0; only the interleave gate can block it here. Restore the
+    // canDonate cache first — the previous tick's donate optimistically cleared it.
     m._addGold(1000000);
+    m.companionState.bossCanDonateGold = true;
+    m.companionState.bossDonateConfirmed = true;
     m.companionState.queue.length = 0;
     m.companionState.cooldowns = {};             // cooldowns ready, but interleave blocks
     m.companionTick();
@@ -2241,6 +2278,8 @@ const ENG = [
     // Level 2: gold allowed again (2 > 1). Gold grew again so amount>0.
     m._setLevel(2);
     m._addGold(1000000);
+    m.companionState.bossCanDonateGold = true;
+    m.companionState.bossDonateConfirmed = true;
     m.companionState.queue.length = 0;
     m.companionState.cooldowns = {};
     m.companionTick();
@@ -2288,6 +2327,98 @@ const ENG = [
   }
 }
 
+// ---- boss canDonate cache: background refresh + round-trip confirm ----------
+{
+  let serverGold = true, serverTroops = true;
+  let actionsCalls = 0;
+  const boss = {
+    name: () => "Boss", smallID: () => 1, id: () => "p1",
+    type: () => "HUMAN", isAlive: () => true,
+    nameLocation: () => ({ x: 20, y: 40, size: 8 }),
+  };
+  const me = {
+    name: () => "Me", smallID: () => 2, id: () => "p2",
+    actions: (tile) => {
+      actionsCalls++;
+      return Promise.resolve({ interaction: { canDonateGold: serverGold, canDonateTroops: serverTroops } });
+    },
+  };
+  const game = { ref: (x, y) => y * 100 + x, myPlayer: () => me };
+
+  const m = loadCompanion(ENG,
+    ["companionRefreshBossActions", "companionApplyBossActions", "companionMarkDonated",
+     "companionState", "COMPANION_ACTIONS_REFRESH_MS", "COMPANION_DONATE_CONFIRM_TIMEOUT_MS"],
+    { sendGamePacket: () => true, registerHelperTickListener: () => {} });
+
+  // companionApplyBossActions: the round-trip confirm state machine (pure, sync).
+  m.companionState.bossDonateConfirmed = true;
+  m.companionApplyBossActions(true, true);
+  assert.equal(m.companionState.bossCanDonateGold, true, "confirmed + server true → cache true");
+
+  m.companionMarkDonated();
+  assert.equal(m.companionState.bossCanDonateGold, false, "donate clears cache");
+  assert.equal(m.companionState.bossDonateConfirmed, false, "and drops confirm");
+
+  m.companionApplyBossActions(true, true);   // server hasn't processed our donate yet
+  assert.equal(m.companionState.bossCanDonateGold, false, "unconfirmed + server true → stay false");
+  assert.equal(m.companionState.bossDonateConfirmed, false, "still not confirmed");
+
+  m.companionApplyBossActions(false, false);  // server now reflects our donate (cooldown)
+  assert.equal(m.companionState.bossDonateConfirmed, true, "server false → confirmed");
+  assert.equal(m.companionState.bossCanDonateGold, false, "and cache follows server (false)");
+
+  m.companionApplyBossActions(true, true);   // cooldown elapsed
+  assert.equal(m.companionState.bossCanDonateGold, true, "confirmed + server true → cache true again");
+
+  // Self-heal: an optimistic donate that never reached the server (socket drop,
+  // dropped from a full queue, rejected) leaves the server reporting both true
+  // forever. Within the confirm timeout we hold the optimistic false; past it we
+  // must resync, or the companion stops donating gold AND troops for the match.
+  // Pin the absolute value: the "past timeout" case below derives its elapsed
+  // time from the live constant, so without this a too-large value goes uncaught.
+  assert.equal(m.COMPANION_DONATE_CONFIRM_TIMEOUT_MS, 12000, "self-heal window is 12s");
+  m.companionMarkDonated();
+  assert.equal(m.companionState.bossDonateConfirmed, false, "self-heal: starts unconfirmed");
+  m.companionState.donateUnconfirmedSince = Date.now() - 2000;   // only 2s elapsed
+  m.companionApplyBossActions(true, true);
+  assert.equal(m.companionState.bossCanDonateGold, false,
+    "self-heal: within timeout stays optimistic false");
+  assert.equal(m.companionState.bossDonateConfirmed, false, "self-heal: still unconfirmed early");
+
+  m.companionState.donateUnconfirmedSince =
+    Date.now() - (m.COMPANION_DONATE_CONFIRM_TIMEOUT_MS + 1000);   // past the timeout
+  m.companionApplyBossActions(true, true);
+  assert.equal(m.companionState.bossDonateConfirmed, true,
+    "self-heal: past the confirm timeout with server true/true → re-confirm");
+  assert.equal(m.companionState.bossCanDonateGold, true, "self-heal: cache resyncs to server");
+
+  // Background refresh: fetches actions(), applies through the confirm gate.
+  m.companionState.lastActionsAt = 0;
+  m.companionState.actionsInFlight = false;
+  m.companionState.bossCanDonateGold = false;
+  m.companionState.bossCanDonateTroops = false;
+  m.companionState.bossDonateConfirmed = true;
+  serverGold = true; serverTroops = false;
+  m.companionRefreshBossActions(game, me, boss);
+  assert.equal(m.companionState.actionsInFlight, true, "refresh marks in-flight");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(m.companionState.bossCanDonateGold, true, "refresh applied server gold=true");
+  assert.equal(m.companionState.bossCanDonateTroops, false, "refresh applied server troops=false");
+  assert.equal(m.companionState.actionsInFlight, false, "refresh cleared in-flight");
+
+  // Throttle: a second call within the refresh window is skipped.
+  const before = actionsCalls;
+  m.companionRefreshBossActions(game, me, boss);
+  assert.equal(actionsCalls, before, "refresh throttled within the window");
+
+  // In-flight guard: no overlapping fetch.
+  m.companionState.lastActionsAt = 0;
+  m.companionState.actionsInFlight = true;
+  const before2 = actionsCalls;
+  m.companionRefreshBossActions(game, me, boss);
+  assert.equal(actionsCalls, before2, "no fetch while one is in flight");
+}
+
 // ---- companionResetRunState zeroes goldAtFactoryLevel -----------------------
 {
   const m = loadCompanion(ENG,
@@ -2297,6 +2428,16 @@ const ENG = [
   m.companionResetRunState();
   assert.equal(m.companionState.goldAtFactoryLevel, 0,
     "a new match resets the gold/factory interleave mark");
+
+  m.companionState.bossCanDonateGold = true;
+  m.companionState.bossDonateConfirmed = false;
+  m.companionState.actionsInFlight = true;
+  m.companionState.donateUnconfirmedSince = 12345;
+  m.companionResetRunState();
+  assert.equal(m.companionState.bossCanDonateGold, false, "reset clears canDonate cache");
+  assert.equal(m.companionState.bossDonateConfirmed, true, "reset restores confirmed default");
+  assert.equal(m.companionState.actionsInFlight, false, "reset clears in-flight");
+  assert.equal(m.companionState.donateUnconfirmedSince, 0, "reset clears the unconfirmed timestamp");
 }
 
 // ---- alliance renew: send extension when the boss alliance is expiring ------
@@ -2397,6 +2538,41 @@ const ENG = [
   me.alliances = () => [{ id: 1, other: "p1", hasExtensionRequest: false }];
   m.companionTick();
   assert.equal(labels().indexOf("renew"), -1, "alliance not expiring → no renew");
+}
+
+// ---- spawn phase runs the tick on a fast cadence ---------------------------
+{
+  let inSpawn = true;
+  const game = {
+    inSpawnPhase: () => inSpawn,
+    myPlayer: () => null,   // tick bails early after the cadence gate; fine
+    __src: {},
+  };
+  const m = loadCompanion(ENG,
+    ["companionTickThrottled", "companionState", "companionPatchSettings",
+     "COMPANION_SPAWN_TICK_MS"],
+    {
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => ({ game: game }),
+    });
+  m.companionPatchSettings({ bossName: "Boss", tickMs: 2000 });
+  m.companionState.enabled = true;
+
+  assert.equal(m.COMPANION_SPAWN_TICK_MS, 300, "spawn cadence is 300ms");
+
+  // 400ms since last tick: with tickMs=2000 the normal gate would skip, but in
+  // the spawn phase the 300ms cadence must let the tick run (lastTickAt advances).
+  m.companionState.lastTickAt = Date.now() - 400;
+  const before = m.companionState.lastTickAt;
+  m.companionTickThrottled();
+  assert.ok(m.companionState.lastTickAt > before, "spawn phase → tick runs at 400ms elapsed");
+
+  // Outside the spawn phase, 400ms is well under tickMs=2000 → tick is skipped.
+  inSpawn = false;
+  m.companionState.lastTickAt = Date.now() - 400;
+  const before2 = m.companionState.lastTickAt;
+  m.companionTickThrottled();
+  assert.equal(m.companionState.lastTickAt, before2, "outside spawn → 400ms skipped (tickMs)");
 }
 
 console.log("COMPANION OK — pure helpers behave");
