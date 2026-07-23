@@ -2347,7 +2347,7 @@ const ENG = [
 
   const m = loadCompanion(ENG,
     ["companionRefreshBossActions", "companionApplyBossActions", "companionMarkDonated",
-     "companionState", "COMPANION_ACTIONS_REFRESH_MS"],
+     "companionState", "COMPANION_ACTIONS_REFRESH_MS", "COMPANION_DONATE_CONFIRM_TIMEOUT_MS"],
     { sendGamePacket: () => true, registerHelperTickListener: () => {} });
 
   // companionApplyBossActions: the round-trip confirm state machine (pure, sync).
@@ -2369,6 +2369,25 @@ const ENG = [
 
   m.companionApplyBossActions(true, true);   // cooldown elapsed
   assert.equal(m.companionState.bossCanDonateGold, true, "confirmed + server true → cache true again");
+
+  // Self-heal: an optimistic donate that never reached the server (socket drop,
+  // dropped from a full queue, rejected) leaves the server reporting both true
+  // forever. Within the confirm timeout we hold the optimistic false; past it we
+  // must resync, or the companion stops donating gold AND troops for the match.
+  m.companionMarkDonated();
+  assert.equal(m.companionState.bossDonateConfirmed, false, "self-heal: starts unconfirmed");
+  m.companionState.donateUnconfirmedSince = Date.now() - 2000;   // only 2s elapsed
+  m.companionApplyBossActions(true, true);
+  assert.equal(m.companionState.bossCanDonateGold, false,
+    "self-heal: within timeout stays optimistic false");
+  assert.equal(m.companionState.bossDonateConfirmed, false, "self-heal: still unconfirmed early");
+
+  m.companionState.donateUnconfirmedSince =
+    Date.now() - (m.COMPANION_DONATE_CONFIRM_TIMEOUT_MS + 1000);   // past the timeout
+  m.companionApplyBossActions(true, true);
+  assert.equal(m.companionState.bossDonateConfirmed, true,
+    "self-heal: past the confirm timeout with server true/true → re-confirm");
+  assert.equal(m.companionState.bossCanDonateGold, true, "self-heal: cache resyncs to server");
 
   // Background refresh: fetches actions(), applies through the confirm gate.
   m.companionState.lastActionsAt = 0;
@@ -2410,10 +2429,12 @@ const ENG = [
   m.companionState.bossCanDonateGold = true;
   m.companionState.bossDonateConfirmed = false;
   m.companionState.actionsInFlight = true;
+  m.companionState.donateUnconfirmedSince = 12345;
   m.companionResetRunState();
   assert.equal(m.companionState.bossCanDonateGold, false, "reset clears canDonate cache");
   assert.equal(m.companionState.bossDonateConfirmed, true, "reset restores confirmed default");
   assert.equal(m.companionState.actionsInFlight, false, "reset clears in-flight");
+  assert.equal(m.companionState.donateUnconfirmedSince, 0, "reset clears the unconfirmed timestamp");
 }
 
 // ---- alliance renew: send extension when the boss alliance is expiring ------

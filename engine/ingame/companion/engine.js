@@ -26,6 +26,10 @@
   const COMPANION_SPAWN_TICK_MS = 300;
   const COMPANION_ACTIONS_REFRESH_MS = 1000;
   const COMPANION_ACTIONS_TIMEOUT_MS = 1500;
+  // How long to wait for the server to reflect an optimistic donate before we
+  // assume it never landed (socket drop / dropped from a full queue / rejected)
+  // and resync — the server donate cooldown is 10s, so 12s leaves a 2s margin.
+  const COMPANION_DONATE_CONFIRM_TIMEOUT_MS = 12000;
 
   // ---------------------------------------------------------------------------
   // Log
@@ -93,6 +97,7 @@
     companionState.actionsInFlight = false;
     companionState.lastActionsAt = 0;
     companionState.bossDonateConfirmed = true;
+    companionState.donateUnconfirmedSince = 0;
   }
 
   function companionCooldownReady(key, ms, now) {
@@ -166,6 +171,14 @@
     if (!companionState.bossDonateConfirmed) {
       if (!g || !t) {
         companionState.bossDonateConfirmed = true;
+      } else if (
+        Date.now() - (companionState.donateUnconfirmedSince || 0)
+          > COMPANION_DONATE_CONFIRM_TIMEOUT_MS
+      ) {
+        // Self-heal: waited past the server cooldown and it still shows both
+        // donates available — our optimistic donate never reached the server.
+        // Resync instead of staying stuck (no gold AND no troops) all match.
+        companionState.bossDonateConfirmed = true;
       } else {
         return; // server hasn't reflected our donation yet — keep the false cache
       }
@@ -181,6 +194,7 @@
     companionState.bossCanDonateGold = false;
     companionState.bossCanDonateTroops = false;
     companionState.bossDonateConfirmed = false;
+    companionState.donateUnconfirmedSince = Date.now();
   }
 
   // Fire a throttled background actions() fetch for the boss and feed the result

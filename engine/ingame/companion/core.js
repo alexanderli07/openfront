@@ -202,6 +202,7 @@
     actionsInFlight: false,
     lastActionsAt: 0,
     bossDonateConfirmed: true,
+    donateUnconfirmedSince: 0,
   };
 
   function companionLoadSettings() {
