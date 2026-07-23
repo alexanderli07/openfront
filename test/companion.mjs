@@ -2516,4 +2516,39 @@ const ENG = [
   assert.equal(labels().indexOf("renew"), -1, "alliance not expiring → no renew");
 }
 
+// ---- spawn phase runs the tick on a fast cadence ---------------------------
+{
+  let inSpawn = true;
+  const game = {
+    inSpawnPhase: () => inSpawn,
+    myPlayer: () => null,   // tick bails early after the cadence gate; fine
+    __src: {},
+  };
+  const m = loadCompanion(ENG,
+    ["companionTickThrottled", "companionState", "companionPatchSettings",
+     "COMPANION_SPAWN_TICK_MS"],
+    {
+      sendGamePacket: () => true, registerHelperTickListener: () => {},
+      getOpenFrontGameContext: () => ({ game: game }),
+    });
+  m.companionPatchSettings({ bossName: "Boss", tickMs: 2000 });
+  m.companionState.enabled = true;
+
+  assert.equal(m.COMPANION_SPAWN_TICK_MS, 300, "spawn cadence is 300ms");
+
+  // 400ms since last tick: with tickMs=2000 the normal gate would skip, but in
+  // the spawn phase the 300ms cadence must let the tick run (lastTickAt advances).
+  m.companionState.lastTickAt = Date.now() - 400;
+  const before = m.companionState.lastTickAt;
+  m.companionTickThrottled();
+  assert.ok(m.companionState.lastTickAt > before, "spawn phase → tick runs at 400ms elapsed");
+
+  // Outside the spawn phase, 400ms is well under tickMs=2000 → tick is skipped.
+  inSpawn = false;
+  m.companionState.lastTickAt = Date.now() - 400;
+  const before2 = m.companionState.lastTickAt;
+  m.companionTickThrottled();
+  assert.equal(m.companionState.lastTickAt, before2, "outside spawn → 400ms skipped (tickMs)");
+}
+
 console.log("COMPANION OK — pure helpers behave");

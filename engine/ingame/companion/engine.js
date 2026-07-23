@@ -23,6 +23,7 @@
   const COMPANION_DONATE_GOLD_COOLDOWN_MS = 30000;
   const COMPANION_FACTORY_COOLDOWN_MS = 5000;
   const COMPANION_RENEW_COOLDOWN_MS = 5000;
+  const COMPANION_SPAWN_TICK_MS = 300;
   const COMPANION_ACTIONS_REFRESH_MS = 1000;
   const COMPANION_ACTIONS_TIMEOUT_MS = 1500;
 
@@ -681,7 +682,17 @@
 
   function companionTickThrottled() {
     const now = Date.now();
-    const period = Number(companionSettings().tickMs) || 2000;
+    let period = Number(companionSettings().tickMs) || 2000;
+    // In the spawn phase, follow the boss fast — a 2s cadence misses quick boss
+    // re-clicks before the phase ends and the bot lands somewhere stale.
+    try {
+      const g = companionGame();
+      if (g && typeof g.inSpawnPhase === "function" && g.inSpawnPhase()) {
+        period = Math.min(period, COMPANION_SPAWN_TICK_MS);
+      }
+    } catch (_error) {
+      /* keep the normal period */
+    }
     if (now - (companionState.lastTickAt || 0) < period) {
       // Still drain the queue at full rate so a burst of commands is not stuck
       // behind the slow decision cadence.
