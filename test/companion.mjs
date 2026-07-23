@@ -2374,6 +2374,9 @@ const ENG = [
   // dropped from a full queue, rejected) leaves the server reporting both true
   // forever. Within the confirm timeout we hold the optimistic false; past it we
   // must resync, or the companion stops donating gold AND troops for the match.
+  // Pin the absolute value: the "past timeout" case below derives its elapsed
+  // time from the live constant, so without this a too-large value goes uncaught.
+  assert.equal(m.COMPANION_DONATE_CONFIRM_TIMEOUT_MS, 12000, "self-heal window is 12s");
   m.companionMarkDonated();
   assert.equal(m.companionState.bossDonateConfirmed, false, "self-heal: starts unconfirmed");
   m.companionState.donateUnconfirmedSince = Date.now() - 2000;   // only 2s elapsed
