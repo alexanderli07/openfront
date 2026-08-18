@@ -7,8 +7,8 @@
 // @license      AGPL-3.0-or-later
 // @homepageURL  https://github.com/nguyenvancaokyfpt/openfront-helper-userscript
 // @supportURL   https://github.com/nguyenvancaokyfpt/openfront-helper-userscript/issues
-// @updateURL    https://raw.githubusercontent.com/alexanderli07/openfront/main/openfront-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/alexanderli07/openfront/main/openfront-helper.user.js
+// @updateURL    https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 // @contributionURL https://greasyfork.org/en/scripts/581664-openfront-tactical-assistant
 // Credits: in-game overlays adapted from phil0010-gh/openfront-helper; several
 // helper/auto-bot features (spawn scoring/heatmap, advisor, threat intel, map
