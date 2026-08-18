@@ -1221,6 +1221,11 @@
         for (const other of this.game.players()) {
           if (!other.isPlayer() || !other.isAlive()) continue;
           if (other.smallID() === this.player.smallID()) continue;
+          // Tribes are NEVER friendly, so without this they all counted as hostile
+          // neighbours — bordering four of them pinned the reserve at 56% and refused
+          // to attack, while tribes are precisely what we want to be spending troops
+          // on. The reserve is about holding troops back from real players.
+          if (other.type() === PlayerType.Bot) continue;
           if (this.player.isFriendly(other)) continue;
           hostile.add(other.smallID());
         }
