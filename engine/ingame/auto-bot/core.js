@@ -84,6 +84,9 @@
     // DIVERGENCE (opt-in, NOT in src): raise the troop reserve as more distinct
     // enemies border us.
     reserveByNeighbors: true,
+    // DIVERGENCE (opt-in, NOT in src): let a counter-attack ignore the troop reserve,
+    // so being invaded does not freeze us out of hitting back.
+    counterAttackFirst: true,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -342,6 +345,7 @@
       "defensePosts",
       "nukeDensityFirst",
       "reserveByNeighbors",
+      "counterAttackFirst",
       "smartSpawn",
       "minimized",
       "hidden",

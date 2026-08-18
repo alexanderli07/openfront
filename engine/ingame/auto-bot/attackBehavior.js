@@ -958,6 +958,25 @@
         if (await this.attackBots()) return;
       }
 
+      // DIVERGENCE (counterAttackFirst): src puts `retaliate` INSIDE the strategy
+      // list, which only runs after the reserve gate below. So at the exact moment we
+      // are being invaded and have dipped under the reserve, the bot refuses to
+      // counter-attack and sits on its troops until the reserve refills — which is
+      // also when troops are being killed fastest. Hoist retaliation above the gate.
+      // Kept BELOW src's bot-with-structures bypass so structure recapture still wins.
+      if (state.settings.counterAttackFirst) {
+        let beingInvaded = false;
+        try {
+          beingInvaded = this.player.incomingAttacks().length > 0;
+        } catch (_e) {
+          beingInvaded = false;
+        }
+        if (beingInvaded) {
+          const attacker = this.findIncomingAttackPlayer();
+          if (attacker && (await this.sendAttack(attacker, true, true))) return;
+        }
+      }
+
       // Save up troops until we reach the reserve ratio
       if (!this.hasReserveRatioTroops()) return;
 
@@ -1653,12 +1672,14 @@
 
     // sendAttack — AiAttackBehavior (now async via sendBoatAttack/
     // sendBoatAttackToNearbyTerraNullius; sendLandAttack stays sync).
-    async sendAttack(target, force = false) {
+    // DIVERGENCE (counterAttackFirst): `retaliating` is threaded through so
+    // sendLandAttack can size a counter-attack against the normal-reserve floor.
+    async sendAttack(target, force = false, retaliating = false) {
       if (!force && !this.shouldAttack(target)) return false;
 
       if (target.isPlayer()) {
         if (this.player.sharesBorderWith(target)) {
-          return this.sendLandAttack(target);
+          return this.sendLandAttack(target, retaliating);
         } else {
           return await this.sendBoatAttack(target);
         }
@@ -1802,7 +1823,7 @@
     }
 
     // sendLandAttack — AiAttackBehavior (private). SYNC: no worker calls.
-    sendLandAttack(target) {
+    sendLandAttack(target, retaliating = false) {
       const maxTroops = this.game.config().maxTroops(this.player);
       const botWithStructures =
         target.isPlayer() &&
@@ -1810,7 +1831,13 @@
         target.units().some((u) => AttackStructures.has(u.type()));
       // Use the expand ratio when attacking a bot that owns structures — we need to
       // recapture those structures ASAP, even before reaching the normal reserve.
-      const useReserve = target.isPlayer() && !botWithStructures;
+      // DIVERGENCE (counterAttackFirst): hoisting retaliation past the gate is not
+      // enough on its own — sizing subtracts maxTroops * reserveRatio, so while under
+      // the reserve `troops` goes negative and the attack silently no-ops. A counter-
+      // attack therefore sizes against expandRatio, reusing the exact rationale (and
+      // constant) src already applies to urgent bot-structure recapture below.
+      const useReserve =
+        target.isPlayer() && !botWithStructures && !retaliating;
       // WIN-FIX (sizeReserve): the player/TN reserve uses the size-aware floor;
       // bot-with-structures recapture still uses the aggressive expandRatio.
       const reserveRatio = useReserve

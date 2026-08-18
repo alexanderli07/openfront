@@ -405,6 +405,11 @@
               <div class="ab-cfg-sw ${state.settings.reserveByNeighbors ? "on" : ""}" data-cfg="reserveByNeighbors"></div>
             </div>
 
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}">${tr("Counter-attack first")}</span>
+              <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
+            </div>
+
             <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
