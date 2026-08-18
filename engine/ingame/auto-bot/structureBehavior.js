@@ -364,24 +364,30 @@
     getEnemyFrontTiles() {
       const game = this.game;
       const player = this.player;
-      const mySid = player.smallID();
-      const hostileBySid = new Map();
+      // Resolve hostiles up front from players() — playerBySmallID is not guaranteed
+      // to exist on every build (see resolveEventPlayer in allianceBehavior.js), and a
+      // prebuilt set avoids a per-tile lookup on a border that can be thousands long.
+      const hostileSids = new Set();
+      try {
+        for (const other of game.players()) {
+          if (!other.isPlayer() || !other.isAlive()) continue;
+          if (other.smallID() === player.smallID()) continue;
+          if (player.isFriendly(other)) continue;
+          hostileSids.add(other.smallID());
+        }
+      } catch (_e) {
+        return [];
+      }
+      if (hostileSids.size === 0) return [];
+
       const front = [];
       outer: for (const borderTile of player.borderTiles()) {
         for (const neighbor of game.neighbors(borderTile)) {
-          if (!game.isLand(neighbor) || !game.hasOwner(neighbor)) continue;
-          const sid = game.ownerID(neighbor);
-          if (sid === mySid) continue;
-          let hostile = hostileBySid.get(sid);
-          if (hostile === undefined) {
-            let other = null;
-            try { other = game.playerBySmallID(sid); } catch (_e) { other = null; }
-            hostile = Boolean(
-              other && other.isPlayer && other.isPlayer() && !player.isFriendly(other),
-            );
-            hostileBySid.set(sid, hostile);
+          if (!game.hasOwner(neighbor) || !game.isLand(neighbor)) continue;
+          if (hostileSids.has(game.ownerID(neighbor))) {
+            front.push(borderTile);
+            continue outer;
           }
-          if (hostile) { front.push(borderTile); continue outer; }
         }
       }
       return front;
