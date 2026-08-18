@@ -387,6 +387,25 @@
               <input class="ab-cfg-num" type="number" min="50" max="2000" step="50" value="${state.settings.tickMs || 200}" data-cfg-num="tickMs">
             </div>
 
+            <!-- DIVERGENCE: none of these four behaviours exist in src's Nation AI. -->
+            <div class="ab-cfg-sec">${tr("Strategy")}</div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}">${tr("Economy first")}</span>
+              <div class="ab-cfg-sw ${state.settings.economyFirst ? "on" : ""}" data-cfg="economyFirst"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}">${tr("Crack enemy SAMs")}</span>
+              <div class="ab-cfg-sw ${state.settings.samCrack ? "on" : ""}" data-cfg="samCrack"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}">${tr("Scale SAMs to threat")}</span>
+              <div class="ab-cfg-sw ${state.settings.samDefense ? "on" : ""}" data-cfg="samDefense"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}">${tr("Proactive defense posts")}</span>
+              <div class="ab-cfg-sw ${state.settings.defensePosts ? "on" : ""}" data-cfg="defensePosts"></div>
+            </div>
+
             <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">

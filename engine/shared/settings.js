@@ -107,7 +107,7 @@
     showFloatingHelpersPanel: false,
     // Quick Panel — compact tabbed floating control with WS actions.
     showQuickPanel: true,
-    quickPanelActiveTab: "actions",
+    quickPanelActiveTab: "helpers",
     // WS-injected actions (Quick Panel Actions tab)
     killShotInstantSend: false,
     killShotHotkey: "Shift+KeyK",

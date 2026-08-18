@@ -9,7 +9,7 @@
 // Constants (QUICK_PANEL_ID, QUICK_PANEL_STYLE_ID, QUICK_PANEL_POS_KEY,
 // quickPanelEnabled) are defined in runtime.js (loaded first).
 
-  var quickPanelActiveTab = "actions";
+  var quickPanelActiveTab = "helpers";
   var _quickPanelSettingsCache = null;
   var _langDropdownCloseBound = false;
 
@@ -48,32 +48,6 @@
   // Feature tips — [label, detailed description] for hover tooltips.
   // Descriptions based on actual code implementation.
   var QP_FEATURE_TIPS = {
-    // === Actions Tab - Section Headers ===
-    "Kill Shot": ["Kill Shot", "One-click attack on the tile under your cursor. Auto-calculates the exact troop amount needed (110% of enemy) to guarantee a kill. If tile is empty, sends 10% to conquer."],
-    "Embargo": ["Embargo", "Block or allow trade with all non-allied human players. 'Embargo All' stops exports to enemies; 'Trade All' lifts all embargoes."],
-    "Silo Tracker": ["Silo Tracker", "Scans all Missile Silos on the map and lists hostile silos with owner, coordinates, level, and build status. Plays audio ping when new enemy silo detected."],
-    "SAM Tracker": ["SAM Tracker", "Scans all SAM Launchers and lists hostile SAMs. Each row has a nuke button to fire at that SAM's location. Helps identify SAM coverage gaps."],
-    "Auto Donate Troops": ["Auto Donate Troops", "Automatically donate troops to the neediest teammate in combat. Runs every 3s when your troops exceed the keep threshold. Finds ally with lowest troop percentage."],
-    "Auto Donate Gold": ["Auto Donate Gold", "Automatically donate gold to the poorest ally when your gold exceeds the threshold. Runs every 3s. Finds ally with lowest gold amount (can donate to allies, not just teammates)."],
-    "Atom batch-fire": ["Atom Batch-fire", "Fire a sequence of nukes at a target. Configure atoms-per-burst and delay between shots. Can overwhelm SAM defenses with decoy nukes."],
-
-    // === Actions Tab - Toggle Keys ===
-    killShotInstantSend: ["Instant Send", "Bypass the attack ratio slider and fire troops immediately when the kill shot hotkey is pressed. No confirmation dialog — sends 110% of enemy troops directly."],
-    combatSiloPanel: ["Silo Tracker Panel", "Show/hide the floating silo tracker panel listing all hostile Missile Silos."],
-    combatSiloShowAll: ["Show All Silos", "Show silos from all players including allies and teammates (spectator mode)."],
-    combatSiloBuildingOnly: ["Building Only", "Only show silos that are currently under construction, not placed ones."],
-    combatSiloAudioAlert: ["Audio Ping", "Play a sound when a new enemy silo is first detected being placed."],
-    combatSiloOneClickFire: ["One-click Fire", "When enabled, the nuke button fires the recommended atom salvo immediately instead of opening the batch-fire dialog. Shows a toast with the reason when firing isn't possible right now."],
-    combatSiloAutoFireBuilding: ["Auto Fire Building", "Automatically nukes enemy Missile Silos that are still under construction, denying them before they ever fire a nuke. A Silo can't intercept, so — unlike the SAM version — it fires as soon as it's affordable/achievable (same check as one-click fire), with no race against construction time. Capped by \"Max nuke auto fire\"."],
-    combatSamTracker: ["SAM Tracker Panel", "Show/hide the floating SAM tracker panel listing all hostile SAM Launchers."],
-    combatSamShowAll: ["Show All SAMs", "Show SAMs from all players including allies and teammates (spectator mode)."],
-    combatSamBuildingOnly: ["Building Only SAMs", "Only show SAMs that are currently under construction, not placed ones."],
-    combatSamOneClickFire: ["One-click Fire", "When enabled, the nuke button fires the recommended atom salvo immediately instead of opening the batch-fire dialog. Shows a toast with the reason when firing isn't possible right now."],
-    combatSamAutoFireBuilding: ["Auto Fire Building", "Automatically nukes enemy SAM Launchers that are still under construction, undefended, and not covered by another SAM's range — only when a shot is guaranteed to land before construction finishes. Capped by \"Max nuke auto fire\"."],
-    autoDonateEnabled: ["Enable Troop Donation", "Automatically donate troops to specifically named players (from the recipient list) who are in combat, picking the one with lowest troop percentage."],
-    autoDonateGoldEnabled: ["Enable Gold Donation", "Automatically donate gold to specifically named players (from the recipient list) when your gold exceeds threshold, picking the poorest."],
-    lastHydrogen: ["Final Shot → Hydrogen", "Convert the last nuke in a batch to a Hydrogen Bomb for maximum damage."],
-
     // === Helpers Tab - Section Keys ===
     panels: ["Panels", "Toggle floating panels: stats, trade, advisor, boat, estate, alliance, script users, auto-bot, auto-join."],
     map: ["Map Overlays", "Toggle visual overlays on the map: troop bars, money, threats, nuke prediction, heatmaps, spawn markers."],
@@ -808,11 +782,11 @@
     hdr.appendChild(xBtn);
     panel.appendChild(hdr);
 
-    // Tab bar (4 tabs — no Lobby, auto-join panel handles that)
+    // Tab bar (2 tabs — no Lobby, auto-join panel handles that; the Actions tab was
+    // removed: everything in it is either handled by the auto-bot or hotkey-only.)
     var tabs = document.createElement("div");
     tabs.className = "ohqp-tabs";
     var TAB_DEFS = [
-      { id: "actions", emoji: "⚔️", title: "Actions", tip: "Quick actions: Kill Shot, Embargo, Silo/SAM trackers, Auto Donate, Atom Batch-fire" },
       { id: "helpers", emoji: "⚙️", title: "Helpers", tip: "Toggle panels, map overlays, combat features, alerts, and tools" },
       { id: "config",  emoji: "🔧", title: "Config", tip: "Theme, language, skin unlocker, low lag mode, and reset settings" },
     ];
@@ -879,7 +853,6 @@
   function _renderActiveTab() {
     var saved = _saveAccordionState();
     switch (quickPanelActiveTab) {
-      case "actions": _renderActionsTab(); break;
       case "helpers": _renderHelpersTab(); break;
       case "config":  _renderConfigTab(); break;
     }
@@ -893,22 +866,6 @@
   function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 
   // Hotkey code → human-readable label
-  function _hotkeyLabel(code) {
-    if (!code) return "—";
-    var parts = code.split("+");
-    var labels = [];
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i];
-      if (p === "Shift") labels.push("⇧");
-      else if (p === "Ctrl") labels.push("Ctrl");
-      else if (p === "Alt") labels.push("Alt");
-      else if (p === "Meta") labels.push("⌘");
-      else if (p.startsWith("Key")) labels.push(p.replace("Key", ""));
-      else if (p.startsWith("Digit")) labels.push(p.replace("Digit", ""));
-      else labels.push(p);
-    }
-    return labels.join("+");
-  }
 
   // Kill shot hotkey listener
   var _killShotListening = false;
@@ -953,43 +910,6 @@
     location.reload();
   }
 
-  function _startHotkeyCapture(settingKey) {
-    _killShotListening = true;
-    // Find the button that triggered this
-    var actionName = settingKey === "killShotHotkey" ? "setKillShotHotkey" : "setAtomHotkey";
-    var btn = document.querySelector('[data-qp-action="' + actionName + '"]');
-    if (btn) {
-      btn.textContent = _tr("Press any key...");
-      btn.style.color = "var(--oh-accent)";
-      btn.style.borderColor = "var(--oh-accent)";
-    }
-    function onKey(e) {
-      // Ignore standalone modifier keys — wait for the actual key
-      if (e.code === "ShiftLeft" || e.code === "ShiftRight" ||
-          e.code === "ControlLeft" || e.code === "ControlRight" ||
-          e.code === "AltLeft" || e.code === "AltRight" ||
-          e.code === "MetaLeft" || e.code === "MetaRight") {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      document.removeEventListener("keydown", onKey, true);
-      _killShotListening = false;
-      // Build code string
-      var parts = [];
-      if (e.shiftKey) parts.push("Shift");
-      if (e.ctrlKey) parts.push("Ctrl");
-      if (e.altKey) parts.push("Alt");
-      if (e.metaKey) parts.push("Meta");
-      parts.push(e.code);
-      var code = parts.join("+");
-      _setAndNotify(settingKey, code);
-      var icon = settingKey === "killShotHotkey" ? "☄️" : "☢️";
-      _toast(icon + " " + _hotkeyLabel(code));
-      _renderActiveTab();
-    }
-    document.addEventListener("keydown", onKey, true);
-  }
 
   // ---- Mini switch helper ----
   function _swHtml(key, checked, disabled, label) {
@@ -1007,165 +927,6 @@
   }
 
   // ---- Tab: Actions (WS-injected) ----
-  function _renderActionsTab() {
-    var el = document.querySelector("#" + QUICK_PANEL_ID + " [data-panel='actions']");
-    if (!el) return;
-    var h = [];
-
-    // Kill Shot — hotkey + instant toggle
-    var ksKey = _getSetting("killShotHotkey", "Shift+KeyK");
-    var ksLabel = _hotkeyLabel(ksKey);
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h open" data-qp-tip-key="Kill Shot">☄️ ' + _tr('Kill Shot') + '<span class="ohqp-tip-icon" data-qp-tip-key="Kill Shot">?</span></div><div class="ohqp-sec-b open">');
-    h.push('<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">');
-    h.push('<span class="ohqp-label-sm" style="flex:1;">' + _tr("Hotkey") + '</span>');
-    h.push('<button class="ohqp-btn" data-qp-action="setKillShotHotkey" style="font-family:monospace;min-width:80px;">' + _esc(ksLabel) + '</button>');
-    h.push('</div>');
-    h.push(_swHtmlWithTip("killShotInstantSend", _getSetting("killShotInstantSend", false), false, "Instant send (no slider)"));
-    h.push('</div></div>');
-
-    // Embargo
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h open" data-qp-tip-key="Embargo">🚫 ' + _tr('Embargo') + '<span class="ohqp-tip-icon" data-qp-tip-key="Embargo">?</span></div><div class="ohqp-sec-b open">');
-    h.push('<div style="display:flex;gap:4px;margin-bottom:4px;">');
-    h.push('<button class="ohqp-btn" data-qp-action="embargoAll" style="flex:1;">' + _tr('Embargo All') + '</button>');
-    h.push('<button class="ohqp-btn" data-qp-action="liftEmbargo" style="flex:1;">' + _tr('Trade All') + '</button>');
-    h.push('</div></div></div>');
-
-    // Silo Tracker — single toggle controls both notification + panel
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h open" data-qp-tip-key="Silo Tracker">🚀 ' + _tr('Silo Tracker') + '<span class="ohqp-tip-icon" data-qp-tip-key="Silo Tracker">?</span></div><div class="ohqp-sec-b open">');
-    h.push(_swHtmlWithTip("combatSiloPanel", _getSetting("combatSiloPanel", false), false, "Silo tracker panel"));
-    h.push(_swHtmlWithTip("combatSiloShowAll", _getSetting("combatSiloShowAll", false), false, "Show all (spectator)"));
-    h.push(_swHtmlWithTip("combatSiloBuildingOnly", _getSetting("combatSiloBuildingOnly", false), false, "Building only"));
-    h.push(_swHtmlWithTip("combatSiloAudioAlert", _getSetting("combatSiloAudioAlert", false), false, "Audio ping on silo"));
-    h.push(_swHtmlWithTip("combatSiloOneClickFire", _getSetting("combatSiloOneClickFire", false), false, "One-click fire"));
-    h.push(_swHtmlWithTip("combatSiloAutoFireBuilding", _getSetting("combatSiloAutoFireBuilding", false), false, "Auto fire building"));
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:110px;">' + _tr('Max nuke auto fire') + '</span>');
-    h.push('<input class="ohqp-input" type="number" min="1" step="1" data-qp-input="combatSiloAutoFireMaxQty" value="' + (_getSetting("combatSiloAutoFireMaxQty", 1) || 1) + '" style="flex:1;">');
-    h.push('</div>');
-    h.push('</div></div>');
-
-    // SAM Tracker — single toggle
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h" data-qp-tip-key="SAM Tracker">🛡️ ' + _tr('SAM Tracker') + '<span class="ohqp-tip-icon" data-qp-tip-key="SAM Tracker">?</span></div><div class="ohqp-sec-b">');
-    h.push(_swHtmlWithTip("combatSamTracker", _getSetting("combatSamTracker", false), false, "SAM tracker panel"));
-    h.push(_swHtmlWithTip("combatSamShowAll", _getSetting("combatSamShowAll", false), false, "Show all (spectator)"));
-    h.push(_swHtmlWithTip("combatSamBuildingOnly", _getSetting("combatSamBuildingOnly", false), false, "Building only"));
-    h.push(_swHtmlWithTip("combatSamOneClickFire", _getSetting("combatSamOneClickFire", false), false, "One-click fire"));
-    h.push(_swHtmlWithTip("combatSamAutoFireBuilding", _getSetting("combatSamAutoFireBuilding", false), false, "Auto fire building"));
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:110px;">' + _tr('Max nuke auto fire') + '</span>');
-    h.push('<input class="ohqp-input" type="number" min="1" step="1" data-qp-input="combatSamAutoFireMaxQty" value="' + (_getSetting("combatSamAutoFireMaxQty", 1) || 1) + '" style="flex:1;">');
-    h.push('</div>');
-    h.push('</div></div>');
-
-    // Auto Donate Troops
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h" data-qp-tip-key="Auto Donate Troops">💪 ' + _tr('Auto Donate Troops') + '<span class="ohqp-tip-icon" data-qp-tip-key="Auto Donate Troops">?</span></div><div class="ohqp-sec-b">');
-    h.push(_swHtmlWithTip("autoDonateEnabled", _getSetting("autoDonateEnabled", false), false, "Enable"));
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:55px;">' + _tr('Keep') + '</span>');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="autoDonateKeepPct" min="10" max="90" step="5" value="' + (_getSetting("autoDonateKeepPct", 40) || 40) + '" style="flex:1;">');
-    h.push('<span class="ohqp-label-sm" style="width:30px;text-align:right;">' + (_getSetting("autoDonateKeepPct", 40) || 40) + '%</span>');
-    h.push('</div>');
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:55px;">' + _tr('Donate') + '</span>');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="autoDonatePercentage" min="1" max="100" step="5" value="' + (_getSetting("autoDonatePercentage", 25) || 25) + '" style="flex:1;">');
-    h.push('<span class="ohqp-label-sm" style="width:30px;text-align:right;">' + (_getSetting("autoDonatePercentage", 25) || 25) + '%</span>');
-    h.push('</div>');
-    h.push('<div style="margin:2px 0 2px 0;"><span class="ohqp-label-sm">' + _tr('Targets (comma-separated names)') + '</span></div>');
-    h.push('<input class="ohqp-input" type="text" data-qp-input-str="autoDonateTargets" value="' + _esc(_getSetting("autoDonateTargets", "")) + '" placeholder="Player1, Player2, [TAG]" style="width:100%;">');
-    h.push('</div></div>');
-
-    // Auto Donate Gold
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h" data-qp-tip-key="Auto Donate Gold">💰 ' + _tr('Auto Donate Gold') + '<span class="ohqp-tip-icon" data-qp-tip-key="Auto Donate Gold">?</span></div><div class="ohqp-sec-b">');
-    h.push(_swHtmlWithTip("autoDonateGoldEnabled", _getSetting("autoDonateGoldEnabled", false), false, "Enable"));
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:55px;">' + _tr('Max gold') + '</span>');
-    h.push('<input class="ohqp-input" type="number" data-qp-input="autoDonateGoldThreshold" value="' + (_getSetting("autoDonateGoldThreshold", 5000000) || 5000000) + '" style="flex:1;">');
-    h.push('</div>');
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin:2px 0;"><span class="ohqp-label-sm" style="width:55px;">' + _tr('Donate') + '</span>');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="autoDonateGoldPercentage" min="1" max="100" step="5" value="' + (_getSetting("autoDonateGoldPercentage", 25) || 25) + '" style="flex:1;">');
-    h.push('<span class="ohqp-label-sm" style="width:30px;text-align:right;">' + (_getSetting("autoDonateGoldPercentage", 25) || 25) + '%</span>');
-    h.push('</div>');
-    h.push('<div style="margin:2px 0 2px 0;"><span class="ohqp-label-sm">' + _tr('Targets (comma-separated names)') + '</span></div>');
-    h.push('<input class="ohqp-input" type="text" data-qp-input-str="autoDonateGoldTargets" value="' + _esc(_getSetting("autoDonateGoldTargets", "")) + '" placeholder="Player1, Player2, [TAG]" style="width:100%;">');
-    h.push('</div></div>');
-
-    // Atom Batch Fire
-    var atomCfg = _atomGetCfg();
-    var atomGap = _atomGapMs(atomCfg.batchSize, atomCfg.delayMs);
-    var atomRate = (1000 / atomGap).toFixed(1);
-    var atomKey = _getSetting("atomBatchHotkey", "Backslash");
-    var atomKeyLabel = _hotkeyLabel(atomKey);
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h" data-qp-tip-key="Atom batch-fire">☢️ ' + _tr('Atom batch-fire') + '<span class="ohqp-tip-icon" data-qp-tip-key="Atom batch-fire">?</span></div><div class="ohqp-sec-b">');
-    h.push('<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">');
-    h.push('<span class="ohqp-label-sm" style="flex:1;">' + _tr("Hotkey") + '</span>');
-    h.push('<button class="ohqp-btn" data-qp-action="setAtomHotkey" style="font-family:monospace;min-width:80px;">' + _esc(atomKeyLabel) + '</button>');
-    h.push('</div>');
-    h.push('<div style="font-size:9px;color:var(--oh-panel-text-dim);margin-bottom:6px;line-height:1.4;">');
-    h.push(_tr("Aim at a target and press the hotkey to open the batch-fire dialog.") + '</div>');
-    h.push('<div class="ohqp-row"><span class="ohqp-label">' + _tr("Atoms per burst") + '</span>');
-    h.push('<input class="ohqp-input" type="number" data-qp-atom="batchSize" min="1" step="1" value="' + atomCfg.batchSize + '" style="width:60px;"></div>');
-    h.push('<div class="ohqp-row"><span class="ohqp-label">' + _tr("Delay (ms)") + '</span>');
-    h.push('<input class="ohqp-input" type="number" data-qp-atom="delayMs" min="0" step="10" value="' + atomCfg.delayMs + '" style="width:60px;"></div>');
-    h.push(_swHtmlWithTip("lastHydrogen", atomCfg.lastHydrogen, false, "Final shot → Hydrogen"));
-    h.push('<div class="ohqp-row"><span class="ohqp-label">' + _tr("Effective fire rate") + '</span>');
-    h.push('<span style="font-family:monospace;color:var(--oh-accent);font-size:10px;">≈ ' + atomRate + ' ' + _tr("shots/sec") + '</span></div>');
-    h.push('<button class="ohqp-btn" data-qp-action="resetAtom" style="width:100%;margin-top:4px;">' + _tr("Reset to safe defaults") + '</button>');
-    h.push('</div></div>');
-
-    el.innerHTML = h.join("");
-    _bindEvents(el);
-    _bindAtomEvents(el);
-  }
-
-  // Atom config helpers (bridge to engine's __OFH_atomBatch)
-  var _ATOM_DEFAULTS = { batchSize: 10, delayMs: 150, lastHydrogen: false };
-  function _atomGetCfg() {
-    try {
-      if (window.__OFH_atomBatch && typeof window.__OFH_atomBatch.get === "function")
-        return window.__OFH_atomBatch.get();
-    } catch (e) {}
-    return _ATOM_DEFAULTS;
-  }
-  function _atomSetCfg(patch) {
-    try {
-      if (window.__OFH_atomBatch && typeof window.__OFH_atomBatch.set === "function")
-        window.__OFH_atomBatch.set(patch);
-    } catch (e) {}
-  }
-  function _atomGapMs(batchSize, delayMs) {
-    try {
-      if (window.__OFH_atomBatch && typeof window.__OFH_atomBatch.effectiveGapMs === "function")
-        return window.__OFH_atomBatch.effectiveGapMs(batchSize, delayMs);
-    } catch (e) {}
-    var perShot = batchSize >= 1 ? (delayMs || 0) / batchSize : delayMs || 0;
-    return Math.max(140, perShot); // 140ms = server-safe floor
-  }
-  function _bindAtomEvents(el) {
-    var inputs = el.querySelectorAll("[data-qp-atom]");
-    for (var i = 0; i < inputs.length; i++) {
-      inputs[i].addEventListener("change", function() {
-        var key = this.dataset.qpAtom;
-        var v = Math.floor(Number(this.value));
-        if (!isFinite(v) || v < 0) v = 0;
-        _atomSetCfg({ [key]: v });
-        _renderActiveTab();
-      });
-    }
-    var hydroSw = el.querySelector('[data-qp-key="lastHydrogen"]');
-    if (hydroSw) {
-      hydroSw.addEventListener("click", function(e) {
-        e.preventDefault();
-        var cfg = _atomGetCfg();
-        var next = !cfg.lastHydrogen;
-        _atomSetCfg({ lastHydrogen: next });
-        this.classList.toggle("on", next);
-      });
-    }
-    var resetBtn = el.querySelector('[data-qp-action="resetAtom"]');
-    if (resetBtn) {
-      resetBtn.addEventListener("click", function() {
-        _atomSetCfg({ batchSize: _ATOM_DEFAULTS.batchSize, delayMs: _ATOM_DEFAULTS.delayMs });
-        _renderActiveTab();
-      });
-    }
-  }
-
-  // ---- Tab: Helpers (mirror of popup HELPER_SECTIONS) ----
   function _renderHelpersTab() {
     var el = document.querySelector("#" + QUICK_PANEL_ID + " [data-panel='helpers']");
     if (!el) return;
@@ -1612,33 +1373,11 @@
 
   function _handleAction(action) {
     switch (action) {
-      case "setKillShotHotkey":
-        _startHotkeyCapture("killShotHotkey");
-        break;
-      case "setAtomHotkey":
-        _startHotkeyCapture("atomBatchHotkey");
-        break;
       case "resetAllSettings":
         _resetAllSettings();
         break;
       case "killShot":
         _doKillShot();
-        break;
-      case "embargoAll":
-        if (typeof sendGamePacket === "function") {
-          sendGamePacket({ type: "embargo_all", action: "start" });
-          _toast("🚫 " + _tr("Embargo All") + " ✓");
-        } else {
-          _toast("✗ WS not connected", "rgba(220,40,40,0.92)");
-        }
-        break;
-      case "liftEmbargo":
-        if (typeof sendGamePacket === "function") {
-          sendGamePacket({ type: "embargo_all", action: "stop" });
-          _toast("✅ " + _tr("Trade All") + " ✓");
-        } else {
-          _toast("✗ WS not connected", "rgba(220,40,40,0.92)");
-        }
         break;
     }
   }
