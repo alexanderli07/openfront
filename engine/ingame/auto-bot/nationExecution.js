@@ -519,11 +519,15 @@
         this.mg.config().gameConfig().gameMode === GameMode.Team;
 
       others.forEach((other) => {
+        // DIVERGENCE: src checks only isOnSameTeam here, so a cross-team ALLY gets
+        // embargoed on sight and (see the lift branches) never released — handing us
+        // the diplomatic half of an alliance and none of the 35k/station trade half.
         if (
           teamGame &&
           isHigherDifficulty &&
           other.type() !== PlayerType.Bot &&
-          !player.isOnSameTeam(other)
+          !player.isOnSameTeam(other) &&
+          !player.isAlliedWith(other)
         ) {
           if (!player.hasEmbargoAgainst(other)) this.addEmbargo(other, false);
           return;
@@ -536,16 +540,13 @@
           this.addEmbargo(other, false);
         } else if (
           player.relation(other) >= Relation.Neutral &&
-          player.hasEmbargoAgainst(other) &&
-          difficulty !== Difficulty.Hard &&
-          difficulty !== Difficulty.Impossible
+          player.hasEmbargoAgainst(other)
         ) {
-          this.stopEmbargo(other);
-        } else if (
-          player.relation(other) >= Relation.Friendly &&
-          player.hasEmbargoAgainst(other) &&
-          difficulty !== Difficulty.Impossible
-        ) {
+          // DIVERGENCE: src gates its two lift paths on NOT being Hard/Impossible.
+          // With difficulty pinned to Impossible neither could ever fire, so every
+          // embargo the bot placed was permanent. Lift as soon as relations recover to
+          // Neutral — which subsumes src's second (Friendly) branch, since
+          // Friendly >= Neutral.
           this.stopEmbargo(other);
         }
       });
