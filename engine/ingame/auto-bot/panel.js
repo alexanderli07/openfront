@@ -18,7 +18,7 @@
         --ab-muted: #94a3b8;
         position: fixed;
         z-index: 8000;
-        width: 244px;
+        width: 280px;
         bottom: 16px;
         right: 16px;
         background: var(--oh-panel-bg, rgba(12, 18, 20, 0.95));
@@ -32,12 +32,12 @@
       }
       #${PANEL_ID} .ab-head {
         display: flex; align-items: center; gap: 8px;
-        padding: 6px 8px; cursor: grab;
+        padding: 9px 10px; cursor: grab;
         background: transparent;
         border-bottom: 1px solid var(--oh-panel-header-border, rgba(148, 163, 184, 0.18));
       }
       #${PANEL_ID} .ab-head:active { cursor: grabbing; }
-      #${PANEL_ID} .ab-title { font-weight: 900; font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase; color: rgba(226, 232, 240, 0.85); flex: 1; }
+      #${PANEL_ID} .ab-title { font-weight: 800; font-size: 11.5px; letter-spacing: 0.2px; color: var(--oh-panel-text, #e2e8f0); flex: 1; }
       #${PANEL_ID} .ab-head-btns { display: flex; align-items: center; gap: 1px; }
       #${PANEL_ID} .ab-mini, #${PANEL_ID} .ab-close {
         background: transparent; border: none; color: var(--ab-muted);
@@ -146,8 +146,9 @@
       #${PANEL_ID}.ab-tab-config .ab-pane[data-pane="config"] { display: block; }
       /* Config tab controls */
       #${PANEL_ID} .ab-cfg-sec {
-        font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;
-        color: var(--oh-panel-text-dim, #94a3b8); margin: 10px 0 5px;
+        font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.7px;
+        color: var(--oh-panel-text, #e2e8f0); margin: 15px 0 6px;
+        padding-bottom: 4px; border-bottom: 1px solid var(--oh-panel-header-border, rgba(148,163,184,0.18));
       }
       #${PANEL_ID} .ab-cfg-sec:first-child { margin-top: 2px; }
       #${PANEL_ID} .ab-cfg-chips { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -162,8 +163,8 @@
         border-color: var(--oh-accent-muted, rgba(96,165,250,0.6));
       }
       #${PANEL_ID} .ab-cfg-row {
-        display: flex; align-items: center; justify-content: space-between; gap: 8px;
-        padding: 5px 0;
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 7px 0; line-height: 1.35;
       }
       #${PANEL_ID} .ab-cfg-label { font-size: 11px; color: var(--oh-panel-text, #e2e8f0); flex: 1; min-width: 0; }
       #${PANEL_ID} .ab-cfg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
