@@ -71,6 +71,13 @@
     // (src restricts it to Impossible) and prefer it over spending a warhead on a
     // zero-value target. Sizing/pacing is unchanged — see maybeDestroyEnemySam.
     samCrack: true,
+    // DIVERGENCE (opt-in, NOT in src): threat-scaled air defence. src fixes the SAM
+    // target at a per-city ratio by difficulty, blind to how much nuclear threat
+    // actually exists. samDefense instead sizes it from hostile Missile Silo levels
+    // and the map-wide average SAM level per player, prioritises SAMs in the build
+    // order while behind, always uses coverage-gap weighting when placing, and
+    // upgrades the launcher guarding the most asset value.
+    samDefense: true,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -318,6 +325,7 @@
       "winFixes",
       "economyFirst",
       "samCrack",
+      "samDefense",
       "smartSpawn",
       "minimized",
       "hidden",

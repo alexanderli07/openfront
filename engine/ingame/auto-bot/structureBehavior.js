@@ -114,6 +114,13 @@
   /** Maximum number of missile silos a nation will build */
   const MAX_MISSILE_SILOS = 3;
 
+  /** samDefense: SAM levels wanted per level of hostile Missile Silo. Silo level ==
+   *  missiles it can hold, and SAM level == interceptions it can make, so ~parity is
+   *  the goal; slightly under parity to stop a silo race from consuming the economy. */
+  const SAM_PER_HOSTILE_SILO_LEVEL = 0.75;
+  /** samDefense: absolute ceiling so a nuke-heavy lobby can't spiral. */
+  const SAM_MAX_LEVELS = 24;
+
   /** Ratio per city used for the first missile silo so nations start nuking earlier */
   const FIRST_MISSILE_SILO_RATIO = 0.4;
 
@@ -716,6 +723,17 @@
         UNIT.SAMLauncher,
         UNIT.MissileSilo,
       ];
+      // DIVERGENCE (samDefense): while our air defence is below the threat-scaled
+      // target, build SAMs BEFORE economy. src always puts ports/factories first, so a
+      // nation under nuclear threat keeps expanding while its cities stay uncovered.
+      if (
+        state.settings.samDefense &&
+        !config.isUnitDisabled(UNIT.SAMLauncher) &&
+        this.ownedLevels(UNIT.SAMLauncher) < this.samTargetLevels(cityCount)
+      ) {
+        buildOrder.splice(buildOrder.indexOf(UNIT.SAMLauncher), 1);
+        buildOrder.unshift(UNIT.SAMLauncher);
+      }
 
       const nukesEnabled =
         !config.isUnitDisabled(UNIT.AtomBomb) ||
@@ -835,6 +853,47 @@
     }
 
     // shouldBuildStructure — NationStructureBehavior.ts:540.
+    /** DIVERGENCE (samDefense): how many SAM levels we actually want, from real threat
+     *  rather than a fixed per-city ratio. Two signals, both bounded by the amount of
+     *  stuff we own that is worth protecting:
+     *    - hostile Missile Silo levels  (who can nuke us, and how hard)
+     *    - map-wide average SAM levels per player  (are we behind the field?)
+     *  Never returns less than src's ratio target, so this only ever adds defence. */
+    samTargetLevels(cityCount) {
+      const stockRatio = getStructureRatios(currentDifficulty())[UNIT.SAMLauncher];
+      const stock = Math.floor(cityCount * stockRatio.ratioPerCity);
+      if (!state.settings.samDefense) return stock;
+
+      const game = this.game;
+      const me = this.player;
+      let hostileSiloLevels = 0;
+      let allSamLevels = 0;
+      let peers = 0;
+      try {
+        for (const p of game.players()) {
+          if (!p.isPlayer() || !p.isAlive()) continue;
+          if (p.type() === PlayerType.Bot) continue; // regular bots never nuke
+          peers += 1;
+          for (const u of p.units(UNIT.SAMLauncher)) allSamLevels += u.level();
+          if (p.smallID() === me.smallID() || me.isFriendly(p)) continue;
+          for (const u of p.units(UNIT.MissileSilo)) hostileSiloLevels += u.level();
+        }
+      } catch (_e) { return stock; }
+
+      const threat = Math.ceil(hostileSiloLevels * SAM_PER_HOSTILE_SILO_LEVEL);
+      const peerAvg = peers > 0 ? Math.ceil(allSamLevels / peers) : 0;
+
+      let protectables = 0;
+      try {
+        for (const u of me.units(UNIT.City, UNIT.Port, UNIT.Factory, UNIT.MissileSilo)) {
+          protectables += Math.max(1, u.level());
+        }
+      } catch (_e) { protectables = stock; }
+
+      const wanted = Math.max(stock, threat, peerAvg);
+      return Math.max(stock, Math.min(wanted, protectables, SAM_MAX_LEVELS));
+    }
+
     shouldBuildStructure(type, cityCount, hasCoastalTiles) {
       const gameConfig = this.game.config();
       const difficulty = currentDifficulty();
@@ -872,7 +931,11 @@
         ratio = FIRST_MISSILE_SILO_RATIO;
       }
 
-      const targetCount = Math.floor(cityCount * ratio);
+      // DIVERGENCE (samDefense): SAMs use the threat-scaled target instead of the ratio.
+      const targetCount =
+        type === UNIT.SAMLauncher
+          ? this.samTargetLevels(cityCount)
+          : Math.floor(cityCount * ratio);
 
       return owned < targetCount;
     }
@@ -1138,6 +1201,35 @@
         structure,
         bu: buByUnitId.get(structure.id()),
       });
+
+      // DIVERGENCE (samDefense): for SAMs, upgrade the launcher guarding the most asset
+      // value, skipping src's RNG draw and its "already best-protected SAM" heuristic.
+      // An upgrade raises both samRange(level) and interception capacity, so the SAM
+      // over the densest cluster of cities/ports/factories/silos is strictly the best.
+      if (
+        state.settings.samDefense &&
+        upgradable.length > 0 &&
+        upgradable[0].type() === UNIT.SAMLauncher
+      ) {
+        const assets = [];
+        for (const u of this.player.units(
+          UNIT.City, UNIT.Port, UNIT.Factory, UNIT.MissileSilo,
+        )) {
+          assets.push({ tile: u.tile(), weight: Math.max(1, u.level()) });
+        }
+        let best = null;
+        let bestScore = -1;
+        for (const sam of upgradable) {
+          const r = game.config().samRange(sam.level());
+          const r2 = r * r;
+          let score = 0;
+          for (const a of assets) {
+            if (game.euclideanDistSquared(sam.tile(), a.tile) <= r2) score += a.weight;
+          }
+          if (score > bestScore) { bestScore = score; best = sam; }
+        }
+        if (best !== null) return mkResult(best);
+      }
 
       // Based on difficulty, chance to just pick a random structure.
       const difficulty = currentDifficulty();
@@ -1925,8 +2017,12 @@
       const range = game.config().defaultSamRange();
       const rangeSquared = range * range;
 
-      const useCoverageWeighting =
-        difficulty !== Difficulty.Easy && this.random.nextInt(0, 100) < 25;
+      // DIVERGENCE (samDefense): src only weighs existing coverage 25% of the time, so
+      // 3 in 4 placements ignore overlap and stack SAMs over already-defended assets.
+      // Always weigh it — that is what makes placement actually tactical.
+      const useCoverageWeighting = state.settings.samDefense
+        ? difficulty !== Difficulty.Easy
+        : difficulty !== Difficulty.Easy && this.random.nextInt(0, 100) < 25;
 
       // Pre-compute existing SAM coverage for each protectable structure.
       let structureCoverage = null;
