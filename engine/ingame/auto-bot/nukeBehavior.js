@@ -346,7 +346,10 @@
       // Make 1/3 of nations "hydro-nations" that only throw hydrogen bombs (to
       // reduce atom bomb spam) — NationNukeBehavior.ts:48. For our single bot we
       // keep the per-instance random designation faithfully.
-      this.isHydroNation = this.random.chance(3);
+      // DIVERGENCE (bestAI): src makes 1 nation in 3 a "hydrogen-only" nation that
+      // refuses to fire atom bombs unless it is already being overrun. Pure
+      // self-handicap - always keep both warheads available.
+      this.isHydroNation = false;
 
       // Per-tick cost memo (see cost()): keyed by unit type, invalidated per tick.
       this._costCacheTick = -1;
@@ -554,11 +557,12 @@
       // On Impossible, the richest nation hunts very high structure density targets
       // Restricting to the richest nation prevents every impossible nation
       // from piling onto the same compact player.
-      if (
-        diff === Difficulty.Impossible &&
-        this.isRichestNation() &&
-        this.random.chance(2)
-      ) {
+      // DIVERGENCE (bestAI): src gates this behind Impossible + being the richest
+      // nation + a 50% roll, so a whole lobby of nations does not pile onto one
+      // compact player. We are a single bot - that anti-pile-on rule only costs us
+      // targets. Note this sits BELOW retaliation in the cascade, so always-on here
+      // cannot pre-empt answering an actual attack.
+      {
         const denseTarget = this.findHighDensityTarget();
         if (denseTarget !== null) {
           return denseTarget;
@@ -798,18 +802,13 @@
         return null;
       }
 
-      if (this.random.chance(2)) {
-        // Strongest player
-        return validTargets.reduce((prev, current) =>
-          this.game.config().maxTroops(prev) >
-          this.game.config().maxTroops(current)
-            ? prev
-            : current,
-        );
-      } else {
-        // Random player
-        return this.random.randElement(validTargets);
-      }
+      // DIVERGENCE (bestAI): src picks a RANDOM member of the strongest team half
+      // the time. Always take the strongest member.
+      return validTargets.reduce((prev, current) =>
+        this.game.config().maxTroops(prev) > this.game.config().maxTroops(current)
+          ? prev
+          : current,
+      );
     }
 
     // ── getPerceivedNukeCost — NationNukeBehavior.ts:431 (now async; cost() is a

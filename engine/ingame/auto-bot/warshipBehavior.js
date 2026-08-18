@@ -334,7 +334,8 @@
       if (
         (difficulty === Difficulty.Medium && this.random.nextInt(0, 100) < 15) ||
         (difficulty === Difficulty.Hard && this.random.nextInt(0, 100) < 50) ||
-        (difficulty === Difficulty.Impossible && this.random.nextInt(0, 100) < 80)
+        // DIVERGENCE (bestAI): 80% -> always.
+        (difficulty === Difficulty.Impossible && this.random.nextInt(0, 100) < 100)
       ) {
         // src: canBuild(Warship, tile) → addExecution / else maybeMoveWarship; then
         // emoji + relation. The buildables probe is async, so defer it; the canBuild

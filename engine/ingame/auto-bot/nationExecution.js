@@ -54,10 +54,13 @@
           return this.random.nextInt(55, 70);
         case Difficulty.Hard:
           return this.random.nextInt(45, 60);
+        // DIVERGENCE (bestAI): fix at the fast end of Impossible's range (mean 40 ->
+        // 30) so the decision loop runs ~25% more often. Deliberately NOT lowered
+        // past src's tested bound - that risks thrashing troops rather than helping.
         case Difficulty.Impossible:
-          return this.random.nextInt(30, 50);
+          return 30;
         default:
-          return this.random.nextInt(30, 50);
+          return 30;
       }
     }
 

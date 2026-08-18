@@ -180,9 +180,8 @@
         return false;
       }
 
-      if (this.random.chance(this.hesitationOdds)) {
-        return false;
-      }
+      // DIVERGENCE (bestAI): src rolls a 1-in-16 chance to hesitate even on
+      // Impossible, with a funded MIRV and a valid target. Never hesitate.
 
       const inboundMIRVSender = this.selectCounterMirvTarget();
       if (inboundMIRVSender && !this.wasRecentlyMirved(inboundMIRVSender)) {

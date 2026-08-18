@@ -1355,11 +1355,13 @@
         case Difficulty.Hard:
           randomChance = 25;
           break;
+        // DIVERGENCE (bestAI): src rolls a 10% chance to upgrade a RANDOM structure
+        // even on Impossible. Never do that - always take the best-scoring one.
         case Difficulty.Impossible:
-          randomChance = 10;
+          randomChance = 0;
           break;
         default:
-          randomChance = 10;
+          randomChance = 0;
       }
 
       if (this.random.nextInt(0, 100) < randomChance) {
@@ -1391,8 +1393,8 @@
           }
         }
 
-        // Add small random factor to break ties.
-        score += this.random.nextInt(0, 5);
+        // DIVERGENCE (bestAI): src adds nextInt(0,5) of noise here, which is enough
+        // to outrank a real +7.5 SAM-level advantage. Ties now resolve by order.
 
         scored.push({ structure, score });
       }
@@ -1404,15 +1406,8 @@
       // Sort descending by score.
       scored.sort((a, b) => b.score - a.score);
 
-      // 50% of the time, pick the second or third best for variety.
-      if (scored.length >= 2 && this.random.chance(2)) {
-        const pickIndex =
-          scored.length >= 3
-            ? this.random.nextInt(1, 3) // pick index 1 or 2
-            : 1; // only index 1 available
-        return mkResult(scored[pickIndex].structure);
-      }
-
+      // DIVERGENCE (bestAI): src throws away its own ranking half the time "for
+      // variety" and upgrades the 2nd/3rd best instead. Always take the best.
       return mkResult(scored[0].structure);
     }
 

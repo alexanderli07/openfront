@@ -1490,11 +1490,7 @@
 
       if (reachablePlayers.length === 0) return null;
 
-      // 33% chance to pick the second-nearest player if available
-      if (reachablePlayers.length >= 2 && this.random.chance(3)) {
-        return reachablePlayers[1];
-      }
-
+      // DIVERGENCE (bestAI): src takes the second-nearest 33% of the time.
       return reachablePlayers[0];
     }
 
@@ -1547,11 +1543,10 @@
       }
 
       // Select a traitor as an enemy
+      // DIVERGENCE (bestAI): src only takes this free target 1 time in 3.
       const toAttack = this.getNeighborTraitorToAttack();
       if (toAttack !== null) {
-        if (this.random.chance(3)) {
-          if (await this.sendAttack(toAttack)) return;
-        }
+        if (await this.sendAttack(toAttack)) return;
       }
 
       // Choose a new enemy randomly
@@ -1559,14 +1554,8 @@
       for (const neighbor of this.random.shuffleArray(neighbors)) {
         if (!neighbor.isPlayer()) continue;
         if (this.player.isFriendly(neighbor)) continue;
-        if (
-          neighbor.type() === PlayerType.Nation ||
-          neighbor.type() === PlayerType.Human
-        ) {
-          if (this.random.chance(2)) {
-            continue;
-          }
-        }
+        // DIVERGENCE (bestAI): src skips a perfectly valid nation/human neighbour
+        // 50% of the time. Never skip one.
         if (await this.sendAttack(neighbor)) return;
       }
     }

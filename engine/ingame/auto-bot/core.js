@@ -29,11 +29,6 @@
   const DEFAULTS = {
     enabled: true, // auto-bot ON by default (runs in public lobbies too — the
     // isPublicLobby gate is disabled; see helpers.js)
-    // Which difficulty of the in-game Nation AI to faithfully replicate. The bot
-    // ports ALL FOUR difficulty branches (Easy/Medium/Hard/Impossible); this
-    // selects which one drives strategy order / ratios / probabilities. Default
-    // Impossible = the strongest, smartest src Nation.
-    difficulty: "Impossible", // "Easy" | "Medium" | "Hard" | "Impossible"
     features: {
       spawn: true,
       expand: true,
@@ -216,7 +211,7 @@
   };
 
   // Throttles (ms) so we don't spam the worker / re-issue intents every tick.
-  // Combat decision cadence is now derived per-difficulty in combatCadenceMs()
+  // Combat decision cadence is derived from getAttackRate() (now a fixed 30 ticks)
   // to match the bot's attackRate. Build runs ~3× per combat cycle (economy
   // keeps growing between the slower, defensive attack decisions).
   const MAX_DEFENSE_RESERVE = 0.8; // never hold back more than this for defense
@@ -329,7 +324,6 @@
     // old saved value (e.g. boatProbeMinTroops=8000) can't mask a new default (1000).
     const PERSISTED_KEYS = [
       "enabled",
-      "difficulty",
       "winFixes",
       "economyFirst",
       "samCrack",

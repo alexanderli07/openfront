@@ -39,17 +39,14 @@
   // strategy order / ratios / probabilities. NOTE: this is distinct from the
   // lobby's actual Nation difficulty; enemy-stat reads (config().maxTroops(enemy))
   // still use the real game difficulty. Default Impossible (the strongest Nation).
+  // DIVERGENCE (bestAI): the difficulty dial is REMOVED. In src this is the knob
+  // that decides how well the computer plays; as an autopilot there is no reason to
+  // ever handicap ourselves, so it is pinned to the strongest tier. Every
+  // Difficulty.* branch in the bot therefore resolves to its Impossible path. The
+  // switches are left in place deliberately: collapsing 135 call sites by hand
+  // would be 135 chances to break something for zero behavioural gain.
   function currentDifficulty() {
-    const d = state && state.settings ? state.settings.difficulty : null;
-    switch (d) {
-      case "Easy":
-      case "Medium":
-      case "Hard":
-      case "Impossible":
-        return d;
-      default:
-        return Difficulty.Impossible;
-    }
+    return Difficulty.Impossible;
   }
 
   // ===========================================================================

@@ -343,16 +343,6 @@
               <div class="ab-cfg-sw ${state.settings.enabled ? "on" : ""}" data-cfg="enabled"></div>
             </div>
 
-            <div class="ab-cfg-sec">${tr("Difficulty")}</div>
-            <div class="ab-cfg-chips" data-role="cfg-difficulty">
-              ${["Easy", "Medium", "Hard", "Impossible"]
-                .map(
-                  (d) =>
-                    `<div class="ab-cfg-chip ${state.settings.difficulty === d ? "on" : ""}" data-diff="${d}">${tr(d)}</div>`,
-                )
-                .join("")}
-            </div>
-
             <div class="ab-cfg-sec">${tr("Auto-build structures")}</div>
             <div class="ab-cfg-grid" data-role="cfg-structs">
               ${[
@@ -628,16 +618,6 @@
     // ── Config tab wiring ───────────────────────────────────────────────────
     // All controls mutate state.settings directly (same shared scope), persist
     // via saveSettings(), and retuneEngine() where the change affects the loop.
-    // difficulty chips
-    panel.querySelectorAll("[data-diff]").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.settings.difficulty = el.dataset.diff;
-        panel
-          .querySelectorAll("[data-diff]")
-          .forEach((c) => c.classList.toggle("on", c.dataset.diff === el.dataset.diff));
-        saveSettings();
-      });
-    });
     // auto-build structure tiles
     panel.querySelectorAll("[data-struct]").forEach((el) => {
       el.addEventListener("click", () => {
