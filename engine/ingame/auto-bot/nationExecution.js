@@ -519,9 +519,12 @@
         this.mg.config().gameConfig().gameMode === GameMode.Team;
 
       others.forEach((other) => {
-        // DIVERGENCE: src checks only isOnSameTeam here, so a cross-team ALLY gets
-        // embargoed on sight and (see the lift branches) never released — handing us
-        // the diplomatic half of an alliance and none of the 35k/station trade half.
+        // DIVERGENCE: src checks only isOnSameTeam here, so a cross-team ALLY got
+        // embargoed on sight and (see the lift branch) never released — handing us the
+        // diplomatic half of an alliance and none of the 35k/station trade half. src
+        // also blanket-embargoes every remaining non-teammate with no cost check, and
+        // its early return means a team-game embargo is never revisited. Gate it on the
+        // trade math and let it release again when that math turns against us.
         if (
           teamGame &&
           isHigherDifficulty &&
@@ -529,18 +532,26 @@
           !player.isOnSameTeam(other) &&
           !player.isAlliedWith(other)
         ) {
-          if (!player.hasEmbargoAgainst(other)) this.addEmbargo(other, false);
+          if (this.embargoIsWorthIt(other)) {
+            if (!player.hasEmbargoAgainst(other)) this.addEmbargo(other, false);
+          } else if (player.hasEmbargoAgainst(other)) {
+            this.stopEmbargo(other);
+          }
           return;
         }
         if (
           player.relation(other) <= Relation.Hostile &&
           !player.hasEmbargoAgainst(other) &&
-          !player.isOnSameTeam(other)
+          !player.isOnSameTeam(other) &&
+          !player.isAlliedWith(other) &&
+          this.embargoIsWorthIt(other)
         ) {
           this.addEmbargo(other, false);
         } else if (
-          player.relation(other) >= Relation.Neutral &&
-          player.hasEmbargoAgainst(other)
+          player.hasEmbargoAgainst(other) &&
+          (player.relation(other) >= Relation.Neutral ||
+            player.isAlliedWith(other) ||
+            !this.embargoIsWorthIt(other))
         ) {
           // DIVERGENCE: src gates its two lift paths on NOT being Hard/Impossible.
           // With difficulty pinned to Impossible neither could ever fire, so every
@@ -550,6 +561,40 @@
           this.stopEmbargo(other);
         }
       });
+    }
+
+    /**
+     * DIVERGENCE (smart embargo): the comparison src never makes. canTrade() is MUTUAL
+     * and buildReachableStations DROPS an embargoed player's stationed units from our
+     * trade network entirely rather than devaluing them — so an embargo costs each side
+     * in proportion to the OTHER side's station count: we forfeit access to theirs,
+     * they forfeit access to ours. Embargoing a trade-RICHER player therefore hurts us
+     * more than it hurts them, which is exactly what src did by default.
+     *
+     * Embargo only when we give up no more than we take away — or when the target is
+     * close enough to winning that denial is worth eating the loss.
+     */
+    embargoIsWorthIt(other) {
+      try {
+        // Runaway leader: deny regardless of what it costs us.
+        const land = this.mg.numLandTiles() || 1;
+        if (other.numTilesOwned() / land >= EMBARGO_DENIAL_SHARE) return true;
+        return this.tradeStationCount(other) <= this.tradeStationCount(this.player);
+      } catch (_e) {
+        // Unknown → never self-tax.
+        return false;
+      }
+    }
+
+    /** Stationed (rail-connected) units — what an embargo actually forfeits. */
+    tradeStationCount(p) {
+      let count = 0;
+      for (const unit of p.units(UNIT.City, UNIT.Port, UNIT.Factory)) {
+        if (typeof unit.hasTrainStation === "function" && unit.hasTrainStation()) {
+          count += 1;
+        }
+      }
+      return count;
     }
 
     addEmbargo(other, _temporary) {

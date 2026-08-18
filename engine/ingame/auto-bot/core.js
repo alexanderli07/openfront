@@ -37,13 +37,12 @@
       nuke: true,
       warship: true,
       alliance: true,
-      // DIVERGENCE: src has this ON. Turned OFF by default — embargo is MUTUAL
-      // (canTrade needs neither side to hold one) and buildReachableStations DROPS an
-      // embargoed player's train stations from the trade network entirely instead of
-      // devaluing them, at 25k/station for a neutral and 35k for an ally. The bot never
-      // weighs what an embargo costs US against what it costs them, so leaving it on
-      // just taxes our own economy. Turn it on deliberately to deny a runaway leader.
-      embargo: false, // auto-stop trading (embargo) hostile nations — src-faithful default
+      // Auto-embargo. src applies this indiscriminately, which is a net LOSS: canTrade
+      // is mutual and buildReachableStations DROPS an embargoed player's train stations
+      // from our trade network rather than devaluing them, so each side forfeits in
+      // proportion to the OTHER side's station count. embargoIsWorthIt() now supplies
+      // the comparison src never made, so this is safe to leave on.
+      embargo: true, // auto-stop trading (embargo) hostile nations — src-faithful default
       donate: true,
       betray: true, // ON = faithful (the bot may betray an ally to grab a weak/MIRVed
       // one or break a stalemate). Turn OFF to keep the bot LOYAL — it never initiates a
@@ -233,6 +232,10 @@
   // DIVERGENCE (reserveByNeighbors): each hostile player touching our border past the
   // first raises the troop reserve by this much, capped below MAX_DEFENSE_RESERVE so
   // a fully-surrounded nation still has troops to attack with.
+  // DIVERGENCE (smart embargo): a player holding at least this share of the land is
+  // close enough to winning that denying them trade is worth eating our own loss.
+  // Mirrors mirvBehavior's victoryDenialIndividualThreshold on Impossible.
+  const EMBARGO_DENIAL_SHARE = 0.4;
   const RESERVE_PER_EXTRA_NEIGHBOR = 0.07;
   const RESERVE_NEIGHBOR_CAP = 0.65;
   // Min fraction of ACTUAL troops to commit when grabbing SAFE empty land (no
