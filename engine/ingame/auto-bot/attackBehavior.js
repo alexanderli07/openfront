@@ -95,6 +95,14 @@
         throw new Error("not initialized");
       }
 
+      // DIVERGENCE (phasedOpening): start a new decision pass. The phase snapshot is
+      // memoised on THIS counter and not on game.ticks(), because ticks advance during
+      // the pass's awaits (boat probes wait up to WORKER_TIMEOUT_MS) — a tick-keyed
+      // memo could recompute mid-pass and hand the retaliation exemption a different
+      // invader set than the veto was originally built from.
+      this._openingPassId = (this._openingPassId || 0) + 1;
+      this._openingSnap = null;
+
       const border = Array.from(this.player.borderTiles())
         .flatMap((t) => this.game.neighbors(t))
         .filter(
@@ -125,9 +133,17 @@
       );
 
       // Attack TerraNullius but not nuked territory (direct border or across a river)
+      // DIVERGENCE (phasedOpening): the land-only term is split out so the phase can
+      // use it directly. Deliberately NOT the full disjunction: nearbyOf's neighbour
+      // walk resolves any unowned neighbour to the TerraNullius sentinel with no
+      // fallout test, so `playerNeighbors.some((n) => !n.isPlayer())` stays true next
+      // to a nuke crater forever — which would pin phase 1 for the rest of the game.
+      const cleanLandTerraNullius = border.some(
+        (t) => !this.game.hasOwner(t) && !this.game.hasFallout(t),
+      );
       const hasNonNukedTerraNullius =
-        border.some((t) => !this.game.hasOwner(t) && !this.game.hasFallout(t)) ||
-        playerNeighbors.some((n) => !n.isPlayer());
+        cleanLandTerraNullius || playerNeighbors.some((n) => !n.isPlayer());
+      this.noteOpenLand(cleanLandTerraNullius);
 
       // Panel feature toggles. maybeAttack runs under feat("expand")||feat("boat"),
       // so each ACTION inside must enforce its own toggle — otherwise turning one
@@ -190,7 +206,25 @@
       // donate is the LAST attack strategy, so on a busy front it never fires; the
       // client also often can't see allies' combat. Throttled; donateTroops keeps our
       // reserve and (in winFix mode) only donates DOWN to a poorer ally.
-      if (state.settings.winFixes && state.settings.features.donate) {
+      // DIVERGENCE (phasedOpening): hold the proactive donate while the opening still
+      // refuses player attacks. donateTroops keeps only max(reserveRatio, donateKeepFrac)
+      // = 0.45 of maxTroops, which mathematically caps our fill BELOW openingArmyFill
+      // (0.65) — so leaving it running in a team game means buildUpReady() can never
+      // latch and veto B would only ever release on the openingMaxTicks timer. The
+      // `donate` STRATEGY inside attackBestTarget is untouched; this is only the
+      // unthrottled top-of-pass one.
+      let openingHoldsDonate = false;
+      try {
+        const _s = this.openingSnapshot();
+        openingHoldsDonate = Boolean(_s && _s.applies && !_s.over && !_s.built);
+      } catch (_e) {
+        openingHoldsDonate = false;
+      }
+      if (
+        state.settings.winFixes &&
+        state.settings.features.donate &&
+        !openingHoldsDonate
+      ) {
         const dNow = performance.now();
         if (dNow - (state.lastDonateMs || 0) > (state.settings.donateThrottleMs || 3000)) {
           if (this.donateTroops()) state.lastDonateMs = dNow;
@@ -299,6 +333,8 @@
             state.settings.boatProbeMinTroops || 8000,
           )
         : this.player.troops() / 5;
+      // DIVERGENCE (phasedOpening): this path emits directly rather than via emitBoat.
+      if (this.openingVetoesTile(dst)) return;
       if (ctors.boat && emitIntent(ctors.boat, dst, troops)) {
         state.stats.attacks++;
         setLastAction(tr("⛵ Random boat"), "naval");
@@ -804,6 +840,9 @@
       if (!(state.settings.features && state.settings.features.boat)) {
         return false;
       }
+      // DIVERGENCE (phasedOpening): boats emit at a TILE and bypass sendAttack, so
+      // re-check the destination owner at the documented chokepoint.
+      if (this.openingVetoesTile(dst)) return false;
       const ctors = discoverCtors(getEventBus());
       if (ctors.boat && emitIntent(ctors.boat, dst, troops)) {
         state.stats.attacks++;
@@ -1150,6 +1189,235 @@
             !this.player.isFriendly(n) &&
             n.units().some((u) => AttackStructures.has(u.type())),
         );
+    }
+
+    // ── DIVERGENCE (phasedOpening) — PURE VETOES, NO REORDERING ───────────────
+    // Two vetoes, evaluated at sendAttack (the single commit point every land attack
+    // funnels through) and at the boat emit chokepoints:
+    //
+    //   blocksBots    = applies && !over && openLand && !built   (A: land before tribes)
+    //   blocksPlayers = applies && !over && !built               (B: build up before people)
+    //
+    // Veto B is NOT conjoined with openLand: if it were, `built` could never release it
+    // and the only way out would be the openingMaxTicks timer.
+    //
+    // Every read below fails OPEN. A broken API read must never stop the bot fighting.
+
+    /** Publish the open-land signal maybeAttack already computed, so the vetoes never
+     *  walk the border themselves. */
+    noteOpenLand(cleanLandAdjacent) {
+      let known = false;
+      try {
+        known = this.player.borderTiles().size > 0;
+      } catch (_e) {
+        known = false;
+      }
+      // An empty border snapshot is UNKNOWN, not "fully enclosed" — the worker returns
+      // an empty Set when the first fetch times out. Hold the last known value rather
+      // than releasing both vetoes on the worst possible tick.
+      if (!known) return;
+      this._openLand = Boolean(cleanLandAdjacent);
+    }
+
+    /** One-way latch. Without it the first permitted attack spends troops back below
+     *  the fill bar and re-closes the veto mid-war, so a war could never be finished. */
+    buildUpReady() {
+      if (this._builtLatched) return true;
+      let ok = false;
+      try {
+        // Fail OPEN when the bar is unreachable by construction: cities are gated by
+        // three independent off-switches (lobby unit-disable, the panel's build
+        // feature toggle, and the per-structure allow list). Any of them means "we are
+        // never going to build cities", not "wait forever".
+        const cannotBuildCities =
+          !(state.settings.features && state.settings.features.build) ||
+          (typeof autoBotBuildAllowed === "function" &&
+            !autoBotBuildAllowed(UNIT.City)) ||
+          this.game.config().isUnitDisabled(UNIT.City);
+        const cityLevels = cannotBuildCities
+          ? Infinity
+          : this.player.totalUnitLevels(UNIT.City);
+        const maxTroops = this.game.config().maxTroops(this.player) || 1;
+        const fill = this.player.troops() / maxTroops;
+        ok =
+          cityLevels >= (state.settings.openingMinCityLevels || 5) &&
+          fill >= (state.settings.openingArmyFill || 0.65);
+      } catch (_e) {
+        ok = true;
+      }
+      if (ok) {
+        this._builtLatched = true;
+        // The opening ending is the single most useful thing to see in the log — it is
+        // the moment the bot is allowed to start fighting players.
+        try {
+          setLastAction(tr("⚖️ Opening complete — engaging players"), "combat");
+        } catch (_e) {
+          /* logging must never break the gate */
+        }
+      }
+      return ok;
+    }
+
+    /** Sticky invader memory — incomingAttacks() lists only IN-FLIGHT waves. */
+    recentInvaderSids(ticks) {
+      if (!this._recentInvaders) this._recentInvaders = new Map();
+      const mem = this._recentInvaders;
+      try {
+        for (const a of this.player.incomingAttacks()) {
+          const at = a.attacker();
+          if (at && at.isPlayer && at.isPlayer()) mem.set(at.smallID(), ticks);
+        }
+      } catch (_e) {
+        /* keep whatever we already remembered */
+      }
+      const window = state.settings.openingInvaderMemoryTicks || 600;
+      for (const entry of Array.from(mem)) {
+        if (!Number.isFinite(entry[1]) || ticks - entry[1] > window) mem.delete(entry[0]);
+      }
+      return new Set(mem.keys());
+    }
+
+    /** Anyone invading an ALLY stays attackable, or `assist` is dead for the whole
+     *  opening and we refuse to defend an ally under invasion. */
+    allyInvaderSids() {
+      const out = new Set();
+      try {
+        for (const ally of this.player.allies()) {
+          for (const a of ally.incomingAttacks()) {
+            const at = a.attacker();
+            if (at && at.isPlayer && at.isPlayer()) out.add(at.smallID());
+          }
+        }
+      } catch (_e) {
+        /* a partial set is still useful */
+      }
+      return out;
+    }
+
+    /** FFA always. Team games only on a bad spawn: no open land AND at least N
+     *  distinct hostile PLAYERS' land touching ours. Latched, so a stale border
+     *  snapshot cannot flap the phase mid-opening. */
+    phasedOpeningApplies(openLand) {
+      if (!state.settings.phasedOpening) return false;
+      if (this._badSpawnLatched) return true;
+      try {
+        if (this.isFFA()) return true;
+        if (
+          !openLand &&
+          this.hostileNeighborCount() >=
+            (state.settings.openingSurroundedNeighbors || 2)
+        ) {
+          this._badSpawnLatched = true;
+          return true;
+        }
+      } catch (_e) {
+        return false;
+      }
+      return false;
+    }
+
+    openingSnapshot() {
+      const pass = this._openingPassId || 0;
+      if (this._openingSnap && this._openingSnapPass === pass) {
+        return this._openingSnap;
+      }
+      const snap = {
+        applies: false,
+        over: false,
+        openLand: false,
+        built: true,
+        invaders: null,
+        allyInvaders: null,
+      };
+      try {
+        const ticks = Number(this.game.ticks());
+        const cap = state.settings.openingMaxTicks || 0;
+        snap.over = cap > 0 && Number.isFinite(ticks) && ticks >= cap;
+        snap.openLand = Boolean(this._openLand);
+        snap.built = this.buildUpReady();
+        snap.applies = this.phasedOpeningApplies(snap.openLand);
+        snap.invaders = this.recentInvaderSids(ticks);
+        snap.allyInvaders = this.allyInvaderSids();
+      } catch (_e) {
+        snap.applies = false;
+      }
+      this._openingSnap = snap;
+      this._openingSnapPass = pass;
+      return snap;
+    }
+
+    /** true = the opening plan refuses this attack. */
+    openingVetoes(target, retaliating) {
+      if (!state.settings.phasedOpening) return false;
+      let snap;
+      try {
+        snap = this.openingSnapshot();
+      } catch (_e) {
+        return false;
+      }
+      if (!snap || !snap.applies || snap.over) return false;
+
+      // (0) TerraNullius is the phase-1 OBJECTIVE. Never vetoed.
+      let isPlayerTarget = false;
+      try {
+        isPlayerTarget = Boolean(target && target.isPlayer && target.isPlayer());
+      } catch (_e) {
+        return false;
+      }
+      if (!isPlayerTarget) return false;
+
+      // (1) an explicit counter-attack is defence.
+      if (retaliating === true) return false;
+
+      let isBot = false;
+      let sid = null;
+      try {
+        isBot = target.type() === PlayerType.Bot;
+        sid = target.smallID();
+      } catch (_e) {
+        return false;
+      }
+
+      // (2) anyone who has attacked us recently, and (3) anyone invading an ally.
+      // (2) covers the faithful `retaliate` strategy without editing it — that path
+      // passes force=true but retaliating=false.
+      if (sid !== null && snap.invaders && snap.invaders.has(sid)) return false;
+      if (sid !== null && snap.allyInvaders && snap.allyInvaders.has(sid)) return false;
+
+      // (4) a disconnected player's land is free real estate, not a war.
+      try {
+        if (target.isDisconnected && target.isDisconnected()) return false;
+      } catch (_e) {
+        /* fall through */
+      }
+
+      if (isBot) {
+        // (5) a tribe squatting on OUR structures is urgent in EVERY phase. This is
+        // src's bot-with-structures bypass, preserved explicitly rather than relying
+        // on call ordering.
+        try {
+          if (target.units().some((u) => AttackStructures.has(u.type()))) return false;
+        } catch (_e) {
+          return false;
+        }
+        return snap.openLand && !snap.built;
+      }
+      return !snap.built;
+    }
+
+    /** Boat form: the boat emitters fire at a TILE and never reach sendAttack.
+     *  Unowned coast (islands, craters) passes straight through — that is objective
+     *  land, not a war. */
+    openingVetoesTile(tile) {
+      if (!state.settings.phasedOpening) return false;
+      try {
+        if (!this.game.hasOwner(tile)) return false;
+        const owner = this.game.playerBySmallID(this.game.ownerID(tile));
+        if (!owner || !owner.isPlayer || !owner.isPlayer()) return false;
+        return this.openingVetoes(owner, false);
+      } catch (_e) {
+        return false;
+      }
     }
 
     // hasReserveRatioTroops — AiAttackBehavior (private).
@@ -1680,6 +1948,12 @@
     // DIVERGENCE (counterAttackFirst): `retaliating` is threaded through so
     // sendLandAttack can size a counter-attack against the normal-reserve floor.
     async sendAttack(target, force = false, retaliating = false) {
+      // DIVERGENCE (phasedOpening): deliberately ABOVE the `force` check, so it also
+      // covers the FORCED non-defensive paths (betray, and the disconnected takeover).
+      // Defence is exempted by openingVetoes' own exemption list, never by `force`.
+      // Placed here and NOT in shouldAttack: nukeBehavior calls shouldAttack, so a veto
+      // there would silently suppress nuke targeting as a side effect.
+      if (this.openingVetoes(target, retaliating)) return false;
       if (!force && !this.shouldAttack(target)) return false;
 
       if (target.isPlayer()) {

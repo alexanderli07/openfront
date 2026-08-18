@@ -92,6 +92,28 @@
     // DIVERGENCE (opt-in, NOT in src): let a counter-attack ignore the troop reserve,
     // so being invaded does not freeze us out of hitting back.
     counterAttackFirst: true,
+    // DIVERGENCE (opt-in, NOT in src): PHASED OPENING. Claim empty land first, then
+    // bordering tribes, and only fight nations/humans once the cities and army are up.
+    // Implemented as two VETOES at sendAttack rather than by reordering maybeAttack:
+    // six independent paths attack players and four sit ABOVE both ratio gates, so a
+    // reorder would have to be replicated in all six and kept in sync.
+    phasedOpening: true,
+    // Troop fill (troops / maxTroops) that counts as "army grown". MUST stay above
+    // 0.59 or it degenerates into a restatement of triggerRatio (0.50-0.60) — and it
+    // also clears sizeReserveCap 0.60 and RESERVE_NEIGHBOR_CAP 0.65.
+    openingArmyFill: 0.65,
+    // Summed City LEVELS that count as "stocked up on buildings".
+    openingMinCityLevels: 5,
+    // Hard stall-breaker: after this many game ticks the opening is over no matter
+    // what, so no veto can freeze the bot on a map where land never runs out. 0 = off.
+    openingMaxTicks: 9000,
+    // Team games only: how many distinct hostile PLAYERS bordering us counts as
+    // "spawned boxed in". Tribes are excluded (see hostileNeighborCount).
+    openingSurroundedNeighbors: 2,
+    // How long an attacker stays exempt after its wave ends. incomingAttacks() lists
+    // only IN-FLIGHT waves, so without a memory an invader becomes un-attackable
+    // between waves and we could never retake our own ground.
+    openingInvaderMemoryTicks: 600,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -355,6 +377,12 @@
       "nukeDensityFirst",
       "reserveByNeighbors",
       "counterAttackFirst",
+      "phasedOpening",
+      "openingArmyFill",
+      "openingMinCityLevels",
+      "openingMaxTicks",
+      "openingSurroundedNeighbors",
+      "openingInvaderMemoryTicks",
       "smartSpawn",
       "minimized",
       "hidden",

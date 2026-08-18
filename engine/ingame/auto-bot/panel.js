@@ -411,6 +411,11 @@
               <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
             </div>
 
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}">${tr("Phased opening")}</span>
+              <div class="ab-cfg-sw ${state.settings.phasedOpening ? "on" : ""}" data-cfg="phasedOpening"></div>
+            </div>
+
             <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
