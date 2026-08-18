@@ -121,6 +121,13 @@
   /** samDefense: absolute ceiling so a nuke-heavy lobby can't spiral. */
   const SAM_MAX_LEVELS = 24;
 
+  /** defensePosts: rolling window for the income estimate. 600 ticks = 60s. */
+  const INCOME_WINDOW_TICKS = 600;
+  /** defensePosts: minutes of income we are willing to have tied up in posts. */
+  const DEFENSE_POST_INCOME_MINUTES = 1;
+  /** defensePosts: absolute ceiling regardless of income. */
+  const DEFENSE_POST_MAX = 12;
+
   /** Ratio per city used for the first missile silo so nations start nuking earlier */
   const FIRST_MISSILE_SILO_RATIO = 0.4;
 
@@ -321,7 +328,85 @@
     }
 
     // handleStructures — NationStructureBehavior.ts:143 (now async).
+    /** DIVERGENCE (defensePosts): src gives the bot no income signal at all. Accumulate
+     *  POSITIVE gold deltas over a rolling window to estimate gold/min. Positive-only
+     *  means spending is ignored (good) but received donations inflate it slightly
+     *  (acceptable — this only sizes a build target, it is not an accounting figure). */
+    sampleBotIncome() {
+      let tick;
+      let gold;
+      try {
+        tick = Number(this.game.ticks());
+        gold = Number(this.player.gold());
+      } catch (_e) { return; }
+      if (!Number.isFinite(tick) || !Number.isFinite(gold)) return;
+      const inc = state.income;
+      if (inc.lastGold !== null && gold > inc.lastGold) inc.earned += gold - inc.lastGold;
+      inc.lastGold = gold;
+      inc.samples.push({ tick, earned: inc.earned });
+      const cutoff = tick - INCOME_WINDOW_TICKS;
+      while (inc.samples.length > 1 && inc.samples[0].tick < cutoff) inc.samples.shift();
+    }
+
+    estimatedGoldPerMinute() {
+      const inc = state.income;
+      if (inc.samples.length < 2) return 0;
+      const first = inc.samples[0];
+      const last = inc.samples[inc.samples.length - 1];
+      const dt = last.tick - first.tick;
+      if (dt <= 0) return 0;
+      return ((last.earned - first.earned) / dt) * 600;
+    }
+
+    /** DIVERGENCE (defensePosts): own border tiles adjacent to land owned by a hostile
+     *  player. Unlike getAttackFrontTiles this does NOT require an active attack — a
+     *  shared border is enough. Regular bots count as hostile; they do attack. */
+    getEnemyFrontTiles() {
+      const game = this.game;
+      const player = this.player;
+      const mySid = player.smallID();
+      const hostileBySid = new Map();
+      const front = [];
+      outer: for (const borderTile of player.borderTiles()) {
+        for (const neighbor of game.neighbors(borderTile)) {
+          if (!game.isLand(neighbor) || !game.hasOwner(neighbor)) continue;
+          const sid = game.ownerID(neighbor);
+          if (sid === mySid) continue;
+          let hostile = hostileBySid.get(sid);
+          if (hostile === undefined) {
+            let other = null;
+            try { other = game.playerBySmallID(sid); } catch (_e) { other = null; }
+            hostile = Boolean(
+              other && other.isPlayer && other.isPlayer() && !player.isFriendly(other),
+            );
+            hostileBySid.set(sid, hostile);
+          }
+          if (hostile) { front.push(borderTile); continue outer; }
+        }
+      }
+      return front;
+    }
+
+    /** DIVERGENCE (defensePosts): how many posts one minute of income can fund, using
+     *  the real escalating cost curve min(250k, n * 50k). Self-scaling: a richer nation
+     *  fortifies more heavily. */
+    affordableDefensePosts() {
+      const perMinute = this.estimatedGoldPerMinute();
+      if (!(perMinute > 0)) return 0;
+      const budget = perMinute * DEFENSE_POST_INCOME_MINUTES;
+      let count = 0;
+      let spend = 0;
+      while (count < DEFENSE_POST_MAX) {
+        const next = Math.min(250_000, (count + 1) * 50_000);
+        if (spend + next > budget) break;
+        spend += next;
+        count += 1;
+      }
+      return count;
+    }
+
     async handleStructures() {
+      if (state.settings.defensePosts) this.sampleBotIncome();
       // Defense posts are handled outside the normal pacing/counter system:
       // they don't increment placementsCount or lastStructureTick, and they are
       // never built as the very first structure.
@@ -370,23 +455,43 @@
       const landAttacks = player
         .incomingAttacks()
         .filter((a) => this.isLandAttack(a));
-      if (landAttacks.length === 0) return false;
+      const proactive = Boolean(state.settings.defensePosts);
+      if (landAttacks.length === 0 && !proactive) return false;
 
       const ourTroops = player.troops();
-      if (ourTroops <= 0) return false;
+      if (ourTroops <= 0 && !proactive) return false;
 
       const incomingTroops = landAttacks.reduce((sum, a) => sum + a.troops(), 0);
-      const ratio = incomingTroops / ourTroops;
-      if (ratio < UNDER_ATTACK_THREAT_RATIO) return false;
+      const ratio = ourTroops > 0 ? incomingTroops / ourTroops : 0;
 
-      let allowed;
-      if (difficulty === Difficulty.Medium) {
-        allowed = 1;
-      } else {
-        allowed = Math.ceil(ratio / DEFENSE_POST_RATIO_PER_POST);
+      // src's reactive target — 0 unless the incoming attack is big enough.
+      let reactiveAllowed = 0;
+      if (landAttacks.length > 0 && ratio >= UNDER_ATTACK_THREAT_RATIO) {
+        reactiveAllowed =
+          difficulty === Difficulty.Medium
+            ? 1
+            : Math.ceil(ratio / DEFENSE_POST_RATIO_PER_POST);
       }
 
-      const frontTiles = this.getAttackFrontTiles(landAttacks);
+      // DIVERGENCE (defensePosts): income-sized target, live whenever we share a land
+      // border with a hostile player — no attack required.
+      let enemyFront = [];
+      let incomeAllowed = 0;
+      if (proactive) {
+        enemyFront = this.getEnemyFrontTiles();
+        if (enemyFront.length > 0) incomeAllowed = this.affordableDefensePosts();
+      }
+
+      const allowed = Math.max(reactiveAllowed, incomeAllowed);
+      if (allowed <= 0) return false;
+
+      // Fortify the attacked front first when under attack; otherwise the whole
+      // hostile border. Spacing in countDefensePostsNearFront / sampleTilesNearFront
+      // self-limits how many actually fit, so no extra cap is needed here.
+      const attackFront =
+        landAttacks.length > 0 ? this.getAttackFrontTiles(landAttacks) : [];
+      const frontTiles = attackFront.length > 0 ? attackFront : enemyFront;
+      if (frontTiles.length === 0) return false;
       if (this.countDefensePostsNearFront(frontTiles, allowed) >= allowed) {
         return false;
       }

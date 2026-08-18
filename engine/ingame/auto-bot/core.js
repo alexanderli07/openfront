@@ -78,6 +78,11 @@
     // order while behind, always uses coverage-gap weighting when placing, and
     // upgrades the launcher guarding the most asset value.
     samDefense: true,
+    // DIVERGENCE (opt-in, NOT in src): proactive Defense Posts. src only builds them
+    // reactively, once incoming land attacks exceed 35% of our troops — by which time
+    // the attack has already landed. defensePosts builds them whenever we share a land
+    // border with a hostile player, and sizes the count from our estimated gold/min.
+    defensePosts: true,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -247,6 +252,9 @@
     tickInFlight: false,
     tickStartedAt: 0,
     lastCombatMs: 0,
+    // DIVERGENCE (defensePosts): src has no income signal. Rolling positive-gold-delta
+    // accumulator, sampled from structureBehavior; see estimatedGoldPerMinute().
+    income: { lastGold: null, earned: 0, samples: [] },
     lastPlayerAttackMs: 0,
     lastRetaliateMs: 0,
     lastBuildMs: 0,
@@ -326,6 +334,7 @@
       "economyFirst",
       "samCrack",
       "samDefense",
+      "defensePosts",
       "smartSpawn",
       "minimized",
       "hidden",
