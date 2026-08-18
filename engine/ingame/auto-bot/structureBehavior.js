@@ -128,6 +128,61 @@
    *  lump reads as 3M/min and instantly asks for the maximum number of defence
    *  posts. Below this span the estimate is 0, i.e. "no data", not "no income". */
   const INCOME_MIN_SPAN_TICKS = 300;
+
+  // ── DIVERGENCE: income sampling. Free functions in the shared scope rather than
+  // StructureBehavior methods, because the nuke throttle needs the NET rate and has no
+  // reference to that instance. Driven once per tick from nationExecution.tick() so it
+  // keeps running regardless of the build/defensePosts feature toggles — a throttle
+  // that fails closed must never be starved of data by an unrelated switch.
+  function sampleBotIncome(game, player) {
+    let tick;
+    let gold;
+    try {
+      tick = Number(game.ticks());
+      gold = Number(player.gold());
+    } catch (_e) {
+      return;
+    }
+    if (!Number.isFinite(tick) || !Number.isFinite(gold)) return;
+    const inc = state.income;
+    // Same tick twice (two callers in one pass) would push a zero-span sample.
+    const tail = inc.samples[inc.samples.length - 1];
+    if (tail && tail.tick === tick) return;
+    if (inc.lastGold !== null && gold > inc.lastGold) inc.earned += gold - inc.lastGold;
+    inc.lastGold = gold;
+    inc.samples.push({ tick: tick, earned: inc.earned, gold: gold });
+    const cutoff = tick - INCOME_WINDOW_TICKS;
+    while (inc.samples.length > 1 && inc.samples[0].tick < cutoff) inc.samples.shift();
+  }
+
+  function incomeWindow() {
+    const inc = state.income;
+    if (!inc || inc.samples.length < 2) return null;
+    const first = inc.samples[0];
+    const last = inc.samples[inc.samples.length - 1];
+    const dt = last.tick - first.tick;
+    if (dt < INCOME_MIN_SPAN_TICKS) return null;
+    return { first: first, last: last, dt: dt };
+  }
+
+  /** GROSS income: positive gold deltas only, so spending is invisible. This is the
+   *  right basis for "what can we afford to own" (defence posts). */
+  function estimatedGoldPerMinute() {
+    const w = incomeWindow();
+    if (w === null) return 0;
+    return ((w.last.earned - w.first.earned) / w.dt) * 600;
+  }
+
+  /** NET income: the actual slope of our gold, so all spending IS counted. This is the
+   *  right basis for "are we still getting richer" — the question that decides whether
+   *  another warhead is affordable. Can legitimately be negative. */
+  function estimatedNetGoldPerMinute() {
+    const w = incomeWindow();
+    if (w === null) return null; // null = no data yet, distinct from 0 = flat
+    if (typeof w.first.gold !== "number" || typeof w.last.gold !== "number") return null;
+    return ((w.last.gold - w.first.gold) / w.dt) * 600;
+  }
+
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
   const DEFENSE_POST_INCOME_MINUTES = 1;
   /** defensePosts: absolute ceiling regardless of income. */
@@ -337,31 +392,6 @@
      *  POSITIVE gold deltas over a rolling window to estimate gold/min. Positive-only
      *  means spending is ignored (good) but received donations inflate it slightly
      *  (acceptable — this only sizes a build target, it is not an accounting figure). */
-    sampleBotIncome() {
-      let tick;
-      let gold;
-      try {
-        tick = Number(this.game.ticks());
-        gold = Number(this.player.gold());
-      } catch (_e) { return; }
-      if (!Number.isFinite(tick) || !Number.isFinite(gold)) return;
-      const inc = state.income;
-      if (inc.lastGold !== null && gold > inc.lastGold) inc.earned += gold - inc.lastGold;
-      inc.lastGold = gold;
-      inc.samples.push({ tick, earned: inc.earned });
-      const cutoff = tick - INCOME_WINDOW_TICKS;
-      while (inc.samples.length > 1 && inc.samples[0].tick < cutoff) inc.samples.shift();
-    }
-
-    estimatedGoldPerMinute() {
-      const inc = state.income;
-      if (inc.samples.length < 2) return 0;
-      const first = inc.samples[0];
-      const last = inc.samples[inc.samples.length - 1];
-      const dt = last.tick - first.tick;
-      if (dt < INCOME_MIN_SPAN_TICKS) return 0;
-      return ((last.earned - first.earned) / dt) * 600;
-    }
 
     /** DIVERGENCE (defensePosts): own border tiles adjacent to land owned by a hostile
      *  player. Unlike getAttackFrontTiles this does NOT require an active attack — a
@@ -402,7 +432,7 @@
      *  the real escalating cost curve min(250k, n * 50k). Self-scaling: a richer nation
      *  fortifies more heavily. */
     affordableDefensePosts() {
-      const perMinute = this.estimatedGoldPerMinute();
+      const perMinute = estimatedGoldPerMinute();
       if (!(perMinute > 0)) return 0;
       const budget = perMinute * DEFENSE_POST_INCOME_MINUTES;
       let count = 0;
@@ -417,7 +447,6 @@
     }
 
     async handleStructures() {
-      if (state.settings.defensePosts) this.sampleBotIncome();
       // Defense posts are handled outside the normal pacing/counter system:
       // they don't increment placementsCount or lastStructureTick, and they are
       // never built as the very first structure.

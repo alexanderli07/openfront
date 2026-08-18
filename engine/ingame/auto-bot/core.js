@@ -92,6 +92,10 @@
     // DIVERGENCE (opt-in, NOT in src): let a counter-attack ignore the troop reserve,
     // so being invaded does not freeze us out of hitting back.
     counterAttackFirst: true,
+    // DIVERGENCE (economyFirst): a single warhead decision may consume at most this many
+    // minutes of NET income. Warheads are otherwise UNCAPPED — the only hard rule is
+    // that our gold must still be growing. See nukeSpendAllowed().
+    nukeIncomeMinutes: 2,
     // DIVERGENCE (opt-in, NOT in src): PHASED OPENING. Claim empty land first, then
     // bordering tribes, and only fight nations/humans once the cities and army are up.
     // Implemented as two VETOES at sendAttack rather than by reordering maybeAttack:
@@ -377,6 +381,7 @@
       "nukeDensityFirst",
       "reserveByNeighbors",
       "counterAttackFirst",
+      "nukeIncomeMinutes",
       "phasedOpening",
       "openingArmyFill",
       "openingMinCityLevels",

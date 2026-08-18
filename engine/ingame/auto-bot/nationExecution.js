@@ -72,6 +72,13 @@
       this.player = this.mg.myPlayer();
       const me = this.player;
 
+      // DIVERGENCE: sample gold EVERY tick, before any feature gate. Both the defence-post
+      // sizing (gross) and the warhead throttle (net) read this window, and a throttle
+      // that fails closed must not be starved of data by an unrelated toggle.
+      if (me !== null && typeof sampleBotIncome === "function") {
+        sampleBotIncome(this.mg, me);
+      }
+
       // ── ship tracking — NationExecution.ts:90-101 (every tick, non-Easy, Port) ─
       if (
         this.behaviorsInitialized &&

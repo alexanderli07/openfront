@@ -234,10 +234,7 @@
   // .Parabola(game, opts) factory below (mirroring src's UniversalPathFinding).
   // ===========================================================================
   const PARABOLA_MIN_HEIGHT = 50;
-  /** economyFirst: hard ceiling on the perceived-cost ratchet, as a multiple of the
-   *  real unit cost. 3n keeps a meaningful throttle (the 3rd+ warhead still "costs"
-   *  3x) while staying inside a 4.5M war chest for atoms. */
-  const PERCEIVED_NUKE_MAX_MULTIPLE = 3n;
+
 
   class NukeParabolaUniversalPathFinder {
     constructor(gameMap, options) {
@@ -567,6 +564,10 @@
       // untouched — maybeDestroyEnemySam already fires totalInterceptions + 1 (+ margin)
       // inside SAMCooldown()/2 and bails on insufficient gold or silo slots, so this
       // stays gradual: it simply does nothing until the economy can fund a full salvo.
+      // DIVERGENCE (economyFirst): income throttle. Checked here, after the warhead
+      // type and target are known, so the cost tested is the real one.
+      if (!this.nukeSpendAllowed(await this.cost(nukeType))) return;
+
       const samCrack = Boolean(state.settings.samCrack);
       if (
         bestTile !== null &&
@@ -1212,29 +1213,46 @@
     // sendNuke up to a dozen times, which flooded the 200-entry log with identical
     // entries; the salvo logs one summary line instead. Stats still count every bomb.
     /**
-     * DIVERGENCE (economyFirst): release valve for the perceived-cost ratchet.
+     * DIVERGENCE (economyFirst): throttle warheads on INCOME, not on a launch counter.
      *
-     * The x1.5-per-atom / x1.25-per-hydrogen inflation exists ONLY to simulate saving
-     * up for a MIRV, and src's escape from it is getPerceivedNukeCost's
-     * `gold > cost(MIRV) + cost(HydrogenBomb)` branch — i.e. holding 30M, at which
-     * point the true cost is used again. economyFirst deliberately caps the war chest
-     * at cost(AtomBomb) * 6n = 4.5M, so that 30M is never reached and the ratchet NEVER
-     * releases: the bot needs 5.7M on hand for its 6th atom while only ever hoarding
-     * 4.5M, and every launch makes it worse. It prices itself out of atom bombs for the
-     * rest of the game. Stock behaviour does not have this problem.
+     * src paces nuking by ratcheting the bot's own perceived warhead cost up 50% per
+     * atom, compounding, whose only release is holding 30M (getPerceivedNukeCost's
+     * `gold > cost(MIRV) + cost(HydrogenBomb)` branch). economyFirst caps the war chest
+     * at cost(AtomBomb) * 6n = 4.5M, so that release never fires and the ratchet becomes
+     * a permanent lockout at roughly the fifth atom.
      *
-     * So under economyFirst the ratchet is capped at a small multiple of the real cost:
-     * it still throttles repeated nuking (the point of the mechanism) but can no longer
-     * lock out permanently (an artefact of removing the MIRV hoard it was pacing).
+     * Replaced with the condition that actually expresses "spend on warheads, but not
+     * into the ground": keep firing while our NET gold rate is still positive. There is
+     * no cap on the number of bombs — a rich economy may fire indefinitely — but a
+     * shrinking one stops. nukeIncomeMinutes additionally bounds a single decision to
+     * that many minutes of net income, so one saturation salvo cannot drain the
+     * treasury in one tick.
+     *
+     * Fails CLOSED (no data => do not spend), which is safe because sampleBotIncome now
+     * runs every tick from nationExecution regardless of feature toggles, so "no data"
+     * only occurs in the first ~30 seconds of a game.
      */
-    async clampPerceivedNukeCost(perceived, type) {
-      if (!state.settings.economyFirst) return perceived;
+    nukeSpendAllowed(costBigInt) {
+      if (!state.settings.economyFirst) return true; // stock ratchet governs
+      let net;
       try {
-        const ceiling = (await this.cost(type)) * PERCEIVED_NUKE_MAX_MULTIPLE;
-        return perceived > ceiling ? ceiling : perceived;
+        net = typeof estimatedNetGoldPerMinute === "function"
+          ? estimatedNetGoldPerMinute()
+          : null;
       } catch (_e) {
-        return perceived;
+        return false;
       }
+      if (net === null) return false; // not enough window yet
+      if (net <= 0) return false; // economy is flat or shrinking — hold fire
+      let cost = 0;
+      try {
+        cost = Number(costBigInt);
+      } catch (_e) {
+        cost = 0;
+      }
+      if (!Number.isFinite(cost) || cost <= 0) return true;
+      const minutes = state.settings.nukeIncomeMinutes || 2;
+      return cost <= net * minutes;
     }
 
     async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false) {
@@ -1274,24 +1292,23 @@
         if (this.atomBombPerceivedCost === null) {
           this.atomBombPerceivedCost = await this.cost(UNIT.AtomBomb);
         }
-        this.atomBombPerceivedCost =
-          (this.atomBombPerceivedCost * 150n) / 100n;
-        this.atomBombPerceivedCost = await this.clampPerceivedNukeCost(
-          this.atomBombPerceivedCost,
-          UNIT.AtomBomb,
-        );
+        // DIVERGENCE (economyFirst): do NOT ratchet — nukeSpendAllowed() throttles on
+        // net income instead, and the ratchet's own release valve is unreachable once
+        // the MIRV hoard is capped.
+        if (!state.settings.economyFirst) {
+          this.atomBombPerceivedCost =
+            (this.atomBombPerceivedCost * 150n) / 100n;
+        }
       } else if (nukeType === UNIT.HydrogenBomb) {
         this.hydrogenBombsLaunched++;
         // Increase perceived cost by 25% each time to simulate saving up for a MIRV
         if (this.hydrogenBombPerceivedCost === null) {
           this.hydrogenBombPerceivedCost = await this.cost(UNIT.HydrogenBomb);
         }
-        this.hydrogenBombPerceivedCost =
-          (this.hydrogenBombPerceivedCost * 125n) / 100n;
-        this.hydrogenBombPerceivedCost = await this.clampPerceivedNukeCost(
-          this.hydrogenBombPerceivedCost,
-          UNIT.HydrogenBomb,
-        );
+        if (!state.settings.economyFirst) {
+          this.hydrogenBombPerceivedCost =
+            (this.hydrogenBombPerceivedCost * 125n) / 100n;
+        }
       }
 
       // LOGGING (light) — on a nuke fire.
@@ -1471,6 +1488,11 @@
       // Check gold for all fired bombs (including wasted ones)
       const totalCost = atomCost * BigInt(bombsToFire);
       if (this.player.gold() < totalCost) {
+        return { ok: false, needsMoreSilos: false, coveringSamIds, totalBombs };
+      }
+      // DIVERGENCE (economyFirst): a saturation salvo is the largest single spend the bot
+      // makes — bound it by net income too, not just by cash on hand.
+      if (!this.nukeSpendAllowed(totalCost)) {
         return { ok: false, needsMoreSilos: false, coveringSamIds, totalBombs };
       }
 
