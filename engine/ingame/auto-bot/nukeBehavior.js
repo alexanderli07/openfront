@@ -449,6 +449,7 @@
       // the ranked list and take the best whose canBuild !== false. This preserves
       // the exact src ordering of which tile wins (the buildables probe is the SAME
       // gate src applies, just deferred to after sync scoring).
+      const densityFirst = Boolean(state.settings.nukeDensityFirst);
       const candidates = [];
       outer: for (const tile of new Set(allTiles)) {
         if (tile === null) continue;
@@ -481,17 +482,21 @@
           continue;
         }
 
-        // On Hard & Impossible, avoid trajectories that can be intercepted by enemy SAMs
-        if (
+        // DIVERGENCE (nukeDensityFirst): src DISCARDS any tile a SAM could intercept —
+        // so the densest cluster gets skipped precisely BECAUSE it is defended, and the
+        // warhead goes somewhere cheap instead. Keep the tile as a candidate and just
+        // record that it is covered; the ranked pass below decides whether we can
+        // afford to punch through. Without the setting, src's skip is preserved.
+        const interceptable =
           (difficulty === Difficulty.Hard ||
             difficulty === Difficulty.Impossible) &&
-          this.isTrajectoryInterceptableBySam(spawnTile, tile)
-        ) {
+          this.isTrajectoryInterceptableBySam(spawnTile, tile);
+        if (interceptable && !densityFirst) {
           continue;
         }
 
         const value = this.nukeTileScore(tile, silos, structures, nukeType);
-        candidates.push({ tile, value });
+        candidates.push({ tile, value, interceptable });
       }
 
       // Pick the best-scoring candidate exactly as src: src adopts a tile only when
@@ -502,17 +507,49 @@
       // score still beats the initial bestValue (-1). Outcome is identical to src's
       // inline scan: the highest-scoring canBuild-passing tile with value > -1 wins.
       candidates.sort((a, b) => b.value - a.value);
+      // DIVERGENCE (nukeDensityFirst): walk the ranked list and take the densest tile
+      // we can ACTUALLY land — undefended means one warhead, defended means a full
+      // saturation salvo, and if we cannot fund that salvo right now we fall through
+      // to the next-best tile rather than giving up on value entirely.
+      let salvoTile = null;
+      let salvoPlan = null;
       for (const cand of candidates) {
         // strict `>` semantics vs the initial bestValue (-1): a tile scoring exactly
         // -1 (or lower) never becomes bestTile in src, so skip it here too. Since the
         // list is sorted desc, once we hit a candidate that isn't > -1 the rest can't
         // be either — but we still confirm canBuild on each higher candidate.
         if (!(cand.value > bestValue)) break;
+        if (cand.interceptable) {
+          // Defended: only worth taking if we can saturate its interceptors now.
+          const canAtom = await this.probeCanBuildNuke(cand.tile, UNIT.AtomBomb);
+          if (!canAtom) continue;
+          const plan = await this.planSaturationSalvoFor(cand.tile);
+          if (plan === null) continue;
+          salvoTile = cand.tile;
+          salvoPlan = plan;
+          bestValue = cand.value;
+          break;
+        }
         const canBuild = await this.probeCanBuildNuke(cand.tile, nukeType);
         if (!canBuild) continue;
         bestTile = cand.tile;
         bestValue = cand.value;
         break;
+      }
+
+      // DIVERGENCE (nukeDensityFirst): fire the breakthrough salvo at the dense
+      // cluster itself, rather than spending it on whichever SAM happened to be
+      // weakest (which is what maybeDestroyEnemySam does as a fallback).
+      if (salvoPlan !== null && salvoTile !== null) {
+        for (let i = 0; i < salvoPlan.bombsToFire; i++) {
+          await this.sendNuke(
+            salvoTile,
+            UNIT.AtomBomb,
+            nukeTarget,
+            salvoPlan.waitTicksPerBomb[i],
+          );
+        }
+        return;
       }
 
       // DIVERGENCE (samCrack): src only cracks SAM batteries on Impossible, and only as
@@ -1219,6 +1256,204 @@
     }
 
     /**
+     * DIVERGENCE (nukeDensityFirst): the saturation-salvo planner, lifted VERBATIM
+     * out of maybeDestroyEnemySam's loop body so that both the SAM-cracking path and
+     * the density-first path can plan the same way. Given a target tile, works out
+     * how many atom bombs it takes to overwhelm every SAM covering it
+     * (sum of levels + 1, plus a 1-in-5 margin) and whether our silos can deliver
+     * them inside half a SAM cooldown. Returns {ok:true, bombsToFire,
+     * waitTicksPerBomb} or {ok:false, needsMoreSilos}. Pure/sync — no worker calls.
+     */
+    planSaturationSalvo(targetTile, atomCost, ourSilos) {
+
+      // Find all enemy SAMs whose range covers the target tile (they will all try to intercept)
+      const coveringSams = this.findEnemySamsCoveringTile(targetTile);
+      const coveringSamIds = new Set(coveringSams.map((s) => s.id()));
+
+      // Total interception capacity = sum of covering SAM levels
+      const totalInterceptions = coveringSams.reduce(
+        (sum, sam) => sum + sam.level(),
+        0,
+      );
+      const bombsNeeded = totalInterceptions + 1;
+
+      // NukeExecution always picks the closest non-cooldown silo by Manhattan
+      // distance to target (via nukeSpawn). Our planning must mirror that order.
+      // Silos with interceptable trajectories will still be picked first by
+      // NukeExecution — their bombs launch but get intercepted, "wasting" slots.
+      const nukeSpeed = this.game.config().defaultNukeSpeed();
+      const allAvailableSilos = [];
+      for (const silo of ourSilos) {
+        const availableSlots = silo.level() - silo.missileTimerQueue().length;
+        if (availableSlots <= 0) {
+          continue;
+        }
+        const interceptable = this.isTrajectoryInterceptableBySam(
+          silo.tile(),
+          targetTile,
+          coveringSamIds,
+        );
+        // Compute actual parabolic flight time in ticks
+        const pathFinder = UniversalPathFinding.Parabola(this.game, {
+          increment: nukeSpeed,
+          distanceBasedHeight: true,
+          directionUp: true,
+        });
+        const trajectory = pathFinder.findPath(silo.tile(), targetTile) ?? [];
+        if (trajectory.length === 0) continue;
+        allAvailableSilos.push({
+          silo,
+          slots: availableSlots,
+          flightTicks: trajectory.length,
+          interceptable,
+        });
+      }
+
+      // Sort by Manhattan distance to target (matching nukeSpawn's pick order)
+      allAvailableSilos.sort(
+        (a, b) =>
+          this.game.manhattanDist(a.silo.tile(), targetTile) -
+          this.game.manhattanDist(b.silo.tile(), targetTile),
+      );
+
+      // Flatten into a per-bomb launch sequence matching NukeExecution's order.
+      // Each silo contributes `slots` consecutive bombs before NukeExecution
+      // moves to the next silo.
+      const launchSequence = [];
+      for (const entry of allAvailableSilos) {
+        for (let s = 0; s < entry.slots; s++) {
+          launchSequence.push({
+            flightTicks: entry.flightTicks,
+            interceptable: entry.interceptable,
+          });
+        }
+      }
+
+      // Use half the SAM cooldown as the max total arrival spread to be safe.
+      const samCooldown = this.game.config().SAMCooldown();
+      const maxTotalArrivalSpread = Math.floor(samCooldown / 2);
+
+      // Add extra bombs: 1 for every 5 to account for enemy building more SAMs
+      // while our bombs are in flight
+      const extraBombs = Math.floor(bombsNeeded / 5);
+      const totalBombs = bombsNeeded + extraBombs;
+
+      // Collect bombs from silos whose trajectory to the target is NOT blocked
+      // by enemy SAMs other than the covering SAMs we're trying to overwhelm.
+      const unblockedBombs = [];
+      for (let i = 0; i < launchSequence.length; i++) {
+        if (!launchSequence[i].interceptable) {
+          unblockedBombs.push({
+            index: i,
+            flightTicks: launchSequence[i].flightTicks,
+          });
+        }
+      }
+
+      if (unblockedBombs.length < totalBombs) {
+        return { ok: false, needsMoreSilos: true, coveringSamIds, totalBombs };
+      }
+
+      // Sort unblocked bombs by flight time to find a sliding window
+      // of maxTotalArrivalSpread that captures the most bombs.
+      const sortedByFlight = [...unblockedBombs].sort(
+        (a, b) => a.flightTicks - b.flightTicks,
+      );
+
+      let bestWindowStart = 0;
+      let bestWindowCount = 0;
+      for (let start = 0; start < sortedByFlight.length; start++) {
+        let end = start;
+        while (
+          end < sortedByFlight.length &&
+          sortedByFlight[end].flightTicks -
+            sortedByFlight[start].flightTicks <=
+            maxTotalArrivalSpread
+        ) {
+          end++;
+        }
+        if (end - start > bestWindowCount) {
+          bestWindowCount = end - start;
+          bestWindowStart = start;
+        }
+      }
+
+      if (bestWindowCount < totalBombs) {
+        return { ok: false, needsMoreSilos: true, coveringSamIds, totalBombs };
+      }
+
+      // From the window, pick totalBombs with the lowest launch-sequence
+      // indices to minimise how many bombs we need to fire (minimise gold cost).
+      const windowBombs = sortedByFlight.slice(
+        bestWindowStart,
+        bestWindowStart + bestWindowCount,
+      );
+      const windowByIndex = [...windowBombs].sort((a, b) => a.index - b.index);
+      const selected = windowByIndex.slice(0, totalBombs);
+      const selectedSet = new Set(selected.map((b) => b.index));
+      const lastSelectedIndex = selected[selected.length - 1].index;
+      const bombsToFire = lastSelectedIndex + 1;
+
+      // Compute per-bomb waitTicks so all selected bombs arrive in the window.
+      // Target: spread arrivals evenly, anchored at the earliest flight time
+      // in the selected set.
+      // DIVERGENCE G1: waitTicks is computed faithfully here for parity, but the
+      // client build menu cannot stagger launches — sendNuke ignores it.
+      const selectedFlightMin = Math.min(
+        ...selected.map((b) => b.flightTicks),
+      );
+      const staggerInterval = Math.max(
+        1,
+        Math.floor(maxTotalArrivalSpread / totalBombs),
+      );
+      let selectedIdx = 0;
+      const waitTicksPerBomb = [];
+      for (let i = 0; i < bombsToFire; i++) {
+        if (selectedSet.has(i)) {
+          const targetArrival =
+            selectedFlightMin + selectedIdx * staggerInterval;
+          waitTicksPerBomb.push(
+            Math.max(0, targetArrival - launchSequence[i].flightTicks),
+          );
+          selectedIdx++;
+        } else {
+          // Wasted bomb (interceptable or out-of-window) — launch immediately
+          waitTicksPerBomb.push(0);
+        }
+      }
+
+      // Check gold for all fired bombs (including wasted ones)
+      const totalCost = atomCost * BigInt(bombsToFire);
+      if (this.player.gold() < totalCost) {
+        return { ok: false, needsMoreSilos: false, coveringSamIds, totalBombs };
+      }
+
+      return { ok: true, bombsToFire, waitTicksPerBomb, coveringSamIds, totalBombs };
+    }
+
+    /**
+     * DIVERGENCE (nukeDensityFirst): affordability-checked wrapper used by
+     * maybeSendNuke. Returns a firable plan or null.
+     */
+    async planSaturationSalvoFor(targetTile) {
+      if (this.game.config().isUnitDisabled(UNIT.AtomBomb)) return null;
+      // Don't stack salvos — mirrors maybeDestroyEnemySam's in-flight guard.
+      if (this.player.units(UNIT.AtomBomb).length > 0) return null;
+      const ourSilos = this.player
+        .units(UNIT.MissileSilo)
+        .filter((silo) => !silo.isUnderConstruction());
+      if (ourSilos.length === 0) return null;
+      const atomCost = await this.cost(UNIT.AtomBomb);
+      let plan;
+      try {
+        plan = this.planSaturationSalvo(targetTile, atomCost, ourSilos);
+      } catch (_e) {
+        return null;
+      }
+      return plan && plan.ok ? plan : null;
+    }
+
+    /**
      * On Impossible difficulty, when no good nuke target is available (score <= 0),
      * attempt to destroy enemy SAMs by overwhelming them with atom bombs.
      * A SAM of level N can intercept N nukes before going on cooldown,
@@ -1258,170 +1493,16 @@
 
       for (const targetSam of sortedSams) {
         const targetTile = targetSam.tile();
-
-        // Find all enemy SAMs whose range covers the target tile (they will all try to intercept)
-        const coveringSams = this.findEnemySamsCoveringTile(targetTile);
-        const coveringSamIds = new Set(coveringSams.map((s) => s.id()));
-
-        // Total interception capacity = sum of covering SAM levels
-        const totalInterceptions = coveringSams.reduce(
-          (sum, sam) => sum + sam.level(),
-          0,
-        );
-        const bombsNeeded = totalInterceptions + 1;
-
-        // NukeExecution always picks the closest non-cooldown silo by Manhattan
-        // distance to target (via nukeSpawn). Our planning must mirror that order.
-        // Silos with interceptable trajectories will still be picked first by
-        // NukeExecution — their bombs launch but get intercepted, "wasting" slots.
-        const nukeSpeed = this.game.config().defaultNukeSpeed();
-        const allAvailableSilos = [];
-        for (const silo of ourSilos) {
-          const availableSlots = silo.level() - silo.missileTimerQueue().length;
-          if (availableSlots <= 0) {
-            continue;
+        const plan = this.planSaturationSalvo(targetTile, atomCost, ourSilos);
+        if (!plan.ok) {
+          if (plan.needsMoreSilos) {
+            failedTarget ??= {
+              targetTile,
+              coveringSamIds: plan.coveringSamIds,
+              totalBombs: plan.totalBombs,
+            };
+            needsMoreSilos = true;
           }
-          const interceptable = this.isTrajectoryInterceptableBySam(
-            silo.tile(),
-            targetTile,
-            coveringSamIds,
-          );
-          // Compute actual parabolic flight time in ticks
-          const pathFinder = UniversalPathFinding.Parabola(this.game, {
-            increment: nukeSpeed,
-            distanceBasedHeight: true,
-            directionUp: true,
-          });
-          const trajectory = pathFinder.findPath(silo.tile(), targetTile) ?? [];
-          if (trajectory.length === 0) continue;
-          allAvailableSilos.push({
-            silo,
-            slots: availableSlots,
-            flightTicks: trajectory.length,
-            interceptable,
-          });
-        }
-
-        // Sort by Manhattan distance to target (matching nukeSpawn's pick order)
-        allAvailableSilos.sort(
-          (a, b) =>
-            this.game.manhattanDist(a.silo.tile(), targetTile) -
-            this.game.manhattanDist(b.silo.tile(), targetTile),
-        );
-
-        // Flatten into a per-bomb launch sequence matching NukeExecution's order.
-        // Each silo contributes `slots` consecutive bombs before NukeExecution
-        // moves to the next silo.
-        const launchSequence = [];
-        for (const entry of allAvailableSilos) {
-          for (let s = 0; s < entry.slots; s++) {
-            launchSequence.push({
-              flightTicks: entry.flightTicks,
-              interceptable: entry.interceptable,
-            });
-          }
-        }
-
-        // Use half the SAM cooldown as the max total arrival spread to be safe.
-        const samCooldown = this.game.config().SAMCooldown();
-        const maxTotalArrivalSpread = Math.floor(samCooldown / 2);
-
-        // Add extra bombs: 1 for every 5 to account for enemy building more SAMs
-        // while our bombs are in flight
-        const extraBombs = Math.floor(bombsNeeded / 5);
-        const totalBombs = bombsNeeded + extraBombs;
-
-        // Collect bombs from silos whose trajectory to the target is NOT blocked
-        // by enemy SAMs other than the covering SAMs we're trying to overwhelm.
-        const unblockedBombs = [];
-        for (let i = 0; i < launchSequence.length; i++) {
-          if (!launchSequence[i].interceptable) {
-            unblockedBombs.push({
-              index: i,
-              flightTicks: launchSequence[i].flightTicks,
-            });
-          }
-        }
-
-        if (unblockedBombs.length < totalBombs) {
-          failedTarget ??= { targetTile, coveringSamIds, totalBombs };
-          needsMoreSilos = true;
-          continue;
-        }
-
-        // Sort unblocked bombs by flight time to find a sliding window
-        // of maxTotalArrivalSpread that captures the most bombs.
-        const sortedByFlight = [...unblockedBombs].sort(
-          (a, b) => a.flightTicks - b.flightTicks,
-        );
-
-        let bestWindowStart = 0;
-        let bestWindowCount = 0;
-        for (let start = 0; start < sortedByFlight.length; start++) {
-          let end = start;
-          while (
-            end < sortedByFlight.length &&
-            sortedByFlight[end].flightTicks -
-              sortedByFlight[start].flightTicks <=
-              maxTotalArrivalSpread
-          ) {
-            end++;
-          }
-          if (end - start > bestWindowCount) {
-            bestWindowCount = end - start;
-            bestWindowStart = start;
-          }
-        }
-
-        if (bestWindowCount < totalBombs) {
-          failedTarget ??= { targetTile, coveringSamIds, totalBombs };
-          needsMoreSilos = true;
-          continue;
-        }
-
-        // From the window, pick totalBombs with the lowest launch-sequence
-        // indices to minimise how many bombs we need to fire (minimise gold cost).
-        const windowBombs = sortedByFlight.slice(
-          bestWindowStart,
-          bestWindowStart + bestWindowCount,
-        );
-        const windowByIndex = [...windowBombs].sort((a, b) => a.index - b.index);
-        const selected = windowByIndex.slice(0, totalBombs);
-        const selectedSet = new Set(selected.map((b) => b.index));
-        const lastSelectedIndex = selected[selected.length - 1].index;
-        const bombsToFire = lastSelectedIndex + 1;
-
-        // Compute per-bomb waitTicks so all selected bombs arrive in the window.
-        // Target: spread arrivals evenly, anchored at the earliest flight time
-        // in the selected set.
-        // DIVERGENCE G1: waitTicks is computed faithfully here for parity, but the
-        // client build menu cannot stagger launches — sendNuke ignores it.
-        const selectedFlightMin = Math.min(
-          ...selected.map((b) => b.flightTicks),
-        );
-        const staggerInterval = Math.max(
-          1,
-          Math.floor(maxTotalArrivalSpread / totalBombs),
-        );
-        let selectedIdx = 0;
-        const waitTicksPerBomb = [];
-        for (let i = 0; i < bombsToFire; i++) {
-          if (selectedSet.has(i)) {
-            const targetArrival =
-              selectedFlightMin + selectedIdx * staggerInterval;
-            waitTicksPerBomb.push(
-              Math.max(0, targetArrival - launchSequence[i].flightTicks),
-            );
-            selectedIdx++;
-          } else {
-            // Wasted bomb (interceptable or out-of-window) — launch immediately
-            waitTicksPerBomb.push(0);
-          }
-        }
-
-        // Check gold for all fired bombs (including wasted ones)
-        const totalCost = atomCost * BigInt(bombsToFire);
-        if (this.player.gold() < totalCost) {
           continue;
         }
 
@@ -1431,12 +1512,12 @@
         // fired with no stagger (sendNuke ignores waitTicks). For a multi-bomb
         // salvo we call sendNuke once per bomb (each consumes a silo slot; the
         // engine validates).
-        for (let i = 0; i < bombsToFire; i++) {
+        for (let i = 0; i < plan.bombsToFire; i++) {
           await this.sendNuke(
             targetTile,
             UNIT.AtomBomb,
             nukeTarget,
-            waitTicksPerBomb[i],
+            plan.waitTicksPerBomb[i],
           );
         }
         return;

@@ -78,6 +78,12 @@
     // the attack has already landed. defensePosts builds them whenever we share a land
     // border with a hostile player, and sizes the count from our estimated gold/min.
     defensePosts: true,
+    // DIVERGENCE (opt-in, NOT in src): aim nukes at the densest cluster we can
+    // actually land on, saturating its SAM cover instead of avoiding it.
+    nukeDensityFirst: true,
+    // DIVERGENCE (opt-in, NOT in src): raise the troop reserve as more distinct
+    // enemies border us.
+    reserveByNeighbors: true,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -215,6 +221,11 @@
   // to match the bot's attackRate. Build runs ~3× per combat cycle (economy
   // keeps growing between the slower, defensive attack decisions).
   const MAX_DEFENSE_RESERVE = 0.8; // never hold back more than this for defense
+  // DIVERGENCE (reserveByNeighbors): each hostile player touching our border past the
+  // first raises the troop reserve by this much, capped below MAX_DEFENSE_RESERVE so
+  // a fully-surrounded nation still has troops to attack with.
+  const RESERVE_PER_EXTRA_NEIGHBOR = 0.07;
+  const RESERVE_NEIGHBOR_CAP = 0.65;
   // Min fraction of ACTUAL troops to commit when grabbing SAFE empty land (no
   // bordering enemies). The maxTroops-based reserve has a ~100k floor while we
   // start with ~25k troops, so it would send only ~18% of our army — far slower
@@ -329,6 +340,8 @@
       "samCrack",
       "samDefense",
       "defensePosts",
+      "nukeDensityFirst",
+      "reserveByNeighbors",
       "smartSpawn",
       "minimized",
       "hidden",

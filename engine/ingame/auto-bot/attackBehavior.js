@@ -1158,7 +1158,70 @@
       } catch (_e) {
         /* default to src reserveRatio */
       }
-      return r;
+      // DIVERGENCE (reserveByNeighbors): src picks one reserveRatio per game and never
+      // revisits it, so a nation boxed in by four enemies commits exactly as much of
+      // its army as one with a single quiet neighbour. Scale the floor with the number
+      // of distinct hostile players actually touching our border.
+      try {
+        if (state.settings.reserveByNeighbors) {
+          const enemies = this.hostileNeighborCount();
+          if (enemies > 1) {
+            r = Math.max(
+              r,
+              Math.min(
+                RESERVE_NEIGHBOR_CAP,
+                r + (enemies - 1) * RESERVE_PER_EXTRA_NEIGHBOR,
+              ),
+            );
+          }
+        }
+      } catch (_e) {
+        /* keep r as-is */
+      }
+      return Math.min(r, MAX_DEFENSE_RESERVE);
+    }
+
+    /**
+     * DIVERGENCE (reserveByNeighbors): count DISTINCT hostile players whose land
+     * touches ours. Memoised per game tick — the border walk is O(border) and
+     * effectiveReserveRatio() is consulted several times per decision cycle.
+     * Resolves hostiles from players() up front rather than per-tile, because
+     * playerBySmallID is not guaranteed to exist on every build.
+     */
+    hostileNeighborCount() {
+      let tick = -1;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return 0;
+      }
+      if (this._hostileNbTick === tick) return this._hostileNbCount;
+      let count = 0;
+      try {
+        const hostile = new Set();
+        for (const other of this.game.players()) {
+          if (!other.isPlayer() || !other.isAlive()) continue;
+          if (other.smallID() === this.player.smallID()) continue;
+          if (this.player.isFriendly(other)) continue;
+          hostile.add(other.smallID());
+        }
+        if (hostile.size > 0) {
+          const touching = new Set();
+          for (const borderTile of this.player.borderTiles()) {
+            for (const neighbor of this.game.neighbors(borderTile)) {
+              if (!this.game.hasOwner(neighbor) || !this.game.isLand(neighbor)) continue;
+              const sid = this.game.ownerID(neighbor);
+              if (hostile.has(sid)) touching.add(sid);
+            }
+          }
+          count = touching.size;
+        }
+      } catch (_e) {
+        count = 0;
+      }
+      this._hostileNbTick = tick;
+      this._hostileNbCount = count;
+      return count;
     }
 
     // hasTriggerRatioTroops — AiAttackBehavior (private).

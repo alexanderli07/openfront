@@ -396,6 +396,15 @@
               <div class="ab-cfg-sw ${state.settings.defensePosts ? "on" : ""}" data-cfg="defensePosts"></div>
             </div>
 
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}">${tr("Nuke densest target")}</span>
+              <div class="ab-cfg-sw ${state.settings.nukeDensityFirst ? "on" : ""}" data-cfg="nukeDensityFirst"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" title="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}">${tr("Reserve vs neighbours")}</span>
+              <div class="ab-cfg-sw ${state.settings.reserveByNeighbors ? "on" : ""}" data-cfg="reserveByNeighbors"></div>
+            </div>
+
             <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
