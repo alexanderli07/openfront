@@ -599,10 +599,16 @@
 
     addEmbargo(other, _temporary) {
       const ctors = discoverCtors(getEventBus());
-      if (ctors.embargo) emitIntent(ctors.embargo, other.__src ?? other, "start");
+      if (!ctors.embargo) return;
+      emitIntent(ctors.embargo, other.__src ?? other, "start");
+      // DIVERGENCE: src logs nothing here, so the single most economically damaging
+      // thing the bot can do to itself was invisible in the action log.
+      setLastAction(tr("🚫 Embargo {name}", { name: safeName(other) }), "diplo");
     }
     stopEmbargo(other) {
       const ctors = discoverCtors(getEventBus());
-      if (ctors.embargo) emitIntent(ctors.embargo, other.__src ?? other, "stop");
+      if (!ctors.embargo) return;
+      emitIntent(ctors.embargo, other.__src ?? other, "stop");
+      setLastAction(tr("✅ Trade resumed {name}", { name: safeName(other) }), "diplo");
     }
   }

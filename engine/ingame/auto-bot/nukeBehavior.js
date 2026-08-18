@@ -547,8 +547,13 @@
             UNIT.AtomBomb,
             nukeTarget,
             salvoPlan.waitTicksPerBomb[i],
+            true,
           );
         }
+        setLastAction(
+          tr("☢️ Salvo ×{n} → dense target", { n: salvoPlan.bombsToFire }),
+          "nuke",
+        );
         return;
       }
 
@@ -1199,7 +1204,10 @@
     // are fired with no stagger. The salvo SIZE / target / silo-pick order is still
     // faithful; only the arrival spread is lost. We keep the `waitTicks` parameter
     // for signature parity but never act on it.
-    async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0) {
+    // DIVERGENCE: quiet suppresses only the per-bomb log line. A saturation salvo calls
+    // sendNuke up to a dozen times, which flooded the 200-entry log with identical
+    // entries; the salvo logs one summary line instead. Stats still count every bomb.
+    async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false) {
       const tick = this.game.ticks();
 
       // Affordability + actuation via the buildables probe + build menu. Probe the
@@ -1250,7 +1258,7 @@
 
       // LOGGING (light) — on a nuke fire.
       state.stats.nukes++;
-      setLastAction(tr("☢️ Launch") + " " + nukeType, "nuke");
+      if (!quiet) setLastAction(tr("☢️ Launch") + " " + nukeType, "nuke");
 
       this.emojiBehavior.maybeSendEmoji(targetPlayer, EMOJI_NUKE);
     }
@@ -1518,8 +1526,13 @@
             UNIT.AtomBomb,
             nukeTarget,
             plan.waitTicksPerBomb[i],
+            true,
           );
         }
+        setLastAction(
+          tr("☢️ Salvo ×{n} → SAM break", { n: plan.bombsToFire }),
+          "nuke",
+        );
         return;
       }
 

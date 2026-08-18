@@ -1878,7 +1878,12 @@
       const targetId = target.isPlayer() ? target.id() : null;
       if (ctors.attack && emitIntent(ctors.attack, targetId, troops)) {
         state.stats.attacks++;
-        setLastAction(tr("⚔️ Attack"), "combat");
+        // DIVERGENCE (counterAttackFirst): distinguish a reserve-ignoring counter-attack
+        // from a normal one, otherwise there is no way to see the behaviour fire.
+        setLastAction(
+          retaliating ? tr("⚔️🛡️ Counter-attack") : tr("⚔️ Attack"),
+          "combat",
+        );
       }
       return true;
     }
