@@ -114,14 +114,14 @@ async function minifyLayer(code) {
 }
 
 function metadataHeader(version) {
-  const repo = "https://github.com/nguyenvancaokyfpt/openfront-helper-userscript";
+  const repo = "https://github.com/alexanderli07/openfront";
   const raw = `https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js`;
   return `// ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
 // @version      ${version}
 // @description  Auto-join lobbies + in-game helper overlays and a private-lobby auto-bot for OpenFront.io. Standalone userscript build with a multi-language UI.
-// @author       nguyenvancaokyfpt (https://github.com/nguyenvancaokyfpt)
+// @author       TheFaix (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
 // @homepageURL  ${repo}
 // @supportURL   ${repo}/issues

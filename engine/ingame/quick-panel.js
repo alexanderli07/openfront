@@ -825,10 +825,8 @@
 
     (document.body || document.documentElement).appendChild(panel);
 
-    if (typeof makeGoldStatPanelDraggable === "function") {
-      makeGoldStatPanelDraggable(panel, hdr, QUICK_PANEL_POS_KEY);
-      applyStoredGoldStatPanelPosition(panel, QUICK_PANEL_POS_KEY);
-    }
+    _qpMakeDraggable(panel, hdr);
+    _qpApplyStoredPos(panel);
 
     _renderActiveTab();
     _themeFromSettings();
@@ -1177,7 +1175,7 @@
 
     h.push('<div class="ohqp-divider"></div>');
     h.push('<div style="text-align:center;padding:4px 0;">');
-    h.push('<a href="https://github.com/nguyenvancaokyfpt/openfront-helper-userscript" target="_blank" rel="noopener" style="color:var(--oh-accent);font-size:9px;text-decoration:none;opacity:0.7;">⭐ GitHub — OpenFront Helper</a>');
+    h.push('<a href="https://github.com/alexanderli07/openfront" target="_blank" rel="noopener" style="color:var(--oh-accent);font-size:9px;text-decoration:none;opacity:0.7;">⭐ GitHub — OpenFront Helper</a>');
     h.push('</div>');
 
     el.innerHTML = h.join("");
@@ -1494,6 +1492,89 @@
     } catch (e) {}
   }
 
+  // ---- Dragging (self-contained) ----
+  // The shared makeGoldStatPanelDraggable() lived in gold-per-minute.js, which the
+  // minimal build removes. Both call sites were typeof-guarded, so rather than
+  // erroring the panel silently became UNDRAGGABLE and stayed welded to the
+  // launcher. This is a local replacement with no external dependency.
+  function _qpReadStoredPos() {
+    try {
+      var raw = localStorage.getItem(QUICK_PANEL_POS_KEY);
+      if (!raw) return null;
+      var p = JSON.parse(raw);
+      if (p && isFinite(p.left) && isFinite(p.top)) return { left: +p.left, top: +p.top };
+    } catch (e) {}
+    return null;
+  }
+  function _qpSavePos(panel) {
+    try {
+      var r = panel.getBoundingClientRect();
+      localStorage.setItem(
+        QUICK_PANEL_POS_KEY,
+        JSON.stringify({ left: Math.round(r.left), top: Math.round(r.top) }),
+      );
+    } catch (e) {}
+  }
+  function _qpClamp(panel, left, top) {
+    // Keep at least the header reachable if the window shrinks.
+    var w = panel.offsetWidth || 270;
+    var maxL = Math.max(0, window.innerWidth - w - 4);
+    var maxT = Math.max(0, window.innerHeight - 44);
+    return {
+      left: Math.min(Math.max(0, left), maxL),
+      top: Math.min(Math.max(0, top), maxT),
+    };
+  }
+  function _qpApplyStoredPos(panel) {
+    var p = _qpReadStoredPos();
+    if (!p) return false;
+    var c = _qpClamp(panel, p.left, p.top);
+    panel.style.left = c.left + "px";
+    panel.style.top = c.top + "px";
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    return true;
+  }
+  function _qpMakeDraggable(panel, handle) {
+    var startX = 0, startY = 0, originLeft = 0, originTop = 0, dragging = false;
+    handle.addEventListener("pointerdown", function(e) {
+      // Never start a drag from the header's own controls (minimise / close).
+      if (e.target && e.target.closest && e.target.closest("button")) return;
+      var r = panel.getBoundingClientRect();
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      originLeft = r.left;
+      originTop = r.top;
+      panel.style.left = originLeft + "px";
+      panel.style.top = originTop + "px";
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+      handle.style.cursor = "grabbing";
+      try { handle.setPointerCapture(e.pointerId); } catch (_e) {}
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", function(e) {
+      if (!dragging) return;
+      var c = _qpClamp(
+        panel,
+        originLeft + (e.clientX - startX),
+        originTop + (e.clientY - startY),
+      );
+      panel.style.left = c.left + "px";
+      panel.style.top = c.top + "px";
+    });
+    function _end(e) {
+      if (!dragging) return;
+      dragging = false;
+      handle.style.cursor = "grab";
+      try { handle.releasePointerCapture(e.pointerId); } catch (_e) {}
+      _qpSavePos(panel);
+    }
+    handle.addEventListener("pointerup", _end);
+    handle.addEventListener("pointercancel", _end);
+  }
+
   // ---- Lifecycle ----
 
   // Toggle with animation (inspired by CourseraHelperEx)
@@ -1506,6 +1587,12 @@
   }
 
   function _setOriginToLauncher(panel) {
+    // Detached from the launcher → grow from the panel's own top edge instead, or the
+    // open/close animation flies in from wherever the crosshair happens to be.
+    if (_qpReadStoredPos()) {
+      panel.style.transformOrigin = "50% 0%";
+      return;
+    }
     var lr = _getLauncherRect();
     if (!lr) return;
     var pr = panel.getBoundingClientRect();
@@ -1518,6 +1605,9 @@
   // Positions panel next to launcher icon, choosing the side with most space.
   // NEVER covers the icon.
   function _placePanel(panel) {
+    // Once the user has dragged the panel it OWNS its position — never yank it back
+    // beside the launcher. Auto-placement now only applies to the very first open.
+    if (_qpApplyStoredPos(panel)) return;
     var lr = _getLauncherRect();
     if (!lr) return;
     var vw = window.innerWidth;

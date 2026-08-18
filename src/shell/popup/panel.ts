@@ -126,7 +126,7 @@ function atomGapMs(batchSize: number, delayMs: number): number {
   return Math.max(ATOM_SAFE_GAP_MS, Math.floor(perShot) || 0);
 }
 
-const REPO_URL = "https://github.com/nguyenvancaokyfpt/openfront-helper-userscript";
+const REPO_URL = "https://github.com/alexanderli07/openfront";
 
 const FEATURE_LABELS: Record<string, [string, string]> = {
   spawn: ["Auto-spawn", "Automatically pick a spawn tile."],
@@ -1338,7 +1338,7 @@ function renderSettings(body: HTMLElement): void {
       el(
         "div",
         { class: "ofh-link-body" },
-        el("div", { class: "ofh-link-title" }, "GitHub — openfront-helper-userscript"),
+        el("div", { class: "ofh-link-title" }, "GitHub — alexanderli07/openfront"),
         el("div", { class: "ofh-link-sub" }, t("Source, issues & updates")),
       ),
       el("span", { class: "ofh-link-arrow" }, "↗"),
