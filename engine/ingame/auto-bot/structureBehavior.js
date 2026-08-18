@@ -78,11 +78,21 @@
    * Cities are always prioritized and built first.
    */
   function getStructureRatios(difficulty) {
+    // DIVERGENCE (economyFirst): src caps income structures at 0.75/city and taxes each
+    // additional one by +100% perceived cost, which throttles compounding hard. Raise the
+    // target and nearly remove the tax so ports/factories snowball. Defensive SAM and
+    // silo ratios are left at src values — we still need air defence and a silo battery.
+    const eco = Boolean(state.settings.economyFirst);
+    const incomeRatio = eco ? 2.0 : 0.75;
+    const incomeTax = eco ? 0.05 : 1;
     return {
-      [UNIT.Port]: { ratioPerCity: 0.75, perceivedCostIncreasePerOwned: 1 },
+      [UNIT.Port]: {
+        ratioPerCity: incomeRatio,
+        perceivedCostIncreasePerOwned: incomeTax,
+      },
       [UNIT.Factory]: {
-        ratioPerCity: 0.75,
-        perceivedCostIncreasePerOwned: 1,
+        ratioPerCity: incomeRatio,
+        perceivedCostIncreasePerOwned: incomeTax,
       },
       [UNIT.SAMLauncher]: {
         ratioPerCity: SAM_RATIO_BY_DIFFICULTY[difficulty],
@@ -587,6 +597,13 @@
 
     // isInPostSaveUpBlockedPhase — NationStructureBehavior.ts:398.
     isInPostSaveUpBlockedPhase() {
+      // DIVERGENCE (economyFirst): this throttle pauses ALL structure building for 150 of
+      // every 300 ticks once gold >= getSaveUpTarget(). src's target is ~30M so it rarely
+      // trips; economyFirst's target is ~4.5M, so the bot would sit in a permanent 50%
+      // duty cycle and halve its own build rate — exactly backwards. Never block.
+      if (state.settings.economyFirst) {
+        return false;
+      }
       if (this.game.config().isUnitDisabled(UNIT.MissileSilo)) {
         return false;
       }
@@ -921,7 +938,12 @@
       // reserve (state.nukeReserveGold ≥ 15M), the economy yields so the bot
       // accumulates the war chest instead of over-building — this is what funds
       // the leader/pre-empt MIRV that closes out a winning game.
-      if (state.settings.winFixes && state.nukeReserveGold) {
+      if (
+        state.settings.winFixes &&
+        state.nukeReserveGold &&
+        // DIVERGENCE (economyFirst): don't let the MIRV war chest freeze the economy.
+        !state.settings.economyFirst
+      ) {
         let reserve = 0n;
         try {
           reserve = BigInt(state.nukeReserveGold || 0);
@@ -986,7 +1008,10 @@
 
       let increasePerOwned;
       if (type === UNIT.City) {
-        increasePerOwned = CITY_PERCEIVED_COST_INCREASE_PER_OWNED;
+        // DIVERGENCE (economyFirst): cities are the income base; don't tax them.
+        increasePerOwned = state.settings.economyFirst
+          ? 0.05
+          : CITY_PERCEIVED_COST_INCREASE_PER_OWNED;
       } else {
         const difficulty = currentDifficulty();
         const ratios = getStructureRatios(difficulty);
@@ -1005,6 +1030,16 @@
     // getSaveUpTarget — NationStructureBehavior.ts:657.
     getSaveUpTarget() {
       const config = this.game.config();
+
+      // DIVERGENCE (economyFirst): src hoards MIRV+Hydrogen (~30M) and starves the
+      // economy to do it. Reserve only enough for one SAM-cracking salvo instead, so
+      // surplus gold keeps compounding. NOTE the checks below read the LOBBY's
+      // disabled-unit list, not the bot's own feature flags — so with features.nuke
+      // OFF stock src still hoards for a MIRV it will never build. Fixed here too.
+      if (state.settings.economyFirst) {
+        if (!state.settings.features.nuke) return 0n;
+        return this.cost(UNIT.AtomBomb) * 6n;
+      }
 
       // Just save up for SAMs if missile silos are disabled
       if (config.isUnitDisabled(UNIT.MissileSilo)) {

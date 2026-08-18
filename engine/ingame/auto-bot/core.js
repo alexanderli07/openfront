@@ -63,6 +63,14 @@
     //    faithful Nation, which is conservative/turtle by design). Toggle winFixes
     //    OFF to restore the exact 1:1 src port. ──
     winFixes: true,
+    // DIVERGENCE (opt-in, NOT in src): economy-first play. Raises the income-structure
+    // targets, removes src's per-owned perceived-cost tax, and replaces the ~30M
+    // MIRV+Hydrogen war chest with a small SAM-cracking reserve so gold compounds.
+    economyFirst: true,
+    // DIVERGENCE (opt-in, NOT in src): allow SAM-battery cracking at ANY difficulty
+    // (src restricts it to Impossible) and prefer it over spending a warhead on a
+    // zero-value target. Sizing/pacing is unchanged — see maybeDestroyEnemySam.
+    samCrack: true,
     // DIVERGENCE: smart spawn scoring — scores candidate tiles by land density,
     // plains ratio, distance from enemies, and edge avoidance, then picks the
     // best instead of the first valid random tile. Toggle OFF to restore the
@@ -308,6 +316,8 @@
       "enabled",
       "difficulty",
       "winFixes",
+      "economyFirst",
+      "samCrack",
       "smartSpawn",
       "minimized",
       "hidden",

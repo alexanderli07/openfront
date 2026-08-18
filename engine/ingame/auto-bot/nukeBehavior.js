@@ -512,12 +512,19 @@
         break;
       }
 
+      // DIVERGENCE (samCrack): src only cracks SAM batteries on Impossible, and only as
+      // a last resort. With samCrack on, prefer breaking the SAM wall over spending a
+      // warhead on a zero-value target, at any difficulty. Salvo sizing/pacing is
+      // untouched — maybeDestroyEnemySam already fires totalInterceptions + 1 (+ margin)
+      // inside SAMCooldown()/2 and bails on insufficient gold or silo slots, so this
+      // stays gradual: it simply does nothing until the economy can fund a full salvo.
+      const samCrack = Boolean(state.settings.samCrack);
       if (
         bestTile !== null &&
-        (bestValue > 0 || difficulty !== Difficulty.Impossible)
+        (bestValue > 0 || (difficulty !== Difficulty.Impossible && !samCrack))
       ) {
         await this.sendNuke(bestTile, nukeType, nukeTarget);
-      } else if (difficulty === Difficulty.Impossible) {
+      } else if (difficulty === Difficulty.Impossible || samCrack) {
         await this.maybeDestroyEnemySam(nukeTarget);
       }
     }

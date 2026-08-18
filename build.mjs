@@ -144,7 +144,7 @@ async function minifyLayer(code) {
 
 function metadataHeader(version) {
   const repo = "https://github.com/nguyenvancaokyfpt/openfront-helper-userscript";
-  const raw = `https://raw.githubusercontent.com/nguyenvancaokyfpt/openfront-helper-userscript/main/openfront-helper.user.js`;
+  const raw = `https://raw.githubusercontent.com/alexanderli07/openfront/main/openfront-helper.user.js`;
   return `// ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
