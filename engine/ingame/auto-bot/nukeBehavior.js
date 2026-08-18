@@ -234,6 +234,10 @@
   // .Parabola(game, opts) factory below (mirroring src's UniversalPathFinding).
   // ===========================================================================
   const PARABOLA_MIN_HEIGHT = 50;
+  /** economyFirst: hard ceiling on the perceived-cost ratchet, as a multiple of the
+   *  real unit cost. 3n keeps a meaningful throttle (the 3rd+ warhead still "costs"
+   *  3x) while staying inside a 4.5M war chest for atoms. */
+  const PERCEIVED_NUKE_MAX_MULTIPLE = 3n;
 
   class NukeParabolaUniversalPathFinder {
     constructor(gameMap, options) {
@@ -1207,6 +1211,32 @@
     // DIVERGENCE: quiet suppresses only the per-bomb log line. A saturation salvo calls
     // sendNuke up to a dozen times, which flooded the 200-entry log with identical
     // entries; the salvo logs one summary line instead. Stats still count every bomb.
+    /**
+     * DIVERGENCE (economyFirst): release valve for the perceived-cost ratchet.
+     *
+     * The x1.5-per-atom / x1.25-per-hydrogen inflation exists ONLY to simulate saving
+     * up for a MIRV, and src's escape from it is getPerceivedNukeCost's
+     * `gold > cost(MIRV) + cost(HydrogenBomb)` branch — i.e. holding 30M, at which
+     * point the true cost is used again. economyFirst deliberately caps the war chest
+     * at cost(AtomBomb) * 6n = 4.5M, so that 30M is never reached and the ratchet NEVER
+     * releases: the bot needs 5.7M on hand for its 6th atom while only ever hoarding
+     * 4.5M, and every launch makes it worse. It prices itself out of atom bombs for the
+     * rest of the game. Stock behaviour does not have this problem.
+     *
+     * So under economyFirst the ratchet is capped at a small multiple of the real cost:
+     * it still throttles repeated nuking (the point of the mechanism) but can no longer
+     * lock out permanently (an artefact of removing the MIRV hoard it was pacing).
+     */
+    async clampPerceivedNukeCost(perceived, type) {
+      if (!state.settings.economyFirst) return perceived;
+      try {
+        const ceiling = (await this.cost(type)) * PERCEIVED_NUKE_MAX_MULTIPLE;
+        return perceived > ceiling ? ceiling : perceived;
+      } catch (_e) {
+        return perceived;
+      }
+    }
+
     async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false) {
       const tick = this.game.ticks();
 
@@ -1246,6 +1276,10 @@
         }
         this.atomBombPerceivedCost =
           (this.atomBombPerceivedCost * 150n) / 100n;
+        this.atomBombPerceivedCost = await this.clampPerceivedNukeCost(
+          this.atomBombPerceivedCost,
+          UNIT.AtomBomb,
+        );
       } else if (nukeType === UNIT.HydrogenBomb) {
         this.hydrogenBombsLaunched++;
         // Increase perceived cost by 25% each time to simulate saving up for a MIRV
@@ -1254,6 +1288,10 @@
         }
         this.hydrogenBombPerceivedCost =
           (this.hydrogenBombPerceivedCost * 125n) / 100n;
+        this.hydrogenBombPerceivedCost = await this.clampPerceivedNukeCost(
+          this.hydrogenBombPerceivedCost,
+          UNIT.HydrogenBomb,
+        );
       }
 
       // LOGGING (light) — on a nuke fire.
