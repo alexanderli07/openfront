@@ -1172,15 +1172,6 @@
     var sections = [
       {
         key: "panels", title: _tr("Panels"), toggles: [
-          ["showTopGoldPerMinute", _tr("Player stats panel")],
-          ["showGoldPerMinute", _tr("Highlight hovered player")],
-          ["showTeamBuildStats", _tr("Team build stats")],
-          ["showTradeBalances", _tr("Trade balances")],
-          ["showAdvisorPanel", _tr("Advisor panel")],
-          ["showBoatPanel", _tr("Boat panel")],
-          ["showEstatePanel", _tr("Estates panel")],
-          ["showAllianceRequestsPanel", _tr("Alliance requests")],
-          ["showHelperUsers", _tr("Script users")],
           ["showAutoBotPanel", _tr("Auto-Bot panel")],
           ["showFloatingAutoJoinPanel", _tr("Auto-Join panel")],
         ]
@@ -1191,7 +1182,6 @@
           ["showMapTroopCounts", _tr("Troop bar"), "showPlayerMapOverlays"],
           ["showMapMoney", _tr("Money"), "showPlayerMapOverlays"],
           ["showThreatIndicators", _tr("Threat indicators"), "showPlayerMapOverlays"],
-          ["markHoveredAlliesGreen", _tr("Ally markers on hover")],
           ["showAttackHighlight", _tr("Attack highlight")],
           ["showNukePrediction", _tr("Nuke prediction")],
           ["showNukeTrajectory", _tr("Trajectory line"), "showNukePrediction"],
@@ -1205,8 +1195,6 @@
           ["showWarshipRoutesTeam", _tr("Team warships"), "showWarshipRoutes"],
           ["showWarshipRoutesAlly", _tr("Ally warships"), "showWarshipRoutes"],
           ["showWarshipRoutesEnemy", _tr("Enemy warships"), "showWarshipRoutes"],
-          ["showEconomyHeatmap", _tr("Economy heatmap")],
-          ["showExportPartnerHeatmap", _tr("Export partner heatmap")],
           ["showSpawnHeatmap", _tr("Spawn heatmap")],
           ["showSpawnMarkers", _tr("Spawn markers")],
           ["showBuildTimers", _tr("Build timers")],
@@ -1215,34 +1203,16 @@
       {
         key: "combat", title: _tr("Combat & Automation"), toggles: [
           ["showRetaliationHud", _tr("Retaliation HUD")],
-          ["autoNuke", _tr("Auto nuke")],
-          ["autoNukeIncludeAllies", _tr("Include allies"), "autoNuke"],
-          ["showNukeSuggestions", _tr("Nuke suggestions")],
-          ["sosDefense", _tr("SOS defense")],
-          ["attackRatioHotkey", _tr("Attack ratio hotkey")],
-          ["rightClickConquest", _tr("Right-click conquest")],
-          ["showEnemyIntent", _tr("Enemy intent warning")],
         ]
       },
       {
         key: "alerts", title: _tr("Alerts"), toggles: [
-          ["showGameTimeAlert", _tr("Game-time alert")],
           ["warnIncomingBoats", _tr("Incoming boat warning")],
         ]
       },
       {
         key: "tools", title: _tr("Tools"), toggles: [
-          ["hideAds", _tr("Hide ads")],
           ["antiAfk", _tr("Anti-AFK")],
-          ["roundLogger", _tr("Round logger")],
-          ["networkLogger", _tr("Network logger")],
-          ["markBotNationsRed", _tr("Mark bot nations red")],
-        ]
-      },
-      {
-        key: "companion", title: _tr("Companion"), toggles: [
-          ["showCompanionPanel", _tr("Companion bot panel")],
-          ["companionEnabled", _tr("Companion mode")],
         ]
       },
     ];

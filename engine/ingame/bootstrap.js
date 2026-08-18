@@ -24,46 +24,6 @@
       );
     }
 
-    if (data.type === "MARK_BOT_NATIONS_RED") {
-      setBotMarkersEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_GOLD_PER_MINUTE") {
-      setGoldPerMinuteEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_TOP_GOLD_PER_MINUTE") {
-      setTopGoldPerMinuteEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_TEAM_BUILD_STATS") {
-      setTeamBuildStatsEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "MARK_HOVERED_ALLIES_GREEN") {
-      setAllyMarkersEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_ALLIANCE_REQUESTS_PANEL") {
-      setAllianceRequestsPanelEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_TRADE_BALANCES") {
-      setTradeBalancesEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_HELPER_USERS") {
-      setHelperUsersEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_SOS_DEFENSE") {
-      setSosDefenseEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_GAME_TIME_ALERT") {
-      setGameTimeAlertEnabled(data.payload?.enabled, data.payload?.thresholdSec);
-    }
-
     if (data.type === "SHOW_PLAYER_MAP_OVERLAYS") {
       setPlayerMapOverlaysEnabled(data.payload?.enabled);
     }
@@ -84,44 +44,16 @@
       setAttackHighlightEnabled(data.payload?.enabled);
     }
 
-    if (data.type === "SHOW_ADVISOR_PANEL") {
-      setAdvisorPanelEnabled(data.payload?.enabled);
-    }
-
     if (data.type === "SHOW_RETALIATION_HUD") {
       setRetaliationEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_HIDE_ADS") {
-      setHideAdsEnabled(data.payload?.enabled);
     }
 
     if (data.type === "SET_ANTI_AFK") {
       setAntiAfkEnabled(data.payload?.enabled);
     }
 
-    if (data.type === "SET_ATTACK_RATIO_HOTKEY") {
-      setAttackRatioHotkeyEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_RIGHT_CLICK_CONQUEST") {
-      setRightClickMenuEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_ROUND_LOGGER") {
-      setRoundLoggerEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_NETWORK_LOGGER") {
-      setNetworkLoggerEnabled(data.payload?.enabled);
-    }
-
     if (data.type === "SHOW_BUILD_TIMERS") {
       setBuildTimerEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_ENEMY_INTENT") {
-      setEnemyIntentEnabled(data.payload?.enabled);
     }
 
     if (data.type === "SHOW_SPAWN_HEATMAP") {
@@ -130,19 +62,6 @@
 
     if (data.type === "SHOW_SPAWN_MARKERS") {
       setSpawnMarkersEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_MY_GPM_HISTORY") {
-      if (typeof setSelfGpmHistoryPanelPosition === "function") {
-        setSelfGpmHistoryPanelPosition(data.payload?.panelPosition);
-      }
-      if (typeof setSelfGpmHistoryEnabled === "function") {
-        setSelfGpmHistoryEnabled(data.payload?.enabled);
-      } else {
-        console.error(
-          "OpenFront helper: self-gpm-history bridge not loaded (check manifest web_accessible_resources)",
-        );
-      }
     }
 
     if (data.type === "SHOW_NUKE_PREDICTION") {
@@ -178,33 +97,8 @@
       setBoatIncomingWarningEnabled(data.payload?.enabled);
     }
 
-    if (data.type === "SHOW_ESTATE_PANEL") {
-      setEstatePanelEnabled(data.payload?.enabled);
-    }
-
     if (data.type === "SET_AUTO_LEAVE_ON_TEAM_WIN") {
       setAutoLeaveOnTeamWinEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_NUKE_SUGGESTIONS") {
-      setNukeSuggestionsEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SET_AUTO_NUKE") {
-      setAutoNukeEnabled(data.payload?.enabled, data.payload?.includeAllies);
-    }
-
-    if (data.type === "SET_SEND_1_PERCENT_BOAT") {
-      setSend1PercentBoatEnabled(data.payload?.enabled, data.payload?.contextMenu !== false);
-    }
-
-    if (data.type === "SHOW_ECONOMY_HEATMAP") {
-      setEconomyHeatmapIntensity(data.payload?.intensity);
-      setEconomyHeatmapEnabled(data.payload?.enabled);
-    }
-
-    if (data.type === "SHOW_EXPORT_PARTNER_HEATMAP") {
-      setExportPartnerHeatmapEnabled(data.payload?.enabled);
     }
 
 
@@ -223,15 +117,6 @@
     if (data.type === "SET_AUTO_BOT_I18N") {
       if (typeof setAutoBotI18n === "function") {
         setAutoBotI18n(data.payload?.language, data.payload?.bundle);
-      }
-    }
-
-    if (data.type === "SET_COMPANION") {
-      if (typeof setCompanionPanelVisible === "function") {
-        setCompanionPanelVisible(Boolean(data.payload?.panel));
-      }
-      if (typeof setCompanionEnabled === "function") {
-        setCompanionEnabled(Boolean(data.payload?.enabled));
       }
     }
 
@@ -257,8 +142,6 @@
   window.setInterval(() => {
     refreshSelectiveTradePolicyAvailability();
     refreshCheatsAvailability();
-    try { if (typeof window.__OFH_updateSiloSamTracker === "function") window.__OFH_updateSiloSamTracker(); } catch (e) {}
-    try { if (typeof window.__OFH_tickAutoDonate === "function") window.__OFH_tickAutoDonate(); } catch (e) {}
   }, 1000);
   refreshSelectiveTradePolicyAvailability();
   refreshCheatsAvailability();

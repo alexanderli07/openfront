@@ -62,13 +62,23 @@
       const underConstruction = Boolean(unit.isUnderConstruction && unit.isUnderConstruction());
 
       if (underConstruction) {
-        // Track when we first saw this unit under construction.
-        if (!_buildTimerConstructionSeen.has(id)) {
-          _buildTimerConstructionSeen.set(id, ticks);
+        // MINIMAL BUILD: prefer the unit's REAL constructionStartTick — the accurate
+        // read that the removed silo-sam-tracker.js used. First-observed stamping
+        // restarts the countdown whenever you join, reconnect, or enable the overlay
+        // mid-build, which over-reports remaining time. Fall back only if absent.
+        let startTick = null;
+        try {
+          const st = unit.state && unit.state.constructionStartTick;
+          if (st != null && Number.isFinite(Number(st))) startTick = Number(st);
+        } catch (_error) { startTick = null; }
+        if (startTick === null) {
+          if (!_buildTimerConstructionSeen.has(id)) {
+            _buildTimerConstructionSeen.set(id, ticks);
+          }
+          startTick = _buildTimerConstructionSeen.get(id);
         }
-        const firstSeen = _buildTimerConstructionSeen.get(id);
         const duration = getConstructionDuration(game, type);
-        const remaining = Math.max(0, duration - (ticks - firstSeen));
+        const remaining = Math.max(0, duration - (ticks - startTick));
         const sec = Math.round(remaining / 10);
         const label = sec > 0 ? `🏗 ${sec}s` : tr("Building");
         out.push({ id, type, worldX, worldY, label, state: "building" });
@@ -88,7 +98,14 @@
 
         if (Array.isArray(queue) && queue.length >= level) {
           const lastFired = queue[0];
-          const remaining = BUILD_TIMER_COOLDOWN_TICKS - (ticks - lastFired);
+          // MINIMAL BUILD: read the real cooldown from game config rather than the
+          // hard-coded 90 ticks; fall back to the constant if unavailable.
+          let cooldown = BUILD_TIMER_COOLDOWN_TICKS;
+          try {
+            const cfg = Number(game.config().SAMCooldown());
+            if (Number.isFinite(cfg) && cfg > 0) cooldown = cfg;
+          } catch (_error) { /* keep the default */ }
+          const remaining = cooldown - (ticks - lastFired);
           if (remaining > 0) {
             const sec = Math.round(remaining / 10);
             out.push({ id, type, worldX, worldY, label: `⟳ ${sec}s`, state: "cooldown" });

@@ -282,7 +282,7 @@ function canStationTradeWith(player, otherPlayer) {
   if (getPlayerSmallId(player) === getPlayerSmallId(otherPlayer)) {
     return true;
   }
-  return canPlayersTrade(player, otherPlayer);
+  return typeof canPlayersTrade === "function" && canPlayersTrade(player, otherPlayer);
 }
 
 function getHeatmapTypePriority(type) {

@@ -187,8 +187,13 @@
     (document.body || document.documentElement).appendChild(panel);
     // Draggable by the header, with the position persisted to localStorage
     // (shared helper from gold-per-minute.js).
-    makeGoldStatPanelDraggable(panel, header, BOAT_PANEL_POS_KEY);
-    applyStoredGoldStatPanelPosition(panel, BOAT_PANEL_POS_KEY);
+    // MINIMAL BUILD: gold-per-minute.js (which declared these) is removed. Unguarded
+    // calls here would throw inside ensureBoatPanel() and leave boatPanelOpen stuck
+    // true, permanently killing the boat-route overlay with no self-heal.
+    if (typeof makeGoldStatPanelDraggable === "function") {
+      makeGoldStatPanelDraggable(panel, header, BOAT_PANEL_POS_KEY);
+      applyStoredGoldStatPanelPosition(panel, BOAT_PANEL_POS_KEY);
+    }
 
     setBoatPanelActiveTab(boatPanelActiveTab);
     return panel;
