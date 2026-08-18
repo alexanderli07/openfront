@@ -123,6 +123,11 @@
 
   /** defensePosts: rolling window for the income estimate. 600 ticks = 60s. */
   const INCOME_WINDOW_TICKS = 600;
+  /** Minimum span before the income estimate is trusted at all. Without this, two
+   *  samples 10 ticks apart around a single trade payout extrapolate 60x — one 50k
+   *  lump reads as 3M/min and instantly asks for the maximum number of defence
+   *  posts. Below this span the estimate is 0, i.e. "no data", not "no income". */
+  const INCOME_MIN_SPAN_TICKS = 300;
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
   const DEFENSE_POST_INCOME_MINUTES = 1;
   /** defensePosts: absolute ceiling regardless of income. */
@@ -354,7 +359,7 @@
       const first = inc.samples[0];
       const last = inc.samples[inc.samples.length - 1];
       const dt = last.tick - first.tick;
-      if (dt <= 0) return 0;
+      if (dt < INCOME_MIN_SPAN_TICKS) return 0;
       return ((last.earned - first.earned) / dt) * 600;
     }
 
@@ -416,18 +421,22 @@
       // Defense posts are handled outside the normal pacing/counter system:
       // they don't increment placementsCount or lastStructureTick, and they are
       // never built as the very first structure.
-      if (
+      // DIVERGENCE (defensePosts): src only ever reached tryBuildDefensePost while
+      // ACTUALLY under attack, so giving it first refusal was a rare interrupt. Making
+      // it proactive turned that into a permanent one: while we border anyone and can
+      // afford a post, this branch built one and returned, so no city/port/factory was
+      // ever considered on that pass. Reactive keeps first refusal (an attack is
+      // landing now); proactive is moved BELOW the economy and spends surplus only.
+      const postsAllowed =
         this.placementsCount > 0 &&
-        !this.game.config().isUnitDisabled(UNIT.DefensePost)
-      ) {
+        !this.game.config().isUnitDisabled(UNIT.DefensePost);
+      if (postsAllowed && this.defensePostNeeded()) {
         if (await this.tryBuildDefensePost()) {
           return true;
         }
-        // If the attack threshold is met, block other structures even when
-        // placement failed (no tile found / can't afford).
-        if (this.defensePostNeeded()) {
-          return false;
-        }
+        // Threshold met but placement failed (no tile / can't afford) — still block
+        // other structures, exactly as src does.
+        return false;
       }
 
       if (this.isOnStructureCooldown()) {
@@ -437,6 +446,13 @@
         return false;
       }
       const built = await this.doHandleStructures();
+      // Proactive defence posts run only when the economy pass declined to build —
+      // i.e. out of surplus, never instead of a city.
+      if (!built && postsAllowed && state.settings.defensePosts) {
+        if (await this.tryBuildDefensePost()) {
+          return true;
+        }
+      }
       if (built) {
         this.lastStructureTick = this.game.ticks();
         this.placementsCount++;
@@ -837,10 +853,13 @@
       // DIVERGENCE (samDefense): while our air defence is below the threat-scaled
       // target, build SAMs BEFORE economy. src always puts ports/factories first, so a
       // nation under nuclear threat keeps expanding while its cities stay uncovered.
+      // Only a REAL threat justifies jumping the economy queue. Comparing against the
+      // full target used to hoist SAMs whenever the flat cities x 0.30 baseline was
+      // unmet — which is true on turn one of a lobby where nobody owns a silo.
       if (
         state.settings.samDefense &&
         !config.isUnitDisabled(UNIT.SAMLauncher) &&
-        this.ownedLevels(UNIT.SAMLauncher) < this.samTargetLevels(cityCount)
+        this.ownedLevels(UNIT.SAMLauncher) < this.samThreatLevels(cityCount)
       ) {
         buildOrder.splice(buildOrder.indexOf(UNIT.SAMLauncher), 1);
         buildOrder.unshift(UNIT.SAMLauncher);
@@ -970,10 +989,47 @@
      *    - hostile Missile Silo levels  (who can nuke us, and how hard)
      *    - map-wide average SAM levels per player  (are we behind the field?)
      *  Never returns less than src's ratio target, so this only ever adds defence. */
+    /** DIVERGENCE (samDefense): the parts behind the SAM target, memoised per game
+     *  tick because both samTargetLevels() and the build-order hoist read them and the
+     *  loop walks every player's units.
+     *
+     *  Split deliberately: `stock` is src's flat cities x ratio baseline, which is
+     *  NON-ZERO even when nobody on the map owns a silo. Prioritising air defence
+     *  ahead of the economy to satisfy a baseline — with no nuclear threat in
+     *  existence — is exactly the "building shields for no reason" behaviour. Only
+     *  `threat` and `peerAvg` justify jumping the queue. */
+    samTargetParts(cityCount) {
+      let tick = -1;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        tick = -1;
+      }
+      if (this._samPartsTick === tick && this._samParts) return this._samParts;
+      const parts = this.computeSamTargetParts(cityCount);
+      this._samPartsTick = tick;
+      this._samParts = parts;
+      return parts;
+    }
+
+    /** Threat-driven SAM levels only — ignores the flat baseline. */
+    samThreatLevels(cityCount) {
+      const p = this.samTargetParts(cityCount);
+      return Math.max(0, Math.min(p.threat, p.protectables, SAM_MAX_LEVELS));
+    }
+
     samTargetLevels(cityCount) {
+      const p = this.samTargetParts(cityCount);
+      if (!state.settings.samDefense) return p.stock;
+      const wanted = Math.max(p.stock, p.threat, p.peerAvg);
+      return Math.max(p.stock, Math.min(wanted, p.protectables, SAM_MAX_LEVELS));
+    }
+
+    computeSamTargetParts(cityCount) {
       const stockRatio = getStructureRatios(currentDifficulty())[UNIT.SAMLauncher];
       const stock = Math.floor(cityCount * stockRatio.ratioPerCity);
-      if (!state.settings.samDefense) return stock;
+      const bail = { stock: stock, threat: 0, peerAvg: 0, protectables: stock };
+      if (!state.settings.samDefense) return bail;
 
       const game = this.game;
       const me = this.player;
@@ -989,7 +1045,7 @@
           if (p.smallID() === me.smallID() || me.isFriendly(p)) continue;
           for (const u of p.units(UNIT.MissileSilo)) hostileSiloLevels += u.level();
         }
-      } catch (_e) { return stock; }
+      } catch (_e) { return bail; }
 
       const threat = Math.ceil(hostileSiloLevels * SAM_PER_HOSTILE_SILO_LEVEL);
       const peerAvg = peers > 0 ? Math.ceil(allSamLevels / peers) : 0;
@@ -1001,8 +1057,7 @@
         }
       } catch (_e) { protectables = stock; }
 
-      const wanted = Math.max(stock, threat, peerAvg);
-      return Math.max(stock, Math.min(wanted, protectables, SAM_MAX_LEVELS));
+      return { stock: stock, threat: threat, peerAvg: peerAvg, protectables: protectables };
     }
 
     shouldBuildStructure(type, cityCount, hasCoastalTiles) {
