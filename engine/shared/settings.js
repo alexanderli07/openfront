@@ -76,7 +76,13 @@
     showBuildTimers: true,
     showEnemyIntent: true,
     showSpawnHeatmap: false,
-    showSpawnMarkers: false,
+    // The top-5 best-spawn markers. This was switched off when the minimal build was
+    // assembled, which made smart spawn invisible: the bot kept working via
+    // computeSpawnTopSpotsForBot (which runs with the overlay disabled), but nothing was
+    // drawn, so there was no way to see whether it had picked a good tile. Markers are
+    // cheap — the draw gate is `spawnHeatmapEnabled || spawnMarkersEnabled`, so this
+    // renders 5 circles without the heavy full-map heatmap.
+    showSpawnMarkers: true,
     sosDefense: true,
     selectiveTradePolicyEnabled: false,
     autoCancelDeniedTradesAvailable: true,
