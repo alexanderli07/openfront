@@ -18,12 +18,13 @@ var OFH_TIP_DELAY_MS = 800;
 //             before this constant existed — must not shrink)
 //   helper    39 head + 41 tabs + 362 Config content               = 442    (below this
 //             the Config tab gets a scrollbar — the binding constraint)
-// 446 sits 4px above the helper floor and 8.6px above the auto-bot's. Do not drop below
-// 444 without re-measuring the Config tab's real content height: 362 is an estimate from
-// a reproduction of the markup, not from the live panel, so the true margin here could be
-// a few px either way. An earlier value of 420 came from a probe that omitted .ab-body's
-// padding entirely, which is how the auto-bot ended up 17px shorter than it should be.
-var OFH_PANEL_HEIGHT_PX = 446;
+// 426 is set from what the panels actually look like on screen, which beats both floors
+// above — those were computed from a REPRODUCTION of the markup, and that estimate has
+// been wrong repeatedly (an earlier value of 420 came from a probe that omitted
+// .ab-body's padding, which is how the auto-bot once ended up 17px short). If the Config
+// tab starts scrolling or the Controls pane feels cramped, raise this; the two panels
+// move together either way.
+var OFH_PANEL_HEIGHT_PX = 426;
 
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
