@@ -596,13 +596,11 @@
       gateDot.addEventListener("mouseleave", _hidePopover);
     }
 
-    // Tab buttons — show popover on hover.
-    panel.querySelectorAll(".ab-tab").forEach(function(tab) {
-      tab.addEventListener("mouseenter", function() {
-        _showPopover(tab, "<b>" + tr(tab.title || "") + "</b>");
-      });
-      tab.addEventListener("mouseleave", _hidePopover);
-    });
+    // Tab buttons deliberately have NO custom popover: each .ab-tab already carries a
+    // title attribute (see the ab-tabs markup), so the browser's own tooltip shows the
+    // name. The popover rendered tr(tab.title) — the identical string — as a second
+    // floating label on top of it. (It also double-translated, since the title was
+    // already passed through tr() when the markup was built.)
 
     var featTip = null;
     panel.querySelectorAll(".ab-feat-mini").forEach((tile) => {
