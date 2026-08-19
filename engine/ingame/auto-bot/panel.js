@@ -97,16 +97,6 @@
       #${PANEL_ID} .ab-feat-mini.on { opacity: 1; border-color: var(--oh-accent-muted, rgba(96,165,250,.45)); background: var(--oh-accent-soft, rgba(96,165,250,.14)); }
       #${PANEL_ID} .ab-feat-mini .ab-feat-emoji { font-size: 16px; line-height: 1; transition: filter .14s; }
       #${PANEL_ID} .ab-feat-mini.on .ab-feat-emoji { filter: drop-shadow(0 0 5px var(--oh-accent-muted, rgba(96,165,250,.85))); }
-      .ab-feat-tip {
-        position: fixed; z-index: 9000; transform: translate(-50%, -100%);
-        padding: 7px 10px; border-radius: 8px; pointer-events: none;
-        background: var(--oh-panel-bg, rgba(12,18,20,0.98)); border: 1px solid var(--oh-accent-muted, rgba(96,165,250,0.35));
-        color: var(--oh-panel-text, #e2e8f0); font: 500 11px/1.4 "Aptos", system-ui, sans-serif;
-        white-space: normal; max-width: 220px; text-align: center;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.12s;
-      }
-      .ab-feat-tip b { color: var(--oh-accent, #60a5fa); font-weight: 800; }
-      .ab-feat-tip.show { opacity: 1; }
       #${PANEL_ID} .ab-status {
         display: none; margin-top: 6px; padding: 11px; border-radius: 11px;
         background: var(--ab-surface); border: 1px solid rgba(255,255,255,.05); font-size: 11px;
@@ -259,12 +249,26 @@
     return '<img class="ab-cfg-struct-icon" src="' + url + '" alt="' + type + '" onerror="this.replaceWith(document.createTextNode(\'' + emoji + '\'))" draggable="false">';
   }
 
+  /** Escape a string for use inside a double-quoted HTML attribute. */
+  function attrEsc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
   function featRow(key, label, emoji) {
     const on = state.settings.features[key];
     // Compact icon tile (5-per-row). No checkmark — when ON the icon lights up
-    // (full opacity + glow). Label + detailed description show on hover.
+    // (full opacity + glow). Name + description come from the shared FEAT_TIP table
+    // and ride a native title attribute — &#10; is a newline in an HTML attribute, so
+    // the two-line shape survives without a bespoke popover element.
+    const tip = FEAT_TIP[key];
+    const title = tip
+      ? attrEsc(tr(tip[0])) + "&#10;" + attrEsc(tr(tip[1]))
+      : attrEsc(tr(label));
     return `
-      <div class="ab-feat ab-feat-mini ${on ? "on" : ""}" data-feat="${key}">
+      <div class="ab-feat ab-feat-mini ${on ? "on" : ""}" data-feat="${key}" title="${title}">
         <span class="ab-feat-emoji">${emoji}</span>
       </div>`;
   }
@@ -565,36 +569,9 @@
       });
     }
 
-    // hover tooltip for the compact feature tiles (label + detailed description)
-    // Clean up any stale tooltip left from a previous panel rebuild.
-    // Popover helper — reuse .ab-feat-tip for any element that needs a rich tooltip.
-    // Clean up old popovers from previous panel builds.
-    document.querySelectorAll(".ab-feat-tip").forEach(function(t) { t.remove(); });
-    var gateTip = null;
-    function _showPopover(el, html) {
-      if (!gateTip) {
-        gateTip = document.createElement("div");
-        gateTip.className = "ab-feat-tip";
-        document.body.appendChild(gateTip);
-      }
-      gateTip.innerHTML = html;
-      var r = el.getBoundingClientRect();
-      gateTip.style.left = (r.left + r.width / 2) + "px";
-      gateTip.style.top = (r.top - 6) + "px";
-      gateTip.classList.add("show");
-    }
-    function _hidePopover() {
-      if (gateTip) gateTip.classList.remove("show");
-    }
-
-    // Gate dot — show popover on hover.
-    var gateDot = panel.querySelector('[data-role="gate-dot"]');
-    if (gateDot) {
-      gateDot.addEventListener("mouseenter", function() {
-        _showPopover(gateDot, "<b>" + tr("Lobby status") + "</b><br>" + (gateDot.title || ""));
-      });
-      gateDot.addEventListener("mouseleave", _hidePopover);
-    }
+    // Every hoverable control in this panel now uses a native title attribute — the
+    // tabs, the gate dot and the feature tiles alike — so there is no bespoke popover
+    // element to create, position or clean up.
 
     // Tab buttons deliberately have NO custom popover: each .ab-tab already carries a
     // title attribute (see the ab-tabs markup), so the browser's own tooltip shows the
@@ -602,26 +579,6 @@
     // floating label on top of it. (It also double-translated, since the title was
     // already passed through tr() when the markup was built.)
 
-    var featTip = null;
-    panel.querySelectorAll(".ab-feat-mini").forEach((tile) => {
-      tile.addEventListener("mouseenter", () => {
-        const info = FEAT_TIP[tile.dataset.feat];
-        if (!info) return;
-        if (!featTip) {
-          featTip = document.createElement("div");
-          featTip.className = "ab-feat-tip";
-          document.body.appendChild(featTip);
-        }
-        featTip.innerHTML = `<b>${tr(info[0])}</b><br>${tr(info[1])}`;
-        const r = tile.getBoundingClientRect();
-        featTip.style.left = `${r.left + r.width / 2}px`;
-        featTip.style.top = `${r.top - 6}px`;
-        featTip.classList.add("show");
-      });
-      tile.addEventListener("mouseleave", () => {
-        if (featTip) featTip.classList.remove("show");
-      });
-    });
 
     // status & stats collapsible group
     const statusToggle = panel.querySelector('[data-role="status-toggle"]');
