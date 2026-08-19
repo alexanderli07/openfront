@@ -24,7 +24,7 @@ var OFH_TIP_DELAY_MS = 800;
 // .ab-body's padding, which is how the auto-bot once ended up 17px short). If the Config
 // tab starts scrolling or the Controls pane feels cramped, raise this; the two panels
 // move together either way.
-var OFH_PANEL_HEIGHT_PX = 426;
+var OFH_PANEL_HEIGHT_PX = 431;
 
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
