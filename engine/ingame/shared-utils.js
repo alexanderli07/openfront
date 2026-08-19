@@ -26,6 +26,113 @@ var OFH_TIP_DELAY_MS = 800;
 // move together either way.
 var OFH_PANEL_HEIGHT_PX = 431;
 
+// ── Overlay design tokens ──────────────────────────────────────────────────────
+// ONE source of truth for how everything drawn on the map looks. Before this, the
+// overlays shared nothing: four different font stacks, three unrelated palettes, pill
+// padding of 3px/4px/5px, background alpha of 0.6/0.72/0.82, and the panel's "Overlay
+// Opacity" slider reached NONE of them.
+//
+// Colour and alpha are PUSHED in here by quick-panel's theme funnel (_applyTheme and
+// _themeFromSettings) rather than pulled: getComputedStyle appears nowhere in this repo
+// and forces a style recalc, which is exactly the per-frame DOM cost the map-overlay
+// scheduler exists to avoid — and rainbow mode repaints at 12.5Hz. The literals below are
+// the pre-theme fallbacks, used until the first push lands.
+var OFH_OVERLAY_STYLE = {
+  // One family for every surface. This is the stack the scheduler, both panels and the
+  // DOM alerts already share; the losers were two `, monospace` tails, which is the real
+  // damage — on a machine without Aptos a build timer resolved to Consolas while the money
+  // pill beside it resolved to Segoe UI. That is the "different fonts on one map" look.
+  family: '"Aptos", "Trebuchet MS", "Segoe UI", sans-serif',
+  // 700, not 900. The overlay canvas is deliberately 1x CSS pixels with no
+  // devicePixelRatio, so there are no subpixels to recover letter counters with; at 10-11px
+  // a synthesised 900 face fills its own bowls and smears. Contrast comes from the pill
+  // and the halo instead.
+  weight: 700,
+  sizeSm: 10, // rank digits
+  sizeMd: 11, // every fixed-size map label
+  sizeMin: 11, // floor for the one zoom-scaled label (the money pill)
+  sizeMax: 18, // ...and its ceiling
+  padX: 6,
+  padY: 3,
+  minH: 14,
+  gap: 6,
+  surfaceRgb: "7, 12, 18",
+  surfaceA: 0.82, // beats bright terrain; 0.6 went muddy over snow/desert
+  outlineA: 0.45, // separates the chip from dark water, where a dark fill has no contrast
+  textA: 0.98,
+  haloRgba: "rgba(0, 0, 0, 0.55)",
+  haloW: 2,
+  lineW: 2,
+  dashComputed: [6, 5], // a real solved path
+  dashGuess: [2, 6], // a straight-line fallback / inferred path
+  routeA: 0.85,
+  accent: "#00ff66",
+  accentR: 0,
+  accentG: 255,
+  accentB: 102,
+  alpha: 1, // the panel's Overlay Opacity slider
+};
+
+function ofhOverlayAlpha() {
+  const a = Number(OFH_OVERLAY_STYLE.alpha);
+  return Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 1;
+}
+
+/** "700 11px \"Aptos\", ..." — the only place an overlay font string is built. */
+function ofhOverlayFont(px) {
+  const size = Number(px);
+  const n = Number.isFinite(size) && size > 0 ? Math.round(size) : OFH_OVERLAY_STYLE.sizeMd;
+  return OFH_OVERLAY_STYLE.weight + " " + n + "px " + OFH_OVERLAY_STYLE.family;
+}
+
+/** Any colour, scaled by the user's overlay opacity. */
+function ofhOverlayRgba(r, g, b, a) {
+  const alpha = (Number.isFinite(Number(a)) ? Number(a) : 1) * ofhOverlayAlpha();
+  return "rgba(" + r + ", " + g + ", " + b + ", " + alpha.toFixed(3) + ")";
+}
+
+/** The accent as rgba. NOTE: never string-concat an alpha suffix onto
+ *  OFH_OVERLAY_STYLE.accent — the hue slider and rainbow mode set it to hsl(...), not a
+ *  hex, so "#rrggbb" + "2b" would silently produce garbage. That is why the channels are
+ *  stored separately. */
+function ofhOverlayAccentRgba(a) {
+  return ofhOverlayRgba(
+    OFH_OVERLAY_STYLE.accentR,
+    OFH_OVERLAY_STYLE.accentG,
+    OFH_OVERLAY_STYLE.accentB,
+    a,
+  );
+}
+
+/** The shared dark chip background. */
+function ofhOverlaySurface(a) {
+  const base = Number.isFinite(Number(a)) ? Number(a) : OFH_OVERLAY_STYLE.surfaceA;
+  return "rgba(" + OFH_OVERLAY_STYLE.surfaceRgb + ", " + (base * ofhOverlayAlpha()).toFixed(3) + ")";
+}
+
+/** Theme push targets. Both are TOTAL — every input is validated and the previous value
+ *  kept on bad input — because a throw in here is swallowed by the layer's try/catch and
+ *  would silently kill rainbow mode. Both mark the canvas dirty so a slider drag or a
+ *  rainbow tick repaints even with a stationary camera. */
+function ofhSetOverlayAccent(css, r, g, b) {
+  const rr = Number(r);
+  const gg = Number(g);
+  const bb = Number(b);
+  if (Number.isFinite(rr) && Number.isFinite(gg) && Number.isFinite(bb)) {
+    OFH_OVERLAY_STYLE.accentR = rr;
+    OFH_OVERLAY_STYLE.accentG = gg;
+    OFH_OVERLAY_STYLE.accentB = bb;
+  }
+  if (typeof css === "string" && css) OFH_OVERLAY_STYLE.accent = css;
+  if (typeof markMapOverlayDirty === "function") markMapOverlayDirty();
+}
+
+function ofhSetOverlayAlpha(a) {
+  const v = Number(a);
+  if (Number.isFinite(v)) OFH_OVERLAY_STYLE.alpha = Math.max(0, Math.min(1, v));
+  if (typeof markMapOverlayDirty === "function") markMapOverlayDirty();
+}
+
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
   if (!Number.isFinite(intensity)) {

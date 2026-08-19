@@ -25,7 +25,9 @@
       #${NUKE_LANDING_CONTAINER_ID} {
         position: fixed;
         inset: 0;
-        z-index: 8000;
+        /* Was 8000, tying the two control panels — a blast ring or its label could paint
+           OVER the panels. Map marks belong below panel chrome. */
+        z-index: 7600;
         pointer-events: none;
       }
 
@@ -36,6 +38,10 @@
         width: var(--nuke-diameter);
         height: var(--nuke-diameter);
         border: 2px dashed var(--nuke-color, rgba(248, 113, 113, 0.92));
+        /* Without this the 2px border sits OUTSIDE --nuke-diameter, so the ring draws 4px
+           wider than the real blast radius. The sibling ring in auto-bot/lifecycle.js
+           pins it; this one did not. */
+        box-sizing: border-box;
         border-radius: 50%;
         background: var(--nuke-bg, rgba(127, 29, 29, 0.18));
         box-shadow:
@@ -469,12 +475,24 @@
       _nukeRadiusReusePos.y = screenPos.y;
       _nukeRadiusReusePos.worldX = landing.worldX;
       _nukeRadiusReusePos.worldY = landing.worldY;
-      const radius = Math.max(
-        12,
-        getNukeLandingScreenRadius(
-          context.transform,
-          _nukeRadiusReusePos,
-          landing.worldRadius,
+      // A MINIMUM existed but no maximum, so a Hydrogen Bomb (world radius 160) at high
+      // zoom became a screen-filling translucent disc with an 18px outer glow and its edge
+      // off-screen — the single biggest reason the nuke estimate looked like a mess. Cap it
+      // at a sane fraction of the viewport: past that the ring conveys nothing extra,
+      // because you can no longer see where it ends.
+      const _nukeMaxR = Math.max(
+        48,
+        Math.round(Math.min(window.innerWidth || 1280, window.innerHeight || 800) * 0.42),
+      );
+      const radius = Math.min(
+        _nukeMaxR,
+        Math.max(
+          12,
+          getNukeLandingScreenRadius(
+            context.transform,
+            _nukeRadiusReusePos,
+            landing.worldRadius,
+          ),
         ),
       );
 

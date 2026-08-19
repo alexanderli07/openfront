@@ -197,6 +197,13 @@
     // Derive a muted accent for switch backgrounds
     root.style.setProperty("--oh-accent-muted", "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + ",0.6)");
     root.style.setProperty("--oh-accent-soft", "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + ",0.15)");
+    // Hand the accent to the CANVAS overlays too. A canvas cannot read a CSS custom
+    // property, so the value has to be pushed. This is the single funnel every accent
+    // source passes through — presets, the colour picker, the hue slider, reset AND
+    // rainbow's 80ms interval — so one line here covers all of them.
+    if (typeof ofhSetOverlayAccent === "function") {
+      ofhSetOverlayAccent(accentHex, rgb.r, rgb.g, rgb.b);
+    }
     _ensureThemeOverrides();
   }
 
@@ -249,6 +256,9 @@
     root.style.setProperty("--oh-panel-text", "rgba(226,232,240," + String(opacity) + ")");
     root.style.setProperty("--oh-panel-text-dim", "rgba(148,163,184," + (0.85 * opacity).toFixed(2) + ")");
     root.style.setProperty("--oh-panel-header-border", "rgba(148,163,184," + (0.18 * opacity).toFixed(2) + ")");
+    // The Overlay Opacity slider used to publish --oh-overlay-opacity and stop there: no
+    // canvas overlay ever read it, so the control did nothing at all. Push it.
+    if (typeof ofhSetOverlayAlpha === "function") ofhSetOverlayAlpha(ovOpacity);
     _applyThemeToAllPanels();
   }
 

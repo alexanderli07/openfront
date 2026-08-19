@@ -548,21 +548,26 @@
       ctx.restore();
       return;
     }
-    const spotColors = ["#ffd54f", "#9ccc65", "#9ccc65", "#d8dde6", "#d8dde6"];
+    // Five distinct steps. The old list repeated #9ccc65 for ranks 2 and 3 and #d8dde6
+    // for 4 and 5, so the top five markers only showed three colours.
+    const spotColors = ["#ffd54f", "#c5e17a", "#9ccc65", "#b9c2cf", "#8b95a3"];
     for (let i = 0; i < topSpots.length; i += 1) {
       const spot = topSpots[i];
       mapProject(proj, spot.x, spot.y, _spawnCellPt);
       const p = _spawnCellPt;
       if (!mapPointOnScreen(p.x, p.y, 20)) continue;
+      // FILL FIRST, then stroke. The old order stroked the 2.5px ring and then filled the
+      // SAME path with an opaque dark disc, which painted over the ring's inner half — the
+      // marker rendered at about half its nominal weight and looked washed out.
       ctx.beginPath();
       ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = spotColors[i] || "#d8dde6";
-      ctx.stroke();
-      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+      ctx.fillStyle = ofhOverlaySurface(0.72);
       ctx.fill();
-      ctx.fillStyle = spotColors[i] || "#d8dde6";
-      ctx.font = 'bold 10px "Aptos", monospace';
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = spotColors[i] || "#8b95a3";
+      ctx.stroke();
+      ctx.fillStyle = spotColors[i] || "#8b95a3";
+      ctx.font = ofhOverlayFont(OFH_OVERLAY_STYLE.sizeSm);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(i + 1), p.x, p.y + 0.5);

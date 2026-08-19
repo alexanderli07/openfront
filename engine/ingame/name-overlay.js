@@ -124,7 +124,23 @@
   var _DYN_SCALE_CAP = 3;
   var _DYN_MONEY_SIZE_MUL = 0.46;
   var _DYN_TROOP_BAR_SIZE_MUL = 0.26;
-  var _DYN_MIN_SCREEN_PX = 5;
+  // Was 5, which let a name render its money pill when the name itself was 5 screen
+  // pixels tall. Combined with the old font floor of 6px that produced a carpet of
+  // unreadable 6px chips — a large part of what made the map look messy. Now that the
+  // font has a real floor (sizeMin), the visibility floor has to rise with it or the
+  // chips would be huge relative to the names they belong to and overlap each other.
+  // Fewer legible labels beats many illegible ones.
+  var _DYN_MIN_SCREEN_PX = 14;
+
+  /** Extra cull padding for everything drawn above the name anchor. */
+  function _dynPadFor(loc, transform) {
+    try {
+      var d = _getDynamicSizes(loc, transform);
+      return d && Number.isFinite(d.moneyOffsetY) ? d.moneyOffsetY + 12 : 0;
+    } catch (_e) {
+      return 0;
+    }
+  }
 
   function _getDynamicSizes(loc, transform) {
     var baseSize = Math.max(1, Math.floor(loc.size || 16));
@@ -133,7 +149,15 @@
     var lineH_world = _DYN_FONT_BASE * (nameWorldSize * nameScale / _DYN_FONT_SCALE);
     var cameraScale = Number(transform.scale) || 1.8;
     var nameScreenPx = lineH_world * cameraScale;
-    var moneyFontSize = Math.max(6, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL));
+    // Clamped to the shared type scale. The old floor of 6px is below the readable limit
+    // on a 1x canvas, and there was no ceiling at all, so at high zoom the pill grew
+    // without bound.
+    var _sizeMin = OFH_OVERLAY_STYLE.sizeMin;
+    var _sizeMax = OFH_OVERLAY_STYLE.sizeMax;
+    var moneyFontSize = Math.max(
+      _sizeMin,
+      Math.min(_sizeMax, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL)),
+    );
     var troopBarH = Math.max(3, Math.floor(nameScreenPx * _DYN_TROOP_BAR_SIZE_MUL));
     var troopBarW = Math.max(20, Math.floor(moneyFontSize * 3.5));
     // Tighter spacing: money pill closer to troop bar.
@@ -141,8 +165,10 @@
     var troopOffsetY = Math.max(5, Math.floor(nameScreenPx * 0.58));
     // Fade background when zoomed close to see the map.
     var zoomFade = nameScreenPx > 30 ? Math.max(0.4, 1.0 - (nameScreenPx - 30) / 80) : 1.0;
-    var pillBgAlpha = (0.6 * zoomFade).toFixed(2);
-    var pillBdAlpha = (0.22 * zoomFade).toFixed(2);
+    // The pills no longer carry their own alphas — drawMapLabel owns that, and applies
+    // one factor to fill, outline AND text. Previously the fade hit only the box
+    // (bg 0.6, border 0.22) while the text stayed at 0.98 and the bar fills at 0.85/0.7,
+    // so zooming in dissolved the boxes and left their contents floating.
     var barBgAlpha = (0.5 * zoomFade).toFixed(2);
     return {
       moneyFontSize: moneyFontSize, troopBarW: troopBarW, troopBarH: troopBarH,
@@ -153,84 +179,46 @@
     };
   }
 
-  function drawMoneyPill(ctx, cx, cy, text, dyn) {
-    var fs = dyn.moneyFontSize;
-    ctx.font = 'bold ' + fs + 'px "Aptos", "Segoe UI", sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = Math.max(1, fs * 0.25);
-    var tw = ctx.measureText(text).width;
-    var w = tw + 6;
-    var h = Math.max(10, fs + 3);
-    var x0 = cx - w / 2;
-    var y0 = cy - h / 2;
-    fillRoundRect(ctx, x0, y0, w, h, 4, "rgba(7, 12, 18, " + dyn.pillBgAlpha + ")", "rgba(252, 211, 77, " + dyn.pillBdAlpha + ")");
-    ctx.fillStyle = "rgba(252, 211, 77, 0.98)";
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.fillText(text, cx, cy + 0.5);
+  // ── The three pills below are now thin wrappers over the shared map label. They keep
+  //    their names because the draw loop calls them by name. What they used to be: three
+  //    near-identical 20-line copies, each restating the font string, the padding, the
+  //    radius 4, the shadow and the +0.5 baseline nudge — and each setting ctx.shadowColor
+  //    for the BOX and then clearing it before drawing the TEXT, so the money numbers had
+  //    no legibility treatment at all over bright terrain. `accent` is the faction colour,
+  //    used for the outline so a teammate's pill reads differently from an enemy's at a
+  //    glance; the money itself stays amber so "gold" remains recognisable.
+  var MONEY_COLOR = "rgba(252, 211, 77, 0.98)";
+  var MAXTROOP_COLOR = "rgba(95, 178, 255, 0.98)";
+
+  function drawMoneyPill(ctx, cx, cy, text, dyn, accent) {
+    drawMapLabel(ctx, cx, cy, text, MONEY_COLOR, {
+      size: dyn.moneyFontSize,
+      segments: [{ text: text, color: MONEY_COLOR }],
+      outlineColor: accent,
+    });
   }
 
-  // Max-troops-only pill (shown above the troop bar when the money readout is off).
-  function drawMaxTroopPill(ctx, cx, cy, maxTroops, dyn) {
-    var fs = dyn.moneyFontSize;
-    var text = "/" + troopsDisplay(maxTroops);
-    ctx.font = 'bold ' + fs + 'px "Aptos", "Segoe UI", sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = Math.max(1, fs * 0.25);
-    var tw = ctx.measureText(text).width;
-    var w = tw + 6;
-    var h = Math.max(10, fs + 3);
-    var x0 = cx - w / 2;
-    var y0 = cy - h / 2;
-    fillRoundRect(ctx, x0, y0, w, h, 4, "rgba(7, 12, 18, " + dyn.pillBgAlpha + ")", "rgba(95, 178, 255, " + dyn.pillBdAlpha + ")");
-    ctx.fillStyle = "rgba(95, 178, 255, 0.98)";
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.fillText(text, cx, cy + 0.5);
+  function drawMaxTroopPill(ctx, cx, cy, maxTroops, dyn, accent) {
+    var label = troopsDisplay(maxTroops);
+    drawMapLabel(ctx, cx, cy, label, MAXTROOP_COLOR, {
+      size: dyn.moneyFontSize,
+      segments: [{ text: label, color: MAXTROOP_COLOR }],
+      outlineColor: accent,
+    });
   }
 
-  // Combined money + max troops pill on a single line.
-  function drawMoneyTroopPill(ctx, cx, cy, moneyText, maxTroops, dyn) {
-    var fs = dyn.moneyFontSize;
-    var maxLabel = "/" + troopsDisplay(maxTroops);
-    var combined = moneyText + "  " + maxLabel;
-
-    ctx.font = 'bold ' + fs + 'px "Aptos", "Segoe UI", sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = Math.max(1, fs * 0.25);
-
-    var tw = ctx.measureText(combined).width;
-    var w = tw + 8;
-    var h = Math.max(10, fs + 3);
-    var x0 = cx - w / 2;
-    var y0 = cy - h / 2;
-
-    fillRoundRect(ctx, x0, y0, w, h, 4, "rgba(7, 12, 18, " + dyn.pillBgAlpha + ")", "rgba(252, 211, 77, " + dyn.pillBdAlpha + ")");
-
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-
-    // Draw money part (gold)
-    var moneyW = ctx.measureText(moneyText).width;
-    var maxW = ctx.measureText(maxLabel).width;
-    var gap = ctx.measureText("  ").width;
-    var startX = cx - tw / 2;
-
-    ctx.fillStyle = "rgba(252, 211, 77, 0.98)";
-    ctx.textAlign = "left";
-    ctx.fillText(moneyText, startX, cy + 0.5);
-
-    // Draw max troops part (blue)
-    ctx.fillStyle = "rgba(95, 178, 255, 0.98)";
-    ctx.fillText(maxLabel, startX + moneyW + gap, cy + 0.5);
-
-    ctx.textAlign = "center";
+  // Money + max troops on one line. The two-colour split is a `segments` list now; it
+  // used to be laid out by measuring the literal two-space string in "money  /max" and
+  // using that as the gap.
+  function drawMoneyTroopPill(ctx, cx, cy, moneyText, maxTroops, dyn, accent) {
+    drawMapLabel(ctx, cx, cy, null, MONEY_COLOR, {
+      size: dyn.moneyFontSize,
+      segments: [
+        { text: moneyText, color: MONEY_COLOR },
+        { text: "/" + troopsDisplay(maxTroops), color: MAXTROOP_COLOR },
+      ],
+      outlineColor: accent,
+    });
   }
 
   // Small rounded-rect helper (background + optional border).
@@ -302,7 +290,10 @@
         continue;
       }
       var p = mapWorldToScreen(transform, loc.x, loc.y);
-      if (!p || !mapPointOnScreen(p.x, p.y, 30)) {
+      // Pad has to cover what we draw ABOVE the anchor: the pill sits up to
+      // ~0.9 * nameScreenPx higher (moneyOffsetY), so a flat 30 made pills pop in and out
+      // at the top edge of the screen when zoomed in.
+      if (!p || !mapPointOnScreen(p.x, p.y, 30 + Math.max(0, _dynPadFor(loc, transform)))) {
         continue;
       }
       var dyn = _getDynamicSizes(loc, transform);
@@ -323,13 +314,13 @@
 
         if (mapMoneyEnabled && mapTroopCountsEnabled) {
           // Combined: money + /max on one line, troop bar below.
-          drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn);
+          drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
           drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn);
         } else if (mapMoneyEnabled) {
-          drawMoneyPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn);
+          drawMoneyPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn, color);
         } else if (mapTroopCountsEnabled) {
           // Money off: /max still gets its own line above the bar.
-          drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn);
+          drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
           drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn);
         }
       }

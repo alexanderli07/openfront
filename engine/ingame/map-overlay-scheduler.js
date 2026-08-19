@@ -99,8 +99,10 @@
       _mapOverlayCanvas = document.createElement("canvas");
       _mapOverlayCanvas.id = MAP_OVERLAY_CANVAS_ID;
       _mapOverlayCanvas.setAttribute("aria-hidden", "true");
-      // Below the DOM overlay layers (nuke ...646 / warship ...645) so their
-      // markers stay on top; still well above the game canvas.
+      // Map marks sit below the helper's DOM overlays and panels, and well above the
+      // game canvas. (The old note here cited "nuke ...646 / warship ...645"; no such
+      // z-indexes exist anywhere — the real DOM overlay values are in the thousands, so
+      // anyone reasoning from that comment was off by an order of magnitude.)
       _mapOverlayCanvas.style.cssText =
         "position:fixed;inset:0;width:100vw;height:100vh;z-index:500;pointer-events:none;";
       (document.body || document.documentElement).appendChild(_mapOverlayCanvas);
@@ -346,11 +348,129 @@
     );
   }
 
-  // Text with a dark halo so it stays readable over any territory color. Matches
-  // the DOM label look (font 900 11px, dark outline) used by boat/nuke labels.
+  /** ── The one map label ────────────────────────────────────────────────────────
+   *  Every piece of text drawn on the map goes through here, so a money pill, a build
+   *  timer and a boat ETA are the same object with different contents. Before this each
+   *  caller rolled its own: different font, different padding (3/4/5px), different
+   *  background alpha (0.6/0.72/0.82), rounded vs square corners, and legibility handled
+   *  three different ways.
+   *
+   *  Three redundant legibility layers, because the map underneath can be anything:
+   *    1. a dark fill at 0.82 beats bright terrain (snow, desert, capital glow);
+   *    2. a 1px semantic outline separates the chip from dark water, where a dark fill
+   *       has nothing to contrast against;
+   *    3. a 2px black text halo covers the case where both fail — when the user pulls
+   *       Overlay Opacity down and the chip itself goes translucent.
+   *  The halo is strokeText-then-fillText, NOT shadowBlur: shadowBlur is the most
+   *  expensive 2D operation on a full-viewport canvas, and the one caller that used it
+   *  applied it to the pill and then cleared it before drawing the text, so it did the
+   *  exact opposite of its purpose.
+   *
+   *  opts: { size, segments:[{text,color}], outline:bool, halo:bool, align }
+   *  Measured width is quantized to 4px because canvas 2D has no font-variant-numeric,
+   *  so a proportional face makes the chip visibly breathe as $1.2k -> $1.3k.
+   *  save/restore is mandatory here: this canvas is shared by ~8 layers drawn in
+   *  sequence, and a leaked font or textAlign shows up as a bug in somebody else's layer.
+   */
+  function drawMapLabel(ctx, cx, cy, text, color, options) {
+    const opts = options || {};
+    const style = typeof OFH_OVERLAY_STYLE === "object" && OFH_OVERLAY_STYLE ? OFH_OVERLAY_STYLE : null;
+    if (!style) return;
+    const size = Number(opts.size) || style.sizeMd;
+    const segments =
+      Array.isArray(opts.segments) && opts.segments.length
+        ? opts.segments
+        : [{ text: String(text == null ? "" : text), color: color }];
+
+    ctx.save();
+    try {
+      ctx.font = ofhOverlayFont(size);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+
+      const widths = segments.map((seg) => ctx.measureText(String(seg.text == null ? "" : seg.text)).width);
+      const gap = segments.length > 1 ? style.gap : 0;
+      let raw = gap * (segments.length - 1);
+      for (const wd of widths) raw += wd;
+      const tw = Math.ceil(raw / 4) * 4;
+
+      const w = tw + style.padX * 2;
+      const h = Math.max(style.minH, size + style.padY * 2);
+      const x0 = cx - w / 2;
+      const y0 = cy - h / 2;
+      const r = Math.max(3, Math.round(h * 0.28));
+
+      ctx.beginPath();
+      ctx.moveTo(x0 + r, y0);
+      ctx.arcTo(x0 + w, y0, x0 + w, y0 + h, r);
+      ctx.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+      ctx.arcTo(x0, y0 + h, x0, y0, r);
+      ctx.arcTo(x0, y0, x0 + w, y0, r);
+      ctx.closePath();
+      ctx.fillStyle = ofhOverlaySurface(style.surfaceA);
+      ctx.fill();
+      if (opts.outline !== false) {
+        ctx.lineWidth = 1;
+        // An explicit outlineColor lets the caller encode a SECOND dimension in the chip:
+        // name-overlay uses the faction colour here while keeping the money text amber, so
+        // a teammate's pill and an enemy's pill differ at a glance. That relation colour
+        // used to be computed and thrown away.
+        ctx.strokeStyle =
+          opts.outlineColor || segments[0].color || ofhOverlayAccentRgba(style.outlineA);
+        ctx.globalAlpha = style.outlineA;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      let x = cx - tw / 2;
+      ctx.lineJoin = "round";
+      for (let i = 0; i < segments.length; i++) {
+        const str = String(segments[i].text == null ? "" : segments[i].text);
+        if (opts.halo !== false) {
+          ctx.lineWidth = style.haloW;
+          ctx.strokeStyle = style.haloRgba;
+          ctx.strokeText(str, x, cy + 0.5);
+        }
+        ctx.fillStyle = segments[i].color || "#e2e8f0";
+        ctx.fillText(str, x, cy + 0.5);
+        x += widths[i] + gap;
+      }
+    } catch (_e) {
+      /* a label is never worth killing the frame for */
+    }
+    ctx.restore();
+  }
+
+  /** A filled triangle at the destination end of a route, so direction is stated rather
+   *  than inferred. `angle` is the heading of the final segment. */
+  function drawMapArrowhead(ctx, x, y, angle, color, size) {
+    const s = Number(size) || 7;
+    ctx.save();
+    try {
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-s, -s * 0.5);
+      ctx.lineTo(-s, s * 0.5);
+      ctx.closePath();
+      ctx.fillStyle = color || "#e2e8f0";
+      ctx.fill();
+    } catch (_e) {
+      /* ignore */
+    }
+    ctx.restore();
+  }
+
+  // Text with a dark halo so it stays readable over any territory color. Used for naked
+  // symbols (a warning glyph, a rank digit) that carry no pill of their own.
   function drawMapHaloText(ctx, x, y, text, color, options) {
     const opts = options || {};
-    const font = opts.font || '900 11px "Aptos", "Trebuchet MS", "Segoe UI", sans-serif';
+    const font =
+      opts.font ||
+      (typeof ofhOverlayFont === "function"
+        ? ofhOverlayFont(OFH_OVERLAY_STYLE.sizeMd)
+        : '700 11px "Aptos", "Trebuchet MS", "Segoe UI", sans-serif');
     ctx.font = font;
     ctx.textAlign = opts.align || "center";
     ctx.textBaseline = opts.baseline || "middle";
