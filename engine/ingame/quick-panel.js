@@ -337,12 +337,15 @@
       "  color:var(--oh-panel-text);",
       "}",
       ".ohqp-body {",
-      // Fixed so switching tabs never resizes the panel, and trimmed to the Config
-      // tab's exact content height now that Theme is always expanded: measured 346px of
-      // content + 16px body padding = 362px, plus 4px of tolerance because that figure
-      // comes from a faithful reproduction of the markup rather than the live render.
-      // The Helpers tab scrolls inside this box, which is fine — its sections expand.
-      "  height:366px; box-sizing:border-box;",
+      // Fixed so switching tabs never resizes the panel, and sized so this panel ends up
+      // the SAME TOTAL HEIGHT as the auto-bot's. Measured with each panel in its own
+      // display model (the auto-bot is display:block, the helper is flex-column):
+      //   auto-bot  41 header + 37.4 tabs + 340 pane + 2 border = 420.4
+      //   helper    39 header + 41   tabs +  ?  body + 2 border
+      // so the body must be 420.4 - 39 - 41 - 2 = 338.4.
+      // NOTE this is derived from the auto-bot's chrome — if .ab-head/.ab-tabs padding
+      // or .ab-pane's 340px ever changes, re-measure rather than nudging this by eye.
+      "  height:338.4px; box-sizing:border-box;",
       "  overflow-y:auto; overflow-x:hidden; padding:8px 10px;",
       "}",
       ".ohqp-body > div { display:none; }",
