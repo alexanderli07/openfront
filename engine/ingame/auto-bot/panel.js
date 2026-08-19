@@ -97,6 +97,21 @@
       #${PANEL_ID} .ab-feat-mini.on { opacity: 1; border-color: var(--oh-accent-muted, rgba(96,165,250,.45)); background: var(--oh-accent-soft, rgba(96,165,250,.14)); }
       #${PANEL_ID} .ab-feat-mini .ab-feat-emoji { font-size: 16px; line-height: 1; transition: filter .14s; }
       #${PANEL_ID} .ab-feat-mini.on .ab-feat-emoji { filter: drop-shadow(0 0 5px var(--oh-accent-muted, rgba(96,165,250,.85))); }
+      /* ONE tooltip for the whole panel. Every hoverable control uses data-tip /
+         data-tip-desc and carries NO title attribute, so the browser's own tooltip
+         never competes with this one. */
+      .ab-tip {
+        position: fixed; z-index: 9000; transform: translate(-50%, -100%);
+        padding: 7px 10px; border-radius: 8px; pointer-events: none;
+        background: var(--oh-panel-bg, rgba(12,18,20,0.98));
+        border: 1px solid var(--oh-accent-muted, rgba(96,165,250,0.5));
+        color: var(--oh-panel-text, #e2e8f0);
+        font: 500 11px/1.4 "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+        white-space: normal; max-width: 240px; text-align: center;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.12s;
+      }
+      .ab-tip b { color: var(--oh-accent, #60a5fa); font-weight: 800; }
+      .ab-tip.show { opacity: 1; }
       #${PANEL_ID} .ab-status {
         display: none; margin-top: 6px; padding: 11px; border-radius: 11px;
         background: var(--ab-surface); border: 1px solid rgba(255,255,255,.05); font-size: 11px;
@@ -264,11 +279,10 @@
     // and ride a native title attribute — &#10; is a newline in an HTML attribute, so
     // the two-line shape survives without a bespoke popover element.
     const tip = FEAT_TIP[key];
-    const title = tip
-      ? attrEsc(tr(tip[0])) + "&#10;" + attrEsc(tr(tip[1]))
-      : attrEsc(tr(label));
+    const tipName = attrEsc(tr(tip ? tip[0] : label));
+    const tipDesc = tip ? attrEsc(tr(tip[1])) : "";
     return `
-      <div class="ab-feat ab-feat-mini ${on ? "on" : ""}" data-feat="${key}" title="${title}">
+      <div class="ab-feat ab-feat-mini ${on ? "on" : ""}" data-feat="${key}" data-tip="${tipName}" data-tip-desc="${tipDesc}">
         <span class="ab-feat-emoji">${emoji}</span>
       </div>`;
   }
@@ -291,18 +305,18 @@
     if (state.activeTab === "config") panel.classList.add("ab-tab-config");
     panel.innerHTML = `
       <div class="ab-head">
-        <div class="ab-gate-dot" data-role="gate-dot" style="color:#fbbf24;" title="${tr("Checking lobby…")}"></div>
+        <div class="ab-gate-dot" data-role="gate-dot" style="color:#fbbf24;" data-tip="${tr("Lobby status")}" data-tip-desc="${tr("Checking lobby…")}"></div>
         <span class="ab-title">Auto-Bot</span>
-        <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" title="${tr("Toggle on/off")}"></div>
+        <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" data-tip="${tr("Toggle on/off")}"></div>
         <div class="ab-head-btns">
-          <button class="ab-mini" data-role="mini" title="${tr("Collapse")}">${state.settings.minimized ? "▢" : "—"}</button>
-          <button class="ab-close" data-role="close" title="${tr("Close")}">✕</button>
+          <button class="ab-mini" data-role="mini" data-tip="${tr("Collapse")}">${state.settings.minimized ? "▢" : "—"}</button>
+          <button class="ab-close" data-role="close" data-tip="${tr("Close")}">✕</button>
         </div>
       </div>
       <div class="ab-tabs">
-        <div class="ab-tab ${state.activeTab === "control" ? "on" : ""}" data-tab="control" title="${tr("🎮 Controls")}">🎮</div>
-        <div class="ab-tab ${state.activeTab === "config" ? "on" : ""}" data-tab="config" title="${tr("⚙️ Config")}">⚙️</div>
-        <div class="ab-tab ${state.activeTab === "log" ? "on" : ""}" data-tab="log" title="${tr("📜 Log")}">📜</div>
+        <div class="ab-tab ${state.activeTab === "control" ? "on" : ""}" data-tab="control" data-tip="${tr("🎮 Controls")}">🎮</div>
+        <div class="ab-tab ${state.activeTab === "config" ? "on" : ""}" data-tab="config" data-tip="${tr("⚙️ Config")}">⚙️</div>
+        <div class="ab-tab ${state.activeTab === "log" ? "on" : ""}" data-tab="log" data-tip="${tr("📜 Log")}">📜</div>
       </div>
       <div class="ab-body">
         <div class="ab-pane" data-pane="control">
@@ -389,38 +403,38 @@
             <!-- DIVERGENCE: none of these four behaviours exist in src's Nation AI. -->
             <div class="ab-cfg-sec">${tr("Strategy")}</div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}">${tr("Economy first")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}">${tr("Economy first")}</span>
               <div class="ab-cfg-sw ${state.settings.economyFirst ? "on" : ""}" data-cfg="economyFirst"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}">${tr("Crack enemy SAMs")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}">${tr("Crack enemy SAMs")}</span>
               <div class="ab-cfg-sw ${state.settings.samCrack ? "on" : ""}" data-cfg="samCrack"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}">${tr("Scale SAMs to threat")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}">${tr("Scale SAMs to threat")}</span>
               <div class="ab-cfg-sw ${state.settings.samDefense ? "on" : ""}" data-cfg="samDefense"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}">${tr("Proactive defense posts")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}">${tr("Proactive defense posts")}</span>
               <div class="ab-cfg-sw ${state.settings.defensePosts ? "on" : ""}" data-cfg="defensePosts"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}">${tr("Nuke densest target")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}">${tr("Nuke densest target")}</span>
               <div class="ab-cfg-sw ${state.settings.nukeDensityFirst ? "on" : ""}" data-cfg="nukeDensityFirst"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}">${tr("Reserve vs neighbours")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}">${tr("Reserve vs neighbours")}</span>
               <div class="ab-cfg-sw ${state.settings.reserveByNeighbors ? "on" : ""}" data-cfg="reserveByNeighbors"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}">${tr("Counter-attack first")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}">${tr("Counter-attack first")}</span>
               <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" title="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}">${tr("Phased opening")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}">${tr("Phased opening")}</span>
               <div class="ab-cfg-sw ${state.settings.phasedOpening ? "on" : ""}" data-cfg="phasedOpening"></div>
             </div>
 
@@ -569,9 +583,42 @@
       });
     }
 
-    // Every hoverable control in this panel now uses a native title attribute — the
-    // tabs, the gate dot and the feature tiles alike — so there is no bespoke popover
-    // element to create, position or clean up.
+    // ── ONE tooltip for every hoverable control ────────────────────────────────
+    // Any element carrying data-tip and/or data-tip-desc gets the styled popover.
+    // None of them carry a title attribute, so the browser tooltip never doubles up —
+    // that duplication is what made the tabs show two labels at once.
+    document.querySelectorAll(".ab-tip").forEach(function(t) { t.remove(); });
+    var abTip = null;
+    function _txtEsc(v) {
+      return String(v == null ? "" : v)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+    function _showTip(el) {
+      var head = el.dataset.tip || "";
+      var desc = el.dataset.tipDesc || "";
+      if (!head && !desc) return;
+      if (!abTip) {
+        abTip = document.createElement("div");
+        abTip.className = "ab-tip";
+        (document.body || document.documentElement).appendChild(abTip);
+      }
+      abTip.innerHTML =
+        (head ? "<b>" + _txtEsc(head) + "</b>" : "") +
+        (desc ? (head ? "<br>" : "") + _txtEsc(desc) : "");
+      var r = el.getBoundingClientRect();
+      abTip.style.left = r.left + r.width / 2 + "px";
+      abTip.style.top = r.top - 6 + "px";
+      abTip.classList.add("show");
+    }
+    function _hideTip() {
+      if (abTip) abTip.classList.remove("show");
+    }
+    panel.querySelectorAll("[data-tip], [data-tip-desc]").forEach(function(el) {
+      el.addEventListener("mouseenter", function() { _showTip(el); });
+      el.addEventListener("mouseleave", _hideTip);
+    });
 
     // Tab buttons deliberately have NO custom popover: each .ab-tab already carries a
     // title attribute (see the ab-tabs markup), so the browser's own tooltip shows the
@@ -801,7 +848,7 @@
     const game = getGame();
     if (!game) {
       dot.style.color = "#fbbf24";
-      dot.title = tr("Waiting to enter game…");
+      dot.dataset.tipDesc = tr("Waiting to enter game…");
       return;
     }
     const type = gameType(game);
@@ -811,10 +858,10 @@
       if (type === "Singleplayer") label = tr("Singleplayer");
       else if (type === "Public") label = tr("Public lobby");
       else label = tr("Private lobby");
-      dot.title = label;
+      dot.dataset.tipDesc = label;
     } else {
       dot.style.color = "#fbbf24";
-      dot.title = tr("Waiting to enter game…");
+      dot.dataset.tipDesc = tr("Waiting to enter game…");
     }
   }
 
