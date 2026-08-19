@@ -299,6 +299,7 @@
     // DIVERGENCE (defensePosts): src has no income signal. Rolling positive-gold-delta
     // accumulator, sampled from structureBehavior; see estimatedGoldPerMinute().
     income: { lastGold: null, earned: 0, samples: [] },
+    lastSeenTick: null, // new-game detector; see maybeResetForNewGame()
     lastPlayerAttackMs: 0,
     lastRetaliateMs: 0,
     lastBuildMs: 0,
@@ -317,7 +318,8 @@
     // the same cluster while the first bomb is still in flight (mirrors the game
     // bot's recentlySentNukes / −1M penalty). Pruned by age in nuke.js.
     hostility: new Map(), // smallID -> accumulated aggression score (relation proxy)
-    nukeReserveGold: 0, // gold the build loop keeps in reserve for the next nuke
+    nukeReserveGold: 0, // gold the build loop keeps in reserve for the next nuke (see
+    // mirvReserveHold(); 0n under economyFirst)
     nukeWantSlots: null, // { need, at } — silo slots wanted to saturate an enemy SAM
     lastMirv: null, // { sid, at } — last MIRV target+time (per-target cooldown)
     navalThreatAt: 0, // ts of last enemy ship/transport near our ports (build extra hulls)
@@ -361,6 +363,32 @@
   // =========================================================================
   // Settings persistence (page localStorage; survives reloads, no chrome dep)
   // =========================================================================
+  /** `state` lives on the page-session singleton, but much of it is GAME-scoped and stamped
+   *  with GAME TICKS. A new game in the same page restarts ticks near 0, which makes every
+   *  `now - at` freshness test NEGATIVE — i.e. stale entries read as maximally FRESH rather
+   *  than being pruned. Observed consequences: a MIRV crater from the previous game hijacks
+   *  amphibious targeting to a foreign TileRef; a funded war chest withholds gold for a MIRV
+   *  that game cannot build; and the income window spans negative so every income-gated
+   *  behaviour (warheads included) fails closed for minutes. Detect the regression ONCE here
+   *  rather than per-field, because each field that forgets the check is a silent bug.
+   *  Returns true if a new game was detected. */
+  function maybeResetForNewGame(tick) {
+    if (typeof tick !== "number" || !Number.isFinite(tick)) return false;
+    const prev = state.lastSeenTick;
+    state.lastSeenTick = tick;
+    if (typeof prev !== "number" || tick >= prev) return false;
+    state.income = { lastGold: null, earned: 0, samples: [] };
+    state.nukeReserveGold = 0n;
+    state.recentMirvHits = [];
+    state.recentNukes = [];
+    state.nukeWantSlots = null;
+    state.lastNuker = null;
+    state.lastMirv = null;
+    state.beachhead = null;
+    state.hostility = new Map();
+    return true;
+  }
+
   function loadSettings() {
     // PERSISTED_KEYS is declared LOCALLY (not module-level) ON PURPOSE: `state.settings
     // = loadSettings()` runs BEFORE a module-level `const` further down would be

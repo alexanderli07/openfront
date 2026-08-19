@@ -128,10 +128,15 @@
     // ── main entry — NationMIRVBehavior.considerMIRV (now async) ──────────────
     async considerMIRV() {
       if (this.player === null) throw new Error("not initialized");
+      // Both of these abandon MIRV planning, so the war chest must not outlive them:
+      // mirvReserveHold() would otherwise keep withholding gold for a MIRV that cannot be
+      // built (losing every silo mid-game, or starting a game before the first silo exists).
       if (this.game.config().isUnitDisabled(UNIT.MIRV)) {
+        if (state.nukeReserveGold) state.nukeReserveGold = 0n;
         return false;
       }
       if (this.player.units(UNIT.MissileSilo).length === 0) {
+        if (state.nukeReserveGold) state.nukeReserveGold = 0n;
         return false;
       }
       // gold is BigInt; cost() is the live MIRV price (BigInt).

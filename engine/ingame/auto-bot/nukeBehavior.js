@@ -359,21 +359,13 @@
 
     // ── maybeSendNuke — NationNukeBehavior.ts:58 (now async) ──────────────────
     async maybeSendNuke() {
-      // WIN-FIX (NOT in src): when mirvBehavior has set the MIRV war-chest
-      // (state.nukeReserveGold ≥ 15M, saving for a leader/pre-empt MIRV), DON'T
-      // spend the gold on smaller atom/hydrogen nukes. That drain is exactly what
-      // was starving the MIRV (gold oscillated 10–18M, never reached its 25M
-      // price) and blocking the close-out from ~65% to victory. Hold fire until
-      // the MIRV launches (mirvBehavior clears the chest on fire).
-      if (state.settings.winFixes && state.nukeReserveGold) {
-        let reserve = 0n;
-        try {
-          reserve = BigInt(state.nukeReserveGold || 0);
-        } catch (_e) {
-          reserve = 0n;
-        }
-        if (reserve >= 15000000n) return;
-      }
+      // WIN-FIX (NOT in src): don't spend the MIRV war chest on smaller warheads — that
+      // drain is what starved the leader/pre-empt MIRV. But hold BACK part of the treasury
+      // rather than refusing to fire at all: the previous all-or-nothing `return` here
+      // deadlocked the entire offence, because the build pass was exempt from the same hold
+      // and spent the gold anyway, so the 25M chest was never reached, the MIRV never
+      // launched, and nothing ever cleared the chest. mirvReserveHold() is the SINGLE
+      // definition of that hold, shared with structureBehavior's build gate.
       const silos = this.player.units(UNIT.MissileSilo);
       const config = this.game.config();
       if (
@@ -400,16 +392,35 @@
 
       const hydroCost = await this.getPerceivedNukeCost(UNIT.HydrogenBomb);
       const atomCost = await this.getPerceivedNukeCost(UNIT.AtomBomb);
+      // Gold we may actually commit to a warhead: the treasury minus the bounded MIRV hold.
+      // BigInt-safe on purpose: gold() just forwards the game's own accessor, and a
+      // `Number - BigInt` subtraction THROWS where the `>=` comparison this replaced
+      // tolerated mixed types. A throw here is swallowed by the layer's try/catch, so it
+      // would silently kill all nuking with nothing in the console; fall back to the
+      // unheld treasury instead.
+      let spendable;
+      try {
+        const rawGold = BigInt(this.player.gold() || 0);
+        spendable = rawGold - mirvReserveHold(rawGold);
+      } catch (_e) {
+        spendable = this.player.gold();
+      }
       let nukeType;
       if (
         !this.game.config().isUnitDisabled(UNIT.HydrogenBomb) &&
-        this.player.gold() >= hydroCost
+        spendable >= hydroCost &&
+        // DIVERGENCE FIX (economyFirst): test the income throttle HERE too. The
+        // nukeSpendAllowed() gate further down is a bare `return`, so committing to
+        // hydrogen on cash alone forfeited the atom bomb we could actually afford — a
+        // rich-but-slow economy fired nothing at all. Falling through to the atom branch
+        // costs no extra worker round-trip: cost() is memoized per tick.
+        this.nukeSpendAllowed(await this.cost(UNIT.HydrogenBomb))
       ) {
         nukeType = UNIT.HydrogenBomb;
       } else if (
         !this.game.config().isUnitDisabled(UNIT.AtomBomb) &&
         (!this.isHydroNation || this.isUnderHeavyAttack()) &&
-        this.player.gold() >= atomCost
+        spendable >= atomCost
       ) {
         nukeType = UNIT.AtomBomb;
       } else {
@@ -903,14 +914,24 @@
       // field initializers. We seed lazily here on first use (from the live cost),
       // then escalate per launch (in sendNuke). Until seeded, fall back to the live
       // cost — identical to src's initial value (cost(type) before any launch).
+      // DIVERGENCE FIX: cost() yields 0n when the buildables probe times out or the
+      // border set is momentarily empty. These fields are seeded only while still null, so
+      // seeding a 0n LATCHED the perceived price at zero for the rest of the game — which
+      // makes `gold() >= hydroCost` trivially true forever, so the bot would pick hydrogen
+      // every time and never an atom again. Only latch a real, positive price; on a bad
+      // probe return it unseeded and retry on the next tick.
       if (type === UNIT.AtomBomb) {
         if (this.atomBombPerceivedCost === null) {
-          this.atomBombPerceivedCost = await this.cost(UNIT.AtomBomb);
+          const seed = await this.cost(UNIT.AtomBomb);
+          if (!seed) return seed;
+          this.atomBombPerceivedCost = seed;
         }
         return this.atomBombPerceivedCost;
       } else {
         if (this.hydrogenBombPerceivedCost === null) {
-          this.hydrogenBombPerceivedCost = await this.cost(UNIT.HydrogenBomb);
+          const seed = await this.cost(UNIT.HydrogenBomb);
+          if (!seed) return seed;
+          this.hydrogenBombPerceivedCost = seed;
         }
         return this.hydrogenBombPerceivedCost;
       }
@@ -1234,25 +1255,38 @@
      */
     nukeSpendAllowed(costBigInt) {
       if (!state.settings.economyFirst) return true; // stock ratchet governs
-      let net;
+      // DIVERGENCE FIX: the basis is GROSS income, NOT the slope of our gold balance.
+      // estimatedNetGoldPerMinute() measures the balance slope, and handleStructures()
+      // runs earlier in this very same tick and spends the treasury down to ~0 with no
+      // ratio ceiling under economyFirst — so the slope reads "flat or shrinking" even in
+      // a booming economy, and `net <= 0` then silenced every warhead for the whole game.
+      // GROSS (state.income.earned, positive deltas only) is what the economy can support
+      // and cannot be zeroed out by our own spending.
+      let gross;
       try {
-        net = typeof estimatedNetGoldPerMinute === "function"
-          ? estimatedNetGoldPerMinute()
-          : null;
+        if (typeof incomeWindow !== "function" || incomeWindow() === null) {
+          return false; // not enough window yet
+        }
+        gross =
+          typeof estimatedGoldPerMinute === "function"
+            ? estimatedGoldPerMinute()
+            : 0;
       } catch (_e) {
         return false;
       }
-      if (net === null) return false; // not enough window yet
-      if (net <= 0) return false; // economy is flat or shrinking — hold fire
+      if (!Number.isFinite(gross) || gross <= 0) return false;
       let cost = 0;
       try {
         cost = Number(costBigInt);
       } catch (_e) {
         cost = 0;
       }
-      if (!Number.isFinite(cost) || cost <= 0) return true;
+      // A non-positive cost only ever means the buildables probe failed (see cost()),
+      // never that a warhead is free. Failing OPEN here let a single bad probe wave a
+      // hydrogen bomb straight past the throttle.
+      if (!Number.isFinite(cost) || cost <= 0) return false;
       const minutes = state.settings.nukeIncomeMinutes || 2;
-      return cost <= net * minutes;
+      return cost <= gross * minutes;
     }
 
     async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false) {
@@ -1289,13 +1323,18 @@
         this.atomBombsLaunched++;
         // Increase perceived cost by 50% each time to simulate saving up for a MIRV
         // (higher than hydro to make atom bombs less attractive for the lategame)
+        // Same 0n-latch guard as getPerceivedNukeCost: a failed buildables probe returns
+        // 0n, and seeding THAT here would pin the perceived price at zero for the rest of
+        // the game, after which `spendable >= hydroCost` is trivially true forever and the
+        // bot can never choose an atom again.
         if (this.atomBombPerceivedCost === null) {
-          this.atomBombPerceivedCost = await this.cost(UNIT.AtomBomb);
+          const seed = await this.cost(UNIT.AtomBomb);
+          if (seed) this.atomBombPerceivedCost = seed;
         }
         // DIVERGENCE (economyFirst): do NOT ratchet — nukeSpendAllowed() throttles on
-        // net income instead, and the ratchet's own release valve is unreachable once
+        // measured income instead, and the ratchet's own release valve is unreachable once
         // the MIRV hoard is capped.
-        if (!state.settings.economyFirst) {
+        if (!state.settings.economyFirst && this.atomBombPerceivedCost) {
           this.atomBombPerceivedCost =
             (this.atomBombPerceivedCost * 150n) / 100n;
         }
@@ -1303,9 +1342,10 @@
         this.hydrogenBombsLaunched++;
         // Increase perceived cost by 25% each time to simulate saving up for a MIRV
         if (this.hydrogenBombPerceivedCost === null) {
-          this.hydrogenBombPerceivedCost = await this.cost(UNIT.HydrogenBomb);
+          const seed = await this.cost(UNIT.HydrogenBomb);
+          if (seed) this.hydrogenBombPerceivedCost = seed;
         }
-        if (!state.settings.economyFirst) {
+        if (!state.settings.economyFirst && this.hydrogenBombPerceivedCost) {
           this.hydrogenBombPerceivedCost =
             (this.hydrogenBombPerceivedCost * 125n) / 100n;
         }

@@ -148,6 +148,9 @@
     // Same tick twice (two callers in one pass) would push a zero-span sample.
     const tail = inc.samples[inc.samples.length - 1];
     if (tail && tail.tick === tick) return;
+    // (A new game restarting game.ticks() near 0 would leave a negative-span window here;
+    // that is handled once for ALL tick-stamped state by maybeResetForNewGame in core.js,
+    // called from nationExecution.tick() just before this sampler.)
     if (inc.lastGold !== null && gold > inc.lastGold) inc.earned += gold - inc.lastGold;
     inc.lastGold = gold;
     inc.samples.push({ tick: tick, earned: inc.earned, gold: gold });
@@ -165,22 +168,61 @@
     return { first: first, last: last, dt: dt };
   }
 
-  /** GROSS income: positive gold deltas only, so spending is invisible. This is the
-   *  right basis for "what can we afford to own" (defence posts). */
+  /** Positive-delta income: the sum of gold INCREASES between consecutive samples.
+   *  NOT true gross income — the game exposes no income accessor, and each sample is taken
+   *  once per tick before the build pass spends, so a tick whose earnings were outspent
+   *  contributes 0 rather than its earnings. That biases the estimate DOWNWARD under heavy
+   *  building, which makes every consumer conservative (it under-spends rather than
+   *  over-spends). Still far better than the raw balance slope, which the build pass drives
+   *  to ~0 every tick and which therefore reported "flat economy" during a boom. */
   function estimatedGoldPerMinute() {
     const w = incomeWindow();
     if (w === null) return 0;
     return ((w.last.earned - w.first.earned) / w.dt) * 600;
   }
 
-  /** NET income: the actual slope of our gold, so all spending IS counted. This is the
-   *  right basis for "are we still getting richer" — the question that decides whether
-   *  another warhead is affordable. Can legitimately be negative. */
-  function estimatedNetGoldPerMinute() {
-    const w = incomeWindow();
-    if (w === null) return null; // null = no data yet, distinct from 0 = flat
-    if (typeof w.first.gold !== "number" || typeof w.last.gold !== "number") return null;
-    return ((w.last.gold - w.first.gold) / w.dt) * 600;
+  // REMOVED: estimatedNetGoldPerMinute(). Its only consumer was the nuke income throttle,
+  // which now reads GROSS — the balance slope it returned was driven to ~0 every tick by
+  // handleStructures() spending the treasury, so it reported "flat economy" while the
+  // economy boomed and blocked every warhead. samples[].gold is kept: it is one number and
+  // it records the raw balance the slope was derived from.
+
+  /** Gold the MIRV war chest holds back. THE single definition of this hold: both the
+   *  build gate (handleStructures) and the warhead gate (maybeSendNuke) call it, so the two
+   *  can no longer disagree — them disagreeing is what deadlocked the entire nuclear
+   *  offence (the nuke pass held fire completely while the build pass, exempt, spent the
+   *  chest away, so the 25M target was never reached and nothing ever cleared it).
+   *
+   *  Returns 0n when no chest is set, which is the common case.
+   *
+   *  Under economyFirst it always returns 0n, and that is deliberate. Withholding gold
+   *  CANNOT fund a 25M MIRV here, in either available shape:
+   *    - all-or-nothing (availableGold = gold - 25M) is ZERO for any gold under 25M, which
+   *      freezes the build pass outright from ~10 min onward;
+   *    - proportional (hold f of the treasury) leaves (1-f)*gold spendable, so any spender
+   *      with a price floor C keeps buying whenever gold >= C/(1-f). The treasury then has a
+   *      fixed point at C/(1-f) — with the 750k atom bomb and f=0.5 that is ~1.5M — and it
+   *      never approaches 25M. Raising f only moves the attractor: it would take f≈97% to
+   *      reach 25M, a value that silently breaks the moment the cheapest marginal purchase
+   *      changes (a 250k defence post would need 99%).
+   *  The real cause is that economyFirst gives the builder an effectively unbounded appetite
+   *  (prices capped at 1M, no ratio ceiling, save-up throttle disabled), so holding gold
+   *  back only strands it for a MIRV that never arrives. The MIRV stays OPPORTUNISTIC under
+   *  economyFirst: considerMIRV still launches one the moment gold reaches its price. With
+   *  economyFirst OFF, the faithful win-fix hold applies in full to BOTH gates. */
+  function mirvReserveHold(goldBigInt) {
+    if (!state.settings.winFixes) return 0n;
+    if (state.settings.economyFirst) return 0n;
+    let chest = 0n;
+    let gold = 0n;
+    try {
+      chest = BigInt(state.nukeReserveGold || 0);
+      gold = BigInt(goldBigInt || 0);
+    } catch (_e) {
+      return 0n;
+    }
+    if (chest <= 0n || gold <= 0n) return 0n;
+    return chest;
   }
 
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
@@ -1266,26 +1308,15 @@
       if (!autoBotBuildAllowed(type)) return false; // user disallowed this type
       const perceivedCost = this.getPerceivedCost(type);
       let availableGold = this.player.gold();
-      // WIN-FIX (NOT in src): when mirvBehavior has set a real MIRV war-chest
-      // reserve (state.nukeReserveGold ≥ 15M), the economy yields so the bot
-      // accumulates the war chest instead of over-building — this is what funds
-      // the leader/pre-empt MIRV that closes out a winning game.
-      if (
-        state.settings.winFixes &&
-        state.nukeReserveGold &&
-        // DIVERGENCE (economyFirst): don't let the MIRV war chest freeze the economy.
-        !state.settings.economyFirst
-      ) {
-        let reserve = 0n;
-        try {
-          reserve = BigInt(state.nukeReserveGold || 0);
-        } catch (_e) {
-          reserve = 0n;
-        }
-        if (reserve >= 15000000n) {
-          availableGold = availableGold > reserve ? availableGold - reserve : 0n;
-        }
-      }
+      // WIN-FIX (NOT in src): yield part of the treasury to the MIRV war chest so the
+      // leader/pre-empt MIRV that closes out a winning game can actually be funded. The
+      // hold is BOUNDED (see mirvReserveHold) rather than all-or-nothing, and it is applied
+      // identically on the warhead side in nukeBehavior.maybeSendNuke — the two gates
+      // disagreeing is what deadlocked the offence: the nuke pass held fire completely
+      // while this pass spent the chest away, so 25M was never reached and no MIRV, atom or
+      // hydrogen bomb ever launched again.
+      const mirvHold = mirvReserveHold(availableGold);
+      availableGold = availableGold > mirvHold ? availableGold - mirvHold : 0n;
       if (availableGold < perceivedCost) {
         return false;
       }
@@ -1818,8 +1849,14 @@
       } catch (_e) {
         return [];
       }
-      const out = [];
-      const seen = new Set();
+      // DIVERGENCE FIX: sample every SAM's ring in FULL, shuffle each one, then interleave
+      // the rings round-robin. The old loop walked dx from -r upward and returned the
+      // instant it hit maxTiles, so all 25 candidates came from the FIRST SAM's two or
+      // three westernmost columns. Every silo then landed in that one wedge, well inside a
+      // single warhead's blast — precisely what the structureSpacing term in the silo value
+      // function exists to prevent, and it could not help because it only ever saw tiles
+      // from that wedge. Interleaving spreads the candidate set across all our SAMs.
+      const rings = [];
       for (const unit of useSams) {
         const samTile = unit.tile();
         const cx = game.x(samTile);
@@ -1829,6 +1866,7 @@
         if (range <= 0) continue;
         const r = Math.floor(range);
         const step = Math.max(2, Math.floor(r / 6));
+        const ring = [];
         for (let dx = -r; dx <= r; dx += step) {
           for (let dy = -r; dy <= r; dy += step) {
             if (dx * dx + dy * dy > range * range) continue;
@@ -1836,14 +1874,28 @@
             const ny = cy + dy;
             if (!game.isValidCoord(nx, ny)) continue;
             const t = game.ref(nx, ny);
-            if (seen.has(t)) continue;
             if (!game.isLand(t)) continue;
             if (game.ownerID(t) !== mySid) continue; // can only build on OUR land
-            seen.add(t);
-            out.push(t);
-            if (out.length >= maxTiles) return out;
+            ring.push(t);
           }
         }
+        if (ring.length > 0) rings.push(this.random.shuffleArray(ring));
+      }
+      if (rings.length === 0) return [];
+      const out = [];
+      const seen = new Set();
+      for (let i = 0; out.length < maxTiles; i++) {
+        let advanced = false;
+        for (const ring of rings) {
+          if (i >= ring.length) continue;
+          advanced = true;
+          const t = ring[i];
+          if (seen.has(t)) continue; // overlapping SAM coverage
+          seen.add(t);
+          out.push(t);
+          if (out.length >= maxTiles) break;
+        }
+        if (!advanced) break; // every ring exhausted
       }
       return out;
     }

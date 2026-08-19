@@ -76,6 +76,19 @@
       // sizing (gross) and the warhead throttle (net) read this window, and a throttle
       // that fails closed must not be starved of data by an unrelated toggle.
       if (me !== null && typeof sampleBotIncome === "function") {
+        // Drop game-scoped state the instant a new game restarts game.ticks(); see
+        // maybeResetForNewGame(). Must run BEFORE the sampler so it cannot push a sample
+        // that straddles two games.
+        if (typeof maybeResetForNewGame === "function") {
+          try {
+            let t = Number(this.mg.ticks());
+            if (maybeResetForNewGame(t)) {
+              botLog(tr("♻️ New game detected — cleared stale per-game state"), "system");
+            }
+          } catch (_e) {
+            /* never let bookkeeping break the tick */
+          }
+        }
         sampleBotIncome(this.mg, me);
       }
 

@@ -250,8 +250,8 @@
         }
       } else {
         if (boatOn && this.random.chance(10)) {
-          await this.attackWithRandomBoat(borderingEnemies);
-          return;
+          // Only give up the rest of this pass if a boat really went out.
+          if (await this.attackWithRandomBoat(borderingEnemies)) return;
         }
 
         if (allianceOn) {
@@ -265,17 +265,22 @@
     }
 
     // attackWithRandomBoat — AiAttackBehavior (private, now async via findRandomBoatTarget).
+    // Returns TRUE only if a boat intent was actually emitted. The caller MUST branch on
+    // that: every early bail below (feature off, unit disabled, the winFixes land-share
+    // skip, no shore, no target, opening veto) leaves the attack pass with nothing done,
+    // and maybeAttack used to `return` regardless — silently discarding ~10% of all attack
+    // passes, alliance requests included, for the whole late game.
     async attackWithRandomBoat(borderingEnemies = []) {
       if (this.player === null) throw new Error("not initialized");
 
       // Honour the panel's "boat" feature toggle (the only boat gate — maybeAttack
       // itself runs under expand||boat, so the toggle must be enforced here).
       if (!(state.settings.features && state.settings.features.boat)) {
-        return;
+        return false;
       }
 
       if (this.game.config().isUnitDisabled(UNIT.TransportShip)) {
-        return;
+        return false;
       }
 
       // WIN-FIX (NOT in src; winFixes-gated): once we DOMINATE the map by land,
@@ -289,7 +294,7 @@
       if (state.settings.winFixes) {
         const totalLand = this.game.numLandTiles() || 1;
         if (this.player.numTilesOwned() / totalLand > 0.25) {
-          return;
+          return false;
         }
       }
 
@@ -298,7 +303,7 @@
         this.player.unitCount(UNIT.TransportShip) >=
         this.game.config().boatMaxNumber()
       ) {
-        return;
+        return false;
       }
 
       // Check if we have any shore tiles to launch from
@@ -306,7 +311,7 @@
         this.game.isShore(t),
       );
       if (shore.length === 0) {
-        return;
+        return false;
       }
 
       const src = this.random.randElement(shore);
@@ -317,7 +322,7 @@
         // None found? Then look for players
         dst = await this.findRandomBoatTarget(src, borderingEnemies, false);
         if (dst === null) {
-          return;
+          return false;
         }
       }
 
@@ -334,12 +339,13 @@
           )
         : this.player.troops() / 5;
       // DIVERGENCE (phasedOpening): this path emits directly rather than via emitBoat.
-      if (this.openingVetoesTile(dst)) return;
+      if (this.openingVetoesTile(dst)) return false;
       if (ctors.boat && emitIntent(ctors.boat, dst, troops)) {
         state.stats.attacks++;
         setLastAction(tr("⛵ Random boat"), "naval");
+        return true;
       }
-      return;
+      return false;
     }
 
     // ── WIN-FIX: opportunistic amphibious landings (NOT in src) ────────────────
