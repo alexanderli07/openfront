@@ -143,6 +143,17 @@
         border-color: var(--oh-accent-muted, rgba(96,165,250,.45));
       }
       /* 3-tab visibility: control is default; log/config show when their class is set. */
+      /* All three panes are the SAME fixed box, so switching tabs never resizes the
+         panel. 340px is not arbitrary: it is the height .ab-cfg-body already declared,
+         i.e. the one deliberate pane height in this file. Deliberately NOT measured from
+         the Controls pane — its .ab-feats-grid animates 0 -> 200px when expanded, so
+         "the Controls height" is not a fixed number to anchor to. Each pane's scrolling
+         body fills the box (see .ab-cfg-body / .ab-log-list), and Controls scrolls
+         itself once its collapsible groups are open. */
+      #${PANEL_ID} .ab-pane {
+        height: 340px; box-sizing: border-box;
+        display: flex; flex-direction: column; overflow-y: auto;
+      }
       #${PANEL_ID} .ab-pane[data-pane="log"],
       #${PANEL_ID} .ab-pane[data-pane="config"] { display: none; }
       #${PANEL_ID}.ab-tab-log .ab-pane[data-pane="control"],
@@ -200,7 +211,7 @@
         width: 60px; background: rgba(0,0,0,0.3); border: 1px solid var(--oh-panel-border, rgba(148,163,184,0.3));
         border-radius: 5px; color: var(--oh-panel-text, #e2e8f0); padding: 3px 6px; font: 11px monospace; text-align: right;
       }
-      #${PANEL_ID} .ab-cfg-body { max-height: 340px; overflow-y: auto; margin-right: -10px; padding-right: 10px; }
+      #${PANEL_ID} .ab-cfg-body { flex: 1; min-height: 0; overflow-y: auto; margin-right: -10px; padding-right: 10px; }
       #${PANEL_ID} .ab-cfg-body::-webkit-scrollbar { width: 6px; }
       #${PANEL_ID} .ab-cfg-body::-webkit-scrollbar-thumb {
         background: rgba(255,255,255,0.18); border-radius: 3px;
@@ -220,7 +231,7 @@
         border-color: var(--oh-accent-muted, rgba(96,165,250,0.4));
       }
       #${PANEL_ID} .ab-log-list {
-        max-height: 240px; overflow-y: auto; display: flex; flex-direction: column;
+        flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
         gap: 1px; font-variant-numeric: tabular-nums;
       }
       #${PANEL_ID} .ab-log-list::-webkit-scrollbar { width: 7px; }

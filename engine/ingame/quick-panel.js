@@ -337,7 +337,11 @@
       "  color:var(--oh-panel-text);",
       "}",
       ".ohqp-body {",
-      "  flex:1; overflow-y:auto; overflow-x:hidden; padding:8px 10px;",
+      // Fixed so switching tabs never resizes the panel. 400px is the auto-bot's 340px
+      // pane plus a bit, per the request for "a little bigger"; with the 41px header and
+      // the tab row it totals ~479px, inside the panel's 560px max-height.
+      "  height:400px; box-sizing:border-box;",
+      "  overflow-y:auto; overflow-x:hidden; padding:8px 10px;",
       "}",
       ".ohqp-body > div { display:none; }",
       ".ohqp-body > div.active { display:block; }",
