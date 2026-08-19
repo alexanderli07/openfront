@@ -7,6 +7,14 @@
 // not pop a card over the thing you are aiming at.
 var OFH_TIP_DELAY_MS = 800;
 
+// Total height of the helper and auto-bot panels, in px. BOTH panels set this as an
+// explicit height and let their body flex to fill whatever the header and tab row do
+// not use — so they are the same size BY CONSTRUCTION, whatever those chrome elements
+// measure. Previously the helper's body carried a hand-measured px value derived from
+// the auto-bot's chrome, which meant the two could silently drift apart whenever a
+// padding or font-size changed. Change this one number to resize both.
+var OFH_PANEL_HEIGHT_PX = 420;
+
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
   if (!Number.isFinite(intensity)) {

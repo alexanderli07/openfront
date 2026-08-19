@@ -291,7 +291,8 @@
     style.textContent = [
       "#" + QUICK_PANEL_ID + " {",
       "  position:fixed; z-index:8000;",
-      "  width:280px; max-height:560px; display:none;",
+      "  width:280px; display:none;",
+      "  height:" + (typeof OFH_PANEL_HEIGHT_PX === "number" ? OFH_PANEL_HEIGHT_PX : 420) + "px;",
       "  border:1px solid var(--oh-panel-border); border-radius:8px;",
       "  background:var(--oh-panel-bg); color:var(--oh-panel-text);",
       "  font:600 11px/1.45 'Aptos','Trebuchet MS','Segoe UI',sans-serif;",
@@ -299,6 +300,7 @@
       "  pointer-events:auto; user-select:none; overflow:hidden; flex-direction:column;",
       "}",
       "#" + QUICK_PANEL_ID + "[data-visible='true'] { display:flex; }",
+      "#" + QUICK_PANEL_ID + "[data-minimized='true'] { height:auto; }",
       "#" + QUICK_PANEL_ID + "[data-minimized='true'] .ohqp-tabs,",
       "#" + QUICK_PANEL_ID + "[data-minimized='true'] .ohqp-body { display:none; }",
       ".ohqp-header {",
@@ -337,15 +339,9 @@
       "  color:var(--oh-panel-text);",
       "}",
       ".ohqp-body {",
-      // Fixed so switching tabs never resizes the panel, and sized so this panel ends up
-      // the SAME TOTAL HEIGHT as the auto-bot's. Measured with each panel in its own
-      // display model (the auto-bot is display:block, the helper is flex-column):
-      //   auto-bot  41 header + 37.4 tabs + 340 pane + 2 border = 420.4
-      //   helper    39 header + 41   tabs +  ?  body + 2 border
-      // so the body must be 420.4 - 39 - 41 - 2 = 338.4.
-      // NOTE this is derived from the auto-bot's chrome — if .ab-head/.ab-tabs padding
-      // or .ab-pane's 340px ever changes, re-measure rather than nudging this by eye.
-      "  height:338.4px; box-sizing:border-box;",
+      // Fills whatever the header and tab row leave over, so the panel's TOTAL height is
+      // exactly OFH_PANEL_HEIGHT_PX regardless of what that chrome measures.
+      "  flex:1; min-height:0; box-sizing:border-box;",
       "  overflow-y:auto; overflow-x:hidden; padding:8px 10px;",
       "}",
       ".ohqp-body > div { display:none; }",

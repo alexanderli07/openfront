@@ -19,6 +19,9 @@
         position: fixed;
         z-index: 8000;
         width: 280px;
+        height: ${typeof OFH_PANEL_HEIGHT_PX === "number" ? OFH_PANEL_HEIGHT_PX : 420}px;
+        display: flex;
+        flex-direction: column;
         bottom: 16px;
         right: 16px;
         background: var(--oh-panel-bg, rgba(12, 18, 20, 0.95));
@@ -61,7 +64,12 @@
         transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.4);
       }
       #${PANEL_ID} .ab-switch.on::after { transform: translateX(16px); }
-      #${PANEL_ID} .ab-body { padding: 9px 10px 10px; }
+      #${PANEL_ID} .ab-body {
+        padding: 9px 10px 10px; flex: 1; min-height: 0;
+        display: flex; flex-direction: column;
+      }
+      /* Collapsed shows only the header, so the fixed height must not apply. */
+      #${PANEL_ID}.ab-collapsed { height: auto; }
       #${PANEL_ID}.ab-collapsed .ab-body { display: none; }
       #${PANEL_ID}.ab-collapsed .ab-tabs { display: none; }
       #${PANEL_ID} .ab-gate-dot {
@@ -151,7 +159,7 @@
          body fills the box (see .ab-cfg-body / .ab-log-list), and Controls scrolls
          itself once its collapsible groups are open. */
       #${PANEL_ID} .ab-pane {
-        height: 340px; box-sizing: border-box;
+        flex: 1; min-height: 0; box-sizing: border-box;
         display: flex; flex-direction: column; overflow-y: auto;
       }
       #${PANEL_ID} .ab-pane[data-pane="log"],
