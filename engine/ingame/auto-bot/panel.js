@@ -162,6 +162,11 @@
         flex: 1; min-height: 0; box-sizing: border-box;
         display: flex; flex-direction: column; overflow-y: auto;
       }
+      /* Pane children keep their natural height and the PANE scrolls. Without this they
+         are flex items with the default flex-shrink:1, so a short pane compresses them —
+         and .ab-feats-grid (display:grid, overflow:hidden) then collapses its rows into
+         each other rather than clipping cleanly. That is the overlapping feature pills. */
+      #${PANEL_ID} .ab-pane > * { flex-shrink: 0; }
       #${PANEL_ID} .ab-pane[data-pane="log"],
       #${PANEL_ID} .ab-pane[data-pane="config"] { display: none; }
       #${PANEL_ID}.ab-tab-log .ab-pane[data-pane="control"],
