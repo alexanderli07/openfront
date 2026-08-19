@@ -458,6 +458,11 @@
             </div>
 
             <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip-desc="${tr("Site buildings away from any border we don't trust — enemies, and allies too, since an alliance can be broken — and close to real teammates for mutual defence. Also weights sites by how far they are from our other buildings, so one atom bomb is less likely to destroy two.")}" data-tip="${tr("Safe placement")}">${tr("Safe placement")}</span>
+              <div class="ab-cfg-sw ${state.settings.safePlacement ? "on" : ""}" data-cfg="safePlacement"></div>
+            </div>
+
+            <div class="ab-cfg-row">
               <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}" data-tip="${tr("Phased opening")}">${tr("Phased opening")}</span>
               <div class="ab-cfg-sw ${state.settings.phasedOpening ? "on" : ""}" data-cfg="phasedOpening"></div>
             </div>

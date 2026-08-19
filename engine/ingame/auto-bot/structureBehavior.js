@@ -225,6 +225,41 @@
     return chest;
   }
 
+  /** safePlacement: distance at which the "away from a threat border" term saturates,
+   *  as a multiple of the atom blast radius. Past this, extra depth buys nothing real and
+   *  would just out-shout the elevation and spacing terms. */
+  const SAFE_PLACEMENT_RANGE_MULT = 3;
+  /** safePlacement: weight of the "far from any border we do not trust" term. Sized to
+   *  compete with src's own terms rather than dominate them: elevation contributes ~0-10
+   *  and the two src distance terms saturate at the blast radius (~31) and twice it (~62). */
+  const SAFE_WEIGHT_THREAT = 40;
+  /** safePlacement: weight of the "near a TEAMMATE border" term. Deliberately smaller than
+   *  the threat term — hugging a teammate is a bonus, but not at the price of sitting next
+   *  to an enemy. */
+  const SAFE_WEIGHT_TEAM = 25;
+  /** safePlacement: weight of the atom-separation term. This is the user's hard
+   *  requirement, so it outweighs both strategic terms.
+   *
+   *  It is a GRADIENT on distance-to-nearest-structure, NOT a flat penalty for "is
+   *  blast-paired". A flat penalty is worthless here and it is worth spelling out why: the
+   *  exclusion disc around each structure has radius 2R (~60 tiles), which on a normal
+   *  territory covers the whole map, so EVERY candidate is paired with something and every
+   *  candidate takes the SAME penalty. Subtracting a constant from every candidate leaves
+   *  every `b.value - a.value` comparison unchanged, so the ranking — and therefore the
+   *  chosen tile — is bit-identical to having no penalty at all. A gradient always
+   *  discriminates: when nothing can fully escape, it still picks the least-paired tile. */
+  const SAFE_WEIGHT_SEPARATION = 60;
+  /** safePlacement: types worth protecting from a shared blast. DefensePost is excluded on
+   *  purpose — posts are cheap and belong ON the border, so pairing rules would fight
+   *  their whole point and would fire constantly. */
+  const BLAST_PAIR_TYPES = [
+    UNIT.City,
+    UNIT.Factory,
+    UNIT.Port,
+    UNIT.MissileSilo,
+    UNIT.SAMLauncher,
+  ];
+
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
   const DEFENSE_POST_INCOME_MINUTES = 1;
   /** defensePosts: absolute ceiling regardless of income. */
@@ -1706,6 +1741,161 @@
       }
     }
 
+    /** DIVERGENCE (safePlacement): a weighting system for WHERE to build, layered on top
+     *  of src's elevation / away-from-border / away-from-same-type terms. Three components:
+     *
+     *    + far from any border we do NOT trust. "Untrusted" means everyone who is not an
+     *      actual TEAMMATE — enemies obviously, but ALLIES too, because an alliance can be
+     *      broken at will, so an ally border is a potential front rather than a safe one.
+     *    + near a TEAMMATE border, for mutual defence. Keyed on team() only, NEVER on
+     *      isFriendly(), which is true for alliances as well.
+     *    + distance from our OWN existing structures, so a single atom bomb cannot take out
+     *      two of them. Full credit at 2x the blast radius, scaled down closer in.
+     *
+     *  Why src's existing spacing term does not already do that last part: it compares
+     *  MANHATTAN distance against 2x the blast radius, and manhattan is far too lenient on
+     *  the diagonal — dx = dy = R sums to 2R and passes, while the true separation is only
+     *  R*sqrt(2) ≈ 1.41R, so both structures sit comfortably inside one blast. This term
+     *  uses euclideanDistSquared, which is the distance a bomb actually cares about. It also
+     *  spans ALL our structure types, not just the type being placed: an atom landing
+     *  between a new city and an existing factory costs us both.
+     *
+     *  Degrades cleanly: in FFA team() is null, so there are no teammates and the team term
+     *  contributes nothing while the threat term still works.
+     *
+     *  `placingType` matters for one case: when siting a MISSILE SILO we do NOT count our
+     *  own SAM launchers as blast partners. Silos are deliberately placed inside a friendly
+     *  SAM's cover, and a SAM's range is typically within 2x the blast radius, so counting it
+     *  would penalise every covered tile equally — which is both useless (a constant cannot
+     *  change a ranking) and backwards, since the SAM's entire job is to shoot that bomb down
+     *  before it lands.
+     *
+     *  Returns a (tile) => number closure. Every expensive step — classifying players,
+     *  walking the border, listing our structures — happens ONCE here, not per candidate. */
+    safePlacementScorer(placingType) {
+      const ZERO = function () {
+        return 0;
+      };
+      if (!state.settings.safePlacement) return ZERO;
+      const game = this.game;
+      const player = this.player;
+
+      let myTeam = null;
+      try {
+        myTeam = player.team ? player.team() : null;
+      } catch (_e) {
+        myTeam = null;
+      }
+
+      // Split every other living player into trusted teammates and everyone else.
+      const teammateSids = new Set();
+      const untrustedSids = new Set();
+      try {
+        for (const other of game.players()) {
+          if (!other.isPlayer() || !other.isAlive()) continue;
+          if (other.smallID() === player.smallID()) continue;
+          let theirTeam = null;
+          try {
+            theirTeam = other.team ? other.team() : null;
+          } catch (_e) {
+            theirTeam = null;
+          }
+          if (myTeam !== null && theirTeam !== null && theirTeam === myTeam) {
+            teammateSids.add(other.smallID());
+          } else {
+            untrustedSids.add(other.smallID());
+          }
+        }
+      } catch (_e) {
+        return ZERO;
+      }
+
+      // ONE border walk, classifying each of our own border tiles by who it faces. A tile
+      // can face both (a pinch between a teammate and an enemy) and counts for both.
+      const threatFront = [];
+      const teamFront = [];
+      try {
+        for (const borderTile of player.borderTiles()) {
+          let facesThreat = false;
+          let facesTeam = false;
+          for (const neighbor of game.neighbors(borderTile)) {
+            if (!game.hasOwner(neighbor) || !game.isLand(neighbor)) continue;
+            const sid = game.ownerID(neighbor);
+            if (untrustedSids.has(sid)) facesThreat = true;
+            else if (teammateSids.has(sid)) facesTeam = true;
+          }
+          if (facesThreat) threatFront.push(borderTile);
+          if (facesTeam) teamFront.push(borderTile);
+        }
+      } catch (_e) {
+        return ZERO;
+      }
+
+      const ourStructures = [];
+      for (const type of BLAST_PAIR_TYPES) {
+        // See the note on placingType: the SAM protecting a silo is not a liability to it.
+        if (placingType === UNIT.MissileSilo && type === UNIT.SAMLauncher) continue;
+        try {
+          for (const u of player.units(type)) ourStructures.push(u.tile());
+        } catch (_e) {
+          /* a missing type is not fatal; a partial list still helps */
+        }
+      }
+
+      const { borderSpacing } = this.spacingConstants();
+      const range = Math.max(1, borderSpacing * SAFE_PLACEMENT_RANGE_MULT);
+      // One bomb catches both when their separation is within 2x the outer radius, so that
+      // distance is where the separation term stops earning credit.
+      const blastPair = Math.max(1, borderSpacing * 2);
+      const haveThreat = threatFront.length > 0;
+      const haveTeam = teamFront.length > 0;
+      // Nothing to say about this tile if there is no threat border, no teammate border and
+      // nothing of ours to stay clear of.
+      if (!haveThreat && !haveTeam && ourStructures.length === 0) return ZERO;
+
+      return (tile) => {
+        let w = 0;
+
+        if (haveThreat) {
+          const d = closestTile(game, threatFront, tile)[1];
+          if (Number.isFinite(d)) {
+            w += SAFE_WEIGHT_THREAT * (Math.min(d, range) / range);
+          }
+        }
+
+        if (haveTeam) {
+          const d = closestTile(game, teamFront, tile)[1];
+          if (Number.isFinite(d)) {
+            w += SAFE_WEIGHT_TEAM * (1 - Math.min(d, range) / range);
+          }
+        }
+
+        // EUCLIDEAN, unlike src's manhattan spacing term: manhattan lets dx = dy = R pass
+        // (it sums to 2R) while the true separation is only R*sqrt(2), i.e. both structures
+        // sit comfortably inside one blast. No early exit — we need the true nearest, since
+        // the term is a gradient rather than a yes/no test.
+        if (ourStructures.length > 0) {
+          let nearestSq = Infinity;
+          for (const other of ourStructures) {
+            if (other === tile) continue;
+            let dsq;
+            try {
+              dsq = game.euclideanDistSquared(other, tile);
+            } catch (_e) {
+              continue;
+            }
+            if (Number.isFinite(dsq) && dsq < nearestSq) nearestSq = dsq;
+          }
+          if (Number.isFinite(nearestSq)) {
+            const d = Math.sqrt(nearestSq);
+            w += SAFE_WEIGHT_SEPARATION * (Math.min(d, blastPair) / blastPair);
+          }
+        }
+
+        return w;
+      };
+    }
+
     // structureSpawnTileValue — NationStructureBehavior.ts:869.
     structureSpawnTileValue(type) {
       switch (type) {
@@ -1731,8 +1921,14 @@
       const otherUnits = this.player.units(UNIT.MissileSilo);
       const { borderSpacing, structureSpacing } = this.spacingConstants();
 
+      // DIVERGENCE (safePlacement): strategic siting weights - away from untrusted
+      // borders, toward teammates, and away from our own structures so one atom cannot
+      // take out two. See safePlacementScorer().
+      const safePlace = this.safePlacementScorer(UNIT.MissileSilo);
+
       return (tile) => {
         let w = 0;
+        w += safePlace(tile);
 
         // Prefer higher elevations
         w += game.magnitude(tile);
@@ -1905,16 +2101,36 @@
     portValue() {
       const game = this.game;
       const otherUnits = this.player.units(UNIT.Port);
+      const { structureSpacing } = this.spacingConstants();
+
+      // DIVERGENCE (safePlacement): strategic siting weights - away from untrusted
+      // borders, toward teammates, and away from our own structures so one atom cannot
+      // take out two. See safePlacementScorer().
+      const safePlace = this.safePlacementScorer(UNIT.Port);
 
       return (tile) => {
         let w = 0;
+        w += safePlace(tile);
 
         // Prefer to be as far as possible from other ports
         const otherTiles = new Set(otherUnits.map((u) => u.tile()));
         otherTiles.delete(tile);
         const closest = closestTile(game, otherTiles, tile);
         const closestOtherDist = closest[1];
-        w += closestOtherDist;
+        // closestTile returns Infinity for an EMPTY set, so with no ports yet every
+        // candidate scored Infinity and tied — which silently discarded every other term
+        // for the very first port. Only add a real distance.
+        if (Number.isFinite(closestOtherDist)) {
+          // DIVERGENCE (safePlacement): CAP it. src leaves this term uncapped, and portValue
+          // has no elevation or border term, so it is the ENTIRE function — a spread of
+          // 100-280 points across the candidate set, which buries every strategic weight.
+          // It also points the wrong way: maximising distance from our existing ports drives
+          // each new port to the far end of the territory, which on a contested map is the
+          // enemy front. Past two blast radii, extra port separation buys nothing anyway.
+          w += state.settings.safePlacement
+            ? Math.min(closestOtherDist, structureSpacing)
+            : closestOtherDist;
+        }
 
         return w;
       };
@@ -1940,8 +2156,14 @@
       // Cross-type spacing: prefer to be away from cities.
       const cityTiles = new Set(player.units(UNIT.City).map((u) => u.tile()));
 
+      // DIVERGENCE (safePlacement): strategic siting weights - away from untrusted
+      // borders, toward teammates, and away from our own structures so one atom cannot
+      // take out two. See safePlacementScorer().
+      const safePlace = this.safePlacementScorer(UNIT.Factory);
+
       return (tile) => {
         let w = 0;
+        w += safePlace(tile);
 
         // Prefer higher elevations
         w += game.magnitude(tile);
@@ -2265,8 +2487,14 @@
         player.units(UNIT.Factory).map((u) => u.tile()),
       );
 
+      // DIVERGENCE (safePlacement): strategic siting weights - away from untrusted
+      // borders, toward teammates, and away from our own structures so one atom cannot
+      // take out two. See safePlacementScorer().
+      const safePlace = this.safePlacementScorer(UNIT.City);
+
       return (tile) => {
         let w = 0;
+        w += safePlace(tile);
 
         w += game.magnitude(tile);
 

@@ -71,6 +71,12 @@
     // (src restricts it to Impossible) and prefer it over spending a warhead on a
     // zero-value target. Sizing/pacing is unchanged — see maybeDestroyEnemySam.
     samCrack: true,
+    // DIVERGENCE (opt-in, NOT in src): strategic siting. Weighs build sites AWAY from any
+    // border we do not trust (enemies, and allies too — an alliance can be broken), TOWARD
+    // real teammates for mutual defence, and refuses to pair two structures inside a single
+    // atom blast (euclidean, unlike src's lenient manhattan spacing). See
+    // safePlacementScorer() in structureBehavior.js.
+    safePlacement: true,
     // DIVERGENCE (opt-in, NOT in src): threat-scaled air defence. src fixes the SAM
     // target at a per-city ratio by difficulty, blind to how much nuclear threat
     // actually exists. samDefense instead sizes it from hostile Missile Silo levels
@@ -405,6 +411,7 @@
       "economyFirst",
       "samCrack",
       "samDefense",
+      "safePlacement",
       "defensePosts",
       "nukeDensityFirst",
       "reserveByNeighbors",
