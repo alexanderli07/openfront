@@ -17,6 +17,10 @@
   // content script posts a bundle (tr() then returns the English key verbatim).
   let autoBotBundle = null;
   let autoBotLang = "en";
+  // Content signature of the delivered bundle. Empty string on purpose: any real
+  // bundle serializes to at least "{}", so the FIRST delivery still counts as a
+  // change and still relocalizes.
+  let autoBotBundleSignature = "";
 
   function tr(key, params) {
     let text = (autoBotBundle && autoBotBundle[key]) || key;
@@ -31,14 +35,36 @@
   // Called when the content script delivers (or updates) the language bundle.
   // The content script posts on every syncHelpers() (so delivery is reliable
   // regardless of injection timing), so we only do the costly panel rebuild when
-  // the language actually changed or the very first bundle arrived.
+  // the language actually changed or the bundle CONTENT changed.
+  //
+  // This compared `bundle !== autoBotBundle` — object IDENTITY — which can never be
+  // false here: the bundle arrives via window.postMessage (posted in lobby/core.js,
+  // received in bootstrap.js), and postMessage structured-clones its payload, so every
+  // post delivers a brand-new object. bundleChanged was therefore true 100% of the
+  // time, and since relocalizeAutoBotPanel() does `panel.remove(); buildPanel();`,
+  // EVERY settings write tore the panel down and rebuilt it — resetting the config
+  // pane's scroll position and the log list, dropping input focus, and killing the
+  // live tooltip. syncHelpers() runs unconditionally from a storage-change handler,
+  // so that was every few seconds in practice.
   function setAutoBotI18n(language, bundle) {
     const nextLang = language || "en";
     const languageChanged = nextLang !== autoBotLang;
-    const bundleChanged = bundle && typeof bundle === "object" && bundle !== autoBotBundle;
+    const hasBundle = bundle && typeof bundle === "object";
+    let nextSignature = autoBotBundleSignature;
+    if (hasBundle) {
+      try {
+        nextSignature = JSON.stringify(bundle);
+      } catch (_e) {
+        // Unserializable (cycle) — leave the signature alone so we do NOT rebuild on
+        // every post. A genuine language switch still comes through languageChanged.
+        nextSignature = autoBotBundleSignature;
+      }
+    }
+    const bundleChanged = hasBundle && nextSignature !== autoBotBundleSignature;
     autoBotLang = nextLang;
-    if (bundle && typeof bundle === "object") {
+    if (hasBundle) {
       autoBotBundle = bundle;
+      autoBotBundleSignature = nextSignature;
     }
     if (languageChanged || bundleChanged) {
       relocalizeAutoBotPanel();
