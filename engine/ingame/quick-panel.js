@@ -337,10 +337,12 @@
       "  color:var(--oh-panel-text);",
       "}",
       ".ohqp-body {",
-      // Fixed so switching tabs never resizes the panel. 400px is the auto-bot's 340px
-      // pane plus a bit, per the request for "a little bigger"; with the 41px header and
-      // the tab row it totals ~479px, inside the panel's 560px max-height.
-      "  height:400px; box-sizing:border-box;",
+      // Fixed so switching tabs never resizes the panel, and trimmed to the Config
+      // tab's exact content height now that Theme is always expanded: measured 346px of
+      // content + 16px body padding = 362px, plus 4px of tolerance because that figure
+      // comes from a faithful reproduction of the markup rather than the live render.
+      // The Helpers tab scrolls inside this box, which is fine — its sections expand.
+      "  height:366px; box-sizing:border-box;",
       "  overflow-y:auto; overflow-x:hidden; padding:8px 10px;",
       "}",
       ".ohqp-body > div { display:none; }",
@@ -361,6 +363,16 @@
       ".ohqp-sec-h.open .ohqp-chevron { transform:rotate(90deg); }",
       ".ohqp-sec-b { display:none; padding:3px 0 3px 2px; }",
       ".ohqp-sec-b.open { display:block; }",
+      // A section heading that is always open: same look as .ohqp-sec-h but outside the
+      // accordion system entirely, so the toggle handler and the save/restore of
+      // collapsed state never see it and cannot close it again.
+      ".ohqp-sec-static {",
+      "  display:flex; align-items:center; gap:4px; padding:4px 6px;",
+      "  background:rgba(148,163,184,0.08); border:1px solid rgba(148,163,184,0.15);",
+      "  border-radius:8px; font-size:9.5px; font-weight:800;",
+      "  text-transform:uppercase; letter-spacing:0.6px; color:var(--oh-panel-text);",
+      "  margin-bottom:4px;",
+      "}",
       ".ohqp-row {",
       "  display:flex; align-items:center; justify-content:space-between;",
       "  padding:2px 4px; gap:8px;",
@@ -1119,7 +1131,10 @@
     var h = [];
 
     // ---- Theme section ----
-    h.push('<div class="ohqp-sec"><div class="ohqp-sec-h" data-qp-tip-key="Theme">🎨 ' + _tr("Theme") + '<span class="ohqp-tip-icon" data-qp-tip-key="Theme">?</span></div><div class="ohqp-sec-b">');
+    // Theme is deliberately NOT an accordion: it is the only section in this tab, so
+    // collapsing it left the fixed-height body almost empty. Static heading + always
+    // visible body.
+    h.push('<div class="ohqp-sec"><div class="ohqp-sec-static" data-qp-tip-key="Theme">🎨 ' + _tr("Theme") + '<span class="ohqp-tip-icon" data-qp-tip-key="Theme">?</span></div><div>');
     h.push('<div class="ohqp-presets">');
     for (var i = 0; i < pkeys.length; i++) {
       var hex = presets[pkeys[i]];
