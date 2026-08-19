@@ -307,16 +307,16 @@
       <div class="ab-head">
         <div class="ab-gate-dot" data-role="gate-dot" style="color:#fbbf24;" data-tip="${tr("Lobby status")}" data-tip-desc="${tr("Checking lobby…")}"></div>
         <span class="ab-title">Auto-Bot</span>
-        <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" data-tip="${tr("Toggle on/off")}"></div>
+        <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" data-tip="${tr("Toggle on/off")}" data-tip-desc="${tr("Start or stop the bot. Persists across reloads, so it resumes on the next game.")}"></div>
         <div class="ab-head-btns">
-          <button class="ab-mini" data-role="mini" data-tip="${tr("Collapse")}">${state.settings.minimized ? "▢" : "—"}</button>
-          <button class="ab-close" data-role="close" data-tip="${tr("Close")}">✕</button>
+          <button class="ab-mini" data-role="mini" data-tip="${tr("Collapse")}" data-tip-desc="${tr("Fold the panel down to just its header. The bot keeps running.")}">${state.settings.minimized ? "▢" : "—"}</button>
+          <button class="ab-close" data-role="close" data-tip="${tr("Close")}" data-tip-desc="${tr("Hide the panel entirely. Reopen it from the ⊕ launcher.")}">✕</button>
         </div>
       </div>
       <div class="ab-tabs">
-        <div class="ab-tab ${state.activeTab === "control" ? "on" : ""}" data-tab="control" data-tip="${tr("🎮 Controls")}">🎮</div>
-        <div class="ab-tab ${state.activeTab === "config" ? "on" : ""}" data-tab="config" data-tip="${tr("⚙️ Config")}">⚙️</div>
-        <div class="ab-tab ${state.activeTab === "log" ? "on" : ""}" data-tab="log" data-tip="${tr("📜 Log")}">📜</div>
+        <div class="ab-tab ${state.activeTab === "control" ? "on" : ""}" data-tab="control" data-tip-desc="${tr("Master switch, live status, feature toggles and the action counters.")}" data-tip="${tr("🎮 Controls")}">🎮</div>
+        <div class="ab-tab ${state.activeTab === "config" ? "on" : ""}" data-tab="config" data-tip-desc="${tr("Difficulty-free strategy switches, build allow-list, and donate/warship tuning.")}" data-tip="${tr("⚙️ Config")}">⚙️</div>
+        <div class="ab-tab ${state.activeTab === "log" ? "on" : ""}" data-tab="log" data-tip-desc="${tr("Timestamped feed of everything the bot has done, filterable by category.")}" data-tip="${tr("📜 Log")}">📜</div>
       </div>
       <div class="ab-body">
         <div class="ab-pane" data-pane="control">
@@ -362,7 +362,7 @@
           <div class="ab-cfg-body">
             <div class="ab-cfg-sec">${tr("General")}</div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Auto-bot enabled")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Auto-bot enabled")}" data-tip-desc="${tr("Same as the header switch. Turn the whole bot on or off.")}">${tr("Auto-bot enabled")}</span>
               <div class="ab-cfg-sw ${state.settings.enabled ? "on" : ""}" data-cfg="enabled"></div>
             </div>
 
@@ -388,81 +388,81 @@
 
             <div class="ab-cfg-sec">${tr("Advanced")}</div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Win-condition fixes")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Win-condition fixes")}" data-tip-desc="${tr("Divergences from the faithful AI that exist purely to close out a win: size-aware troop reserve, cheap 1% boat probes, MIRV war-chest and smart diplomacy.")}">${tr("Win-condition fixes")}</span>
               <div class="ab-cfg-sw ${state.settings.winFixes ? "on" : ""}" data-cfg="winFixes"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Smart spawn")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Smart spawn")}" data-tip-desc="${tr("Pick the opening tile from the spawn heatmap's best spot instead of a random valid tile, and keep moving it while the spawn phase lasts.")}">${tr("Smart spawn")}</span>
               <div class="ab-cfg-sw ${state.settings.smartSpawn ? "on" : ""}" data-cfg="smartSpawn"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Tick interval (ms)")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Tick interval (ms)")}" data-tip-desc="${tr("How often the engine polls. The bot gates its own decisions on game ticks, so lowering this costs CPU without making it act more often.")}">${tr("Tick interval (ms)")}</span>
               <input class="ab-cfg-num" type="number" min="50" max="2000" step="50" value="${state.settings.tickMs || 200}" data-cfg-num="tickMs">
             </div>
 
             <!-- DIVERGENCE: none of these four behaviours exist in src's Nation AI. -->
             <div class="ab-cfg-sec">${tr("Strategy")}</div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}">${tr("Economy first")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}" data-tip="${tr("Economy first")}">${tr("Economy first")}</span>
               <div class="ab-cfg-sw ${state.settings.economyFirst ? "on" : ""}" data-cfg="economyFirst"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}">${tr("Crack enemy SAMs")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}" data-tip="${tr("Crack enemy SAMs")}">${tr("Crack enemy SAMs")}</span>
               <div class="ab-cfg-sw ${state.settings.samCrack ? "on" : ""}" data-cfg="samCrack"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}">${tr("Scale SAMs to threat")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}" data-tip="${tr("Scale SAMs to threat")}">${tr("Scale SAMs to threat")}</span>
               <div class="ab-cfg-sw ${state.settings.samDefense ? "on" : ""}" data-cfg="samDefense"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}">${tr("Proactive defense posts")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}" data-tip="${tr("Proactive defense posts")}">${tr("Proactive defense posts")}</span>
               <div class="ab-cfg-sw ${state.settings.defensePosts ? "on" : ""}" data-cfg="defensePosts"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}">${tr("Nuke densest target")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}" data-tip="${tr("Nuke densest target")}">${tr("Nuke densest target")}</span>
               <div class="ab-cfg-sw ${state.settings.nukeDensityFirst ? "on" : ""}" data-cfg="nukeDensityFirst"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}">${tr("Reserve vs neighbours")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}" data-tip="${tr("Reserve vs neighbours")}">${tr("Reserve vs neighbours")}</span>
               <div class="ab-cfg-sw ${state.settings.reserveByNeighbors ? "on" : ""}" data-cfg="reserveByNeighbors"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}">${tr("Counter-attack first")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}" data-tip="${tr("Counter-attack first")}">${tr("Counter-attack first")}</span>
               <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
             </div>
 
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}">${tr("Phased opening")}</span>
+              <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}" data-tip="${tr("Phased opening")}">${tr("Phased opening")}</span>
               <div class="ab-cfg-sw ${state.settings.phasedOpening ? "on" : ""}" data-cfg="phasedOpening"></div>
             </div>
 
             <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Keep fraction")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Keep fraction")}" data-tip-desc="${tr("Share of our maximum troops to hold back when donating to a teammate.")}">${tr("Keep fraction")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateKeepFrac">${Math.round((state.settings.donateKeepFrac || 0.45) * 100)}%</span>
               </div>
               <input type="range" min="0" max="100" step="5" value="${Math.round((state.settings.donateKeepFrac || 0.45) * 100)}" data-cfg-range="donateKeepFrac" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Need threshold")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Need threshold")}" data-tip-desc="${tr("Donate to any teammate sitting below this share of their own maximum troops.")}">${tr("Need threshold")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateNeedThreshold">${Math.round((state.settings.donateNeedThreshold || 0.8) * 100)}%</span>
               </div>
               <input type="range" min="0" max="100" step="5" value="${Math.round((state.settings.donateNeedThreshold || 0.8) * 100)}" data-cfg-range="donateNeedThreshold" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Min donate %")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Min donate %")}" data-tip-desc="${tr("Skip the donation entirely unless it would move at least this share of our current troops — avoids a stream of pointless tiny gifts.")}">${tr("Min donate %")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateMinDonatePct">${Math.round((state.settings.donateMinDonatePct || 0.2) * 100)}%</span>
               </div>
               <input type="range" min="5" max="80" step="5" value="${Math.round((state.settings.donateMinDonatePct || 0.2) * 100)}" data-cfg-range="donateMinDonatePct" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Throttle (ms)")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Throttle (ms)")}" data-tip-desc="${tr("Minimum real time between proactive team donations.")}">${tr("Throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateThrottleMs">${state.settings.donateThrottleMs || 1200}ms</span>
               </div>
               <input type="range" min="500" max="10000" step="100" value="${state.settings.donateThrottleMs || 1200}" data-cfg-range="donateThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
@@ -470,38 +470,38 @@
 
             <div class="ab-cfg-sec">${tr("Warship tuning")}</div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Auto-build warships")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Auto-build warships")}" data-tip-desc="${tr("Build new warships. Turn off to keep commanding the ones you already have without paying for more.")}">${tr("Auto-build warships")}</span>
               <div class="ab-cfg-sw ${state.settings.warshipAutoSpawn !== false ? "on" : ""}" data-cfg="warshipAutoSpawn"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Hunt enemy trade")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Hunt enemy trade")}" data-tip-desc="${tr("Send idle warships after enemy trade ships to capture them, when no enemy warship is nearby.")}">${tr("Hunt enemy trade")}</span>
               <div class="ab-cfg-sw ${state.settings.warshipHuntTrade !== false ? "on" : ""}" data-cfg="warshipHuntTrade"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Evade enemies")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Evade enemies")}" data-tip-desc="${tr("Break off and reposition when the battle simulation says the fight is lost.")}">${tr("Evade enemies")}</span>
               <div class="ab-cfg-sw ${state.settings.warshipEvade !== false ? "on" : ""}" data-cfg="warshipEvade"></div>
             </div>
             <div class="ab-cfg-row">
-              <span class="ab-cfg-label">${tr("Dodge nukes")}</span>
+              <span class="ab-cfg-label" data-tip="${tr("Dodge nukes")}" data-tip-desc="${tr("Move warships out of a predicted blast radius before the warhead lands.")}">${tr("Dodge nukes")}</span>
               <div class="ab-cfg-sw ${state.settings.warshipNukeDodge !== false ? "on" : ""}" data-cfg="warshipNukeDodge"></div>
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Retreat HP %")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Retreat HP %")}" data-tip-desc="${tr("Send a damaged warship back to port below this share of its health. The same threshold also decides which of our ships count as combat-effective in the fight-or-flee simulation.")}">${tr("Retreat HP %")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipRetreatHealthPct">${state.settings.warshipRetreatHealthPct || 50}%</span>
               </div>
               <input type="range" min="10" max="90" step="5" value="${state.settings.warshipRetreatHealthPct || 50}" data-cfg-range="warshipRetreatHealthPct" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Combat throttle (ms)")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Combat throttle (ms)")}" data-tip-desc="${tr("Minimum real time between warship combat passes.")}">${tr("Combat throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipCombatThrottleMs">${state.settings.warshipCombatThrottleMs || 800}ms</span>
               </div>
               <input type="range" min="200" max="5000" step="100" value="${state.settings.warshipCombatThrottleMs || 800}" data-cfg-range="warshipCombatThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="ab-cfg-label">${tr("Patrol throttle (ms)")}</span>
+                <span class="ab-cfg-label" data-tip="${tr("Patrol throttle (ms)")}" data-tip-desc="${tr("Minimum real time between warship patrol repositioning passes.")}">${tr("Patrol throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipPatrolThrottleMs">${state.settings.warshipPatrolThrottleMs || 1500}ms</span>
               </div>
               <input type="range" min="500" max="10000" step="100" value="${state.settings.warshipPatrolThrottleMs || 1500}" data-cfg-range="warshipPatrolThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
