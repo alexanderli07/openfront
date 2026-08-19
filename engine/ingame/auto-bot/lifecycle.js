@@ -45,7 +45,16 @@
   if (!window.__openfrontAutoBotLoaded) {
     window.__openfrontAutoBotLoaded = true;
     window.setInterval(watcher, 1200);
-    watcher();
+    // The interval is registered FIRST on purpose, so a failure in this first synchronous
+    // pass still self-heals ~1.2s later. But an escaping throw here would abort the rest
+    // of the concatenated in-game layer — including quick-panel.js, which owns the theme
+    // tokens and the crosshair listener. Contain it: the auto-bot panel is allowed to
+    // fail without taking the helper UI down with it.
+    try {
+      watcher();
+    } catch (e) {
+      console.error("[ofh] auto-bot first paint failed (retrying in 1.2s):", e);
+    }
     // Persisted enabled=true survives F5 — kick the engine so the tick timer
     // actually starts (loadSettings only restores the flag, not the timer).
     if (state.settings.enabled) setEnabled(true);

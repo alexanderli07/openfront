@@ -231,7 +231,11 @@
       #${PANEL_ID} .ab-log-text { color: #e5e7eb; font-size: 11px; word-break: break-word; }
       #${PANEL_ID} .ab-log-empty { color: #6b7280; font-size: 11px; text-align: center; padding: 16px 0; }
     `;
-    document.head.appendChild(style);
+    // @run-at document-start means <head> may not exist yet. Every other overlay in
+    // this layer uses this guard; panel.js was the sole omission, and the resulting
+    // TypeError aborted the whole in-game IIFE before quick-panel.js (file #38) could
+    // apply --oh-accent or register the crosshair's toggle listener.
+    (document.head || document.documentElement).appendChild(style);
   }
 
   // key -> [label, detailed description] for the hover tooltip. Descriptions
@@ -500,7 +504,7 @@
         </div>
       </div>`;
 
-    document.body.appendChild(panel);
+    (document.body || document.documentElement).appendChild(panel);
     wirePanel(panel);
     applyStoredPosition(panel);
     return panel;
