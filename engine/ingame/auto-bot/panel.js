@@ -595,24 +595,35 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
     }
+    var abTipTimer = null;
+    var TIP_DELAY = typeof OFH_TIP_DELAY_MS === "number" ? OFH_TIP_DELAY_MS : 800;
     function _showTip(el) {
       var head = el.dataset.tip || "";
       var desc = el.dataset.tipDesc || "";
       if (!head && !desc) return;
-      if (!abTip) {
-        abTip = document.createElement("div");
-        abTip.className = "ab-tip";
-        (document.body || document.documentElement).appendChild(abTip);
-      }
-      abTip.innerHTML =
-        (head ? "<b>" + _txtEsc(head) + "</b>" : "") +
-        (desc ? (head ? "<br>" : "") + _txtEsc(desc) : "");
-      var r = el.getBoundingClientRect();
-      abTip.style.left = r.left + r.width / 2 + "px";
-      abTip.style.top = r.top - 6 + "px";
-      abTip.classList.add("show");
+      _hideTip(); // cancel any pending timer first
+      abTipTimer = setTimeout(function () {
+        // The panel is rebuilt on a 1.2s watcher, which can remove our node.
+        if (abTip && !abTip.parentNode) abTip = null;
+        if (!abTip) {
+          abTip = document.createElement("div");
+          abTip.className = "ab-tip";
+          (document.body || document.documentElement).appendChild(abTip);
+        }
+        abTip.innerHTML =
+          (head ? "<b>" + _txtEsc(head) + "</b>" : "") +
+          (desc ? (head ? "<br>" : "") + _txtEsc(desc) : "");
+        var r = el.getBoundingClientRect();
+        abTip.style.left = r.left + r.width / 2 + "px";
+        abTip.style.top = r.top - 6 + "px";
+        abTip.classList.add("show");
+      }, TIP_DELAY);
     }
     function _hideTip() {
+      if (abTipTimer) {
+        clearTimeout(abTipTimer);
+        abTipTimer = null;
+      }
       if (abTip) abTip.classList.remove("show");
     }
     panel.querySelectorAll("[data-tip], [data-tip-desc]").forEach(function(el) {

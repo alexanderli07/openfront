@@ -1,5 +1,12 @@
 // Shared player, team, overlay, and formatting helpers used across bridge features.
 
+// Hover-intent delay for every helper/auto-bot tooltip, in ms. Declared here because
+// shared-utils.js is emitted at position #5, ahead of both auto-bot/panel.js (#28) and
+// quick-panel.js (#38), so the value is assigned before either can read it.
+// Long enough that moving the cursor across a control on the way to clicking it does
+// not pop a card over the thing you are aiming at.
+var OFH_TIP_DELAY_MS = 800;
+
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
   if (!Number.isFinite(intensity)) {

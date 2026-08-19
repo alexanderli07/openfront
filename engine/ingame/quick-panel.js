@@ -17,7 +17,10 @@
   // auto-bot panel's rebuild cycle (which cleans up .ab-feat-tip elements).
   var _qpPopoverEl = null;
   var _qpPopoverTimer = null;
-  var _QP_POPOVER_DELAY = 100; // ms before popover appears
+  // ms before a popover appears. Sourced from the shared constant so the helper and the
+  // auto-bot cannot drift apart; the ?? keeps it working if shared-utils ever fails to load.
+  var _QP_POPOVER_DELAY =
+    typeof OFH_TIP_DELAY_MS === "number" ? OFH_TIP_DELAY_MS : 800;
   function _showQpPopover(el, html, delay) {
     if (delay === undefined) delay = _QP_POPOVER_DELAY;
     _hideQpPopover(); // cancel any pending timer
@@ -800,7 +803,7 @@
       // Popover on hover (uses .qp-feat-tip, safe from auto-bot cleanup).
       (function(tabDef) {
         tb.addEventListener("mouseenter", function() {
-          _showQpPopover(this, "<b>" + _tr(tabDef.title || "") + "</b><br>" + _tr(tabDef.tip || ""), 800);
+          _showQpPopover(this, "<b>" + _tr(tabDef.title || "") + "</b><br>" + _tr(tabDef.tip || ""));
         });
         tb.addEventListener("mouseleave", _hideQpPopover);
       })(TAB_DEFS[i]);
