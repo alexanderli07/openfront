@@ -1041,6 +1041,61 @@
       return parts;
     }
 
+    /** Largest silo capacity any single hostile coalition can field. Union-find over the
+     *  "same coalition" relation, so a chain A-B, B-C groups all three. */
+    peakHostileCoalitionCapacity(hostiles) {
+      if (!hostiles || hostiles.length === 0) return 0;
+      const parent = hostiles.map((_unused, i) => i);
+      const find = (i) => {
+        while (parent[i] !== i) {
+          parent[i] = parent[parent[i]];
+          i = parent[i];
+        }
+        return i;
+      };
+      for (let i = 0; i < hostiles.length; i += 1) {
+        for (let j = i + 1; j < hostiles.length; j += 1) {
+          // Pass the WRAPPED PLAYERS, never the {player, capacity} records — team() and
+          // isFriendly() exist on the player, and handing them a record would make every
+          // comparison throw, silently leaving every coalition a singleton.
+          if (this.sameCoalition(hostiles[i].player, hostiles[j].player)) {
+            const a = find(i);
+            const b = find(j);
+            if (a !== b) parent[b] = a;
+          }
+        }
+      }
+      const byRoot = new Map();
+      for (let i = 0; i < hostiles.length; i += 1) {
+        const root = find(i);
+        byRoot.set(root, (byRoot.get(root) || 0) + hostiles[i].capacity);
+      }
+      let peak = 0;
+      for (const capacity of byRoot.values()) {
+        if (capacity > peak) peak = capacity;
+      }
+      return peak;
+    }
+
+    /** Two hostiles count as one attacker if they share a team or are allied. */
+    sameCoalition(a, b) {
+      try {
+        const ta = a.team ? a.team() : null;
+        const tb = b.team ? b.team() : null;
+        if (ta != null && tb != null && ta === tb) return true;
+      } catch (_e) {
+        /* fall through to the alliance test */
+      }
+      try {
+        return a.isFriendly(b) === true;
+      } catch (_e) {
+        // Fail CLOSED: if we cannot establish that they are UNRELATED, assume they
+        // coordinate. That merges them, sums their capacity, and over-protects — the
+        // safe direction. Failing open would silently split a real team into singletons.
+        return true;
+      }
+    }
+
     /** Threat-driven SAM levels only — ignores the flat baseline. */
     samThreatLevels(cityCount) {
       const p = this.samTargetParts(cityCount);
@@ -1062,7 +1117,7 @@
 
       const game = this.game;
       const me = this.player;
-      let hostileSiloLevels = 0;
+      const hostiles = [];
       let allSamLevels = 0;
       let peers = 0;
       try {
@@ -1072,11 +1127,30 @@
           peers += 1;
           for (const u of p.units(UNIT.SAMLauncher)) allSamLevels += u.level();
           if (p.smallID() === me.smallID() || me.isFriendly(p)) continue;
-          for (const u of p.units(UNIT.MissileSilo)) hostileSiloLevels += u.level();
+          let capacity = 0;
+          for (const u of p.units(UNIT.MissileSilo)) capacity += u.level();
+          if (capacity > 0) hostiles.push({ player: p, capacity: capacity });
         }
       } catch (_e) { return bail; }
 
-      const threat = Math.ceil(hostileSiloLevels * SAM_PER_HOSTILE_SILO_LEVEL);
+      // DIVERGENCE (samDefense): threat is the largest capacity any ONE hostile coalition
+      // can deliver, not the global sum across every hostile player.
+      //
+      // Why: a SAM's interception capacity REGENERATES each SAMCooldown(), and the
+      // attacker's own planner requires a whole breakthrough salvo to arrive inside
+      // floor(SAMCooldown()/2) (see planSaturationSalvo in nukeBehavior.js). Two unallied
+      // players firing one warhead each, at times they have no way to coordinate, are
+      // therefore BOTH stopped by a single level-1 launcher. Summing them modelled a
+      // simultaneity the game's timing cannot produce, and bought a SAM per attacker.
+      // Teammates DO coordinate — that is exactly why isTeammateAlreadyNukingThisSpot
+      // exists to de-duplicate their strikes — so a coalition is summed, not discounted.
+      //
+      // The 0.75 factor is unchanged, so protection against any single coordinated
+      // arsenal is exactly what it was; only the double-counting of uncoordinated
+      // attackers is removed. In a 5-player FFA holding 2,2,1,1,1 silo levels this is
+      // 2 SAM levels instead of 6 — about 12M gold.
+      const peakCoalition = this.peakHostileCoalitionCapacity(hostiles);
+      const threat = Math.ceil(peakCoalition * SAM_PER_HOSTILE_SILO_LEVEL);
       const peerAvg = peers > 0 ? Math.ceil(allSamLevels / peers) : 0;
 
       let protectables = 0;
