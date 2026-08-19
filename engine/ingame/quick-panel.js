@@ -319,7 +319,7 @@
       "}",
       ".ohqp-min-btn:hover { background:var(--oh-accent-soft); }",
       ".ohqp-tabs {",
-      "  display:flex; gap:6px; padding:7px 10px; background:rgba(0,0,0,0.25);",
+      "  display:flex; gap:3px; padding:7px 10px; background:rgba(0,0,0,0.25);",
       "  border-bottom:1px solid var(--oh-panel-header-border); flex-shrink:0;",
       "}",
       ".ohqp-tabs button {",
@@ -754,7 +754,7 @@
     var title = document.createElement("div");
     title.className = "ohqp-title";
     var _ver = (window.__OFH_ASSETS && window.__OFH_ASSETS.version) ? window.__OFH_ASSETS.version : "dev";
-    title.textContent = "⚙ OpenFront Helper v" + _ver;
+    title.textContent = "OpenFront Helper v" + _ver;
     var minBtn = document.createElement("button");
     minBtn.type = "button";
     minBtn.className = "ohqp-min-btn";
@@ -1494,7 +1494,7 @@
 
   // ---- Dragging (self-contained) ----
   // The shared makeGoldStatPanelDraggable() lived in gold-per-minute.js, which the
-  // minimal build removes. Both call sites were typeof-guarded, so rather than
+  // this build removes. Both call sites were typeof-guarded, so rather than
   // erroring the panel silently became UNDRAGGABLE and stayed welded to the
   // launcher. This is a local replacement with no external dependency.
   function _qpReadStoredPos() {

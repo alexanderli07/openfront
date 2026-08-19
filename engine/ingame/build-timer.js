@@ -62,7 +62,7 @@
       const underConstruction = Boolean(unit.isUnderConstruction && unit.isUnderConstruction());
 
       if (underConstruction) {
-        // MINIMAL BUILD: prefer the unit's REAL constructionStartTick — the accurate
+        // BUILD NOTE: prefer the unit's REAL constructionStartTick — the accurate
         // read that the removed silo-sam-tracker.js used. First-observed stamping
         // restarts the countdown whenever you join, reconnect, or enable the overlay
         // mid-build, which over-reports remaining time. Fall back only if absent.
@@ -98,7 +98,7 @@
 
         if (Array.isArray(queue) && queue.length >= level) {
           const lastFired = queue[0];
-          // MINIMAL BUILD: read the real cooldown from game config rather than the
+          // BUILD NOTE: read the real cooldown from game config rather than the
           // hard-coded 90 ticks; fall back to the constant if unavailable.
           let cooldown = BUILD_TIMER_COOLDOWN_TICKS;
           try {

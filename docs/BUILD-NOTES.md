@@ -1,6 +1,6 @@
-# Minimal build — dependency analysis and removal plan
+# Build notes — dependency analysis and removal plan
 
-Reference for the `minimal` branch: auto-join + auto-bot + three helper categories
+Reference for this build: auto-join + auto-bot + three helper categories
 (build/missile/attack timings · missile/boat/warship routes · money & troop capacity),
 built at 575 KB vs 1322 KB for `main`.
 
@@ -17,7 +17,7 @@ Notes on what shipped differently from this plan:
 - `retaliation-hud.js` was **kept** as an attack-timing display.
 - `silo-sam-tracker.js` was deleted, but its accurate `constructionStartTick` read and real
   `SAMCooldown()` lookup were ported into `build-timer.js` — see §7 risk 6 for why that mattered.
-- `@updateURL` is per-branch (`build.mjs`); on this branch it points at `minimal`.
+- `@updateURL` is per-branch (`build.mjs`); it points at this build's branch.
 
 ---
 
