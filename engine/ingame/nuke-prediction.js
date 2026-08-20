@@ -207,6 +207,42 @@
   // from the tile-keyed nukeLandingEntries).
   const nukeFlightById = new Map();
 
+  // ── Self-calibrating flight time ──────────────────────────────────────────────
+  // computeNukeRemainingTicks models the game exactly as far as it can be verified from
+  // this repo: the game advances `speed` of ARC distance per tick and detonates once the
+  // distance flown exceeds the polyline length, which is floor(L/speed)+1 ticks. But the
+  // curve itself is a PORT of the game's Bezier, and `speed` is used twice — as the point
+  // spacing AND as the divisor — so any error in the ported height coefficients or in
+  // defaultNukeSpeed() scales the whole estimate. Observed symptom of exactly that: the
+  // warhead lands while the label still shows several seconds left, with the leftover
+  // proportional to flight length.
+  //
+  // Since the upstream constants are not available to check against, measure instead. Each
+  // nuke that flies to completion is a free experiment: compare how long it ACTUALLY took
+  // against what was predicted at anchor time, and fold the ratio into a correction.
+  // Converges within a couple of observed warheads and needs no constant to be right.
+  // MEDIAN of recent observed ratios, not a running average. Some samples are lies: an
+  // intercepted warhead vanishes early, and losing track of one does the same. A mean lets a
+  // single such sample move the estimate; a median ignores a minority of them outright. That
+  // also means the accept window can stay wide enough to learn a LARGE model error — a hard
+  // floor near 1 would have rejected exactly the over-estimate this is here to measure.
+  const NUKE_CAL = { factor: 1, ratios: [] };
+  const NUKE_CAL_MIN_RATIO = 0.25; // wide: the point is to learn the error, not assume it
+  const NUKE_CAL_MAX_RATIO = 4;
+  const NUKE_CAL_WINDOW = 7;
+  const NUKE_CAL_MIN_SAMPLES = 3; // below this, trust the model rather than one observation
+
+  function nukeCalObserve(ratio) {
+    if (!Number.isFinite(ratio)) return;
+    if (ratio < NUKE_CAL_MIN_RATIO || ratio > NUKE_CAL_MAX_RATIO) return;
+    const r = NUKE_CAL.ratios;
+    r.push(ratio);
+    if (r.length > NUKE_CAL_WINDOW) r.shift();
+    if (r.length < NUKE_CAL_MIN_SAMPLES) return;
+    const sorted = r.slice().sort((a, b) => a - b);
+    NUKE_CAL.factor = sorted[Math.floor(sorted.length / 2)];
+  }
+
   // Remaining flight ticks from a point on the arc to the target, via the SAME parabola the
   // game uses (UniversalPathFinding lives in the auto-bot bundle; guarded in case it is not
   // loaded). Flight time is flip-INDEPENDENT — the arc LENGTH is identical whether it bows up
@@ -304,8 +340,15 @@
             // Counting down in real time also makes the label smooth between the 250ms
             // scans instead of stepping, and it is what the reader actually wants: seconds
             // until this thing hits, on their clock.
-            const secs = ofhTicksToSeconds(game, remainTicks);
-            flight = { impactAtMs: Date.now() + secs * 1000 };
+            const rawSecs = ofhTicksToSeconds(game, remainTicks);
+            const secs = rawSecs * NUKE_CAL.factor;
+            const nowMs = Date.now();
+            flight = {
+              impactAtMs: nowMs + secs * 1000,
+              anchorMs: nowMs,
+              // what the UNCORRECTED model predicted, so the ratio measures the model
+              rawMs: rawSecs * 1000,
+            };
             nukeFlightById.set(id, flight);
           }
         }
@@ -352,6 +395,19 @@
     if (nukeFlightById.size > 0) {
       for (const id of nukeFlightById.keys()) {
         if (!seenIds.has(id)) {
+          // This nuke is gone, so its flight is over: calibrate on it.
+          try {
+            const done = nukeFlightById.get(id);
+            if (done && done.rawMs > 1000) {
+              const actualMs = Date.now() - done.anchorMs;
+              const ratio = actualMs / done.rawMs;
+              // Reject interception-shaped samples (vanished far too early) and anything
+              // implausible; a real flight ratio sits near the true model error.
+              nukeCalObserve(ratio);
+            }
+          } catch (_error) {
+            /* calibration is never worth breaking the scan for */
+          }
           nukeFlightById.delete(id);
         }
       }
