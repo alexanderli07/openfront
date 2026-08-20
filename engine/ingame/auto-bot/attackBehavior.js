@@ -604,20 +604,15 @@
             : "🏝️ Island grab"
           : "🛟 Probe landing";
       if (this.emitBoat(dst, troops, label)) {
-        console.log("[Boat] LAUNCHED", label, Math.round(troops), "troops");
         state.lastOppBoatMs = nowMs;
         state.beachhead = { tile: dst, at: this.game.ticks(), surged: false };
         return true;
       }
-      // Target FOUND but the boat intent was REFUSED (stale / already-conquered /
-      // resolves-to-self target — common at MAX game speed when the probe result
-      // goes stale before we emit). Silent until now; this is the invisible stall
-      // that looks like "bot stopped sending boats even though enemies exist".
-      console.log("[Boat] emitBoat REFUSED", label, {
-        dstX: this.game.x(dst),
-        dstY: this.game.y(dst),
-        owner: this.game.hasOwner(dst) ? this.game.ownerID(dst) : "TN",
-      });
+      // Target found but the boat was refused — most often because we are already at the
+      // transport-ship cap, which is a completely normal state, not a fault. This used to
+      // console.log every single refusal, which floods the console the entire time the cap
+      // is full. The refusal is now silent; a genuine stall shows up as the action log
+      // going quiet, which is the signal that matters.
       return false;
     }
 
@@ -845,6 +840,21 @@
       // Final chokepoint for the "boat" feature toggle: never fire when off.
       if (!(state.settings.features && state.settings.features.boat)) {
         return false;
+      }
+      // The game caps how many transport ships one player may have in the water at once
+      // (boatMaxNumber, 3 by default). Every OTHER boat path tests it, but this shared
+      // chokepoint did not — so once the cap was reached the opportunistic-landing path
+      // kept emitting intents the game silently dropped, each one counted as an attack and
+      // written to the action log. Refuse here instead, quietly.
+      try {
+        if (
+          this.player.unitCount(UNIT.TransportShip) >=
+          this.game.config().boatMaxNumber()
+        ) {
+          return false;
+        }
+      } catch (_e) {
+        /* if the cap cannot be read, fall through and let the game arbitrate */
       }
       // DIVERGENCE (phasedOpening): boats emit at a TILE and bypass sendAttack, so
       // re-check the destination owner at the documented chokepoint.
@@ -2237,6 +2247,20 @@
       if (target.isPlayer() && this.player.type() === PlayerType.Nation) {
         if (this.emojiBehavior === undefined) throw new Error("not initialized");
         this.emojiBehavior.maybeSendAttackEmoji(target);
+      }
+
+      // Respect the transport-ship cap here too. This path checked isUnitDisabled but not
+      // boatMaxNumber, so at the cap it emitted an intent the game drops while still
+      // counting an attack and writing "⛵ Boat attack" to the log.
+      try {
+        if (
+          this.player.unitCount(UNIT.TransportShip) >=
+          this.game.config().boatMaxNumber()
+        ) {
+          return false;
+        }
+      } catch (_e) {
+        /* cap unreadable — let the game arbitrate */
       }
 
       // src: game.addExecution(new TransportShipExecution(player, closest.y, troops)).

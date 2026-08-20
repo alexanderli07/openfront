@@ -261,7 +261,6 @@
   function collectNukeScan(game) {
     const groupedByTile = new Map();
     const seenIds = new Set();
-    const nowTicks = typeof game.ticks === "function" ? game.ticks() : 0;
     for (const unit of game.units(...NUKE_UNIT_TYPES)) {
       if (!unit?.isActive?.()) {
         continue;
@@ -291,17 +290,28 @@
             targetTile,
           );
           if (remainTicks !== null) {
-            flight = { firstTick: nowTicks, remainTicks };
+            // Anchor an ABSOLUTE impact time in real milliseconds, then count down against
+            // the wall clock. The arc-length model gives a good tick count, so convert it
+            // ONCE here and stop depending on game ticks thereafter.
+            //
+            // Why not decrement by elapsed game ticks: nowTicks comes from
+            // `typeof game.ticks === "function" ? game.ticks() : 0`, so on any client where
+            // that accessor is absent it is permanently 0 — making
+            // `remainTicks - (nowTicks - firstTick)` equal remainTicks on EVERY scan. The
+            // label then sits at the full flight time and never counts down at all, which
+            // reads as badly wrong rather than as broken.
+            //
+            // Counting down in real time also makes the label smooth between the 250ms
+            // scans instead of stepping, and it is what the reader actually wants: seconds
+            // until this thing hits, on their clock.
+            const secs = ofhTicksToSeconds(game, remainTicks);
+            flight = { impactAtMs: Date.now() + secs * 1000 };
             nukeFlightById.set(id, flight);
           }
         }
         if (flight !== undefined) {
-          const etaTicks = flight.remainTicks - (nowTicks - flight.firstTick);
-          // Ticks -> seconds at the MEASURED rate. etaTicks is a correct game-tick count
-          // (the arc-length model above is careful about it); dividing by a hardcoded 10
-          // made the label wrong by exactly the game-speed multiplier, always in the
-          // dangerous direction: at 3x it claimed 4.2s of warning when impact was 1.4s away.
-          etaSec = Math.round(Math.max(0, ofhTicksToSeconds(game, etaTicks)) * 10) / 10;
+          const left = (flight.impactAtMs - Date.now()) / 1000;
+          etaSec = Math.round(Math.max(0, left) * 10) / 10;
         }
       }
 
