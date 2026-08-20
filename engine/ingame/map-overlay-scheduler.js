@@ -366,7 +366,11 @@
    *  applied it to the pill and then cleared it before drawing the text, so it did the
    *  exact opposite of its purpose.
    *
-   *  opts: { size, segments:[{text,color}], outline:bool, halo:bool, align }
+   *  Returns the chip's WIDTH in px, so a caller can line something up with it exactly
+   *  (name-overlay sizes the troop bar off this) instead of re-deriving it from a formula
+   *  that only approximates the real measured width.
+   *
+   *  opts: { size, segments:[{text,color}], outline:bool, halo:bool, align, outlineColor }
    *  Measured width is quantized to 4px because canvas 2D has no font-variant-numeric,
    *  so a proportional face makes the chip visibly breathe as $1.2k -> $1.3k.
    *  save/restore is mandatory here: this canvas is shared by ~8 layers drawn in
@@ -375,7 +379,8 @@
   function drawMapLabel(ctx, cx, cy, text, color, options) {
     const opts = options || {};
     const style = typeof OFH_OVERLAY_STYLE === "object" && OFH_OVERLAY_STYLE ? OFH_OVERLAY_STYLE : null;
-    if (!style) return;
+    if (!style) return 0;
+    let chipW = 0;
     const size = Number(opts.size) || style.sizeMd;
     const segments =
       Array.isArray(opts.segments) && opts.segments.length
@@ -395,6 +400,7 @@
       const tw = Math.ceil(raw / 4) * 4;
 
       const w = tw + style.padX * 2;
+      chipW = w;
       const h = Math.max(style.minH, size + style.padY * 2);
       const x0 = cx - w / 2;
       const y0 = cy - h / 2;
@@ -439,6 +445,7 @@
       /* a label is never worth killing the frame for */
     }
     ctx.restore();
+    return chipW;
   }
 
   /** A filled triangle at the destination end of a route, so direction is stated rather

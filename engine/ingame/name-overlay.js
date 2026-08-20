@@ -123,7 +123,11 @@
   var _DYN_NAME_SCALE_FACTOR = 0.25;
   var _DYN_SCALE_CAP = 3;
   var _DYN_MONEY_SIZE_MUL = 0.46;
-  var _DYN_TROOP_BAR_SIZE_MUL = 0.26;
+  // The troop bar is a CONSTANT thickness. It used to be
+  // max(3, floor(nameScreenPx * 0.26)), so it fattened as you zoomed in, which looked
+  // wrong under a pill whose own height is capped. 4px leaves 2px of visible fill inside
+  // the 1px outline — thin, but the green/orange split still reads.
+  var _TROOP_BAR_H = 4;
   // Keep this LOW. Everything a player shows — money pill, troop bar, threat marks — is
   // behind the single `if (!dyn.visible) continue;` gate, so raising this hides all of it
   // at once. It was briefly 14 on the theory that fewer legible labels beat many illegible
@@ -157,7 +161,7 @@
       6,
       Math.min(_sizeMax, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL)),
     );
-    var troopBarH = Math.max(3, Math.floor(nameScreenPx * _DYN_TROOP_BAR_SIZE_MUL));
+    var troopBarH = _TROOP_BAR_H;
     var troopBarW = Math.max(20, Math.floor(moneyFontSize * 3.5));
     // Tighter spacing: money pill closer to troop bar.
     var moneyOffsetY = Math.max(10, Math.floor(nameScreenPx * 0.9));
@@ -190,7 +194,7 @@
   var MAXTROOP_COLOR = "rgba(95, 178, 255, 0.98)";
 
   function drawMoneyPill(ctx, cx, cy, text, dyn, accent) {
-    drawMapLabel(ctx, cx, cy, text, MONEY_COLOR, {
+    return drawMapLabel(ctx, cx, cy, text, MONEY_COLOR, {
       size: dyn.moneyFontSize,
       segments: [{ text: text, color: MONEY_COLOR }],
       outlineColor: accent,
@@ -199,7 +203,7 @@
 
   function drawMaxTroopPill(ctx, cx, cy, maxTroops, dyn, accent) {
     var label = troopsDisplay(maxTroops);
-    drawMapLabel(ctx, cx, cy, label, MAXTROOP_COLOR, {
+    return drawMapLabel(ctx, cx, cy, label, MAXTROOP_COLOR, {
       size: dyn.moneyFontSize,
       segments: [{ text: label, color: MAXTROOP_COLOR }],
       outlineColor: accent,
@@ -210,7 +214,7 @@
   // used to be laid out by measuring the literal two-space string in "money  /max" and
   // using that as the gap.
   function drawMoneyTroopPill(ctx, cx, cy, moneyText, maxTroops, dyn, accent) {
-    drawMapLabel(ctx, cx, cy, null, MONEY_COLOR, {
+    return drawMapLabel(ctx, cx, cy, null, MONEY_COLOR, {
       size: dyn.moneyFontSize,
       segments: [
         { text: moneyText, color: MONEY_COLOR },
@@ -242,8 +246,11 @@
   // home troops = green (fixed, NOT faction color), attacking = orange, total bar
   // length = total/max. The "/max" label is drawn as its own pill on the line
   // above (drawMoneyTroopPill or drawMaxTroopPill), never on the bar itself.
-  function drawTroopBar(ctx, cx, barTop, relation, troops, attacking, maxTroops, dyn) {
-    var barW = dyn.troopBarW;
+  // `pillW` is the exact measured width of the pill drawn directly above this bar, so the
+  // two line up precisely. dyn.troopBarW (moneyFontSize * 3.5) is only a fallback for a
+  // caller that has no pill to match.
+  function drawTroopBar(ctx, cx, barTop, relation, troops, attacking, maxTroops, dyn, pillW) {
+    var barW = Number.isFinite(pillW) && pillW > 0 ? pillW : dyn.troopBarW;
     var barH = dyn.troopBarH;
     var barX = cx - barW / 2;
     var max = Math.max(1, maxTroops);
@@ -313,14 +320,14 @@
 
         if (mapMoneyEnabled && mapTroopCountsEnabled) {
           // Combined: money + /max on one line, troop bar below.
-          drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
-          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn);
+          var pillW = drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
+          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn, pillW);
         } else if (mapMoneyEnabled) {
           drawMoneyPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn, color);
         } else if (mapTroopCountsEnabled) {
           // Money off: /max still gets its own line above the bar.
-          drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
-          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn);
+          var maxPillW = drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
+          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn, maxPillW);
         }
       }
 
