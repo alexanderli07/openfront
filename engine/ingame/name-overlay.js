@@ -124,13 +124,12 @@
   var _DYN_SCALE_CAP = 3;
   var _DYN_MONEY_SIZE_MUL = 0.46;
   var _DYN_TROOP_BAR_SIZE_MUL = 0.26;
-  // Was 5, which let a name render its money pill when the name itself was 5 screen
-  // pixels tall. Combined with the old font floor of 6px that produced a carpet of
-  // unreadable 6px chips — a large part of what made the map look messy. Now that the
-  // font has a real floor (sizeMin), the visibility floor has to rise with it or the
-  // chips would be huge relative to the names they belong to and overlap each other.
-  // Fewer legible labels beats many illegible ones.
-  var _DYN_MIN_SCREEN_PX = 14;
+  // Keep this LOW. Everything a player shows — money pill, troop bar, threat marks — is
+  // behind the single `if (!dyn.visible) continue;` gate, so raising this hides all of it
+  // at once. It was briefly 14 on the theory that fewer legible labels beat many illegible
+  // ones; that hid every player with loc.size <= 10 at default zoom (and even size-16 names
+  // when zoomed out), i.e. most of the map. Not a tuning question — 5 is the shipped floor.
+  var _DYN_MIN_SCREEN_PX = 5;
 
   /** Extra cull padding for everything drawn above the name anchor. */
   function _dynPadFor(loc, transform) {
@@ -149,13 +148,13 @@
     var lineH_world = _DYN_FONT_BASE * (nameWorldSize * nameScale / _DYN_FONT_SCALE);
     var cameraScale = Number(transform.scale) || 1.8;
     var nameScreenPx = lineH_world * cameraScale;
-    // Clamped to the shared type scale. The old floor of 6px is below the readable limit
-    // on a 1x canvas, and there was no ceiling at all, so at high zoom the pill grew
-    // without bound.
-    var _sizeMin = OFH_OVERLAY_STYLE.sizeMin;
-    var _sizeMax = OFH_OVERLAY_STYLE.sizeMax;
+    // The CEILING is the real fix here: there was none, so at high zoom the pill grew
+    // without bound. The floor stays at src's 6 — raising it to the type scale's 11 makes
+    // a small player's chip bigger than the name it belongs to, and pushing the
+    // visibility gate up to compensate hid most of the map.
+    var _sizeMax = OFH_OVERLAY_STYLE && OFH_OVERLAY_STYLE.sizeMax ? OFH_OVERLAY_STYLE.sizeMax : 18;
     var moneyFontSize = Math.max(
-      _sizeMin,
+      6,
       Math.min(_sizeMax, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL)),
     );
     var troopBarH = Math.max(3, Math.floor(nameScreenPx * _DYN_TROOP_BAR_SIZE_MUL));
@@ -175,7 +174,7 @@
       moneyOffsetY: moneyOffsetY, troopOffsetY: troopOffsetY,
       visible: nameScreenPx >= _DYN_MIN_SCREEN_PX,
       screenPx: nameScreenPx,
-      pillBgAlpha: pillBgAlpha, pillBdAlpha: pillBdAlpha, barBgAlpha: barBgAlpha,
+      barBgAlpha: barBgAlpha,
     };
   }
 
