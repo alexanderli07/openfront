@@ -899,7 +899,7 @@
           const t = this.game.ticks();
           if (t - (state._buildDomDiagTick || -999) >= 80) {
             state._buildDomDiagTick = t;
-            console.log("[Build] dominance gate", {
+            ofhDebug("[Build] dominance gate", {
               share: share === null ? null : Number(share.toFixed(3)),
               trigger,
               dominant: this._dominant,

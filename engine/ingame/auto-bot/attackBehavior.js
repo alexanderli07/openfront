@@ -174,7 +174,7 @@
         });
         if (sleeping.length > 0) {
           sleeping.sort((a, b) => a.troops() - b.troops());
-          console.log(
+          ofhDebug(
             "[Takeover] disconnected neighbour → grabbing land:",
             sleeping[0].name?.() ?? sleeping[0].smallID?.(),
           );
@@ -397,7 +397,7 @@
       try {
         if (nowMs - (state._boatDiagAt || 0) > 5000) {
           state._boatDiagAt = nowMs;
-          console.log("[Boat] diag:", {
+          ofhDebug("[Boat] diag:", {
             reason: capped
               ? "capped"
               : throttled
@@ -495,7 +495,7 @@
           dst = disco;
           dstOwned = true;
           lowFillOk = true; // cheap 1% grab of free land → low fill gate
-          console.log("[Boat] heading to a DISCONNECTED neighbour's land");
+          ofhDebug("[Boat] heading to a DISCONNECTED neighbour's land");
         }
       }
 
@@ -568,7 +568,7 @@
         // scanCandidates > 0 but none reachable ⇒ targets exist but are LAND-reachable
         // (no water between us and them) → the bot attacks them by foot, not by boat.
         // scanCandidates == 0 ⇒ no non-self land found near any sampled shore tile.
-        console.log("[Boat] no reachable target", {
+        ofhDebug("[Boat] no reachable target", {
           scanCandidates: targets.length,
           shoreSamples: Math.min(
             state.settings.islandScanSamples || 6,
@@ -585,7 +585,7 @@
         ? state.settings.boatIslandFill || 0.35
         : surplusFill;
       if (fill < minFill) {
-        console.log("[Boat] fill too low to launch", {
+        ofhDebug("[Boat] fill too low to launch", {
           fill: Number(fill.toFixed(2)),
           need: minFill,
           contested: !lowFillOk,
@@ -2315,7 +2315,7 @@
                 p.smallID() !== this.player.smallID() &&
                 p.isAlive(),
             );
-          console.log(
+          ofhDebug(
             "[Donate] diag: " +
               JSON.stringify({
                 featureOn: !!state.settings.features.donate,
@@ -2366,7 +2366,7 @@
       // winner, and `undefined !== null` is TRUE — which silently blocked EVERY donation
       // (all other gates passed: Impossible/Team/allowed). Only block on a REAL winner.
       if (this.game.getWinner()) {
-        console.log("[Donate] skip: game already has a winner");
+        ofhDebug("[Donate] skip: game already has a winner");
         return false;
       }
 
@@ -2419,7 +2419,7 @@
         );
 
       if (teammates.length === 0) {
-        console.log("[Donate] skip: no same-team players found");
+        ofhDebug("[Donate] skip: no same-team players found");
         return false;
       }
 
@@ -2477,7 +2477,7 @@
       let selectedTeammate = null;
       if (needy.length > 0) {
         selectedTeammate = needy[0].entry.teammate;
-        console.log(
+        ofhDebug(
           "[Donate] picked ally at " +
             Math.round(needy[0].entry.troopPercentage * 100) +
             "% " +
@@ -2486,7 +2486,7 @@
       }
 
       if (selectedTeammate === null) {
-        console.log("[Donate] skip: no teammate below the need threshold (all allies healthy)");
+        ofhDebug("[Donate] skip: no teammate below the need threshold (all allies healthy)");
         return false;
       }
 
@@ -2505,7 +2505,7 @@
         : 1;
 
       if (availableTroops < minExcess) {
-        console.log("[Donate] skip: not enough above the keep line", {
+        ofhDebug("[Donate] skip: not enough above the keep line", {
           troops: Math.round(this.player.troops()),
           keep: Math.round(troopsToKeep),
           needExcess: Math.round(minExcess),
@@ -2518,7 +2518,7 @@
       const minDonatePct = state.settings.donateMinDonatePct || 0.2;
       const minDonateAmount = this.player.troops() * minDonatePct;
       if (availableTroops < minDonateAmount) {
-        console.log("[Donate] skip: donation too small (minDonatePct)", {
+        ofhDebug("[Donate] skip: donation too small (minDonatePct)", {
           available: Math.round(availableTroops),
           minChunk: Math.round(minDonateAmount),
           pct: Math.round(minDonatePct * 100) + "%",
@@ -2538,7 +2538,7 @@
           availableTroops,
         )
       ) {
-        console.log(
+        ofhDebug(
           "[Donate] SENT",
           Math.round(availableTroops),
           "→",
@@ -2546,7 +2546,7 @@
         );
         setLastAction(tr("🎁 Donate troops"), "combat");
       } else {
-        console.log("[Donate] emit failed", { ctor: !!ctors.donateTroops });
+        ofhDebug("[Donate] emit failed", { ctor: !!ctors.donateTroops });
       }
 
       return true;

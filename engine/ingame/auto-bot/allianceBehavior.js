@@ -460,7 +460,7 @@
         "diplo",
       );
       state.lastFarAllyMs = now;
-      console.log("[Diplo] reach out far →", safeName(target));
+      ofhDebug("[Diplo] reach out far →", safeName(target));
     }
 
     // getAllianceDecision — NationAllianceBehavior.ts:88 (THE decision tree)
@@ -492,7 +492,7 @@
           return false; // dominant → shed far allies, court no new ones
         }
         if (isResponse) {
-          console.log("[Diplo] far accept →", safeName(otherPlayer));
+          ofhDebug("[Diplo] far accept →", safeName(otherPlayer));
         }
         return true;
       }

@@ -893,7 +893,7 @@
       emitIntent(ctors.moveWarship, [w.id()], tile);
       s.cooldown.set(w.id(), tick);
       setLastAction(tr("🚢 Patrol → {k}", { k: kind }), "naval");
-      console.log(
+      ofhDebug(
         "[Warship] patrol →",
         kind,
         "@",
@@ -1116,7 +1116,7 @@
       if (nowMs - (this._dodgeLogAtMs || 0) > 1000) {
         this._dodgeLogAtMs = nowMs;
         const mySid = this.player.smallID();
-        console.log(
+        ofhDebug(
           "[Warship] nuke-dodge scan:",
           zones.length,
           "zone(s)",

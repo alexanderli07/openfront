@@ -59,7 +59,7 @@
       };
 
       _workerReady = true;
-      console.log("[AntiAFK] Worker timer hub started");
+      ofhDebug("[AntiAFK] Worker timer hub started");
     } catch (e) {
       console.warn("[AntiAFK] Web Worker unavailable:", e);
       _workerReady = false;
@@ -106,7 +106,7 @@
     if (typeof sendRawPacket !== "function") return;
     try {
       sendRawPacket({ type: "ping" });
-      console.log("[AntiAFK] keep-alive ping sent");
+      ofhDebug("[AntiAFK] keep-alive ping sent");
     } catch (e) {}
   }
 
@@ -133,10 +133,10 @@
     antiAfkEnabled = !!enabled;
     if (antiAfkEnabled) {
       _startKeepAlive();
-      console.log("[AntiAFK] Enabled — setInterval overridden via Web Worker");
+      ofhDebug("[AntiAFK] Enabled — setInterval overridden via Web Worker");
     } else {
       _stopKeepAlive();
-      console.log("[AntiAFK] Disabled");
+      ofhDebug("[AntiAFK] Disabled");
     }
   }
 
@@ -148,5 +148,5 @@
   // setAntiAfkEnabled(true) once settings are synced. The setInterval override
   // is always active regardless — it routes ALL timers through the worker.
   _startKeepAlive();
-  console.log("[AntiAFK] Loaded — all setInterval calls routed through Web Worker");
+  ofhDebug("[AntiAFK] Loaded — all setInterval calls routed through Web Worker");
 })();

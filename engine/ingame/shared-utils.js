@@ -133,6 +133,22 @@ function ofhSetOverlayAlpha(a) {
   if (typeof markMapOverlayDirty === "function") markMapOverlayDirty();
 }
 
+// ── Developer diagnostics ──────────────────────────────────────────────────────────
+// OFF by default. Several of these fire once per DECISION — every boat attempt, every
+// donate pass, every build gate, every anti-AFK ping — which floods the console during
+// normal play and buries anything that actually matters. Enable at runtime with
+//   window.__OFH_DEBUG = true
+// from the console; no rebuild and no reload needed. console.warn / console.error are
+// deliberately NOT routed through here: those report real faults and should always show.
+function ofhDebug() {
+  try {
+    if (!window.__OFH_DEBUG) return;
+    console.log.apply(console, arguments);
+  } catch (_e) {
+    /* never let logging break a caller */
+  }
+}
+
 // ── Game tick rate ────────────────────────────────────────────────────────────────
 // Every countdown the helper shows is computed in GAME TICKS and then converted to
 // seconds. Those conversions all assumed a fixed 10 ticks/sec, which is only true at 1x:

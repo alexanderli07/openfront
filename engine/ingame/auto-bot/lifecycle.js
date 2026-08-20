@@ -84,12 +84,12 @@
 // symptom we hit. The IIFE still sees shared globals (tr, lastOpenFrontGameContext).
 (function () {
   "use strict";
-  console.log("[AtomMacro] script start — file is injected & executing");
+  ofhDebug("[AtomMacro] script start — file is injected & executing");
   // Page-level idempotency guard: the same code also lives at the end of
   // lifecycle.js (so a plain F5 loads it without an extension reload). Whichever
   // copy runs first installs; the other no-ops.
   if (window.__ofhAtomMacroInstalled) {
-    console.log("[AtomMacro] already installed in this page → skip duplicate");
+    ofhDebug("[AtomMacro] already installed in this page → skip duplicate");
     return;
   }
 
@@ -1354,7 +1354,7 @@
 
     const confirmed = scanAtoms() + (scanHydro ? scanHydro() : 0);
     if (atomFireCancel) stopReason = "cancelled";
-    console.log("[Atom] fireAtoms done", {
+    ofhDebug("[Atom] fireAtoms done", {
       emitted,
       confirmed,
       qty,
@@ -1454,13 +1454,13 @@
       return;
     }
     if (!atomIsHotkey(event)) return;
-    console.log("[AtomMacro] key '\\' detected");
+    ofhDebug("[AtomMacro] key '\\' detected");
     // Swallow the key (chosen to NOT collide with the game's "8" atom hotkey).
     event.preventDefault();
     event.stopImmediatePropagation();
     const ctx = atomGameContext();
     if (!ctx.game || !ctx.myPlayer?.isPlayer?.()) {
-      console.log("[AtomMacro] no game/player context", {
+      ofhDebug("[AtomMacro] no game/player context", {
         radial: !!atomRadialElement(),
         game: !!ctx.game,
         transform: !!ctx.transform,
@@ -1474,7 +1474,7 @@
     // Enter (or re-enter) ring-aiming: the atom + hydrogen blast radius preview at the
     // cursor; a LEFT-CLICK then commits the target tile and opens the dialog. Pressing \
     // again re-aims (closing any open dialog), so a fresh aim + click retargets the strike.
-    console.log("[AtomMacro] entering aim mode");
+    ofhDebug("[AtomMacro] entering aim mode");
     startAtomAiming(ctx);
   }
 
@@ -1551,7 +1551,7 @@
     }
     const cx = event.clientX;
     const cy = event.clientY;
-    console.log("[AtomMacro] aim click → tile", tile);
+    ofhDebug("[AtomMacro] aim click → tile", tile);
     atomAiming = false;
     if (atomUsingNativeOverlay) {
       // Đường đạn native bám con trỏ → khi mở dialog sẽ chạy lệch mục tiêu, nên tắt.
@@ -1718,7 +1718,7 @@
   try {
     installAtomMacro();
     window.__ofhAtomMacroInstalled = true;
-    console.log("[AtomMacro] installed (point mouse + press '\\' → dialog)");
+    ofhDebug("[AtomMacro] installed (point mouse + press '\\' → dialog)");
   } catch (e) {
     console.warn("[AtomMacro] install failed:", e);
   }

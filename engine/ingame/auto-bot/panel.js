@@ -856,14 +856,14 @@
         top: parseInt(panel.style.top, 10),
       };
       saveSettings();
-      console.log("[Panel] saved pos", state.settings.pos);
+      ofhDebug("[Panel] saved pos", state.settings.pos);
     }
     handle.addEventListener("pointerdown", onDown);
   }
 
   function applyStoredPosition(panel) {
     const pos = state.settings.pos;
-    console.log("[Panel] applyStoredPosition", pos);
+    ofhDebug("[Panel] applyStoredPosition", pos);
     if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
       panel.style.right = "auto";
       panel.style.bottom = "auto";
