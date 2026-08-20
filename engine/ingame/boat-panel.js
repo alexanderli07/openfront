@@ -446,7 +446,7 @@
         border-radius: 7px;
         background: rgba(20, 184, 166, 0.18);
         color: #ccfbf1;
-        font: 700 12px/1 "Aptos", "Segoe UI", sans-serif;
+        font: 700 12px/1 "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
         padding: 6px 9px;
         white-space: nowrap;
       }

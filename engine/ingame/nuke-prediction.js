@@ -81,7 +81,11 @@
         border-radius: 8px;
         background: rgba(7, 12, 18, 0.86);
         color: var(--nuke-label-color, #fecaca);
-        font: 900 11px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        /* Interpolated from the shared overlay tokens so this DOM map label is the same
+           type as its canvas siblings. It was a FIFTH font stack — 900-weight system-ui,
+           with no Aptos in it at all — which is why the nuke label never looked related to
+           the money pill sitting next to it. */
+        font: ${OFH_OVERLAY_STYLE.weight} ${OFH_OVERLAY_STYLE.sizeMd}px/1 ${OFH_OVERLAY_STYLE.family};
         letter-spacing: 0;
         text-shadow: 0 1px 4px rgba(0, 0, 0, 0.92);
         transform: translate3d(var(--nuke-tx, 0px), var(--nuke-label-ty, 0px), 0) translate(-50%, -100%);
