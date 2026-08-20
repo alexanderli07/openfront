@@ -17,6 +17,11 @@
 
   // Map: unitId -> firstSeenTick (when we first saw it under construction).
   const _buildTimerConstructionSeen = new Map();
+  // Game ticks restart near 0 in a new match while this Map survives (it lives for the page
+  // session). A reused unit id would then carry the PREVIOUS match's start tick, and
+  // `remaining = duration + (staleAnchor - nowTicks)` has no upper clamp, so the label
+  // would show a wildly inflated countdown. Detected by the tick going backwards.
+  let _buildTimerLastTicks = null;
   // Scan cache: [{ id, type, worldX, worldY, label, ready }].
   let _buildTimerScan = [];
 
@@ -41,6 +46,13 @@
       return;
     }
     const ticks = game.ticks ? game.ticks() : 0;
+    // Ticks running backwards means a new match started in this same page session; the
+    // anchor Map outlives the match, so drop it or a reused unit id inherits a start tick
+    // from the previous game.
+    if (_buildTimerLastTicks !== null && ticks < _buildTimerLastTicks) {
+      _buildTimerConstructionSeen.clear();
+    }
+    _buildTimerLastTicks = ticks;
     const out = [];
     const seenIds = new Set();
 
@@ -79,7 +91,7 @@
         }
         const duration = getConstructionDuration(game, type);
         const remaining = Math.max(0, duration - (ticks - startTick));
-        const sec = Math.round(remaining / 10);
+        const sec = Math.round(ofhTicksToSeconds(game, remaining));
         const label = sec > 0 ? `🏗 ${sec}s` : tr("Building");
         out.push({ id, type, worldX, worldY, label, state: "building" });
       } else {
@@ -97,17 +109,31 @@
         } catch (_error) { level = 1; }
 
         if (Array.isArray(queue) && queue.length >= level) {
-          const lastFired = queue[0];
-          // BUILD NOTE: read the real cooldown from game config rather than the
-          // hard-coded 90 ticks; fall back to the constant if unavailable.
-          let cooldown = BUILD_TIMER_COOLDOWN_TICKS;
+          // Prefer the unit's OWN ticksLeftInCooldown() — the game's authoritative answer,
+          // already relied on by the auto-bot (nukeBehavior nukeSpawn) where
+          // "not in cooldown" is defined as ticksLeftInCooldown() === 0. Reconstructing it
+          // from missileTimerQueue()[0] minus SAMCooldown() had two problems: it assumed
+          // the queue entry is an absolute fire tick, and it applied the SAM constant to
+          // Missile Silos as well, which is simply the wrong structure's cooldown. The
+          // reconstruction stays as a fallback for a client that doesn't expose the getter.
+          let remaining = null;
           try {
-            const cfg = Number(game.config().SAMCooldown());
-            if (Number.isFinite(cfg) && cfg > 0) cooldown = cfg;
-          } catch (_error) { /* keep the default */ }
-          const remaining = cooldown - (ticks - lastFired);
+            if (typeof unit.ticksLeftInCooldown === "function") {
+              const left = Number(unit.ticksLeftInCooldown());
+              if (Number.isFinite(left)) remaining = left;
+            }
+          } catch (_error) { remaining = null; }
+          if (remaining === null) {
+            const lastFired = queue[0];
+            let cooldown = BUILD_TIMER_COOLDOWN_TICKS;
+            try {
+              const cfg = Number(game.config().SAMCooldown());
+              if (Number.isFinite(cfg) && cfg > 0) cooldown = cfg;
+            } catch (_error) { /* keep the default */ }
+            remaining = cooldown - (ticks - lastFired);
+          }
           if (remaining > 0) {
-            const sec = Math.round(remaining / 10);
+            const sec = Math.round(ofhTicksToSeconds(game, remaining));
             out.push({ id, type, worldX, worldY, label: `⟳ ${sec}s`, state: "cooldown" });
           } else {
             out.push({ id, type, worldX, worldY, label: "✓", state: "ready" });

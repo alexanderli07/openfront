@@ -297,7 +297,11 @@
         }
         if (flight !== undefined) {
           const etaTicks = flight.remainTicks - (nowTicks - flight.firstTick);
-          etaSec = Math.round(Math.max(0, etaTicks / 10) * 10) / 10; // 0.1 s steps
+          // Ticks -> seconds at the MEASURED rate. etaTicks is a correct game-tick count
+          // (the arc-length model above is careful about it); dividing by a hardcoded 10
+          // made the label wrong by exactly the game-speed multiplier, always in the
+          // dangerous direction: at 3x it claimed 4.2s of warning when impact was 1.4s away.
+          etaSec = Math.round(Math.max(0, ofhTicksToSeconds(game, etaTicks)) * 10) / 10;
         }
       }
 

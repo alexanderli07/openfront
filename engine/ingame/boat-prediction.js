@@ -319,8 +319,11 @@
       }
       const endTick = plan.startTick + plan.path.length * plan.ticksPerStep;
       const remainingTicks = endTick - Number(game?.ticks?.());
-      const msPerTick = Number(game?.config?.()?.msPerTick?.()) || 100;
-      return Math.max(0, remainingTicks * msPerTick);
+      // config().msPerTick() looks authoritative but is upstream a parameterless
+      // `return 100`, so multiplying by it is the same fixed 10-ticks/sec assumption as a
+      // /10 elsewhere. The tick count here is excellent — it comes from the game's OWN
+      // motion plan, path and ticksPerStep — so only the unit conversion needed fixing.
+      return Math.max(0, ofhTicksToSeconds(game, remainingTicks) * 1000);
     } catch (_error) {
       return null;
     }

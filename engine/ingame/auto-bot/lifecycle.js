@@ -364,7 +364,18 @@
   function atomReloadAwareSalvo(baseIntercept, gapMs, cooldownTicks) {
     const B = Math.max(0, Math.floor(baseIntercept));
     if (B <= 0) return { recommended: 1, achievable: true };
-    const gapTicks = Math.max(1, gapMs / 100); // 100 ms per game tick (10 ticks/sec)
+    // ms -> ticks. At 10 ticks/sec that is gapMs/100, but the tick rate follows the game
+    // speed, so a fixed divisor under-counts the delivery spread by exactly the speed
+    // factor and moves the SAM-overwhelm cliff. Unlike the overlays, this code only runs
+    // inside the bot's own loop, so state.speed.factor is live here.
+    let _spd = 1;
+    try {
+      const f = Number(state.speed && state.speed.factor);
+      if (Number.isFinite(f) && f > 0) _spd = f;
+    } catch (_e) {
+      _spd = 1;
+    }
+    const gapTicks = Math.max(1, (gapMs / 100) * _spd);
     const cd = cooldownTicks > 0 ? cooldownTicks : 90;
     const deliveryTicks = B * gapTicks; // arrival spread of the B blocking bombs
     return {

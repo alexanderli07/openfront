@@ -133,6 +133,73 @@ function ofhSetOverlayAlpha(a) {
   if (typeof markMapOverlayDirty === "function") markMapOverlayDirty();
 }
 
+// ── Game tick rate ────────────────────────────────────────────────────────────────
+// Every countdown the helper shows is computed in GAME TICKS and then converted to
+// seconds. Those conversions all assumed a fixed 10 ticks/sec, which is only true at 1x:
+// OpenFront's speed control multiplies the real interval between ticks, so at 2x a
+// 300-tick build completes in 15 real seconds while a /10 label still reads "30s". Every
+// predictor was therefore wrong by exactly the speed multiplier — the tick arithmetic was
+// fine, only the units were wrong.
+//
+// game.config().msPerTick() looks like the answer and is not: upstream it is literally
+// `return 100`, a parameterless constant with no speed dependence, so it is numerically
+// identical to the /10 it would replace.
+//
+// The auto-bot already measures the real rate (auto-bot/helpers.js updateSpeedFactor into
+// state.speed.factor) but that is unusable here: its only caller is botTick, which returns
+// early when the bot is disabled or the lobby is public, so the factor sits frozen at 1 for
+// anyone not running the bot. Wiring the overlays to it would apply a 0% correction and look
+// like a fix. Hence a meter of our own.
+//
+// It starts at the documented 10/s baseline, so behaviour is unchanged until a measurement
+// lands, and a measured rate is right whether or not the game is actually speed-capped.
+var OFH_TICK_BASELINE = 10;
+var OFH_TICK_RATE = { lastTick: null, lastMs: 0, perSec: OFH_TICK_BASELINE };
+
+/** Measured game ticks per real second. Self-sampling: every caller that wants a duration
+ *  also feeds the estimate, so no separate polling loop is needed. */
+function ofhTickRate(game) {
+  const s = OFH_TICK_RATE;
+  try {
+    const t = Number(game.ticks());
+    if (!Number.isFinite(t)) return s.perSec;
+    const ms = Date.now();
+    if (s.lastTick === null || t < s.lastTick) {
+      // First sample, or ticks ran backwards — a new game restarted the clock.
+      s.lastTick = t;
+      s.lastMs = ms;
+      return s.perSec;
+    }
+    const dms = ms - s.lastMs;
+    // A window shorter than this straddles too few tick boundaries to mean anything: two
+    // samples 30ms apart read either 0/s or 1000/s depending where the boundary fell.
+    if (dms >= 500) {
+      const dt = t - s.lastTick;
+      if (dt > 0) {
+        const raw = (dt / dms) * 1000;
+        // Reject nonsense: a paused game or a hitching frame reads far too low, a
+        // devtools pause far too high. Keep the last good value rather than believing it.
+        if (raw >= 0.5 && raw <= 400) s.perSec = s.perSec * 0.7 + raw * 0.3;
+      }
+      // Re-anchor either way — a paused stretch must not dilute the next window.
+      s.lastTick = t;
+      s.lastMs = ms;
+    }
+  } catch (_e) {
+    /* keep the last known rate */
+  }
+  return s.perSec > 0 ? s.perSec : OFH_TICK_BASELINE;
+}
+
+/** Game ticks -> real seconds. THE one conversion; every countdown goes through it. */
+function ofhTicksToSeconds(game, ticks) {
+  const v = Number(ticks);
+  if (!Number.isFinite(v)) return 0;
+  const r = ofhTickRate(game);
+  return v / (r > 0 ? r : OFH_TICK_BASELINE);
+}
+
+
 function normalizeEconomyHeatmapIntensity(value) {
   const intensity = Number(value);
   if (!Number.isFinite(intensity)) {

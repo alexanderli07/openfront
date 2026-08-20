@@ -215,7 +215,9 @@
         t += g;
         ticks += 1;
       }
-      timeToPushSec = t >= target ? Math.round(ticks / 10) : null;
+      // Same measured conversion as every other countdown (this path is not currently
+      // rendered, but a latent /10 is a bug waiting for a caller).
+      timeToPushSec = t >= target ? Math.round(ofhTicksToSeconds(game, ticks)) : null;
     }
 
     return {
