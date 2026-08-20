@@ -1,10 +1,10 @@
 // Attack-highlight overlay — a map-scheduler layer that flags who is attacking
 // you: a pulsing red ring around each attacker, a dashed line from them to your
-// territory, and the total incoming troop count. Reads me.incomingAttacks()
+// territory. Reads me.incomingAttacks()
 // (plain { troops, attackerID, retreating } objects) and resolves attackers via
 // game.playerBySmallID. Teammates/allies are skipped.
 
-  let _attackHighlightScan = null; // { myLoc, attackers:[{loc, troops}], total }
+  let _attackHighlightScan = null; // { myLoc, attackers:[{loc, troops}] }
 
   function scanAttackHighlight(game) {
     const me = game.myPlayer ? game.myPlayer() : null;
@@ -25,19 +25,17 @@
       atks = null;
     }
     if (!atks || atks.length === 0) {
-      _attackHighlightScan = { myLoc, attackers: [], total: 0 };
+      _attackHighlightScan = { myLoc, attackers: [] };
       return;
     }
 
     const byAttacker = new Map();
-    let total = 0;
     for (let i = 0; i < atks.length; i += 1) {
       const a = atks[i];
       if (!a || a.retreating) {
         continue;
       }
       const troops = Number(a.troops) || 0;
-      total += troops;
       const sid = a.attackerID;
       byAttacker.set(sid, (byAttacker.get(sid) || 0) + troops);
     }
@@ -72,7 +70,7 @@
       }
     });
 
-    _attackHighlightScan = { myLoc, attackers, total };
+    _attackHighlightScan = { myLoc, attackers };
   }
 
   function drawAttackHighlight(ctx, game, transform, now) {
@@ -113,16 +111,10 @@
       ctx.stroke();
     }
 
-    // Total-incoming label near my territory.
-    if (myScreen && scan.total > 0) {
-      drawMapHaloText(
-        ctx,
-        myScreen.x,
-        myScreen.y - 22,
-        `⚔ ${troopsDisplay(scan.total)}`,
-        "rgba(254, 202, 202, 0.98)",
-      );
-    }
+    // (Removed: a "⚔ <total incoming>" number was drawn at myScreen.y - 22. It had no
+    // backing chip, was anchored to the territory centre rather than to any edge, and so
+    // sat on top of whatever else was there. The pulsing attacker rings above already
+    // convey that an attack is incoming, and the game's own UI carries the troop counts.)
     ctx.restore();
   }
 

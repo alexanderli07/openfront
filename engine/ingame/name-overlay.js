@@ -46,8 +46,8 @@
     );
   }
 
-  // Scan cache: [{ player, relation, isEnemy, troops, inCombat, maxTroops, gold, threat }].
-  // troops/inCombat/maxTroops are RAW (10x); divide by 10 only when displaying.
+  // Scan cache: [{ player, relation, isEnemy, troops, maxTroops, gold, threat }].
+  // troops/maxTroops are RAW (10x); divide by 10 only when displaying.
   let _playerOverlayScan = [];
 
   function scanPlayerOverlay(game) {
@@ -64,7 +64,10 @@
     const players = getCachedPlayerViews(game);
     const me = game.myPlayer ? game.myPlayer() : null;
     const nukeBuilders = threatIndicatorsEnabled ? advNukeBuilderIds(game) : null;
-    const needBar = mapTroopCountsEnabled;
+    // maxTroops feeds the "/max" pill and the threat indicators. inCombat used to feed the
+    // troop bar's "attacking" segment and has no reader now that the bar is gone, so the
+    // per-player advTroopsInCombat() call goes with it.
+    const needMaxTroops = mapTroopCountsEnabled;
     const out = [];
     for (let i = 0; i < players.length; i += 1) {
       const player = players[i];
@@ -96,8 +99,7 @@
         isEnemy,
         troops,
         skipOverlay: isRegularBot,
-        inCombat: (needBar && !isRegularBot) ? advTroopsInCombat(player) : 0,
-        maxTroops: (needBar || threatIndicatorsEnabled) && !isRegularBot ? advMaxTroops(game, player) : 0,
+        maxTroops: (needMaxTroops || threatIndicatorsEnabled) && !isRegularBot ? advMaxTroops(game, player) : 0,
         gold: (mapMoneyEnabled && !isRegularBot) ? advGoldNumber(player) : 0,
         threat: null,
       };
@@ -123,11 +125,6 @@
   var _DYN_NAME_SCALE_FACTOR = 0.25;
   var _DYN_SCALE_CAP = 3;
   var _DYN_MONEY_SIZE_MUL = 0.46;
-  // The troop bar is a CONSTANT thickness. It used to be
-  // max(3, floor(nameScreenPx * 0.26)), so it fattened as you zoomed in, which looked
-  // wrong under a pill whose own height is capped. 4px leaves 2px of visible fill inside
-  // the 1px outline — thin, but the green/orange split still reads.
-  var _TROOP_BAR_H = 4;
   // Keep this LOW. Everything a player shows — money pill, troop bar, threat marks — is
   // behind the single `if (!dyn.visible) continue;` gate, so raising this hides all of it
   // at once. It was briefly 14 on the theory that fewer legible labels beat many illegible
@@ -161,24 +158,19 @@
       6,
       Math.min(_sizeMax, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL)),
     );
-    var troopBarH = _TROOP_BAR_H;
-    var troopBarW = Math.max(20, Math.floor(moneyFontSize * 3.5));
+
     // Tighter spacing: money pill closer to troop bar.
     var moneyOffsetY = Math.max(10, Math.floor(nameScreenPx * 0.9));
-    var troopOffsetY = Math.max(5, Math.floor(nameScreenPx * 0.58));
+
     // Fade background when zoomed close to see the map.
     var zoomFade = nameScreenPx > 30 ? Math.max(0.4, 1.0 - (nameScreenPx - 30) / 80) : 1.0;
-    // The pills no longer carry their own alphas — drawMapLabel owns that, and applies
-    // one factor to fill, outline AND text. Previously the fade hit only the box
-    // (bg 0.6, border 0.22) while the text stayed at 0.98 and the bar fills at 0.85/0.7,
-    // so zooming in dissolved the boxes and left their contents floating.
-    var barBgAlpha = (0.5 * zoomFade).toFixed(2);
+    // The pill carries no alpha of its own — drawMapLabel owns that and applies one factor
+    // to fill, outline AND text.
     return {
-      moneyFontSize: moneyFontSize, troopBarW: troopBarW, troopBarH: troopBarH,
-      moneyOffsetY: moneyOffsetY, troopOffsetY: troopOffsetY,
+      moneyFontSize: moneyFontSize,
+      moneyOffsetY: moneyOffsetY,
       visible: nameScreenPx >= _DYN_MIN_SCREEN_PX,
       screenPx: nameScreenPx,
-      barBgAlpha: barBgAlpha,
     };
   }
 
@@ -246,34 +238,6 @@
   // home troops = green (fixed, NOT faction color), attacking = orange, total bar
   // length = total/max. The "/max" label is drawn as its own pill on the line
   // above (drawMoneyTroopPill or drawMaxTroopPill), never on the bar itself.
-  // `pillW` is the exact measured width of the pill drawn directly above this bar, so the
-  // two line up precisely. dyn.troopBarW (moneyFontSize * 3.5) is only a fallback for a
-  // caller that has no pill to match.
-  function drawTroopBar(ctx, cx, barTop, relation, troops, attacking, maxTroops, dyn, pillW) {
-    var barW = Number.isFinite(pillW) && pillW > 0 ? pillW : dyn.troopBarW;
-    var barH = dyn.troopBarH;
-    var barX = cx - barW / 2;
-    var max = Math.max(1, maxTroops);
-    var total = troops + attacking;
-    var totalRatio = Math.min(total / max, 1);
-    var mainRatio = attacking === 0 ? 1 : total > 0 ? troops / total : 0;
-    var bufferRatio = attacking === 0 ? 0 : total > 0 ? attacking / total : 0;
-    var mainW = mainRatio * totalRatio * barW;
-    var bufferW = bufferRatio * totalRatio * barW;
-
-    ctx.fillStyle = "rgba(34, 34, 34, " + dyn.barBgAlpha + ")";
-    ctx.fillRect(barX, barTop, barW, barH);
-    ctx.fillStyle = "rgba(0, 210, 82, 0.85)";
-    ctx.fillRect(barX, barTop, mainW, barH);
-    if (bufferW > 0) {
-      ctx.fillStyle = "rgba(255, 166, 0, 0.7)";
-      ctx.fillRect(barX + mainW, barTop, bufferW, barH);
-    }
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(68, 68, 68, 0.8)";
-    ctx.strokeRect(barX + 0.5, barTop + 0.5, barW - 1, barH - 1);
-  }
-
   function drawPlayerOverlay(ctx, game, transform) {
     const me = game.myPlayer ? game.myPlayer() : null;
     let myTroops = 1;
@@ -309,25 +273,13 @@
       var color = mapFactionColor(entry.relation);
 
       if (!entry.skipOverlay) {
-        var liveTroops = entry.troops;
-        if (mapTroopCountsEnabled) {
-          try {
-            liveTroops = Number(player.troops ? player.troops() : entry.troops) || entry.troops;
-          } catch (_error) {
-            liveTroops = entry.troops;
-          }
-        }
-
         if (mapMoneyEnabled && mapTroopCountsEnabled) {
-          // Combined: money + /max on one line, troop bar below.
-          var pillW = drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
-          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn, pillW);
+          // Money and /max on one line.
+          drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
         } else if (mapMoneyEnabled) {
           drawMoneyPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn, color);
         } else if (mapTroopCountsEnabled) {
-          // Money off: /max still gets its own line above the bar.
-          var maxPillW = drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
-          drawTroopBar(ctx, p.x, p.y - dyn.troopOffsetY, entry.relation, liveTroops, entry.inCombat, entry.maxTroops, dyn, maxPillW);
+          drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
         }
       }
 

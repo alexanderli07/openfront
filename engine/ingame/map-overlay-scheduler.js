@@ -367,8 +367,9 @@
    *  exact opposite of its purpose.
    *
    *  Returns the chip's WIDTH in px, so a caller can line something up with it exactly
-   *  (name-overlay sizes the troop bar off this) instead of re-deriving it from a formula
-   *  that only approximates the real measured width.
+   *  instead of re-deriving it from a formula that only approximates the real measured
+   *  width. (No caller needs it today — the troop bar that did was removed — but it is the
+   *  only place the measurement exists, so it stays exposed rather than recomputed.)
    *
    *  opts: { size, segments:[{text,color}], outline:bool, halo:bool, align, outlineColor }
    *  Measured width is quantized to 4px because canvas 2D has no font-variant-numeric,
