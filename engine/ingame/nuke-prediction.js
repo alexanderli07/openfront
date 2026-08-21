@@ -6,7 +6,8 @@
   // rank decides the marker color: an incoming enemy strike (defensive warning)
   // outranks my own salvo, which outranks an ally's. In practice relations rarely
   // mix on a single tile, so for my own batch the marker is cyan with my count.
-  const NUKE_RELATION_RANK = { ally: 1, self: 2, enemy: 3 };
+  // Team included since v1.56 (teammate nukes used to be filtered out entirely).
+  const NUKE_RELATION_RANK = { ally: 1, team: 2, self: 3, enemy: 4 };
 
   // Atom/Hydrogen follow a ground-launched parabola we can time for a "time to impact"
   // readout. MIRV Warheads are EXCLUDED: they spawn mid-air at the MIRV split and fly flat
@@ -115,14 +116,43 @@
   function getNukePredictionRelation(game, unit) {
     const owner = unit?.owner?.();
     const relation = getPlayerRelationToMyPlayer(game, owner);
-    return relation === "enemy" || relation === "ally" || relation === "self"
+    return relation === "enemy" ||
+      relation === "ally" ||
+      relation === "team" ||
+      relation === "self"
       ? relation
       : null;
   }
 
-  function getNukePredictionColors(relation) {
+  function getNukePredictionColors(relation, owner) {
     // bg/innerGlow/labelBorder dropped in v1.54 — the ring is fill-less and the
     // label is chipless, so nothing reads them any more.
+    // USER (v1.56): everyone except SELF takes the owner's on-map (team) colour;
+    // the relation palettes below are the fallback when it can't be read.
+    if (relation !== "self") {
+      const ownerRgb =
+        typeof ofhOwnerOverlayRgb === "function" ? ofhOwnerOverlayRgb(owner) : null;
+      if (ownerRgb) {
+        const tint = ofhOwnerTint(ownerRgb, 0.65);
+        return {
+          color: ofhOwnerRgba(ownerRgb, 0.95),
+          glow: ofhOwnerRgba(ownerRgb, 0.38),
+          crossColor: ofhOwnerRgba(tint, 0.96),
+          crossGlow: ofhOwnerRgba(ownerRgb, 0.65),
+          labelColor: "rgb(" + tint.r + ", " + tint.g + ", " + tint.b + ")",
+        };
+      }
+    }
+    if (relation === "team") {
+      // Fallback only — teal, matching the boat/warship team palette.
+      return {
+        color: "rgba(45, 212, 191, 0.92)",
+        glow: "rgba(45, 212, 191, 0.36)",
+        crossColor: "rgba(153, 246, 228, 0.94)",
+        crossGlow: "rgba(45, 212, 191, 0.6)",
+        labelColor: "#99f6e4",
+      };
+    }
     if (relation === "ally") {
       return {
         color: "rgba(74, 222, 128, 0.92)",
@@ -302,6 +332,13 @@
       if (!relation) {
         continue;
       }
+      const nukeOwner = unit.owner?.();
+      let nukeOwnerSid = null;
+      try {
+        nukeOwnerSid = nukeOwner?.smallID?.() ?? null;
+      } catch (_e) {
+        nukeOwnerSid = null;
+      }
       const targetTile = unit.targetTile?.();
       if (targetTile === undefined) {
         continue;
@@ -388,6 +425,8 @@
           (NUKE_RELATION_RANK[existing.relation] ?? 0)
         ) {
           existing.relation = relation;
+          existing.owner = nukeOwner;
+          existing.ownerSid = nukeOwnerSid;
         }
         // Group ETA = the SOONEST incoming impact on this tile.
         if (etaSec !== null && (existing.eta === null || etaSec < existing.eta)) {
@@ -403,6 +442,8 @@
           worldY: game.y(targetTile),
           worldRadius,
           relation,
+          owner: nukeOwner,
+          ownerSid: nukeOwnerSid,
           count: 1,
           eta: etaSec,
         });
@@ -492,6 +533,7 @@
       labelTy: NaN,
       radius: NaN,
       relation: "",
+      colorKey: "",
       count: -1,
       eta: NaN,
     };
@@ -639,8 +681,16 @@
         entry.zone.style.setProperty("--nuke-diameter", `${radius * 2}px`);
         entry.radius = radius;
       }
-      if (entry.relation !== landing.relation) {
-        applyNukeColors(entry.zone, entry.label, getNukePredictionColors(landing.relation));
+      // Key on relation AND owner: two different enemies bombing the same tile at
+      // different times must recolour the reused entry.
+      const colorKey = landing.relation + "|" + (landing.ownerSid ?? "");
+      if (entry.colorKey !== colorKey) {
+        applyNukeColors(
+          entry.zone,
+          entry.label,
+          getNukePredictionColors(landing.relation, landing.owner),
+        );
+        entry.colorKey = colorKey;
         entry.relation = landing.relation;
         entry.count = -1; // force the label prefix below to refresh on a relation flip
       }
@@ -648,9 +698,11 @@
         const labelPrefix =
           landing.relation === "self"
             ? tr("My nuke")
-            : landing.relation === "ally"
-              ? tr("Ally nuke")
-              : tr("Enemy nuke");
+            : landing.relation === "team"
+              ? tr("Team nuke")
+              : landing.relation === "ally"
+                ? tr("Ally nuke")
+                : tr("Enemy nuke");
         const countPart = landing.count > 1 ? ` ${landing.count}x` : "";
         // "time to impact" of the soonest nuke on this tile (atom/hydrogen only).
         const etaPart =

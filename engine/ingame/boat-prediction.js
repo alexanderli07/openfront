@@ -487,7 +487,18 @@
       // that I then capture should start counting as "incoming to my territory".
       const targetsMyTerritory = isBoatTargetingMyPlayer(game, targetTile);
       const targeting = relation === "enemy" && targetsMyTerritory;
-      const { color, bg } = getBoatPredictionColors(relation, targeting);
+      // USER (v1.56): everyone except SELF is tinted with their on-map (team)
+      // colour; the relation palette is the fallback when the colour can't be
+      // read. An enemy boat aimed at MY territory additionally gets a red alarm
+      // ring in the renderer — the team colour says WHO, the ring says DANGER.
+      let { color, bg } = getBoatPredictionColors(relation, targeting);
+      if (relation !== "self") {
+        const ownerRgb = ofhOwnerOverlayRgb(unit.owner?.());
+        if (ownerRgb) {
+          color = ofhOwnerRgba(ownerRgb, 0.95);
+          bg = ofhOwnerRgba(ownerRgb, 0.22);
+        }
+      }
       const labelPrefix =
         relation === "self"
           ? tr("Your landing")
@@ -1031,6 +1042,13 @@
           ctx.beginPath(); ctx.arc(spx, spy, selfBoat ? 9 : 8, 0, Math.PI * 2);
           ctx.fillStyle = t.bg; ctx.fill();
           ctx.lineWidth = selfBoat ? 3 : 2; ctx.strokeStyle = color; ctx.stroke();
+          // Alarm ring: enemy boat heading INTO my territory. With owner-team
+          // colours the hue no longer screams danger, so the ring does.
+          if (t.relation === "enemy" && t.targetsMyTerritory) {
+            ctx.beginPath(); ctx.arc(spx, spy, 11.5, 0, Math.PI * 2);
+            ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(248, 113, 113, 0.9)";
+            ctx.stroke();
+          }
           ctx.beginPath();
           ctx.moveTo(spx - 5, spy); ctx.lineTo(spx + 5, spy);
           ctx.moveTo(spx, spy - 5); ctx.lineTo(spx, spy + 5);

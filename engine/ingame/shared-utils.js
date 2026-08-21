@@ -140,6 +140,60 @@ function ofhSetOverlayAlpha(a) {
 //   window.__OFH_DEBUG = true
 // from the console; no rebuild and no reload needed. console.warn / console.error are
 // deliberately NOT routed through here: those report real faults and should always show.
+// ── Owner-identity overlay colour (USER, v1.56) ──
+// Landings/routes/rings are tinted with their owner's ON-MAP colour — the team
+// colour in team games, the player's own colour in FFA. PlayerView exposes it
+// as territoryColor() (a colord instance; method/property names survive the
+// game's minification — this repo already relies on that). Territory tones are
+// pastel, so a thin stroke would vanish: saturate and pin lightness into a
+// readable band. Returns {r,g,b} or null — the caller falls back to its
+// relation palette. SELF is the caller's business (magenta identity).
+function ofhOwnerOverlayRgb(owner) {
+  try {
+    if (!owner || typeof owner.territoryColor !== "function") return null;
+    let c = owner.territoryColor();
+    if (!c || typeof c.toRgb !== "function") return null;
+    try {
+      if (typeof c.saturate === "function") c = c.saturate(0.25);
+      if (typeof c.toHsl === "function") {
+        const l = c.toHsl().l; // 0..100
+        if (l < 45 && typeof c.lighten === "function") {
+          c = c.lighten((45 - l) / 100);
+        } else if (l > 70 && typeof c.darken === "function") {
+          c = c.darken((l - 70) / 100);
+        }
+      }
+    } catch (_e) {
+      /* keep the unboosted colour */
+    }
+    const rgb = c.toRgb();
+    if (
+      !rgb ||
+      !Number.isFinite(rgb.r) ||
+      !Number.isFinite(rgb.g) ||
+      !Number.isFinite(rgb.b)
+    ) {
+      return null;
+    }
+    return { r: Math.round(rgb.r), g: Math.round(rgb.g), b: Math.round(rgb.b) };
+  } catch (_e) {
+    return null;
+  }
+}
+
+function ofhOwnerRgba(rgb, alpha) {
+  return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+}
+
+/** Mix toward white — label/crosshair tints derived from the owner colour. */
+function ofhOwnerTint(rgb, f) {
+  return {
+    r: Math.round(rgb.r + (255 - rgb.r) * f),
+    g: Math.round(rgb.g + (255 - rgb.g) * f),
+    b: Math.round(rgb.b + (255 - rgb.b) * f),
+  };
+}
+
 function ofhDebug() {
   try {
     if (!window.__OFH_DEBUG) return;

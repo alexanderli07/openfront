@@ -1,5 +1,6 @@
 // Warship route overlay: destination markers + travel routes for warships,
-// colored by relation (self/team/ally/enemy). Mirrors boat-prediction.js but
+// tinted by the owner's on-map (team) colour — self = magenta, relation palette
+// as fallback (USER, v1.56). Mirrors boat-prediction.js but
 // simpler — always-on when enabled, no hover/focus/panel. Reuses boat-prediction
 // helpers from the shared in-game scope (toScreenPoint, getBoatRouteScreenPoints,
 // getBoatPredictionRelation, getOpenFrontGameContext, …). Destination = the
@@ -185,11 +186,17 @@
         /* ignore — draw it anyway if we can't measure */
       }
 
+      // USER (v1.56): non-self warships take their owner's on-map (team) colour.
+      let color = warshipRouteColor(relation);
+      if (relation !== "self") {
+        const ownerRgb = ofhOwnerOverlayRgb(unit.owner?.());
+        if (ownerRgb) color = ofhOwnerRgba(ownerRgb, 0.95);
+      }
       out.push({
         id: String(unit.id?.() ?? `dest:${destTile}`),
         unit,
         self: relation === "self",
-        color: warshipRouteColor(relation),
+        color,
         motionPlanUnitId: Number.isFinite(motionPlanUnitId) ? motionPlanUnitId : null,
         destWorldX,
         destWorldY,
