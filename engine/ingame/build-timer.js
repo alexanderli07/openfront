@@ -135,11 +135,10 @@
           if (remaining > 0) {
             const sec = Math.round(ofhTicksToSeconds(game, remaining));
             out.push({ id, type, worldX, worldY, label: `⟳ ${sec}s`, state: "cooldown" });
-          } else {
-            out.push({ id, type, worldX, worldY, label: "✓", state: "ready" });
           }
-        } else {
-          out.push({ id, type, worldX, worldY, label: "✓", state: "ready" });
+          // Ready state draws NOTHING. The ✓ badge used to sit permanently over every
+          // idle silo and SAM — which is their normal state almost all game — so it was
+          // constant clutter carrying no information. Absence of a timer = ready.
         }
       }
     }
@@ -167,20 +166,13 @@
       const boxH = Math.max(OFH_OVERLAY_STYLE.minH, OFH_OVERLAY_STYLE.sizeMd + OFH_OVERLAY_STYLE.padY * 2);
       const by = p.y - boxH - 6; // above the unit
 
-      // Colors by state; the "ready" ✓ is further split by unit type so Silo and
-      // SAM are distinguishable at a glance: Silo ready = green, SAM ready = cyan.
-      let fg = "#9ccc65";
-      let border = "rgba(156, 204, 101, 0.5)";
+      // Two states only: building (blue) and cooldown (amber). Ready draws nothing.
+      let fg = "#ffd54f"; // amber (cooldown)
+      let border = "rgba(255, 213, 79, 0.5)";
       if (entry.state === "building") {
         fg = "#60a5fa"; // blue
         border = "rgba(96, 165, 250, 0.5)";
-      } else if (entry.state === "cooldown") {
-        fg = "#ffd54f"; // amber
-        border = "rgba(255, 213, 79, 0.5)";
-      } else if (entry.type === "SAM Launcher") {
-        fg = "#22d3ee"; // SAM ready = cyan
-        border = "rgba(34, 211, 238, 0.5)";
-      } // else Silo ready = green (default)
+      }
       drawMapLabel(ctx, p.x, by + boxH / 2, entry.label, fg, {
         size: OFH_OVERLAY_STYLE.sizeMd,
         outlineColor: border,
