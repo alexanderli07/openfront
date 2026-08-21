@@ -102,6 +102,18 @@
     // minutes of NET income. Warheads are otherwise UNCAPPED — the only hard rule is
     // that our gold must still be growing. See nukeSpendAllowed().
     nukeIncomeMinutes: 2,
+    // DIVERGENCE (combatReserve, USER): "when we're attacking or defending, the
+    // troop count we're maintaining is too low — about 20% ish". That 20% is
+    // expandRatio (0.10-0.20 of max): terra-nullius expansion and counter-attacks
+    // both size against it. While we're in a REAL fight (a non-tribe wave inbound,
+    // or our own wave in flight against a human/nation), hold a proper standing
+    // army instead: the effective reserve floors at combatReserveFloor, expansion
+    // sizes against that reserve rather than expandRatio, and a counter-attack
+    // keeps counterKeepFrac of the CURRENT army home. Tribes don't count as a
+    // fight on either side — farming them is routine expansion.
+    combatReserve: true,
+    combatReserveFloor: 0.45, // min troops/maxTroops held while in a real fight
+    counterKeepFrac: 0.45, // fraction of CURRENT troops a counter-attack leaves home
     // DIVERGENCE (opt-in, NOT in src): PHASED OPENING. Claim empty land first, then
     // bordering tribes, and only fight nations/humans once the cities and army are up.
     // Implemented as two VETOES at sendAttack rather than by reordering maybeAttack:
@@ -270,6 +282,10 @@
   const EMBARGO_DENIAL_SHARE = 0.4;
   const RESERVE_PER_EXTRA_NEIGHBOR = 0.07;
   const RESERVE_NEIGHBOR_CAP = 0.65;
+  // DIVERGENCE (combatReserve): how long "we are in a fight" stays true after the
+  // last hostile wave resolved. Bridges the gap BETWEEN an enemy's waves — which is
+  // exactly when their next one is being sized — so the reserve floor doesn't flap.
+  const COMBAT_THREAT_STICKY_TICKS = 150; // ~15s at baseline speed
   // Min fraction of ACTUAL troops to commit when grabbing SAFE empty land (no
   // bordering enemies). The maxTroops-based reserve has a ~100k floor while we
   // start with ~25k troops, so it would send only ~18% of our army — far slower
@@ -416,6 +432,7 @@
       "nukeDensityFirst",
       "reserveByNeighbors",
       "counterAttackFirst",
+      "combatReserve",
       "nukeIncomeMinutes",
       "phasedOpening",
       "openingArmyFill",

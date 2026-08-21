@@ -1487,6 +1487,18 @@
       } catch (_e) {
         /* keep r as-is */
       }
+      // DIVERGENCE (combatReserve, USER): while we're in a real fight, hold at
+      // least combatReserveFloor of max troops — the standing army IS the defence
+      // against the wave that's still inbound. Reaches every consumer of this
+      // reserve: player-attack sizing, the pre-strategy reserve gate, the donate
+      // keep-line, and (via sendLandAttack's threat clause) expansion.
+      try {
+        if (state.settings.combatReserve && this.underThreat()) {
+          r = Math.max(r, state.settings.combatReserveFloor ?? 0.45);
+        }
+      } catch (_e) {
+        /* keep r as-is */
+      }
       return Math.min(r, MAX_DEFENSE_RESERVE);
     }
 
@@ -1536,6 +1548,65 @@
       this._hostileNbTick = tick;
       this._hostileNbCount = count;
       return count;
+    }
+
+    /**
+     * DIVERGENCE (combatReserve, USER): are we in a REAL fight — a wave from a
+     * non-friendly human/nation inbound, or one of our own waves in flight against
+     * one? Tribes are excluded on BOTH sides (mirrors findIncomingAttackPlayer and
+     * hostileNeighborCount): their constant trickle would pin the floor up
+     * permanently, and farming them is what expandRatio is for. Sticky for
+     * COMBAT_THREAT_STICKY_TICKS after the last hostile wave, memoised per tick
+     * (effectiveReserveRatio is consulted several times per decision cycle), and
+     * the stamp clears on tick regression (new game).
+     */
+    underThreat() {
+      let tick;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return false;
+      }
+      if (!Number.isFinite(tick)) return false;
+      if (this._threatMemoTick === tick) return this._threatMemoVal;
+      if (this._threatAtTick !== undefined && tick < this._threatAtTick) {
+        this._threatAtTick = undefined;
+      }
+      let live = false;
+      try {
+        live = this.player.incomingAttacks().some((a) => {
+          const at = a.attacker();
+          return (
+            at && at.type() !== PlayerType.Bot && !this.player.isFriendly(at)
+          );
+        });
+      } catch (_e) {
+        live = false;
+      }
+      if (!live) {
+        try {
+          live = this.player.outgoingAttacks().some((a) => {
+            if (a.retreating()) return false;
+            const t = a.target();
+            return (
+              t &&
+              typeof t.isPlayer === "function" &&
+              t.isPlayer() &&
+              t.type() !== PlayerType.Bot &&
+              !this.player.isFriendly(t)
+            );
+          });
+        } catch (_e) {
+          /* keep live = false */
+        }
+      }
+      if (live) this._threatAtTick = tick;
+      const val =
+        this._threatAtTick !== undefined &&
+        tick - this._threatAtTick < COMBAT_THREAT_STICKY_TICKS;
+      this._threatMemoTick = tick;
+      this._threatMemoVal = val;
+      return val;
     }
 
     // hasTriggerRatioTroops — AiAttackBehavior (private).
@@ -2141,9 +2212,25 @@
         target.isPlayer() && !botWithStructures && !retaliating;
       // WIN-FIX (sizeReserve): the player/TN reserve uses the size-aware floor;
       // bot-with-structures recapture still uses the aggressive expandRatio.
-      const reserveRatio = useReserve
+      let reserveRatio = useReserve
         ? this.effectiveReserveRatio()
         : this.expandRatio;
+      // DIVERGENCE (combatReserve, USER): expansion (terra nullius / bot-structure
+      // recapture) sizes against expandRatio — 10-20% of max is fine in peacetime,
+      // but mid-war every land grab drained the standing army to exactly the
+      // "20% ish" the user kept seeing. While in a real fight, expansion must not
+      // dip us under the defensive reserve. Counter-attacks are exempt (capped
+      // below instead) — they must fire even below the reserve, which is the whole
+      // point of counterAttackFirst.
+      if (!useReserve && !retaliating) {
+        try {
+          if (state.settings.combatReserve && this.underThreat()) {
+            reserveRatio = Math.max(reserveRatio, this.effectiveReserveRatio());
+          }
+        } catch (_e) {
+          /* keep expandRatio */
+        }
+      }
       const targetTroops = maxTroops * reserveRatio;
 
       let troops;
@@ -2158,6 +2245,20 @@
         );
       } else {
         troops = this.player.troops() - targetTroops;
+      }
+
+      // DIVERGENCE (combatReserve, USER): a counter-attack sized against
+      // expandRatio commits everything above 10-20% of MAX — with a full army that
+      // is nearly everything we have, and the remainder is all that defends against
+      // the wave still inbound. Cap the commitment so at least counterKeepFrac of
+      // the CURRENT army stays home. A cap, not a reserve swap, so the counter
+      // still fires when we're under the reserve — the exact case
+      // counterAttackFirst exists for.
+      if (retaliating && state.settings.combatReserve) {
+        const keep = state.settings.counterKeepFrac ?? 0.45;
+        if (keep > 0 && keep < 1) {
+          troops = Math.min(troops, this.player.troops() * (1 - keep));
+        }
       }
 
       if (troops < 1) {
