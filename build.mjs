@@ -72,6 +72,7 @@ const INGAME_FILES = [
   "attack-highlight.js",
   "nuke-trajectory.js",
   "build-timer.js",
+  "instant-goto.js",
   "spawn-heatmap.js",
   "quick-panel.js",
   "bootstrap.js",
