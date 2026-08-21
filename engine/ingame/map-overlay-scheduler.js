@@ -386,9 +386,12 @@
    *  save/restore is mandatory here: this canvas is shared by ~8 layers drawn in
    *  sequence, and a leaked font or textAlign shows up as a bug in somebody else's layer.
    */
-  // Plain outlined map text — the game-plate style (coloured fill over a black
-  // outline, no chip). The money line, build timers and nuke ETA all read as the
-  // game's own text now; drawMapLabel's chip stays for hover tooltips only.
+  // Plain map text in the REAL vanilla plate style (USER, v1.57 — verified in the
+  // game's render-settings.json): fillUsePlayerColor=false with shade 0 means the
+  // glyphs are BLACK, and outlineUsePlayerColor=true means the identity colour
+  // lives in the OUTLINE. So `color` here is the halo, not the fill. The money
+  // line, build timers and nuke ETA all read as the game's own text now;
+  // drawMapLabel's chip stays for hover tooltips only.
   function drawPlainMapText(ctx, cx, cy, text, color, sizePx) {
     ctx.save();
     try {
@@ -398,9 +401,9 @@
       ctx.lineJoin = "round";
       // The outline scales with the glyphs, like the plate's SDF outline does.
       ctx.lineWidth = Math.max(1.5, sizePx / 6);
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+      ctx.strokeStyle = color;
       ctx.strokeText(text, cx, cy);
-      ctx.fillStyle = color;
+      ctx.fillStyle = "rgba(10, 12, 14, 0.98)";
       ctx.fillText(text, cx, cy);
     } finally {
       ctx.restore();

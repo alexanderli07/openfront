@@ -74,12 +74,21 @@
         !isNationBotPlayer(player) &&
         player.type && player.type() === "BOT";
 
+      // USER (v1.57): the money halo is the owner's team colour (magenta for
+      // self), like the vanilla plate. Resolved once per scan (500ms), never in
+      // the per-frame draw — colord chains are not frame-budget material.
+      let accent = mapFactionColor(relation);
+      if (relation !== "self" && mapMoneyEnabled && !isRegularBot) {
+        const ownerRgb = ofhOwnerOverlayRgb(player);
+        if (ownerRgb) accent = ofhOwnerRgba(ownerRgb, 0.95);
+      }
       const entry = {
         player,
         relation,
         isEnemy,
         troops,
         skipOverlay: isRegularBot,
+        accent,
         maxTroops: threatIndicatorsEnabled && !isRegularBot ? advMaxTroops(game, player) : 0,
         gold: (mapMoneyEnabled && !isRegularBot) ? advGoldNumber(player) : 0,
         threat: null,
@@ -146,17 +155,14 @@
     };
   }
 
-  // USER (v1.53.0): the money readout is PLAIN OUTLINED TEXT, not a chip — styled
-  // like the game's own name plate. Vanilla draws the troop count under the name at
-  // troopSizeMultiplier (0.6) x the name size with a black outline
-  // (render-settings.json), and the money line mirrors that exactly one line ABOVE
-  // the name: gold-yellow fill, black outline, no background, zooming with the
-  // plate. The "/max" troop-cap readout is gone entirely. The faction accent lives
-  // on routes/markers now (magenta = mine), so dropping it here loses nothing.
+  // USER (v1.57): the money readout mirrors the REAL vanilla plate text — BLACK
+  // glyphs with the owner's team colour as the outline (self = magenta), sized at
+  // troopSizeMultiplier (0.6) x the name size, one line ABOVE the name, no chip.
+  // Gold survives only as the fallback halo when an owner colour can't be read.
   var MONEY_COLOR = "rgba(252, 211, 77, 0.98)";
 
-  function drawMoneyText(ctx, cx, cy, text, dyn) {
-    drawPlainMapText(ctx, cx, cy, text, MONEY_COLOR, dyn.moneyFontSize);
+  function drawMoneyText(ctx, cx, cy, text, dyn, accent) {
+    drawPlainMapText(ctx, cx, cy, text, accent || MONEY_COLOR, dyn.moneyFontSize);
   }
 
   // Per-player draw pass: the plain-text money line above the name (drawMoneyText)
@@ -197,7 +203,7 @@
       var color = mapFactionColor(entry.relation);
 
       if (!entry.skipOverlay && mapMoneyEnabled) {
-        drawMoneyText(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn);
+        drawMoneyText(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn, entry.accent);
       }
 
       if (threatIndicatorsEnabled && entry.isEnemy && !entry.skipOverlay) {

@@ -77,9 +77,11 @@
         position: fixed;
         left: 0;
         top: 0;
-        /* USER (v1.54): plain outlined text, no chip — same treatment as the
-           money line and build timers. */
-        color: var(--nuke-label-color, #fecaca);
+        /* USER (v1.57): the REAL plate style — BLACK text with the owner colour
+           as the outline (vanilla render-settings: fillUsePlayerColor=false,
+           outlineUsePlayerColor=true). The colour arrives via --nuke-label-color
+           in the 4-way text-shadow below. */
+        color: rgba(10, 12, 14, 0.98);
         /* Interpolated from the shared overlay tokens so this DOM map label is the same
            type as its canvas siblings. It was a FIFTH font stack — 900-weight system-ui,
            with no Aptos in it at all — which is why the nuke label never looked related to
@@ -87,11 +89,11 @@
         font: ${OFH_OVERLAY_STYLE.weight} ${OFH_OVERLAY_STYLE.sizeMd}px/1 ${OFH_OVERLAY_STYLE.family};
         letter-spacing: 0;
         text-shadow:
-          -1px -1px 0 rgba(0, 0, 0, 0.9),
-          1px -1px 0 rgba(0, 0, 0, 0.9),
-          -1px 1px 0 rgba(0, 0, 0, 0.9),
-          1px 1px 0 rgba(0, 0, 0, 0.9),
-          0 1px 4px rgba(0, 0, 0, 0.92);
+          -1px -1px 0 var(--nuke-label-color, #fecaca),
+          1px -1px 0 var(--nuke-label-color, #fecaca),
+          -1px 1px 0 var(--nuke-label-color, #fecaca),
+          1px 1px 0 var(--nuke-label-color, #fecaca),
+          0 1px 4px rgba(0, 0, 0, 0.55);
         transform: translate3d(var(--nuke-tx, 0px), var(--nuke-label-ty, 0px), 0) translate(-50%, -100%);
         will-change: transform;
         white-space: nowrap;
@@ -139,7 +141,9 @@
           glow: ofhOwnerRgba(ownerRgb, 0.38),
           crossColor: ofhOwnerRgba(tint, 0.96),
           crossGlow: ofhOwnerRgba(ownerRgb, 0.65),
-          labelColor: "rgb(" + tint.r + ", " + tint.g + ", " + tint.b + ")",
+          // v1.57: the label is BLACK text; this is its outline shadow, so it is
+          // the full owner colour, not a light tint.
+          labelColor: ofhOwnerRgba(ownerRgb, 0.95),
         };
       }
     }
@@ -150,7 +154,7 @@
         glow: "rgba(45, 212, 191, 0.36)",
         crossColor: "rgba(153, 246, 228, 0.94)",
         crossGlow: "rgba(45, 212, 191, 0.6)",
-        labelColor: "#99f6e4",
+        labelColor: "rgba(45, 212, 191, 0.95)",
       };
     }
     if (relation === "ally") {
@@ -159,7 +163,7 @@
         glow: "rgba(74, 222, 128, 0.36)",
         crossColor: "rgba(187, 247, 208, 0.94)",
         crossGlow: "rgba(74, 222, 128, 0.6)",
-        labelColor: "#bbf7d0",
+        labelColor: "rgba(74, 222, 128, 0.95)",
       };
     }
 
@@ -172,7 +176,7 @@
         glow: "rgba(240, 110, 255, 0.38)",
         crossColor: "rgba(250, 208, 255, 0.96)",
         crossGlow: "rgba(240, 110, 255, 0.65)",
-        labelColor: "#f5d0fe",
+        labelColor: "rgba(240, 110, 255, 0.95)",
       };
     }
 
@@ -181,7 +185,7 @@
       glow: "rgba(248, 113, 113, 0.36)",
       crossColor: "rgba(254, 202, 202, 0.94)",
       crossGlow: "rgba(248, 113, 113, 0.6)",
-      labelColor: "#fecaca",
+      labelColor: "rgba(248, 113, 113, 0.95)",
     };
   }
 

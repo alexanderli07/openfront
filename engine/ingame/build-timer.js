@@ -166,12 +166,12 @@
       const boxH = Math.max(OFH_OVERLAY_STYLE.minH, OFH_OVERLAY_STYLE.sizeMd + OFH_OVERLAY_STYLE.padY * 2);
       const by = p.y - boxH - 6; // above the unit
 
-      // Two states only: building (blue) and cooldown (white — the old amber was
-      // a second gold on a map where gold now means MONEY, USER v1.54). Ready
-      // draws nothing. Plain outlined plate-style text: the chip was one of the
-      // last black boxes on the map.
-      const fg = entry.state === "building" ? "#60a5fa" : "#e2e8f0";
-      drawPlainMapText(ctx, p.x, by + boxH / 2, entry.label, fg, OFH_OVERLAY_STYLE.sizeMd);
+      // Two states only: building (blue halo) and cooldown (white halo). Ready
+      // draws nothing. Since v1.57 drawPlainMapText renders BLACK glyphs with the
+      // colour as the OUTLINE (the real vanilla plate style), so the state colour
+      // is the halo here, not the fill.
+      const halo = entry.state === "building" ? "#60a5fa" : "#e2e8f0";
+      drawPlainMapText(ctx, p.x, by + boxH / 2, entry.label, halo, OFH_OVERLAY_STYLE.sizeMd);
     }
     ctx.restore();
   }
