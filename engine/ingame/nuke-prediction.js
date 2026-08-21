@@ -340,20 +340,40 @@
             // Counting down in real time also makes the label smooth between the 250ms
             // scans instead of stepping, and it is what the reader actually wants: seconds
             // until this thing hits, on their clock.
-            const rawSecs = ofhTicksToSeconds(game, remainTicks);
-            const secs = rawSecs * NUKE_CAL.factor;
             const nowMs = Date.now();
+            const anchorTick = Number(game.ticks?.());
             flight = {
-              impactAtMs: nowMs + secs * 1000,
+              // The UNCORRECTED model prediction, in ticks. Ratios are measured against
+              // this so the correction converges on the model's real error.
+              rawTicks: remainTicks,
+              anchorTick: Number.isFinite(anchorTick) ? anchorTick : null,
               anchorMs: nowMs,
-              // what the UNCORRECTED model predicted, so the ratio measures the model
-              rawMs: rawSecs * 1000,
+              // Wall-clock fallback, used only when the tick accessor is unusable.
+              impactAtMs:
+                nowMs + ofhTicksToSeconds(game, remainTicks) * NUKE_CAL.factor * 1000,
             };
             nukeFlightById.set(id, flight);
           }
         }
         if (flight !== undefined) {
-          const left = (flight.impactAtMs - Date.now()) / 1000;
+          // Remember where it was last seen, so the prune step can tell a warhead that
+          // DETONATED from one that was intercepted or that we simply lost track of.
+          flight.lastTile = unit.tile?.();
+          flight.targetTile = targetTile;
+
+          let left;
+          const nowTick = Number(game.ticks?.());
+          if (flight.anchorTick !== null && Number.isFinite(nowTick)) {
+            // Count down in GAME TICKS. A wall-clock countdown keeps running while the
+            // game is paused or the tab is hidden (the scan loop is rAF-driven, so ticks
+            // and scans stall together), which raced the label to 0.0 while the warhead
+            // hung in the air — and then fed the stalled duration back into calibration.
+            const ticksLeft =
+              flight.rawTicks * NUKE_CAL.factor - (nowTick - flight.anchorTick);
+            left = ofhTicksToSeconds(game, ticksLeft);
+          } else {
+            left = (flight.impactAtMs - Date.now()) / 1000;
+          }
           etaSec = Math.round(Math.max(0, left) * 10) / 10;
         }
       }
@@ -398,12 +418,36 @@
           // This nuke is gone, so its flight is over: calibrate on it.
           try {
             const done = nukeFlightById.get(id);
-            if (done && done.rawMs > 1000) {
-              const actualMs = Date.now() - done.anchorMs;
-              const ratio = actualMs / done.rawMs;
-              // Reject interception-shaped samples (vanished far too early) and anything
-              // implausible; a real flight ratio sits near the true model error.
-              nukeCalObserve(ratio);
+            if (done && done.rawTicks > 10) {
+              // Only learn from warheads that plausibly DETONATED. "Vanished from the scan"
+              // is not the same as "landed": a SAM kill, an alliance change that flips the
+              // relation filter, a deactivated unit or the match ending all remove a nuke
+              // mid-flight, and every one of those is a truncated sample that drags the
+              // factor DOWN. A ratio floor cannot separate them — a late intercept has a
+              // ratio near 1. Position can: if the last place we saw it was nowhere near
+              // its target, it did not land there.
+              let landed = false;
+              try {
+                const lt = done.lastTile;
+                const tt = done.targetTile;
+                if (lt !== undefined && lt !== null && tt !== undefined && tt !== null) {
+                  const speed = Number(game.config?.().defaultNukeSpeed?.()) || 8;
+                  const dx = game.x(lt) - game.x(tt);
+                  const dy = game.y(lt) - game.y(tt);
+                  landed = Math.hypot(dx, dy) <= 3 * speed;
+                }
+              } catch (_e) {
+                landed = false;
+              }
+              if (landed) {
+                const endTick = Number(game.ticks?.());
+                if (done.anchorTick !== null && Number.isFinite(endTick)) {
+                  nukeCalObserve((endTick - done.anchorTick) / done.rawTicks);
+                } else {
+                  const rawMs = ofhTicksToSeconds(game, done.rawTicks) * 1000;
+                  if (rawMs > 0) nukeCalObserve((Date.now() - done.anchorMs) / rawMs);
+                }
+              }
             }
           } catch (_error) {
             /* calibration is never worth breaking the scan for */

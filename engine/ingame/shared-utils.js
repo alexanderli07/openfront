@@ -203,7 +203,7 @@ function ofhDebug() {
 // It starts at the documented 10/s baseline, so behaviour is unchanged until a measurement
 // lands, and a measured rate is right whether or not the game is actually speed-capped.
 var OFH_TICK_BASELINE = 10;
-var OFH_TICK_RATE = { lastTick: null, lastMs: 0, perSec: OFH_TICK_BASELINE };
+var OFH_TICK_RATE = { lastTick: null, lastMs: 0, perSec: OFH_TICK_BASELINE, seeded: false };
 
 /** Measured game ticks per real second. Self-sampling: every caller that wants a duration
  *  also feeds the estimate, so no separate polling loop is needed. */
@@ -226,9 +226,21 @@ function ofhTickRate(game) {
       const dt = t - s.lastTick;
       if (dt > 0) {
         const raw = (dt / dms) * 1000;
-        // Reject nonsense: a paused game or a hitching frame reads far too low, a
-        // devtools pause far too high. Keep the last good value rather than believing it.
-        if (raw >= 0.5 && raw <= 400) s.perSec = s.perSec * 0.7 + raw * 0.3;
+        // Band, step cap and first-reading snap, in that order:
+        //  - 2..60/s is the plausible range for real game speeds. The old 0.5..400 band
+        //    accepted a tick-replay burst after a refocus or reconnect (150 ticks in one
+        //    500ms window reads 300/s), and a single accepted burst pulled the estimate up
+        //    several-fold, compressing every countdown until it decayed back.
+        //  - the 2x step cap blunts any burst that still sneaks under the ceiling.
+        //  - the first real reading SNAPS instead of blending, because blending starts from
+        //    the 10/s baseline: in a 2x lobby every countdown was wrong for the couple of
+        //    seconds it took to converge, and a nuke anchored in that window kept its wrong
+        //    ETA for the whole flight (the anchor is taken once).
+        if (raw >= 2 && raw <= 60) {
+          const capped = Math.min(raw, s.perSec * 2);
+          s.perSec = s.seeded ? s.perSec * 0.7 + capped * 0.3 : raw;
+          s.seeded = true;
+        }
       }
       // Re-anchor either way — a paused stretch must not dilute the next window.
       s.lastTick = t;

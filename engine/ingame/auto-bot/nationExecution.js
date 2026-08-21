@@ -83,7 +83,10 @@
           try {
             let t = Number(this.mg.ticks());
             if (maybeResetForNewGame(t)) {
-              botLog(tr("♻️ New game detected — cleared stale per-game state"), "system");
+              // pushLog, not botLog — botLog is defined nowhere, so this threw a
+              // ReferenceError into the local catch and the notice never appeared. (The
+              // reset itself ran: it happens in the condition above.)
+              pushLog(tr("♻️ New game detected — cleared stale per-game state"), "system");
             }
           } catch (_e) {
             /* never let bookkeeping break the tick */

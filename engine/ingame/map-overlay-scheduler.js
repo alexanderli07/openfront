@@ -107,6 +107,13 @@
         "position:fixed;inset:0;width:100vw;height:100vh;z-index:500;pointer-events:none;";
       (document.body || document.documentElement).appendChild(_mapOverlayCanvas);
       _mapOverlayCtx = null;
+      // Force the sizing gate below to run for a freshly created canvas. Without this, a
+      // canvas recreated after the game rebuilds the DOM keeps its default 300x150 backing
+      // store whenever the window has not changed size — the cached _mapOverlayCssW/H still
+      // match the viewport, so the resize branch is skipped and every layer draws into a
+      // 300x150 buffer stretched across the screen.
+      _mapOverlayCssW = 0;
+      _mapOverlayCssH = 0;
     }
     if (!_mapOverlayCtx) {
       _mapOverlayCtx = _mapOverlayCanvas.getContext("2d");

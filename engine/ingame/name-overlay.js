@@ -194,7 +194,10 @@
   }
 
   function drawMaxTroopPill(ctx, cx, cy, maxTroops, dyn, accent) {
-    var label = troopsDisplay(maxTroops);
+    // Keep the "/" — without it a lone "48k" reads as CURRENT troops rather than the
+    // maximum. It used to come from the combined pill's "/max" segment, and removing the
+    // troop bar took the prefix with it.
+    var label = "/" + troopsDisplay(maxTroops);
     return drawMapLabel(ctx, cx, cy, label, MAXTROOP_COLOR, {
       size: dyn.moneyFontSize,
       segments: [{ text: label, color: MAXTROOP_COLOR }],

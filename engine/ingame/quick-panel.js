@@ -53,7 +53,7 @@
   var QP_FEATURE_TIPS = {
     // === Helpers Tab - Section Keys ===
     panels: ["Panels", "Toggle floating panels: stats, trade, advisor, boat, estate, alliance, script users, auto-bot, auto-join."],
-    map: ["Map Overlays", "Toggle visual overlays on the map: troop bars, money, threats, nuke prediction, heatmaps, spawn markers."],
+    map: ["Map Overlays", "Toggle visual overlays on the map: money, max troops, threats, nuke prediction, heatmaps, spawn markers."],
     combat: ["Combat & Automation", "Toggle combat features: retaliation HUD, nuke suggestions, SOS defense, attack hotkey, right-click conquest, enemy intent."],
     alerts: ["Alerts", "Toggle alert notifications: game-time alert, incoming boat warning."],
     tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
@@ -73,7 +73,7 @@
 
     // === Helpers Tab - Toggle Keys (Map Overlays) ===
     showPlayerMapOverlays: ["Player Overlays (Master)", "Master toggle for all player name overlays. Individual sub-overlays only render when this is enabled."],
-    showMapTroopCounts: ["Troop Bar", "Horizontal bar above each player's name showing troops/max ratio. Green = home troops, orange = troops in combat."],
+    showMapTroopCounts: ["Max Troops", "Adds each player's maximum troop capacity to their map pill as \"/max\". Old horizontal-bar rendering removed. Was: troops/max ratio. Green = home troops, orange = troops in combat."],
     showMapMoney: ["Money Overlay", "Gold pill above each player's name showing current gold ($K/$M format). Combines with troop bar when both enabled."],
     showThreatIndicators: ["Threat Indicators", "Colored marks near enemies: nuke icon if nuke-capable, red dot if stronger (>=1.35x), amber dot if weak (<=10% max)."],
     markHoveredAlliesGreen: ["Ally Markers", "When hovering a nation, allied players get a green highlight to distinguish them from enemies on the map."],
@@ -280,6 +280,11 @@
       // background onto a position:fixed;inset:0 element blankets the whole
       // screen. Excluded by id, same as -layer/-styles above.
       if (el.id.indexOf("-range") !== -1) continue;
+      // The atom-macro banner and dialog own their colours because the colour IS the
+      // signal (red = armed/danger, green = ready). This sweep re-stamps background and
+      // border inline !important every 2s, which erased that signal a moment after it
+      // appeared.
+      if (el.id.indexOf("atom-macro") !== -1) continue;
       el.style.setProperty("background", bg, "important");
       el.style.setProperty("border-color", border, "important");
     }
@@ -963,7 +968,7 @@
       {
         key: "map", title: _tr("Map overlays"), toggles: [
           ["showPlayerMapOverlays", _tr("Player overlays (master)")],
-          ["showMapTroopCounts", _tr("Troop bar"), "showPlayerMapOverlays"],
+          ["showMapTroopCounts", _tr("Max troops"), "showPlayerMapOverlays"],
           ["showMapMoney", _tr("Money"), "showPlayerMapOverlays"],
           ["showThreatIndicators", _tr("Threat indicators"), "showPlayerMapOverlays"],
           ["showAttackHighlight", _tr("Attack highlight")],
@@ -1261,7 +1266,11 @@
         // switches immediately (no re-render needed).
         var childSwitches = document.querySelectorAll('.ohqp-sw[data-qp-parent="' + key + '"]');
         for (var ci = 0; ci < childSwitches.length; ci++) {
-          childSwitches[ci].classList.toggle("disabled", !cur); // !cur = new parent state
+          // The new parent state is !cur, and children are disabled when the parent is
+          // OFF — so pass `cur`. Passing !cur inverted it: switching a master toggle ON
+          // greyed out and pointer-events:none'd every child, and switching it OFF left
+          // them live. Nothing re-rendered to correct it, so the state persisted.
+          childSwitches[ci].classList.toggle("disabled", cur);
         }
         // Only re-render when the toggle controls sub-toggles that need to
         // show/hide (e.g. parent toggles in the Actions or Helpers tabs).

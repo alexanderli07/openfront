@@ -427,6 +427,9 @@
       if (
         bh &&
         bh.tile != null &&
+        // One surge per beachhead. `bh.surged` was set but never read, and the window was
+        // refreshed on every surge, so a single landing could re-surge indefinitely.
+        !bh.surged &&
         fill >= surplusFill &&
         this.game.ticks() - (bh.at || 0) < windowTicks
       ) {
@@ -446,7 +449,6 @@
             const troops = this.player.troops() * frac;
             if (this.emitBoat(bh.tile, troops, "⚓ Surge landing")) {
               state.lastOppBoatMs = nowMs;
-              bh.at = this.game.ticks(); // refresh the surge window
               bh.surged = true;
               return true;
             }
@@ -1430,6 +1432,10 @@
         if (!this.game.hasOwner(tile)) return false;
         const owner = this.game.playerBySmallID(this.game.ownerID(tile));
         if (!owner || !owner.isPlayer || !owner.isPlayer()) return false;
+        // Our OWN land is never a veto target. Surging into a beachhead we already hold
+        // starts no war, but openingVetoes would treat us as the owner being attacked and
+        // block the surge for the whole opening — the phase the surge exists for.
+        if (owner.smallID && owner.smallID() === this.player.smallID()) return false;
         return this.openingVetoes(owner, false);
       } catch (_e) {
         return false;
