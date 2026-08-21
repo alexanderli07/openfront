@@ -499,16 +499,20 @@
         // warhead goes somewhere cheap instead. Keep the tile as a candidate and just
         // record that it is covered; the ranked pass below decides whether we can
         // afford to punch through. Without the setting, src's skip is preserved.
-        const interceptable =
-          (difficulty === Difficulty.Hard ||
-            difficulty === Difficulty.Impossible) &&
-          this.isTrajectoryInterceptableBySam(spawnTile, tile);
+        // DIVERGENCE (nukeArcRotate): both arcs are tested — a tile only counts
+        // as interceptable when NEITHER arc dodges the rings, and the winning arc
+        // travels with the candidate to launch.
+        const arc =
+          difficulty === Difficulty.Hard || difficulty === Difficulty.Impossible
+            ? this.chooseNukeArc(spawnTile, tile)
+            : { intercepted: false, arcUp: true };
+        const interceptable = arc.intercepted;
         if (interceptable && !densityFirst) {
           continue;
         }
 
         const value = this.nukeTileScore(tile, silos, structures, nukeType);
-        candidates.push({ tile, value, interceptable });
+        candidates.push({ tile, value, interceptable, arcUp: arc.arcUp });
       }
 
       // Pick the best-scoring candidate exactly as src: src adopts a tile only when
@@ -525,6 +529,7 @@
       // to the next-best tile rather than giving up on value entirely.
       let salvoTile = null;
       let salvoPlan = null;
+      let bestArcUp = true;
       for (const cand of candidates) {
         // strict `>` semantics vs the initial bestValue (-1): a tile scoring exactly
         // -1 (or lower) never becomes bestTile in src, so skip it here too. Since the
@@ -546,6 +551,7 @@
         if (!canBuild) continue;
         bestTile = cand.tile;
         bestValue = cand.value;
+        bestArcUp = cand.arcUp !== false;
         break;
       }
 
@@ -560,6 +566,7 @@
             nukeTarget,
             salvoPlan.waitTicksPerBomb[i],
             true,
+            salvoPlan.arcUpPerBomb ? salvoPlan.arcUpPerBomb[i] !== false : true,
           );
         }
         setLastAction(
@@ -584,7 +591,7 @@
         bestTile !== null &&
         (bestValue > 0 || (difficulty !== Difficulty.Impossible && !samCrack))
       ) {
-        await this.sendNuke(bestTile, nukeType, nukeTarget);
+        await this.sendNuke(bestTile, nukeType, nukeTarget, 0, false, bestArcUp);
       } else if (difficulty === Difficulty.Impossible || samCrack) {
         await this.maybeDestroyEnemySam(nukeTarget);
       }
@@ -1010,12 +1017,14 @@
 
     // ── isTrajectoryInterceptableBySam — NationNukeBehavior.ts:547 ────────────
     // mirroring NukeTrajectoryPreviewLayer.ts logic a bit
-    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds) {
+    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds, directionUp = true) {
       const speed = this.game.config().defaultNukeSpeed();
       const pathFinder = UniversalPathFinding.Parabola(this.game, {
         increment: speed,
         distanceBasedHeight: true, // Atom/Hydrogen bombs use distance-based height
-        directionUp: true, // AI nukes always go "up" for now
+        // src hardcodes true ('AI nukes always go "up" for now') — nukeArcRotate
+        // tests BOTH arcs, so the arc under test is a parameter here.
+        directionUp: directionUp !== false,
       });
 
       const trajectory = pathFinder.findPath(spawnTile, targetTile) ?? [];
@@ -1094,6 +1103,57 @@
       }
 
       return false;
+    }
+
+    /**
+     * DIVERGENCE (nukeArcRotate, USER): pick the arc for a launch. A nuke is only
+     * interceptable within defaultNukeTargetableRange (150) of its SILO and of its
+     * TARGET — mid-flight it is untargetable — so what matters is whether the
+     * ascent/descent corridors cross an enemy SAM ring, and the two arcs (the
+     * Bezier bows +/-max(dist/3, 50) in y) trace different corridors. Up first
+     * (faithful src behaviour); rotate to down only when it dodges an interception
+     * the up arc would eat. The arcs are mirror images with identical length, so
+     * flight time is unchanged (except near map edges, where clamping bends one).
+     */
+    chooseNukeArc(spawnTile, targetTile, excludedSamIds) {
+      const upBlocked = this.isTrajectoryInterceptableBySam(
+        spawnTile,
+        targetTile,
+        excludedSamIds,
+        true,
+      );
+      if (!upBlocked) return { intercepted: false, arcUp: true };
+      if (!state.settings.nukeArcRotate || !this.canSetNukeArc()) {
+        return { intercepted: true, arcUp: true };
+      }
+      const downBlocked = this.isTrajectoryInterceptableBySam(
+        spawnTile,
+        targetTile,
+        excludedSamIds,
+        false,
+      );
+      if (!downBlocked) return { intercepted: false, arcUp: false };
+      return { intercepted: true, arcUp: true };
+    }
+
+    /**
+     * The arc is applied through the build menu's own uiState — the exact object
+     * sendBuildOrUpgrade reads rocketDirectionUp from for Atom/Hydrogen intents.
+     * If this client build doesn't expose it, rotation must not run: we'd choose
+     * a down arc we cannot actually launch on.
+     */
+    canSetNukeArc() {
+      try {
+        const bm = getBuildMenu();
+        return !!(
+          bm &&
+          typeof bm.sendBuildOrUpgrade === "function" &&
+          bm.uiState &&
+          typeof bm.uiState === "object"
+        );
+      } catch (_e) {
+        return false;
+      }
     }
 
     // ── isValidNukeTile — NationNukeBehavior.ts:630 ───────────────────────────
@@ -1289,7 +1349,7 @@
       return cost <= gross * minutes;
     }
 
-    async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false) {
+    async sendNuke(tile, nukeType, targetPlayer, waitTicks = 0, quiet = false, arcUp = true) {
       const tick = this.game.ticks();
 
       // Affordability + actuation via the buildables probe + build menu. Probe the
@@ -1313,7 +1373,24 @@
 
       const buildMenu = getBuildMenu();
       if (!buildMenu || typeof buildMenu.sendBuildOrUpgrade !== "function") return;
-      buildMenu.sendBuildOrUpgrade(bu, tile);
+      // DIVERGENCE (nukeArcRotate): sendBuildOrUpgrade reads uiState.rocketDirectionUp
+      // for Atom/Hydrogen intents — the same state the player's manual aiming key
+      // flips. Pin it to OUR chosen arc for exactly this send and restore the
+      // player's setting after. This also fixes a latent mismatch: the corridor
+      // check always assumed "up" while a player-flipped uiState silently launched
+      // every bot nuke on the down arc.
+      const ui = buildMenu.uiState;
+      const pinArc = !!(ui && typeof ui === "object");
+      let prevArc;
+      if (pinArc) {
+        prevArc = ui.rocketDirectionUp;
+        ui.rocketDirectionUp = arcUp !== false;
+      }
+      try {
+        buildMenu.sendBuildOrUpgrade(bu, tile);
+      } finally {
+        if (pinArc) ui.rocketDirectionUp = prevArc;
+      }
 
       // Mirror src state updates only AFTER a successful fire (src does these
       // unconditionally because addExecution can't "fail"; on the client the build
@@ -1391,11 +1468,10 @@
         if (availableSlots <= 0) {
           continue;
         }
-        const interceptable = this.isTrajectoryInterceptableBySam(
-          silo.tile(),
-          targetTile,
-          coveringSamIds,
-        );
+        // DIVERGENCE (nukeArcRotate): a silo blocked on the up arc may be clean
+        // on the down arc — rotation turns wasted salvo slots into usable ones.
+        const arc = this.chooseNukeArc(silo.tile(), targetTile, coveringSamIds);
+        const interceptable = arc.intercepted;
         // Compute actual parabolic flight time in ticks
         const pathFinder = UniversalPathFinding.Parabola(this.game, {
           increment: nukeSpeed,
@@ -1409,6 +1485,7 @@
           slots: availableSlots,
           flightTicks: trajectory.length,
           interceptable,
+          arcUp: arc.arcUp !== false,
         });
       }
 
@@ -1428,6 +1505,7 @@
           launchSequence.push({
             flightTicks: entry.flightTicks,
             interceptable: entry.interceptable,
+            arcUp: entry.arcUp !== false,
           });
         }
       }
@@ -1511,7 +1589,9 @@
       );
       let selectedIdx = 0;
       const waitTicksPerBomb = [];
+      const arcUpPerBomb = [];
       for (let i = 0; i < bombsToFire; i++) {
+        arcUpPerBomb.push(launchSequence[i].arcUp !== false);
         if (selectedSet.has(i)) {
           const targetArrival =
             selectedFlightMin + selectedIdx * staggerInterval;
@@ -1536,7 +1616,14 @@
         return { ok: false, needsMoreSilos: false, coveringSamIds, totalBombs };
       }
 
-      return { ok: true, bombsToFire, waitTicksPerBomb, coveringSamIds, totalBombs };
+      return {
+        ok: true,
+        bombsToFire,
+        waitTicksPerBomb,
+        arcUpPerBomb,
+        coveringSamIds,
+        totalBombs,
+      };
     }
 
     /**
@@ -1687,11 +1774,11 @@
       const unblockedSilos = [];
       for (const silo of silos) {
         if (
-          !this.isTrajectoryInterceptableBySam(
+          !this.chooseNukeArc(
             silo.tile(),
             failedTarget.targetTile,
             failedTarget.coveringSamIds,
-          )
+          ).intercepted
         ) {
           unblockedSilos.push(silo);
         }

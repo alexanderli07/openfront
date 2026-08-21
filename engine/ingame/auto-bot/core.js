@@ -108,6 +108,12 @@
     // minutes of NET income. Warheads are otherwise UNCAPPED — the only hard rule is
     // that our gold must still be growing. See nukeSpendAllowed().
     nukeIncomeMinutes: 2,
+    // DIVERGENCE (nukeArcRotate, USER): the game lets the SHOOTER pick the arc
+    // direction per launch (BuildUnitIntent.rocketDirectionUp — the manual UI
+    // flips it while aiming) but the Nation AI hardcodes "up" and only ever
+    // corridor-checks that arc (src: 'AI nukes always go "up" for now'). Test
+    // BOTH arcs and launch on whichever dodges enemy SAM rings.
+    nukeArcRotate: true,
     // DIVERGENCE (combatReserve, USER): "when we're attacking or defending, the
     // troop count we're maintaining is too low — about 20% ish". That 20% is
     // expandRatio (0.10-0.20 of max): terra-nullius expansion and counter-attacks
@@ -441,6 +447,7 @@
       "counterAttackFirst",
       "combatReserve",
       "nukeIncomeMinutes",
+      "nukeArcRotate",
       "phasedOpening",
       "openingArmyFill",
       "openingMinCityLevels",
