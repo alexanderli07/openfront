@@ -1,7 +1,7 @@
 // Per-player on-map overlay — a single layer on the shared map-overlay scheduler
 // that draws, above each living player's name:
 //   • threat marks: ☢ nuke-capable icon,  — toggle: showThreatIndicators
-//     red "stronger than you" dot, amber "weak" dot (enemies only)
+//     red "stronger than you" dot, hollow white "weak" ring (enemies only)
 //   • gold readout                        — toggle: showMapMoney
 // Colored by relation (blue=you, teal=team, green=ally, red=enemy). One scan
 // (throttled) feeds everything; the per-frame draw maps nameLocation → screen.
@@ -9,17 +9,6 @@
 // IMPORTANT: OpenFront stores troops at 10x internally and the UI renders /10
 // (see gold-per-minute.js renderTroops). Ratios (troops/max) are scale-invariant,
 // but any DISPLAYED absolute troop number must be divided by 10.
-
-  function formatMapTroops(value) {
-    const v = Math.max(0, Math.floor(Number(value) || 0));
-    if (v >= 1e6) {
-      return `${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1)}M`;
-    }
-    if (v >= 1e3) {
-      return `${(v / 1e3).toFixed(v >= 1e4 ? 0 : 1)}k`;
-    }
-    return String(v);
-  }
 
   function formatMapGold(value) {
     const v = Math.max(0, Math.floor(Number(value) || 0));
@@ -107,10 +96,8 @@
     _playerOverlayScan = out;
   }
 
-  // Money readout with a dark rounded-pill background (Tactical-style), centered
-  // above the player's name. Bigger + a coin icon so it reads clearly on the map.
-  // Dynamic font sizing (Blon-inspired): scale money/troop bar with camera zoom
-  // so overlays stay readable. Cull when the screen-space size drops below 5px.
+  // Dynamic sizing (mirrors the game's own name-plate math, see _getDynamicSizes):
+  // scale the money text with camera zoom so it tracks the plate. Cull below 5px.
   var _DYN_FONT_BASE = 36;
   var _DYN_FONT_SCALE = 48;
   var _DYN_SIZE_FACTOR = 0.4;
@@ -169,39 +156,7 @@
   var MONEY_COLOR = "rgba(252, 211, 77, 0.98)";
 
   function drawMoneyText(ctx, cx, cy, text, dyn) {
-    ctx.save();
-    try {
-      ctx.font = ofhOverlayFont(dyn.moneyFontSize);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineJoin = "round";
-      // The outline scales with the glyphs, like the plate's SDF outline does.
-      ctx.lineWidth = Math.max(1.5, dyn.moneyFontSize / 6);
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-      ctx.strokeText(text, cx, cy);
-      ctx.fillStyle = MONEY_COLOR;
-      ctx.fillText(text, cx, cy);
-    } finally {
-      ctx.restore();
-    }
-  }
-
-  // Small rounded-rect helper (background + optional border).
-  function fillRoundRect(ctx, x, y, w, h, r, bg, border) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-    ctx.fillStyle = bg;
-    ctx.fill();
-    if (border) {
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = border;
-      ctx.stroke();
-    }
+    drawPlainMapText(ctx, cx, cy, text, MONEY_COLOR, dyn.moneyFontSize);
   }
 
   // Per-player draw pass: the plain-text money line above the name (drawMoneyText)
@@ -258,20 +213,39 @@
       drawMapHaloText(ctx, x - 30, baseY, "☢", "rgba(248, 113, 113, 0.95)");
     }
     // Ratios are scale-invariant → compare raw values directly.
+    // USER (v1.54): weak = HOLLOW WHITE ring. The old amber dot was a third
+    // near-identical yellow fighting the gold money text right above it — gold
+    // now means money and nothing else. Filled red = stronger stays.
     let dot = null;
+    let hollow = false;
     if (troops >= 1.35 * myTroops) {
       dot = "rgba(248, 113, 113, 0.95)"; // stronger than you
     } else if (entry.maxTroops > 0 && troops <= 0.1 * entry.maxTroops) {
-      dot = "rgba(251, 191, 36, 0.95)"; // weak
+      dot = "rgba(255, 255, 255, 0.95)"; // weak (hollow)
+      hollow = true;
     }
     if (dot) {
-      ctx.beginPath();
-      ctx.arc(x + 30, baseY, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = dot;
-      ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
-      ctx.stroke();
+      if (hollow) {
+        // Dark rim first so the white ring reads on bright terrain too.
+        ctx.beginPath();
+        ctx.arc(x + 30, baseY, 4.5, 0, Math.PI * 2);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x + 30, baseY, 3.5, 0, Math.PI * 2);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = dot;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(x + 30, baseY, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = dot;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.stroke();
+      }
     }
   }
 

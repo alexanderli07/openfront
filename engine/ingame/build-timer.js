@@ -166,17 +166,12 @@
       const boxH = Math.max(OFH_OVERLAY_STYLE.minH, OFH_OVERLAY_STYLE.sizeMd + OFH_OVERLAY_STYLE.padY * 2);
       const by = p.y - boxH - 6; // above the unit
 
-      // Two states only: building (blue) and cooldown (amber). Ready draws nothing.
-      let fg = "#ffd54f"; // amber (cooldown)
-      let border = "rgba(255, 213, 79, 0.5)";
-      if (entry.state === "building") {
-        fg = "#60a5fa"; // blue
-        border = "rgba(96, 165, 250, 0.5)";
-      }
-      drawMapLabel(ctx, p.x, by + boxH / 2, entry.label, fg, {
-        size: OFH_OVERLAY_STYLE.sizeMd,
-        outlineColor: border,
-      });
+      // Two states only: building (blue) and cooldown (white — the old amber was
+      // a second gold on a map where gold now means MONEY, USER v1.54). Ready
+      // draws nothing. Plain outlined plate-style text: the chip was one of the
+      // last black boxes on the map.
+      const fg = entry.state === "building" ? "#60a5fa" : "#e2e8f0";
+      drawPlainMapText(ctx, p.x, by + boxH / 2, entry.label, fg, OFH_OVERLAY_STYLE.sizeMd);
     }
     ctx.restore();
   }

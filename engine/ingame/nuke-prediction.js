@@ -43,10 +43,10 @@
            pins it; this one did not. */
         box-sizing: border-box;
         border-radius: 50%;
-        background: var(--nuke-bg, rgba(127, 29, 29, 0.18));
-        box-shadow:
-          0 0 18px var(--nuke-glow, rgba(248, 113, 113, 0.36)),
-          inset 0 0 24px var(--nuke-inner-glow, rgba(248, 113, 113, 0.18));
+        /* USER (v1.54): ring only — the translucent disc fill (and its inset glow)
+           tinted a huge patch of map under every incoming warhead. */
+        background: transparent;
+        box-shadow: 0 0 18px var(--nuke-glow, rgba(248, 113, 113, 0.36));
         transform: translate3d(var(--nuke-tx, 0px), var(--nuke-ty, 0px), 0) translate(-50%, -50%);
         will-change: transform;
       }
@@ -76,10 +76,8 @@
         position: fixed;
         left: 0;
         top: 0;
-        padding: 4px 8px;
-        border: 1px solid var(--nuke-label-border, rgba(248, 113, 113, 0.52));
-        border-radius: 8px;
-        background: rgba(7, 12, 18, 0.86);
+        /* USER (v1.54): plain outlined text, no chip — same treatment as the
+           money line and build timers. */
         color: var(--nuke-label-color, #fecaca);
         /* Interpolated from the shared overlay tokens so this DOM map label is the same
            type as its canvas siblings. It was a FIFTH font stack — 900-weight system-ui,
@@ -87,7 +85,12 @@
            the money pill sitting next to it. */
         font: ${OFH_OVERLAY_STYLE.weight} ${OFH_OVERLAY_STYLE.sizeMd}px/1 ${OFH_OVERLAY_STYLE.family};
         letter-spacing: 0;
-        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.92);
+        text-shadow:
+          -1px -1px 0 rgba(0, 0, 0, 0.9),
+          1px -1px 0 rgba(0, 0, 0, 0.9),
+          -1px 1px 0 rgba(0, 0, 0, 0.9),
+          1px 1px 0 rgba(0, 0, 0, 0.9),
+          0 1px 4px rgba(0, 0, 0, 0.92);
         transform: translate3d(var(--nuke-tx, 0px), var(--nuke-label-ty, 0px), 0) translate(-50%, -100%);
         will-change: transform;
         white-space: nowrap;
@@ -512,9 +515,8 @@
 
   function applyNukeColors(zone, label, colors) {
     zone.style.setProperty("--nuke-color", colors.color);
-    zone.style.setProperty("--nuke-bg", colors.bg);
+    // --nuke-bg / --nuke-inner-glow no longer exist in the sheet (ring only).
     zone.style.setProperty("--nuke-glow", colors.glow);
-    zone.style.setProperty("--nuke-inner-glow", colors.innerGlow);
     zone.style.setProperty("--nuke-cross-color", colors.crossColor);
     zone.style.setProperty("--nuke-cross-glow", colors.crossGlow);
     label.style.setProperty("--nuke-label-border", colors.labelBorder);

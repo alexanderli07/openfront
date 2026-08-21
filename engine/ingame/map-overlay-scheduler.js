@@ -386,6 +386,27 @@
    *  save/restore is mandatory here: this canvas is shared by ~8 layers drawn in
    *  sequence, and a leaked font or textAlign shows up as a bug in somebody else's layer.
    */
+  // Plain outlined map text — the game-plate style (coloured fill over a black
+  // outline, no chip). The money line, build timers and nuke ETA all read as the
+  // game's own text now; drawMapLabel's chip stays for hover tooltips only.
+  function drawPlainMapText(ctx, cx, cy, text, color, sizePx) {
+    ctx.save();
+    try {
+      ctx.font = ofhOverlayFont(sizePx);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
+      // The outline scales with the glyphs, like the plate's SDF outline does.
+      ctx.lineWidth = Math.max(1.5, sizePx / 6);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+      ctx.strokeText(text, cx, cy);
+      ctx.fillStyle = color;
+      ctx.fillText(text, cx, cy);
+    } finally {
+      ctx.restore();
+    }
+  }
+
   function drawMapLabel(ctx, cx, cy, text, color, options) {
     const opts = options || {};
     const style = typeof OFH_OVERLAY_STYLE === "object" && OFH_OVERLAY_STYLE ? OFH_OVERLAY_STYLE : null;
