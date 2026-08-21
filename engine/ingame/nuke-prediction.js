@@ -121,42 +121,36 @@
   }
 
   function getNukePredictionColors(relation) {
+    // bg/innerGlow/labelBorder dropped in v1.54 — the ring is fill-less and the
+    // label is chipless, so nothing reads them any more.
     if (relation === "ally") {
       return {
         color: "rgba(74, 222, 128, 0.92)",
-        bg: "rgba(20, 83, 45, 0.18)",
         glow: "rgba(74, 222, 128, 0.36)",
-        innerGlow: "rgba(74, 222, 128, 0.18)",
         crossColor: "rgba(187, 247, 208, 0.94)",
         crossGlow: "rgba(74, 222, 128, 0.6)",
-        labelBorder: "rgba(74, 222, 128, 0.52)",
         labelColor: "#bbf7d0",
       };
     }
 
     if (relation === "self") {
-      // Cyan/sky — distinct from enemy (red) and ally (green) so my own
-      // outgoing salvo is instantly recognizable as mine.
+      // USER (v1.55): magenta = mine, same identity as routes/markers/pills
+      // (warshipRouteColor / getBoatPredictionColors / mapFactionColor). This was
+      // the one overlay still using the old cyan for self.
       return {
-        color: "rgba(56, 189, 248, 0.92)",
-        bg: "rgba(8, 47, 73, 0.20)",
-        glow: "rgba(56, 189, 248, 0.38)",
-        innerGlow: "rgba(56, 189, 248, 0.18)",
-        crossColor: "rgba(186, 230, 253, 0.96)",
-        crossGlow: "rgba(56, 189, 248, 0.65)",
-        labelBorder: "rgba(56, 189, 248, 0.55)",
-        labelColor: "#bae6fd",
+        color: "rgba(240, 110, 255, 0.95)",
+        glow: "rgba(240, 110, 255, 0.38)",
+        crossColor: "rgba(250, 208, 255, 0.96)",
+        crossGlow: "rgba(240, 110, 255, 0.65)",
+        labelColor: "#f5d0fe",
       };
     }
 
     return {
       color: "rgba(248, 113, 113, 0.92)",
-      bg: "rgba(127, 29, 29, 0.18)",
       glow: "rgba(248, 113, 113, 0.36)",
-      innerGlow: "rgba(248, 113, 113, 0.18)",
       crossColor: "rgba(254, 202, 202, 0.94)",
       crossGlow: "rgba(248, 113, 113, 0.6)",
-      labelBorder: "rgba(248, 113, 113, 0.52)",
       labelColor: "#fecaca",
     };
   }
@@ -519,7 +513,6 @@
     zone.style.setProperty("--nuke-glow", colors.glow);
     zone.style.setProperty("--nuke-cross-color", colors.crossColor);
     zone.style.setProperty("--nuke-cross-glow", colors.crossGlow);
-    label.style.setProperty("--nuke-label-border", colors.labelBorder);
     label.style.setProperty("--nuke-label-color", colors.labelColor);
   }
 
