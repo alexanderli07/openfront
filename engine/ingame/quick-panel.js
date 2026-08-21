@@ -54,7 +54,7 @@
     // === Helpers Tab - Section Keys ===
     panels: ["Panels", "Toggle floating panels: stats, trade, advisor, boat, estate, alliance, script users, auto-bot, auto-join."],
     map: ["Map Overlays", "Toggle visual overlays on the map: money, max troops, threats, nuke prediction, heatmaps, spawn markers."],
-    combat: ["Combat & Automation", "Toggle combat features: retaliation HUD, nuke suggestions, SOS defense, attack hotkey, right-click conquest, enemy intent."],
+    combat: ["Combat & Automation", "Toggle combat features: nuke suggestions, SOS defense, attack hotkey, right-click conquest, enemy intent."],
     alerts: ["Alerts", "Toggle alert notifications: game-time alert, incoming boat warning."],
     tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
     companion: ["Companion", "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack)."],
@@ -97,7 +97,6 @@
     showBuildTimers: ["Build Timers", "Construction countdown timers above Missile Silos and SAM Launchers. Shows remaining build time and missile cooldown."],
 
     // === Helpers Tab - Toggle Keys (Combat & Automation) ===
-    showRetaliationHud: ["Retaliation HUD", "Center-screen alert when enemy nuke targets your territory. Shows attacker name with 'Focus' button to pan camera to launch source."],
     showNukeSuggestions: ["Nuke Suggestions", "Hover-target nuke strike suggestions for optimal targets. Includes economic nuke suggestions and SAM burn logic."],
     autoNuke: ["Auto Nuke", "Automatically fires nukes at suggested targets."],
     autoNukeIncludeAllies: ["Include Allies", "Allow auto nuke to target allies."],
@@ -108,7 +107,6 @@
 
     // === Helpers Tab - Toggle Keys (Alerts) ===
     showGameTimeAlert: ["Game-time Alert", "One-shot center-screen notice when match reaches configurable time (default 5 minutes). Blue info-toned design."],
-    warnIncomingBoats: ["Incoming Boat Warning", "Alert when new enemy transport detected heading for your territory. Shows attacker name with 'Focus' button. Auto-dismisses after 9s."],
 
     // === Helpers Tab - Toggle Keys (Tools) ===
     hideAds: ["Hide Ads", "Injects a style tag to hide game ad containers (Google Ads, iframes, ad wrappers) using multiple CSS techniques: display:none, visibility:hidden, zero-sizing, and pointer-events:none."],
@@ -560,7 +558,6 @@
     showHelperUsers: "openfront-helper-users-container",
     showAutoBotPanel: "openfront-helper-autobot-panel",
     showFloatingAutoJoinPanel: "openfront-helper-floating-autojoin",
-    showRetaliationHud: "openfront-helper-retaliation-container",
     showGameTimeAlert: "openfront-helper-game-time-alert",
   };
 
@@ -660,7 +657,6 @@
       case "showEconomyHeatmap":     return typeof setEconomyHeatmapEnabled === "function" ? setEconomyHeatmapEnabled : null;
       case "showExportPartnerHeatmap": return typeof setExportPartnerHeatmapEnabled === "function" ? setExportPartnerHeatmapEnabled : null;
       case "showAttackHighlight":    return typeof setAttackHighlightEnabled === "function" ? setAttackHighlightEnabled : null;
-      case "showRetaliationHud":     return typeof setRetaliationEnabled === "function" ? setRetaliationEnabled : null;
       case "hideAds":                return typeof setHideAdsEnabled === "function" ? setHideAdsEnabled : null;
       case "antiAfk":                return typeof setAntiAfkEnabled === "function" ? setAntiAfkEnabled : null;
       case "attackRatioHotkey":      return typeof setAttackRatioHotkeyEnabled === "function" ? setAttackRatioHotkeyEnabled : null;
@@ -678,7 +674,6 @@
       case "showThreatIndicators":   return typeof setThreatIndicatorsEnabled === "function" ? setThreatIndicatorsEnabled : null;
       case "showMapMoney":           return typeof setMapMoneyEnabled === "function" ? setMapMoneyEnabled : null;
       case "skinUnlocker":           return typeof _setSkinUnlockerEnabled === "function" ? _setSkinUnlockerEnabled : null;
-      case "warnIncomingBoats":      return typeof setBoatIncomingWarningEnabled === "function" ? setBoatIncomingWarningEnabled : null;
       case "showCompanionPanel":     return typeof setCompanionPanelVisible === "function" ? setCompanionPanelVisible : null;
       case "companionEnabled":       return typeof setCompanionEnabled === "function" ? setCompanionEnabled : null;
     }
@@ -991,12 +986,10 @@
       },
       {
         key: "combat", title: _tr("Combat & Automation"), toggles: [
-          ["showRetaliationHud", _tr("Retaliation HUD")],
         ]
       },
       {
         key: "alerts", title: _tr("Alerts"), toggles: [
-          ["warnIncomingBoats", _tr("Incoming boat warning")],
         ]
       },
       {

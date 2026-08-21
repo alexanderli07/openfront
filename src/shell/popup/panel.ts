@@ -409,11 +409,6 @@ const HELPER_SECTIONS: HelperSection[] = [
         desc: "Suggests high-value nuke targets.",
       },
       {
-        name: "showRetaliationHud",
-        title: "Retaliation HUD",
-        desc: "When hit by a nuke, shows a confirmation card to fire back (semi-auto).",
-      },
-      {
         name: "sosDefense",
         title: "SOS when attacked",
         desc: "When under attack, sends an SOS emoji to allies/teammates and marks the attacker for your team. Works with or without the auto-bot.",
@@ -450,11 +445,6 @@ const HELPER_SECTIONS: HelperSection[] = [
         desc: "When to fire the game-time alert.",
         parent: "showGameTimeAlert",
         input: "gameTimeMinutes",
-      },
-      {
-        name: "warnIncomingBoats",
-        title: "Incoming boat warning",
-        desc: "Center-screen alert when a new boat targets your territory (like the Missile Silo warning).",
       },
       {
         name: "showEnemyIntent",

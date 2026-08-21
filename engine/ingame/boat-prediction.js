@@ -298,10 +298,9 @@
   }
 
   function isBoatOverlayActive() {
-    // The shared scan/render loop runs for any consumer that needs it: the
-    // prediction overlay, or the incoming warning (which needs the periodic scan to
-    // spot new boats). The boat list panel used to be a third consumer.
-    return boatPredictionEnabled || boatWarnIncoming;
+    // Only the prediction overlay drives this loop now. The boat list panel and the
+    // incoming-boat warning were the other two consumers; both have been removed.
+    return boatPredictionEnabled;
   }
 
   // Remaining travel time for a transport, from the game's own motion plan (the
@@ -718,9 +717,6 @@
       lastBoatPredictionScanAt = 0;
       boatPredictionTransports = [];
       clearBoatPredictionDomCache();
-      // Left the match (menu / between games): drop the warning baseline so the
-      // next match seeds fresh instead of inheriting stale ids.
-      resetIncomingBoatWarningBaseline();
       boatLandingAnimationFrame = requestAnimationFrame(syncBoatPrediction);
       return;
     }
@@ -733,9 +729,6 @@
         scanIds.add(transport.domUnitId);
       }
       cleanupBoatPredictionDomCache(scanIds);
-      // Detection runs on the scan tick (~1s), off the per-frame path. Self-
-      // gates on the warning toggle (defined in boat-panel.js, shared scope).
-      maybeWarnNewIncomingBoats(boatPredictionTransports);
       lastBoatPredictionScanAt = now;
     }
 
@@ -981,7 +974,6 @@
       if (!context?.game || !context?.transform) {
         ctx.clearRect(0, 0, w, h);
         lastBoatPredictionScanAt = 0; boatPredictionTransports = [];
-        resetIncomingBoatWarningBaseline();
         boatLandingAnimationFrame = requestAnimationFrame(syncBoatPrediction);
         return;
       }
@@ -990,7 +982,6 @@
       var now = Date.now();
       if (!lastBoatPredictionScanAt || now - lastBoatPredictionScanAt >= BOAT_PREDICTION_SCAN_MS) {
         boatPredictionTransports = collectBoatPredictionTransports(game);
-        maybeWarnNewIncomingBoats(boatPredictionTransports);
         lastBoatPredictionScanAt = now;
       }
 

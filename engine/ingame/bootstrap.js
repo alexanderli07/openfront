@@ -44,9 +44,6 @@
       setAttackHighlightEnabled(data.payload?.enabled);
     }
 
-    if (data.type === "SHOW_RETALIATION_HUD") {
-      setRetaliationEnabled(data.payload?.enabled);
-    }
 
     if (data.type === "SET_ANTI_AFK") {
       setAntiAfkEnabled(data.payload?.enabled);
@@ -89,9 +86,6 @@
       });
     }
 
-    if (data.type === "SET_BOAT_INCOMING_WARNING") {
-      setBoatIncomingWarningEnabled(data.payload?.enabled);
-    }
 
     if (data.type === "SET_AUTO_LEAVE_ON_TEAM_WIN") {
       setAutoLeaveOnTeamWinEnabled(data.payload?.enabled);
@@ -157,7 +151,6 @@
       { enabled: function() { return typeof allianceRequestsPanelEnabled !== "undefined" && allianceRequestsPanelEnabled; }, set: function(v) { if (typeof setAllianceRequestsPanelEnabled === "function") setAllianceRequestsPanelEnabled(v); } },
       { enabled: function() { return typeof allyMarkersEnabled !== "undefined" && allyMarkersEnabled; }, set: function(v) { if (typeof setAllyMarkersEnabled === "function") setAllyMarkersEnabled(v); } },
       { enabled: function() { return typeof buildTimerEnabled !== "undefined" && buildTimerEnabled; }, set: function(v) { if (typeof setBuildTimerEnabled === "function") setBuildTimerEnabled(v); } },
-      { enabled: function() { return typeof retaliationEnabled !== "undefined" && retaliationEnabled; }, set: function(v) { if (typeof setRetaliationEnabled === "function") setRetaliationEnabled(v); } },
     ];
     for (var i = 0; i < panels.length; i++) {
       var p = panels[i];

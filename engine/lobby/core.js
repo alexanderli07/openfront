@@ -315,18 +315,6 @@ function syncAdvisorPanelHelper() {
   );
 }
 
-function syncRetaliationHudHelper() {
-  window.postMessage(
-    {
-      source: BRIDGE_SOURCE_EXTENSION,
-      type: "SHOW_RETALIATION_HUD",
-      payload: {
-        enabled: Boolean(settings.showRetaliationHud),
-      },
-    },
-    "*",
-  );
-}
 
 function syncHideAdsHelper() {
   window.postMessage(
@@ -492,18 +480,6 @@ function syncWarshipRoutesHelper() {
   );
 }
 
-function syncBoatIncomingWarningHelper() {
-  window.postMessage(
-    {
-      source: BRIDGE_SOURCE_EXTENSION,
-      type: "SET_BOAT_INCOMING_WARNING",
-      payload: {
-        enabled: Boolean(settings.warnIncomingBoats),
-      },
-    },
-    "*",
-  );
-}
 
 function syncEstatePanelHelper() {
   window.postMessage(
@@ -784,7 +760,6 @@ function syncHelpers() {
   syncMapMoneyHelper();
   syncAttackHighlightHelper();
   syncAdvisorPanelHelper();
-  syncRetaliationHudHelper();
   syncHideAdsHelper();
   syncAntiAfkHelper();
   syncAttackRatioHotkeyHelper();
@@ -800,7 +775,6 @@ function syncHelpers() {
   syncNukePredictionHelper();
   syncBoatPredictionHelper();
   syncWarshipRoutesHelper();
-  syncBoatIncomingWarningHelper();
   syncEstatePanelHelper();
   syncAutoLeaveOnTeamWinHelper();
   syncNukeSuggestionsHelper();

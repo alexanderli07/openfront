@@ -133,39 +133,6 @@ function ofhSetOverlayAlpha(a) {
   if (typeof markMapOverlayDirty === "function") markMapOverlayDirty();
 }
 
-// ── Shared alert stack ──────────────────────────────────────────────────
-// The two threat notifications — "you are being attacked / nuked" and "a boat is
-// heading for you" — each used to create their OWN fixed container, centre-screen at
-// top:18% and top:17%, both at z-index 9000. Two consequences: either card covered the
-// middle of the map, and when both fired they landed on top of each other with DOM
-// insertion order deciding the winner.
-//
-// They now share ONE fixed column anchored bottom-right. Each notification keeps its own
-// container element (its dismiss/clear code queries it by id) but as a plain flow child of
-// this stack, so the two stack vertically instead of overlapping.
-//
-// z-index sits above the panels (8000) and below tooltips/toasts (9000).
-var OFH_ALERT_STACK_ID = "openfront-helper-alert-stack";
-
-function ensureOfhAlertStack() {
-  let stack = document.getElementById(OFH_ALERT_STACK_ID);
-  if (stack) return stack;
-  if (!document.getElementById(OFH_ALERT_STACK_ID + "-styles")) {
-    const st = document.createElement("style");
-    st.id = OFH_ALERT_STACK_ID + "-styles";
-    st.textContent =
-      "#" + OFH_ALERT_STACK_ID + "{position:fixed;right:12px;bottom:12px;z-index:8600;" +
-      "display:flex;flex-direction:column;align-items:flex-end;gap:8px;width:max-content;" +
-      "max-width:min(360px,calc(100vw - 24px));pointer-events:none;}";
-    (document.head || document.documentElement).appendChild(st);
-  }
-  stack = document.createElement("div");
-  stack.id = OFH_ALERT_STACK_ID;
-  stack.setAttribute("aria-hidden", "true");
-  (document.body || document.documentElement).appendChild(stack);
-  return stack;
-}
-
 // ── Developer diagnostics ──────────────────────────────────────────────────────────
 // OFF by default. Several of these fire once per DECISION — every boat attempt, every
 // donate pass, every build gate, every anti-AFK ping — which floods the console during

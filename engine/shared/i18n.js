@@ -300,7 +300,6 @@
     "⛵ Probe landing {name}": "⛵ Probe landing {name}",
     "☢️ MIRV the dominant enemy": "☢️ MIRV the dominant enemy",
     "☢️ Saturate air defense ({bombs} bombs, {sams} SAMs on path)": "☢️ Saturate air defense ({bombs} bombs, {sams} SAMs on path)",
-    "☢️ Nuclear RETALIATION": "☢️ Nuclear RETALIATION",
     "☢️ Launch": "☢️ Launch",
     "Toggle on/off": "Toggle on/off",
     "Collapse": "Collapse",
