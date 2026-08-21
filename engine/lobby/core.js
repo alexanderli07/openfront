@@ -492,19 +492,6 @@ function syncWarshipRoutesHelper() {
   );
 }
 
-function syncBoatPanelHelper() {
-  window.postMessage(
-    {
-      source: BRIDGE_SOURCE_EXTENSION,
-      type: "SHOW_BOAT_PANEL",
-      payload: {
-        enabled: Boolean(settings.showBoatPanel),
-      },
-    },
-    "*",
-  );
-}
-
 function syncBoatIncomingWarningHelper() {
   window.postMessage(
     {
@@ -813,7 +800,6 @@ function syncHelpers() {
   syncNukePredictionHelper();
   syncBoatPredictionHelper();
   syncWarshipRoutesHelper();
-  syncBoatPanelHelper();
   syncBoatIncomingWarningHelper();
   syncEstatePanelHelper();
   syncAutoLeaveOnTeamWinHelper();

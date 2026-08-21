@@ -89,10 +89,6 @@
       });
     }
 
-    if (data.type === "SHOW_BOAT_PANEL") {
-      setBoatPanelEnabled(data.payload?.enabled);
-    }
-
     if (data.type === "SET_BOAT_INCOMING_WARNING") {
       setBoatIncomingWarningEnabled(data.payload?.enabled);
     }
@@ -158,7 +154,6 @@
       { enabled: function() { return typeof topGoldPerMinuteEnabled !== "undefined" && topGoldPerMinuteEnabled; }, set: function(v) { if (typeof setTopGoldPerMinuteEnabled === "function") setTopGoldPerMinuteEnabled(v); } },
       { enabled: function() { return typeof teamGoldPerMinuteEnabled !== "undefined" && teamGoldPerMinuteEnabled; }, set: function(v) { if (typeof setTeamBuildStatsEnabled === "function") setTeamBuildStatsEnabled(v); } },
       { enabled: function() { return typeof tradeBalancesEnabled !== "undefined" && tradeBalancesEnabled; }, set: function(v) { if (typeof setTradeBalancesEnabled === "function") setTradeBalancesEnabled(v); } },
-      { enabled: function() { return typeof boatPanelOpen !== "undefined" && boatPanelOpen; }, set: function(v) { if (typeof setBoatPanelEnabled === "function") setBoatPanelEnabled(v); } },
       { enabled: function() { return typeof allianceRequestsPanelEnabled !== "undefined" && allianceRequestsPanelEnabled; }, set: function(v) { if (typeof setAllianceRequestsPanelEnabled === "function") setAllianceRequestsPanelEnabled(v); } },
       { enabled: function() { return typeof allyMarkersEnabled !== "undefined" && allyMarkersEnabled; }, set: function(v) { if (typeof setAllyMarkersEnabled === "function") setAllyMarkersEnabled(v); } },
       { enabled: function() { return typeof buildTimerEnabled !== "undefined" && buildTimerEnabled; }, set: function(v) { if (typeof setBuildTimerEnabled === "function") setBuildTimerEnabled(v); } },

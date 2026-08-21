@@ -65,7 +65,6 @@
     showTeamBuildStats: ["Team Build Stats", "Lists each team's structure counts (City, Port, Factory, SAM, Silo) with economy stats. Alerts when enemy builds first Missile Silo."],
     showTradeBalances: ["Trade Balances", "Shows trade data when hovering a player: imports, exports, ROI, break-even time, and top 5 trade partners."],
     showAdvisorPanel: ["Advisor Panel", "Strategic summary: economy state, troops vs max, growth efficiency, safe-to-spend, and top 6 enemy threats ranked by danger."],
-    showBoatPanel: ["Boat Panel", "Lists all transport boats (sent and incoming) with live ETA. Click to pan camera; hover to highlight route on map."],
     showEstatePanel: ["Estates Panel", "Lists each separate connected parcel of land you own with tile count. Click to pan camera to that parcel."],
     showAllianceRequestsPanel: ["Alliance Requests", "Shows pending alliance requests with accept/reject buttons and countdown timers. Includes auto-renew toggle for expiring alliances."],
     showHelperUsers: ["Script Users", "Detects other players running the same script via emoji broadcast handshake. Shows detected users with name, color, and relation."],
@@ -551,7 +550,6 @@
     showTopGoldPerMinute: "openfront-helper-top-gold-per-minute",
     showTeamBuildStats: "openfront-helper-team-build-stats",
     showTradeBalances: "openfront-helper-trade-balances",
-    showBoatPanel: "openfront-helper-boat-panel",
     showEstatePanel: "openfront-helper-estate-panel",
     showAllianceRequestsPanel: "openfront-helper-alliance-requests-panel",
     showHelperUsers: "openfront-helper-users-container",
@@ -622,7 +620,6 @@
       case "showTopGoldPerMinute":   return typeof setTopGoldPerMinuteEnabled === "function" ? setTopGoldPerMinuteEnabled : null;
       case "showTeamBuildStats":     return typeof setTeamBuildStatsEnabled === "function" ? setTeamBuildStatsEnabled : null;
       case "showTradeBalances":      return typeof setTradeBalancesEnabled === "function" ? setTradeBalancesEnabled : null;
-      case "showBoatPanel":          return typeof setBoatPanelEnabled === "function" ? setBoatPanelEnabled : null;
       case "showEstatePanel":        return typeof setEstatePanelEnabled === "function" ? setEstatePanelEnabled : null;
       case "showAllianceRequestsPanel": return typeof setAllianceRequestsPanelEnabled === "function" ? setAllianceRequestsPanelEnabled : null;
       case "showHelperUsers":        return typeof setHelperUsersEnabled === "function" ? setHelperUsersEnabled : null;

@@ -299,9 +299,9 @@
 
   function isBoatOverlayActive() {
     // The shared scan/render loop runs for any consumer that needs it: the
-    // prediction overlay, an open boat panel (focused routes), or the incoming
-    // warning (which needs the periodic scan to spot new boats).
-    return boatPredictionEnabled || boatPanelOpen || boatWarnIncoming;
+    // prediction overlay, or the incoming warning (which needs the periodic scan to
+    // spot new boats). The boat list panel used to be a third consumer.
+    return boatPredictionEnabled || boatWarnIncoming;
   }
 
   // Remaining travel time for a transport, from the game's own motion plan (the
@@ -759,8 +759,9 @@
 
     for (let i = 0; i < boatPredictionTransports.length; i += 1) {
       const transport = boatPredictionTransports[i];
-      const isFocused =
-        boatPanelFocusedId !== null && transport.domUnitId === boatPanelFocusedId;
+      // Row-hover focus died with the boat list panel. This is inside the DOM
+      // renderer, which is unreachable anyway (_boatUseCanvas is hardcoded true).
+      const isFocused = false;
 
       // Use pre-resolved world coords from the scan; avoids two proxy calls
       // (game.x, game.y) per transport per pan frame.

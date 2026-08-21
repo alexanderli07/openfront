@@ -28,14 +28,12 @@
     // Estimated panel widths (right-column panels are right-anchored so their
     // right edges line up; exact heights are unknown so vertical gaps are typical).
     const PLAYER_W = 340;
-    const BOAT_W = 260;
     const ESTATE_W = 178;
     const ALLIANCE_W = 258;
 
     // Left column (fixed x).
     const leftX = PAD;
     // Right column (right-anchored, edges aligned).
-    const boatX = Math.max(PAD, W - BOAT_W - PAD);
     const estateX = Math.max(PAD, W - ESTATE_W - PAD);
     const allianceX = Math.max(PAD, W - ALLIANCE_W - PAD);
     // Advisor sits just to the right of the player panel.
@@ -46,8 +44,7 @@
       "openfront-helper-top-gpm-pos": { left: leftX, top: PAD }, // Player stats
       "openfront-helper-team-build-stats-pos": { left: leftX, top: 314 }, // below player
       "openfront-helper-advisor-panel-pos": { left: advisorX, top: PAD }, // beside player
-      openfrontHelperBoatPanelPos: { left: boatX, top: PAD }, // top-right
-      openfrontHelperEstatePanelPos: { left: estateX, top: 300 }, // below boats
+      openfrontHelperEstatePanelPos: { left: estateX, top: 300 },
       "openfront-helper-alliance-request-panel-pos": { left: allianceX, top: 520 }, // below estates
       "openfront-helper-quick-panel-pos": { left: W - 286, top: PAD }, // top-right, Quick Panel 270px wide
     };

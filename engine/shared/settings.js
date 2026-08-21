@@ -100,7 +100,6 @@
     alwaysShowTeamBoatRoutes: true,
     alwaysShowAllyBoatRoutes: true,
     alwaysShowEnemyBoatRoutes: true,
-    showBoatPanel: false,
     warnIncomingBoats: true,
     showEstatePanel: true,
     autoNuke: true,

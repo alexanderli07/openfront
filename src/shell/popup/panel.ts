@@ -229,11 +229,6 @@ const HELPER_SECTIONS: HelperSection[] = [
         desc: "Compact HUD: troop-economy state, growth, spendable troops, expansion advice, and top threats.",
       },
       {
-        name: "showBoatPanel",
-        title: "Boat panel",
-        desc: "Lists boats you sent and boats incoming to your territory, with arrival times.",
-      },
-      {
         name: "showEstatePanel",
         title: "Estates panel",
         desc: "Lists your separate land parcels (tile counts); click a row to jump there.",

@@ -11,81 +11,71 @@
     const style = document.createElement("style");
     style.id = RETALIATION_STYLE_ID;
     style.textContent = `
+      /* A plain flow child of the shared bottom-right stack — no position/z-index of
+         its own, so it cannot collide with the incoming-boat card any more. */
       #${RETALIATION_CONTAINER_ID} {
-        position: fixed;
-        top: 18%;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 9000;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 10px;
+        align-items: flex-end;
+        gap: 6px;
         width: max-content;
-        max-width: min(520px, calc(100vw - 24px));
+        max-width: 100%;
         pointer-events: none;
       }
 
+      /* Deliberately understated: this is a corner notice, not a takeover. The 2px
+         accent border, 28px shaking icon, 15px message and infinite glow pulse all went
+         — a pulsing card in the corner of the eye is worse than a still one. */
       #${RETALIATION_CONTAINER_ID} .ofh-ret-card {
         pointer-events: auto;
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 12px 16px;
-        border: 2px solid rgba(248, 113, 113, 0.9);
-        border-radius: 12px;
-        background: linear-gradient(180deg, rgba(60, 9, 9, 0.96), rgba(30, 6, 6, 0.96));
+        gap: 8px;
+        padding: 7px 9px;
+        border: 1px solid rgba(248, 113, 113, 0.42);
+        border-radius: 8px;
+        background: rgba(26, 9, 9, 0.9);
         color: #fee2e2;
         font-family: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
-        box-shadow:
-          0 18px 50px rgba(0, 0, 0, 0.55),
-          0 0 30px rgba(248, 113, 113, 0.45);
-        animation:
-          openfront-helper-ret-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2),
-          openfront-helper-ret-glow 1.2s ease-in-out infinite;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+        animation: openfront-helper-ret-in 0.18s ease-out;
       }
 
+      /* Slides in from the right edge it is anchored to. */
       @keyframes openfront-helper-ret-in {
-        from { opacity: 0; transform: translateY(-14px) scale(0.94); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-      }
-
-      @keyframes openfront-helper-ret-glow {
-        0%, 100% { box-shadow: 0 18px 50px rgba(0,0,0,0.55), 0 0 22px rgba(248,113,113,0.3); }
-        50% { box-shadow: 0 18px 50px rgba(0,0,0,0.55), 0 0 40px rgba(248,113,113,0.8); }
+        from { opacity: 0; transform: translateX(14px); }
+        to { opacity: 1; transform: translateX(0); }
       }
 
       #${RETALIATION_CONTAINER_ID} .ofh-ret-icon {
-        font-size: 28px; line-height: 1;
-        animation: openfront-helper-ret-shake 0.9s ease-in-out infinite;
-      }
-      @keyframes openfront-helper-ret-shake {
-        0%, 100% { transform: rotate(-9deg); }
-        50% { transform: rotate(9deg); }
+        flex: 0 0 auto;
+        font-size: 15px; line-height: 1;
       }
 
-      #${RETALIATION_CONTAINER_ID} .ofh-ret-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
       #${RETALIATION_CONTAINER_ID} .ofh-ret-title {
-        font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+        font-size: 9px; font-weight: 800; letter-spacing: 0.07em;
         text-transform: uppercase; color: #fca5a5;
       }
-      #${RETALIATION_CONTAINER_ID} .ofh-ret-msg { font-size: 15px; font-weight: 800; line-height: 1.2; }
-
-      #${RETALIATION_CONTAINER_ID} .ofh-ret-fire {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 8px 13px; border: 1px solid rgba(248,250,252,0.5);
-        border-radius: 8px; background: rgba(248,113,113,0.92);
-        color: #450a0a; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap;
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-msg {
+        font-size: 12px; font-weight: 700; line-height: 1.2;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
-      #${RETALIATION_CONTAINER_ID} .ofh-ret-fire:hover { background: #fecaca; }
 
+      /* One button treatment shared with the boat card: a quiet ghost, not a filled
+         call-to-action. The same Focus action used to be solid red here and teal there. */
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-fire,
       #${RETALIATION_CONTAINER_ID} .ofh-ret-dismiss {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 26px; height: 26px; border: 1px solid rgba(248,250,252,0.25);
-        border-radius: 8px; background: rgba(15,23,42,0.5);
-        color: #fecaca; font-size: 14px; font-weight: 800; cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+        border: 1px solid rgba(248, 250, 252, 0.22);
+        border-radius: 6px; background: rgba(148, 163, 184, 0.14);
+        color: #fee2e2; font: 700 10px/1 "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+        cursor: pointer; white-space: nowrap;
       }
-      #${RETALIATION_CONTAINER_ID} .ofh-ret-dismiss:hover { background: rgba(248,113,113,0.3); }
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-fire { padding: 5px 7px; }
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-dismiss { width: 20px; height: 20px; }
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-fire:hover,
+      #${RETALIATION_CONTAINER_ID} .ofh-ret-dismiss:hover { background: rgba(248, 113, 113, 0.28); }
     `;
     (document.head || document.documentElement).appendChild(style);
   }
@@ -97,7 +87,7 @@
       c = document.createElement("div");
       c.id = RETALIATION_CONTAINER_ID;
       c.setAttribute("aria-hidden", "true");
-      (document.body || document.documentElement).appendChild(c);
+      ensureOfhAlertStack().appendChild(c);
     }
     return c;
   }
