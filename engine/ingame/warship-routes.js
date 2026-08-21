@@ -80,12 +80,10 @@
         stroke-linejoin: round;
         opacity: 0.75;
       }
-      /* USER: OWN routes draw SOLID and brighter; other factions stay dotted.
-         Colour alone isn't enough at a glance (and fails for colourblind users);
-         solid-vs-dotted reads before the hue does. */
+      /* USER: own routes stay DOTTED like everyone else's (solid was too loud) —
+         "mine" reads through the magenta hue plus the heavier, brighter stroke. */
       #${WARSHIP_ROUTES_CONTAINER_ID} .openfront-helper-warship-route-line.ofh-ws-self {
         stroke-width: 3;
-        stroke-dasharray: none;
         opacity: 0.92;
       }
       #${WARSHIP_ROUTES_CONTAINER_ID} .openfront-helper-warship-dest {

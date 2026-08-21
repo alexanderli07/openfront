@@ -1044,11 +1044,12 @@
           if (rpts.length >= 2) {
             ctx.beginPath(); ctx.moveTo(rpts[0].x, rpts[0].y);
             for (var rj = 1; rj < rpts.length; rj++) ctx.lineTo(rpts[rj].x, rpts[rj].y);
-            // USER: OWN trails draw SOLID and brighter; other factions stay
-            // dashed — solid-vs-dashed reads before the hue does.
+            // USER: own trails are dashed like everyone else's (solid was too
+            // loud) — "mine" reads through the magenta plus the brighter,
+            // heavier dash.
             if (selfBoat) {
               ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.lineWidth = 2.25;
-              ctx.stroke(); ctx.globalAlpha = 1;
+              ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
             } else {
               ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5;
               ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
