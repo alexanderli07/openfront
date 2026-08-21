@@ -271,9 +271,11 @@
 
   function getBoatPredictionColors(relation, targeting) {
     if (relation === "self") {
+      // USER: own units must be unmistakable — magenta, in lockstep with
+      // warshipRouteColor and mapFactionColor (see the note there).
       return {
-        color: "rgba(96, 165, 250, 0.95)",
-        bg: "rgba(30, 58, 138, 0.22)",
+        color: "rgba(240, 110, 255, 0.98)",
+        bg: "rgba(134, 25, 143, 0.28)",
       };
     }
 
@@ -1020,13 +1022,15 @@
           : t.relation === "ally" ? allyAlways : enemyAlways;
         var isHovered = i === hoverIdx;
         var color = t.color;
+        var selfBoat = t.relation === "self";
 
         // Marker: circle + crosshair (Blon pattern) — always shown; hover-only
         // detail (route + ETA label) is added below.
         if (markersOn) {
-          ctx.beginPath(); ctx.arc(spx, spy, 8, 0, Math.PI * 2);
+          // USER: own landing marker is a size up with a heavier ring.
+          ctx.beginPath(); ctx.arc(spx, spy, selfBoat ? 9 : 8, 0, Math.PI * 2);
           ctx.fillStyle = t.bg; ctx.fill();
-          ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
+          ctx.lineWidth = selfBoat ? 3 : 2; ctx.strokeStyle = color; ctx.stroke();
           ctx.beginPath();
           ctx.moveTo(spx - 5, spy); ctx.lineTo(spx + 5, spy);
           ctx.moveTo(spx, spy - 5); ctx.lineTo(spx, spy + 5);
@@ -1040,8 +1044,15 @@
           if (rpts.length >= 2) {
             ctx.beginPath(); ctx.moveTo(rpts[0].x, rpts[0].y);
             for (var rj = 1; rj < rpts.length; rj++) ctx.lineTo(rpts[rj].x, rpts[rj].y);
-            ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+            // USER: OWN trails draw SOLID and brighter; other factions stay
+            // dashed — solid-vs-dashed reads before the hue does.
+            if (selfBoat) {
+              ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.lineWidth = 2.25;
+              ctx.stroke(); ctx.globalAlpha = 1;
+            } else {
+              ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5;
+              ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+            }
           }
         }
 

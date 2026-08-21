@@ -39,7 +39,11 @@
   function warshipRouteColor(relation) {
     switch (relation) {
       case "self":
-        return "rgba(96, 165, 250, 0.95)"; // blue
+        // USER: own units must be unmistakable at a glance. Magenta is the one
+        // hue no other overlay uses (enemy red, idle yellow, ally green, team
+        // teal) and rarely occurs in territory colours around a fight. Kept in
+        // lockstep with getBoatPredictionColors and mapFactionColor.
+        return "rgba(240, 110, 255, 0.98)"; // own = magenta
       case "team":
         return "rgba(45, 212, 191, 0.95)"; // teal
       case "ally":
@@ -76,6 +80,14 @@
         stroke-linejoin: round;
         opacity: 0.75;
       }
+      /* USER: OWN routes draw SOLID and brighter; other factions stay dotted.
+         Colour alone isn't enough at a glance (and fails for colourblind users);
+         solid-vs-dotted reads before the hue does. */
+      #${WARSHIP_ROUTES_CONTAINER_ID} .openfront-helper-warship-route-line.ofh-ws-self {
+        stroke-width: 3;
+        stroke-dasharray: none;
+        opacity: 0.92;
+      }
       #${WARSHIP_ROUTES_CONTAINER_ID} .openfront-helper-warship-dest {
         position: fixed;
         left: 0;
@@ -88,6 +100,13 @@
         box-shadow: 0 0 5px var(--ws-color);
         transform: translate3d(var(--ws-tx, 0px), var(--ws-ty, 0px), 0) translate(-50%, -50%) rotate(45deg);
         will-change: transform;
+      }
+      /* USER: own destination diamond is a size up with a heavier ring + glow. */
+      #${WARSHIP_ROUTES_CONTAINER_ID} .openfront-helper-warship-dest.ofh-ws-self {
+        width: 16px;
+        height: 16px;
+        border-width: 3px;
+        box-shadow: 0 0 8px var(--ws-color), 0 0 3px var(--ws-color);
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -171,6 +190,7 @@
       out.push({
         id: String(unit.id?.() ?? `dest:${destTile}`),
         unit,
+        self: relation === "self",
         color: warshipRouteColor(relation),
         motionPlanUnitId: Number.isFinite(motionPlanUnitId) ? motionPlanUnitId : null,
         destWorldX,
@@ -206,10 +226,13 @@
       };
       warshipRouteDomCache.set(item.id, entry);
     }
-    if (entry.signature !== item.color) {
+    const signature = item.color + (item.self ? "|self" : "");
+    if (entry.signature !== signature) {
       entry.routeLine.style.stroke = item.color;
       entry.marker.style.setProperty("--ws-color", item.color);
-      entry.signature = item.color;
+      entry.routeLine.classList.toggle("ofh-ws-self", !!item.self);
+      entry.marker.classList.toggle("ofh-ws-self", !!item.self);
+      entry.signature = signature;
     }
     return entry;
   }

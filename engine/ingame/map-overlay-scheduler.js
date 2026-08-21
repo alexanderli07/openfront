@@ -293,7 +293,9 @@
   function mapFactionColor(relation) {
     switch (relation) {
       case "self":
-        return "rgba(96, 165, 250, 0.95)"; // blue
+        // USER: "magenta = mine" across the whole helper — matches
+        // warshipRouteColor and getBoatPredictionColors.
+        return "rgba(240, 110, 255, 0.98)"; // own = magenta
       case "team":
         return "rgba(45, 212, 191, 0.95)"; // teal
       case "ally":
