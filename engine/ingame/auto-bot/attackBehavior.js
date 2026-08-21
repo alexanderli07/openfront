@@ -2342,6 +2342,34 @@
       // Thin UX gate (PORT-CONTRACT donate strategy note — not a strategy change).
       if (!state.settings.features.donate) return false;
 
+      // USER RULE: while WE are being invaded, defence owns every troop — donations stop
+      // entirely, and only resume once we have been attack-free for a short window (so a
+      // gap between two waves of the same invasion doesn't leak a donation out mid-fight).
+      // Deliberately INCOMING only: outgoing attacks are constant (expansion), and gating
+      // on them would disable donation for the whole game. incomingAttacks() is reliable
+      // for OUR OWN player (it is other players' attack lists the client can't see).
+      try {
+        const nowTick = Number(this.game.ticks());
+        if (Number.isFinite(nowTick)) {
+          // Tick regression = a new game in this page session; forget the old stamp.
+          if (this._donateUnsafeAtTick !== undefined && nowTick < this._donateUnsafeAtTick) {
+            this._donateUnsafeAtTick = undefined;
+          }
+          const atks = this.player.incomingAttacks();
+          if (atks && atks.length > 0) this._donateUnsafeAtTick = nowTick;
+          const DONATE_SAFE_TICKS = 100; // ~10s at baseline speed
+          if (
+            this._donateUnsafeAtTick !== undefined &&
+            nowTick - this._donateUnsafeAtTick < DONATE_SAFE_TICKS
+          ) {
+            ofhDebug("[Donate] skip: under attack — defending first");
+            return false;
+          }
+        }
+      } catch (_e) {
+        /* if attacks can't be read, don't block donation on it */
+      }
+
       // Only donate in team games
       if (this.game.config().gameConfig().gameMode !== GameMode.Team) {
         return false;
@@ -2501,8 +2529,13 @@
       // 0.42·maxTroops, so winFix mode keeps ~donateKeepFrac (45%) and donates the rest;
       // faithful mode keeps the plain reserveRatio.
       const maxTroops = this.game.config().maxTroops(this.player);
+      // effectiveReserveRatio, not the raw src ratio: it rises with hostile neighbours
+      // (reserveByNeighbors) and territory size, so "enemies touching our border" now
+      // shrinks donations through the same number the attack logic already holds back.
+      // The raw ratio here let the bot donate down to 45% while its own attack gates
+      // were trying to keep 65% at home.
       const keepFrac = state.settings.winFixes
-        ? Math.max(this.reserveRatio, state.settings.donateKeepFrac || 0.45)
+        ? Math.max(this.effectiveReserveRatio(), state.settings.donateKeepFrac || 0.45)
         : this.reserveRatio;
       const troopsToKeep = maxTroops * keepFrac;
       const availableTroops = this.player.troops() - troopsToKeep;
