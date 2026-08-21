@@ -33,6 +33,7 @@
     }
   }
   let warshipRoutesAnimationFrame = null;
+  let _wsFrameCounter = 0;
   let lastWarshipRouteScanAt = 0;
   let warshipRouteScan = []; // [{ id, unit, color, motionPlanUnitId, destWorldX, destWorldY }]
   const warshipRouteDomCache = new Map(); // id -> { routeLine, marker, routePoints, markerX, markerY, signature }
@@ -255,6 +256,12 @@
   function syncWarshipRoutes() {
     if (!warshipRoutesEnabled) {
       teardownWarshipRoutes();
+      return;
+    }
+    // ⚡ Low lag mode: drop to ~20fps like every other helper overlay (v1.58).
+    _wsFrameCounter = (_wsFrameCounter + 1) % 3;
+    if (_wsFrameCounter !== 0 && _isLowLagMode()) {
+      warshipRoutesAnimationFrame = requestAnimationFrame(syncWarshipRoutes);
       return;
     }
     const container = ensureWarshipRouteContainer();

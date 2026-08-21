@@ -226,6 +226,7 @@
   // changes; the screen position changes every pan frame. Splitting these
   // updates eliminates the per-frame querySelector storm.
   const nukeLandingEntries = new Map();
+  let _nukeFrameCounter = 0; // low-lag frame skip (v1.58)
   let nukeScanCache = []; // [{ unitId, targetTile, worldRadius, relation, count, eta }]
   let lastNukeScanAt = 0;
   const NUKE_SCAN_MS = 250;
@@ -570,6 +571,12 @@
       nukeScanCache = [];
       lastNukeScanAt = 0;
       nukeLandingAnimationFrame = null;
+      return;
+    }
+    // ⚡ Low lag mode: drop to ~20fps like every other helper overlay (v1.58).
+    _nukeFrameCounter = (_nukeFrameCounter + 1) % 3;
+    if (_nukeFrameCounter !== 0 && _isLowLagMode()) {
+      nukeLandingAnimationFrame = requestAnimationFrame(syncNukePrediction);
       return;
     }
 

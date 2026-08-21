@@ -709,10 +709,13 @@
   }
 
   function syncBoatPrediction() {
-    // Frame skip: only render every 3rd rAF frame (~20fps). Scan still runs
-    // at its own cadence. Blon pattern — smooth enough for boats, ~67% less CPU.
+    // Frame skip — LOW-LAG MODE ONLY (USER, v1.58): this used to be
+    // unconditional, so our markers stuttered at ~20fps while the game panned
+    // at 60 ("choppy compared to the other one"). Full rate is the default;
+    // the ~20fps skip is opt-in via the ⚡ Low lag mode switch, same gate the
+    // map-overlay scheduler already uses. Scans keep their own ms cadence.
     _boatFrameCounter = (_boatFrameCounter + 1) % 3;
-    if (_boatFrameCounter !== 0) {
+    if (_boatFrameCounter !== 0 && _isLowLagMode()) {
       boatLandingAnimationFrame = requestAnimationFrame(syncBoatPrediction);
       return;
     }
@@ -960,9 +963,9 @@
   // ── Canvas-based boat render (Blon port — replaces heavy DOM/SVG per-frame) ──
   if (typeof _boatUseCanvas !== "undefined" && _boatUseCanvas) {
     syncBoatPrediction = function _canvasBoatRender() {
-      // Frame skip: render every 3rd rAF (~20fps)
+      // Frame skip — LOW-LAG MODE ONLY (see the DOM-path note above).
       _boatFrameCounter = (_boatFrameCounter + 1) % 3;
-      if (_boatFrameCounter !== 0) {
+      if (_boatFrameCounter !== 0 && _isLowLagMode()) {
         boatLandingAnimationFrame = requestAnimationFrame(syncBoatPrediction);
         return;
       }

@@ -128,7 +128,7 @@
     // === Config Tab - Toggle Keys ===
     rainbowMode: ["Rainbow Mode", "Cycles through all accent colors automatically for a rainbow effect on all panels and overlays."],
     skinUnlocker: ["Skin Unlocker", "Unlocks all available skins. May require page reload. Can cause slight lag in-game on weaker devices."],
-    lowLagMode: ["Low Lag Mode", "Throttles overlays to ~20fps for weaker devices. Reduces scan frequencies and disables non-essential animations."],
+    lowLagMode: ["Low Lag Mode", "Renders ALL helper overlays (boats, warships, nukes, map labels) at ~20fps instead of full frame rate. Off = smooth 60fps overlays (default)."],
   };
 
   // ---- Theme engine ----
