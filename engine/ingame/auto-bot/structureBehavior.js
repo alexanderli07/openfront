@@ -405,6 +405,22 @@
    */
   const DEFENSE_POST_RATIO_PER_POST = 0.4;
 
+  /** defensePostTiming: don't compute an advance rate from front snapshots closer
+   *  together than this many ticks (sub-window deltas are all noise). */
+  const DP_SPEED_MIN_WINDOW_TICKS = 20;
+  /** defensePostTiming: EMA weight of the newest front-speed measurement. */
+  const DP_SPEED_EMA = 0.5;
+  /** defensePostTiming: max tiles kept per front snapshot — comparisons stay
+   *  O(64 x 64) no matter how wide the war gets. */
+  const DP_FRONT_SAMPLE_CAP = 64;
+  /** defensePostTiming: the front must need DP_ETA_SAFETY x constructionDuration
+   *  (+ the tick margin) to reach a candidate before we'll buy a post there. */
+  const DP_ETA_SAFETY = 1.25;
+  const DP_ETA_MARGIN_TICKS = 10;
+  /** defensePostTiming: give up (buy nothing) once the required depth exceeds this
+   *  many border-spacings — a blitz that fast outruns any post anywhere. */
+  const DP_MAX_DEPTH_SPACINGS = 4;
+
   // NOTE: the OCEAN sentinel (-1) used by sharedWaterComponents now lives in
   // gameApi's water reconstruction (SHARED_OCEAN_SENTINEL); structureBehavior only
   // consumes the resulting Set<number>|null via shimSharedWaterComponents.
@@ -715,7 +731,65 @@
         landAttacks.length > 0 ? this.getAttackFrontTiles(landAttacks) : [];
       const frontTiles = attackFront.length > 0 ? attackFront : enemyFront;
       if (frontTiles.length === 0) return false;
-      if (this.countDefensePostsNearFront(frontTiles, allowed) >= allowed) {
+
+      // DIVERGENCE (defensePostTiming, USER): a post takes constructionDuration
+      // ticks to finish and defends NOTHING until then. Against a fast attack the
+      // front used to overrun the site mid-build — pure wasted gold. Measure the
+      // front's real advance rate and require every candidate's ETA (distance from
+      // the front over that speed) to beat the build time plus margin: fast attack
+      // → the whole sampling band shifts DEEPER so the post finishes just before
+      // the front arrives; blitz nothing can beat → buy nothing, keep the gold.
+      // Peacetime / stalled-front placement is unchanged.
+      let depthPlan = null;
+      let etaNeed = 0; // min tiles a candidate must sit from the front (0 = off)
+      let frontProbe = null; // subsampled attack front for candidate distances
+      if (attackFront.length > 0 && state.settings.defensePostTiming) {
+        const speed = this.measureAttackFrontSpeed(attackFront, landAttacks);
+        // First sight of this attack: snapshot taken, no rate yet. Hold this pass
+        // (~1s) rather than guess — the build takes ~10x longer than the wait.
+        if (speed === null) return false;
+        if (speed > 0) {
+          const buildTicks =
+            typeof getConstructionDuration === "function"
+              ? getConstructionDuration(this.game, UNIT.DefensePost)
+              : 100;
+          const needTicks = buildTicks * DP_ETA_SAFETY + DP_ETA_MARGIN_TICKS;
+          const requiredDepth = speed * needTicks;
+          const { borderSpacing } = this.spacingConstants();
+          if (requiredDepth > borderSpacing * DP_MAX_DEPTH_SPACINGS) {
+            ofhDebug(
+              "[DPost] front advancing " +
+                speed.toFixed(2) +
+                " tiles/tick — no site can finish a post in time, keeping the gold",
+            );
+            return false;
+          }
+          etaNeed = requiredDepth;
+          frontProbe = this.dpSubsample(attackFront);
+          const defMin = Math.ceil(borderSpacing * 0.75);
+          if (requiredDepth > defMin) {
+            const min = Math.ceil(requiredDepth);
+            depthPlan = { min, max: min + defMin };
+            ofhDebug(
+              "[DPost] front " +
+                speed.toFixed(2) +
+                " tiles/tick, build " +
+                buildTicks +
+                "t → placing ≥" +
+                min +
+                " tiles back",
+            );
+          }
+        }
+      }
+
+      if (
+        this.countDefensePostsNearFront(
+          frontTiles,
+          allowed,
+          depthPlan ? depthPlan.max : undefined,
+        ) >= allowed
+      ) {
         return false;
       }
 
@@ -730,8 +804,38 @@
       // candidates and probe them, which can yield slightly fewer probes. Same
       // candidate-generation distribution; only the in-sampler canBuild filter
       // moves to the probe phase (rank-then-probe).
-      const tiles = this.sampleTilesNearFront(frontTiles, 25, UNIT.DefensePost);
-      for (const tile of tiles) {
+      const tiles = this.sampleTilesNearFront(
+        frontTiles,
+        25,
+        UNIT.DefensePost,
+        depthPlan,
+      );
+      // With the timing gate live, keep only candidates the front cannot reach
+      // before the post finishes, closest-first (maximum useful coverage). Without
+      // it (peacetime / stalled front) the sampler's original order is preserved.
+      let ordered = tiles;
+      if (etaNeed > 0 && frontProbe && frontProbe.length > 0) {
+        const g = this.game;
+        const withDist = [];
+        for (const t of tiles) {
+          let best = Infinity;
+          for (const f of frontProbe) {
+            const d = g.euclideanDistSquared(t, f);
+            if (d < best) best = d;
+          }
+          const dist = Math.sqrt(best);
+          if (dist >= etaNeed) withDist.push([dist, t]);
+        }
+        withDist.sort((a, b) => a[0] - b[0]);
+        ordered = withDist.map((e) => e[1]);
+        if (ordered.length === 0) {
+          ofhDebug(
+            "[DPost] no candidate deep enough to finish in time — keeping the gold",
+          );
+          return false;
+        }
+      }
+      for (const tile of ordered) {
         const bu = await this.buildableFor(UNIT.DefensePost, tile);
         if (bu === null || bu.canBuild === false) continue;
         const buildMenu = getBuildMenu();
@@ -808,13 +912,102 @@
       return frontTiles;
     }
 
+    /** DIVERGENCE (defensePostTiming, USER): every build pass while under attack,
+     *  snapshot the attack front and compare with the previous snapshot at least
+     *  DP_SPEED_MIN_WINDOW_TICKS older: the median, over current front tiles, of
+     *  the distance to the nearest previous-front tile = how far the line moved.
+     *  Direction comes from the attackers' total tile count — if the SAME attackers
+     *  aren't gaining ground, the front is stalled (or WE are pushing) and the speed
+     *  is 0. EMA-smoothed. Everything is in ticks and tiles, so the game-speed
+     *  factor cancels (the tick-rate lesson: never convert through wall time).
+     *  Returns null while unmeasured (first snapshot just taken), else tiles/tick.
+     *  A tick regression (new game) resets the state.
+     */
+    measureAttackFrontSpeed(attackFront, landAttacks) {
+      const game = this.game;
+      let tick;
+      try {
+        tick = Number(game.ticks());
+      } catch (_e) {
+        return 0;
+      }
+      if (!Number.isFinite(tick)) return 0;
+      if (this._dpSpeed && tick < this._dpSpeed.tick) this._dpSpeed = undefined;
+
+      let attTiles = 0;
+      const sidList = [];
+      for (const a of landAttacks) {
+        try {
+          const at = a.attacker();
+          if (at && at.isPlayer && at.isPlayer()) {
+            attTiles += at.numTilesOwned();
+            sidList.push(at.smallID());
+          }
+        } catch (_e) {
+          /* skip this attack */
+        }
+      }
+      const sids = sidList.sort().join(",");
+
+      const prev = this._dpSpeed;
+      if (!prev) {
+        this._dpSpeed = {
+          tick,
+          sample: this.dpSubsample(attackFront),
+          attTiles,
+          sids,
+          ema: null,
+        };
+        return null;
+      }
+      const elapsed = tick - prev.tick;
+      if (elapsed < DP_SPEED_MIN_WINDOW_TICKS) return prev.ema;
+
+      const sample = this.dpSubsample(attackFront);
+      const dists = [];
+      for (const t of sample) {
+        let best = Infinity;
+        for (const o of prev.sample) {
+          const d = game.euclideanDistSquared(t, o);
+          if (d < best) best = d;
+        }
+        if (Number.isFinite(best)) dists.push(Math.sqrt(best));
+      }
+      dists.sort((a, b) => a - b);
+      const disp = dists.length > 0 ? dists[Math.floor(dists.length / 2)] : 0;
+      // Same attackers whose tile count did not grow → stalled front, or our own
+      // counter-push moving the line the OTHER way — either way nothing is racing
+      // our construction. A changed attacker set can't be compared by count, so
+      // trust the displacement (placing deeper is the cheap error).
+      const gaining = prev.sids !== sids || attTiles > prev.attTiles;
+      const inst = gaining ? disp / elapsed : 0;
+      const ema =
+        prev.ema === null
+          ? inst
+          : prev.ema * (1 - DP_SPEED_EMA) + inst * DP_SPEED_EMA;
+      this._dpSpeed = { tick, sample, attTiles, sids, ema };
+      return ema;
+    }
+
+    /** Bounded every-k-th subsample of a front so snapshot comparisons stay cheap. */
+    dpSubsample(tiles) {
+      const step = Math.max(1, Math.floor(tiles.length / DP_FRONT_SAMPLE_CAP));
+      const out = [];
+      for (let i = 0; i < tiles.length; i += step) out.push(tiles[i]);
+      return out;
+    }
+
     // countDefensePostsNearFront — NationStructureBehavior.ts:269.
-    countDefensePostsNearFront(frontTiles, cap) {
+    // DIVERGENCE (defensePostTiming): optional maxDepth widens "near the front" to
+    // at least the depth the timing plan actually places posts at — a deep-sited
+    // post must still count here or the bot keeps buying more of them.
+    countDefensePostsNearFront(frontTiles, cap, maxDepth) {
       if (frontTiles.length === 0) return 0;
 
       const game = this.game;
       const { borderSpacing } = this.spacingConstants();
-      const rangeSquared = (borderSpacing * 1.5) ** 2;
+      const range = Math.max(borderSpacing * 1.5, (maxDepth || 0) + 2);
+      const rangeSquared = range ** 2;
 
       let count = 0;
       for (const dp of this.player.units(UNIT.DefensePost)) {
@@ -836,7 +1029,7 @@
     // tiles; tryBuildDefensePost probes buildability down the returned list
     // (rank-then-probe). Sampling geometry/RNG and the spread-anchor filtering are
     // otherwise identical. `unitType` is retained in the signature for parity.
-    sampleTilesNearFront(frontTiles, count, _unitType) {
+    sampleTilesNearFront(frontTiles, count, _unitType, depthPlan) {
       const game = this.game;
       const player = this.player;
 
@@ -845,9 +1038,16 @@
       }
 
       const { borderSpacing } = this.spacingConstants();
-      const searchRadius = Math.ceil(borderSpacing * 1.5);
-      const minBorderDist = Math.ceil(borderSpacing * 0.75);
-      const maxBorderDist = Math.ceil(borderSpacing * 1.5);
+      // DIVERGENCE (defensePostTiming): the caller may push the whole band deeper
+      // than src's [0.75, 1.5] x spacing so a post can finish building before a
+      // fast front reaches it. searchRadius must reach the band's far edge.
+      const minBorderDist = depthPlan
+        ? depthPlan.min
+        : Math.ceil(borderSpacing * 0.75);
+      const maxBorderDist = depthPlan
+        ? depthPlan.max
+        : Math.ceil(borderSpacing * 1.5);
+      const searchRadius = maxBorderDist;
       const borderTiles = player.borderTiles();
       const mySid = player.smallID();
 

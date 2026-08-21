@@ -89,6 +89,12 @@
     // the attack has already landed. defensePosts builds them whenever we share a land
     // border with a hostile player, and sizes the count from our estimated gold/min.
     defensePosts: true,
+    // DIVERGENCE (defensePostTiming, USER): "we try to place a shield but it takes
+    // too long to load up and then it's just a waste of money". Track how fast the
+    // attack front is advancing (tiles/tick from successive front snapshots) and
+    // place the post deep enough to FINISH building before the front gets there —
+    // or don't buy one at all when nothing can finish in time.
+    defensePostTiming: true,
     // DIVERGENCE (opt-in, NOT in src): aim nukes at the densest cluster we can
     // actually land on, saturating its SAM cover instead of avoiding it.
     nukeDensityFirst: true,
@@ -429,6 +435,7 @@
       "samDefense",
       "safePlacement",
       "defensePosts",
+      "defensePostTiming",
       "nukeDensityFirst",
       "reserveByNeighbors",
       "counterAttackFirst",
