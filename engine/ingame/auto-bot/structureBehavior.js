@@ -249,6 +249,101 @@
    *  chosen tile — is bit-identical to having no penalty at all. A gradient always
    *  discriminates: when nothing can fully escape, it still picks the least-paired tile. */
   const SAFE_WEIGHT_SEPARATION = 60;
+  /** safePlacement: penalty for sitting in a low-level SAM's "outranged" ring.
+   *
+   *  The nuke target scorer has exactly ONE owner-blind term, and it is huge: on
+   *  Impossible with a Hydrogen Bomb, every SAM launcher of level 1-4 within the hydrogen
+   *  blast radius of the aim tile adds 100_000 * level to that tile's value, no matter
+   *  WHOSE launcher it is (nukeBehavior.js, the "SAMs that can be outranged" block).
+   *  A city is 25_000 * level by comparison — one level-4 launcher is worth sixteen cities
+   *  as a target. So a building sited in that ring is standing in a bullseye.
+   *
+   *  It is a RING, not a disc: the bonus requires distToSam > samRange(level), because a
+   *  closer tile would simply be intercepted. Sitting INSIDE a launcher's range is safe
+   *  from this term (and defended). Only the annulus
+   *  ( samRange(level), hydrogenOuter ] is dangerous.
+   *
+   *  Saturating rather than per-level so a single level-4 launcher cannot dominate the
+   *  whole score, and graded by exposure so it still discriminates when every candidate
+   *  sits in some ring — a flat penalty applied to every candidate changes no ranking. */
+  const SAFE_WEIGHT_SAM_MAGNET = 50;
+  /** Level at and above which a launcher stops being a magnet: the targeting term skips
+   *  level >= 5 ("can't outrange level 5+ SAMs"). Upgrading a level-4 launcher to 5 removes
+   *  the bullseye outright — cheaper than relocating everything around it. */
+  const SAM_MAGNET_MAX_LEVEL = 5;
+  /** Exposure (summed magnet levels) at which the penalty saturates. */
+  const SAM_MAGNET_FULL_LEVELS = 4;
+
+  /** samDefense: what each asset class is worth PROTECTING, independent of its level.
+   *  Ports and Factories are the economy — they mint the gold that pays for the troops,
+   *  the warheads and the SAMs themselves — so a launcher covering them is worth more than
+   *  one covering the same number of city levels. A City is troop capacity and rebuilds; a
+   *  Missile Silo is offence, and is already deliberately sited inside SAM cover. */
+  const SAM_PROTECT_WEIGHT = {};
+  SAM_PROTECT_WEIGHT[UNIT.Port] = 2.5;
+  SAM_PROTECT_WEIGHT[UNIT.Factory] = 2.5;
+  SAM_PROTECT_WEIGHT[UNIT.City] = 1;
+  SAM_PROTECT_WEIGHT[UNIT.MissileSilo] = 1;
+
+  function samProtectWeight(type) {
+    const w = SAM_PROTECT_WEIGHT[type];
+    return typeof w === "number" && w > 0 ? w : 1;
+  }
+
+  /** Every level-1..4 SAM launcher on the map, ANY owner, with the ring that makes tiles
+   *  around it attractive to a hydrogen strike. Owner-blind on purpose: the targeting term
+   *  it mirrors does not care whose launcher it is, and OUR OWN low-level launchers are
+   *  exactly as much of a magnet as an enemy's. */
+  function collectSamMagnets(game) {
+    const out = [];
+    let hydroOuter = 0;
+    try {
+      hydroOuter = Number(game.config().nukeMagnitudes(UNIT.HydrogenBomb).outer) || 0;
+    } catch (_e) {
+      return out;
+    }
+    if (hydroOuter <= 0) return out;
+    let all = [];
+    try {
+      all = game.units(UNIT.SAMLauncher) || [];
+    } catch (_e) {
+      return out;
+    }
+    for (const u of all) {
+      try {
+        const level = Number(u.level && u.level()) || 1;
+        if (level >= SAM_MAGNET_MAX_LEVEL) continue;
+        const inner = Number(game.config().samRange(level)) || 0;
+        if (inner <= 0 || inner >= hydroOuter) continue; // no ring exists
+        out.push({
+          tile: u.tile(),
+          level: level,
+          innerSq: inner * inner,
+          outerSq: hydroOuter * hydroOuter,
+        });
+      } catch (_e) {
+        /* skip this launcher */
+      }
+    }
+    return out;
+  }
+
+  /** Summed magnet level of every ring `tile` sits inside. 0 = not in any bullseye. */
+  function samMagnetExposure(game, magnets, tile) {
+    let levels = 0;
+    for (const m of magnets) {
+      let dsq;
+      try {
+        dsq = game.euclideanDistSquared(tile, m.tile);
+      } catch (_e) {
+        continue;
+      }
+      if (!Number.isFinite(dsq)) continue;
+      if (dsq > m.innerSq && dsq <= m.outerSq) levels += m.level;
+    }
+    return levels;
+  }
+
   /** safePlacement: types worth protecting from a shared blast. DefensePost is excluded on
    *  purpose — posts are cheap and belong ON the border, so pairing rules would fight
    *  their whole point and would fire constantly. */
@@ -1539,8 +1634,16 @@
 
       // DIVERGENCE (samDefense): for SAMs, upgrade the launcher guarding the most asset
       // value, skipping src's RNG draw and its "already best-protected SAM" heuristic.
-      // An upgrade raises both samRange(level) and interception capacity, so the SAM
-      // over the densest cluster of cities/ports/factories/silos is strictly the best.
+      // Asset value is weighted by CLASS as well as level — ports and factories are the
+      // economy, so the launcher over the money outranks one over the same number of city
+      // levels (samProtectWeight).
+      //
+      // An upgrade definitely raises samRange(level) — that is the one level-parameterised
+      // SAM accessor the config exposes. Whether it also raises interception CAPACITY is
+      // asserted by a src-marked comment in nukeBehavior (a level-N SAM intercepts N nukes
+      // per cooldown) but is not verifiable from this repo, so nothing here depends on it.
+      // Upgrading past level 4 has a separate, provable benefit: it removes the launcher
+      // from the owner-blind "outranged SAM" targeting bonus entirely.
       if (
         state.settings.samDefense &&
         upgradable.length > 0 &&
@@ -1550,7 +1653,10 @@
         for (const u of this.player.units(
           UNIT.City, UNIT.Port, UNIT.Factory, UNIT.MissileSilo,
         )) {
-          assets.push({ tile: u.tile(), weight: Math.max(1, u.level()) });
+          assets.push({
+            tile: u.tile(),
+            weight: Math.max(1, u.level()) * samProtectWeight(u.type()),
+          });
         }
         let best = null;
         let bestScore = -1;
@@ -1842,6 +1948,9 @@
         }
       }
 
+      // Owner-blind: our own level-1..4 launchers are as much of a bullseye as an enemy's.
+      const samMagnets = collectSamMagnets(game);
+
       const { borderSpacing } = this.spacingConstants();
       const range = Math.max(1, borderSpacing * SAFE_PLACEMENT_RANGE_MULT);
       // One bomb catches both when their separation is within 2x the outer radius, so that
@@ -1867,6 +1976,15 @@
           const d = closestTile(game, teamFront, tile)[1];
           if (Number.isFinite(d)) {
             w += SAFE_WEIGHT_TEAM * (1 - Math.min(d, range) / range);
+          }
+        }
+
+        if (samMagnets.length > 0) {
+          const lv = samMagnetExposure(game, samMagnets, tile);
+          if (lv > 0) {
+            w -=
+              SAFE_WEIGHT_SAM_MAGNET *
+              (Math.min(lv, SAM_MAGNET_FULL_LEVELS) / SAM_MAGNET_FULL_LEVELS);
           }
         }
 
@@ -2554,9 +2672,33 @@
           case UNIT.Port:
             protectEntries.push({
               tile: unit.tile(),
-              weight: weightByLevel ? unit.level() : 1,
+              // DIVERGENCE (samDefense): scale by asset CLASS as well as level. Ports and
+              // factories are the economy, so covering them outranks covering the same
+              // number of city levels.
+              weight:
+                (weightByLevel ? unit.level() : 1) * samProtectWeight(unit.type()),
             });
         }
+      }
+
+      // DIVERGENCE (safePlacement): a NEW launcher is level 1, and a level-1..4 launcher
+      // makes the ring around itself — outside its own range, inside a hydrogen blast — a
+      // bullseye worth 100_000 * level to an Impossible AI holding a Hydrogen Bomb. Placing
+      // one on top of our cluster therefore hands the enemy a high-value aim point right
+      // next to the very assets it was meant to defend. Penalise sites whose ring would
+      // contain our own structures. (Note the assets INSIDE the new launcher's range are
+      // not affected — that region is exactly what it protects.)
+      let magnetInnerSq = 0;
+      let magnetOuterSq = 0;
+      try {
+        const r1 = Number(game.config().samRange(1)) || 0;
+        const ho = Number(game.config().nukeMagnitudes(UNIT.HydrogenBomb).outer) || 0;
+        if (r1 > 0 && ho > r1) {
+          magnetInnerSq = r1 * r1;
+          magnetOuterSq = ho * ho;
+        }
+      } catch (_e) {
+        magnetInnerSq = 0;
       }
       const range = game.config().defaultSamRange();
       const rangeSquared = range * range;
@@ -2606,6 +2748,21 @@
         if (closestOther !== null) {
           const d = game.manhattanDist(closestOther.x, tile);
           w += Math.min(d, structureSpacing);
+        }
+
+        // How much of OUR OWN asset value would land in this launcher's magnet ring.
+        if (magnetOuterSq > 0) {
+          let exposed = 0;
+          for (const entry of protectEntries) {
+            const dsq = game.euclideanDistSquared(tile, entry.tile);
+            if (dsq > magnetInnerSq && dsq <= magnetOuterSq) exposed += entry.weight;
+          }
+          if (exposed > 0) {
+            w -=
+              structureSpacing *
+              Math.min(exposed, SAM_MAGNET_FULL_LEVELS) /
+              SAM_MAGNET_FULL_LEVELS;
+          }
         }
 
         // Prefer to be in range of other structures (skip on easy difficulty)
