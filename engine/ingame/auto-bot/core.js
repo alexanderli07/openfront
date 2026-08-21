@@ -114,6 +114,13 @@
     // corridor-checks that arc (src: 'AI nukes always go "up" for now'). Test
     // BOTH arcs and launch on whichever dodges enemy SAM rings.
     nukeArcRotate: true,
+    // DIVERGENCE (samUpgradeMargin, USER): "nuke right outside the ONE sam upgrade
+    // range, instead of the current range". Aim points and corridors that clear a
+    // SAM's CURRENT ring but sit inside its LEVEL+1 ring die to a single enemy
+    // upgrade. Prefer trajectories clean against every SAM's upgraded ring, halve
+    // the score of aim points that are only current-ring-clean, and claim the
+    // outranged-SAM hydrogen bonus only past the upgraded ring.
+    samUpgradeMargin: true,
     // DIVERGENCE (combatReserve, USER): "when we're attacking or defending, the
     // troop count we're maintaining is too low — about 20% ish". That 20% is
     // expandRatio (0.10-0.20 of max): terra-nullius expansion and counter-attacks
@@ -448,6 +455,7 @@
       "combatReserve",
       "nukeIncomeMinutes",
       "nukeArcRotate",
+      "samUpgradeMargin",
       "phasedOpening",
       "openingArmyFill",
       "openingMinCityLevels",

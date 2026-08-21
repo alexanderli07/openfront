@@ -505,13 +505,21 @@
         const arc =
           difficulty === Difficulty.Hard || difficulty === Difficulty.Impossible
             ? this.chooseNukeArc(spawnTile, tile)
-            : { intercepted: false, arcUp: true };
+            : { intercepted: false, arcUp: true, upgradeSafe: true };
         const interceptable = arc.intercepted;
         if (interceptable && !densityFirst) {
           continue;
         }
 
-        const value = this.nukeTileScore(tile, silos, structures, nukeType);
+        let value = this.nukeTileScore(tile, silos, structures, nukeType);
+        // DIVERGENCE (samUpgradeMargin): a shot that is only clean against the
+        // CURRENT rings dies to a single SAM upgrade — half expected value. Tiles
+        // right outside the upgraded ring keep full value, so ties break toward
+        // them. Interceptable tiles are exempt: the saturation path overwhelms the
+        // rings outright, upgraded or not.
+        if (!interceptable && arc.upgradeSafe === false) {
+          value *= 0.5;
+        }
         candidates.push({ tile, value, interceptable, arcUp: arc.arcUp });
       }
 
@@ -1017,7 +1025,7 @@
 
     // ── isTrajectoryInterceptableBySam — NationNukeBehavior.ts:547 ────────────
     // mirroring NukeTrajectoryPreviewLayer.ts logic a bit
-    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds, directionUp = true) {
+    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds, directionUp = true, levelBump = 0) {
       const speed = this.game.config().defaultNukeSpeed();
       const pathFinder = UniversalPathFinding.Parabola(this.game, {
         increment: speed,
@@ -1094,8 +1102,11 @@
           if (excludedSamIds?.has(sam.unit.id())) {
             continue;
           }
+          // DIVERGENCE (samUpgradeMargin): levelBump = 1 tests the ring the SAM
+          // would have after ONE upgrade — rings grow monotonically with level, so
+          // clean-at-bumped implies clean-at-current.
           const rangeSquared =
-            this.game.config().samRange(sam.unit.level()) ** 2;
+            this.game.config().samRange(sam.unit.level() + levelBump) ** 2;
           if (sam.distSquared <= rangeSquared) {
             return true;
           }
@@ -1116,15 +1127,49 @@
      * flight time is unchanged (except near map edges, where clamping bends one).
      */
     chooseNukeArc(spawnTile, targetTile, excludedSamIds) {
+      const rotate = Boolean(state.settings.nukeArcRotate) && this.canSetNukeArc();
+      // DIVERGENCE (samUpgradeMargin, USER): tier the arcs — an arc clean against
+      // every SAM's LEVEL+1 ring survives the enemy's cheapest counter (one
+      // upgrade), so it outranks even the faithful up arc that is merely clean
+      // against the current rings. upgradeSafe:true also stands for "margin
+      // disabled" so the caller's score discount stays inert when the gate is off.
+      if (state.settings.samUpgradeMargin) {
+        if (
+          !this.isTrajectoryInterceptableBySam(
+            spawnTile,
+            targetTile,
+            excludedSamIds,
+            true,
+            1,
+          )
+        ) {
+          return { intercepted: false, arcUp: true, upgradeSafe: true };
+        }
+        if (
+          rotate &&
+          !this.isTrajectoryInterceptableBySam(
+            spawnTile,
+            targetTile,
+            excludedSamIds,
+            false,
+            1,
+          )
+        ) {
+          return { intercepted: false, arcUp: false, upgradeSafe: true };
+        }
+      }
+      const marginOff = !state.settings.samUpgradeMargin;
       const upBlocked = this.isTrajectoryInterceptableBySam(
         spawnTile,
         targetTile,
         excludedSamIds,
         true,
       );
-      if (!upBlocked) return { intercepted: false, arcUp: true };
-      if (!state.settings.nukeArcRotate || !this.canSetNukeArc()) {
-        return { intercepted: true, arcUp: true };
+      if (!upBlocked) {
+        return { intercepted: false, arcUp: true, upgradeSafe: marginOff };
+      }
+      if (!rotate) {
+        return { intercepted: true, arcUp: true, upgradeSafe: false };
       }
       const downBlocked = this.isTrajectoryInterceptableBySam(
         spawnTile,
@@ -1132,8 +1177,10 @@
         excludedSamIds,
         false,
       );
-      if (!downBlocked) return { intercepted: false, arcUp: false };
-      return { intercepted: true, arcUp: true };
+      if (!downBlocked) {
+        return { intercepted: false, arcUp: false, upgradeSafe: marginOff };
+      }
+      return { intercepted: true, arcUp: true, upgradeSafe: false };
     }
 
     /**
@@ -1243,7 +1290,14 @@
           const samLevel = sam.unit.level();
           if (samLevel >= 5) continue; // Can't outrange level 5+ SAMs
 
-          const samRange = this.game.config().samRange(samLevel);
+          // DIVERGENCE (samUpgradeMargin): claim "outranged" only past the ring
+          // the SAM would have after ONE upgrade — a tile between the current and
+          // upgraded rings loses this bonus the moment the owner reacts. Side
+          // effect (correct): a level-4 SAM is never counted — samRange(5) = 102
+          // exceeds the hydrogen outer radius (100), matching the L5+ exemption.
+          const samRange = this.game
+            .config()
+            .samRange(samLevel + (state.settings.samUpgradeMargin ? 1 : 0));
           const distToSam = Math.sqrt(
             this.game.euclideanDistSquared(tile, sam.unit.tile()),
           );
