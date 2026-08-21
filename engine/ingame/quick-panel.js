@@ -73,8 +73,7 @@
 
     // === Helpers Tab - Toggle Keys (Map Overlays) ===
     showPlayerMapOverlays: ["Player Overlays (Master)", "Master toggle for all player name overlays. Individual sub-overlays only render when this is enabled."],
-    showMapTroopCounts: ["Max Troops", "Adds each player's maximum troop capacity to their map pill as \"/max\". Old horizontal-bar rendering removed. Was: troops/max ratio. Green = home troops, orange = troops in combat."],
-    showMapMoney: ["Money Overlay", "Gold pill above each player's name showing current gold ($K/$M format). Combines with troop bar when both enabled."],
+    showMapMoney: ["Money Overlay", "Gold amount above each player's name as plain outlined text ($K/$M) — styled and sized like the game's own troop count, no background."],
     showThreatIndicators: ["Threat Indicators", "Colored marks near enemies: nuke icon if nuke-capable, red dot if stronger (>=1.35x), amber dot if weak (<=10% max)."],
     markHoveredAlliesGreen: ["Ally Markers", "When hovering a nation, allied players get a green highlight to distinguish them from enemies on the map."],
     showAttackHighlight: ["Attack Highlight", "Pulsing red rings around attackers with dashed lines to your territory. Shows total incoming troop count. Skips teammates."],
@@ -670,7 +669,6 @@
       case "sosDefense":             return typeof setSosDefenseEnabled === "function" ? setSosDefenseEnabled : null;
       case "showGameTimeAlert":      return typeof setGameTimeAlertEnabled === "function" ? setGameTimeAlertEnabled : null;
       case "showPlayerMapOverlays":  return typeof setPlayerMapOverlaysEnabled === "function" ? setPlayerMapOverlaysEnabled : null;
-      case "showMapTroopCounts":     return typeof setMapTroopCountsEnabled === "function" ? setMapTroopCountsEnabled : null;
       case "showThreatIndicators":   return typeof setThreatIndicatorsEnabled === "function" ? setThreatIndicatorsEnabled : null;
       case "showMapMoney":           return typeof setMapMoneyEnabled === "function" ? setMapMoneyEnabled : null;
       case "skinUnlocker":           return typeof _setSkinUnlockerEnabled === "function" ? _setSkinUnlockerEnabled : null;
@@ -963,7 +961,6 @@
       {
         key: "map", title: _tr("Map overlays"), toggles: [
           ["showPlayerMapOverlays", _tr("Player overlays (master)")],
-          ["showMapTroopCounts", _tr("Max troops"), "showPlayerMapOverlays"],
           ["showMapMoney", _tr("Money"), "showPlayerMapOverlays"],
           ["showThreatIndicators", _tr("Threat indicators"), "showPlayerMapOverlays"],
           ["showAttackHighlight", _tr("Attack highlight")],

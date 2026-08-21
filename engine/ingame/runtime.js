@@ -164,7 +164,6 @@ let gameTimeAlertLastGame = null;
 // on so overlays enabled via settings show before the first sync arrives.
 let playerMapOverlaysEnabled = true;
 // Per-player on-map overlay (troop counts) — first layer on the shared scheduler.
-let mapTroopCountsEnabled = false;
 // Per-player threat marks (☢ nuke-capable, weak/danger dots) on the same layer.
 let threatIndicatorsEnabled = false;
 // Per-player gold readout on the same layer.

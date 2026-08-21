@@ -260,12 +260,6 @@ const HELPER_SECTIONS: HelperSection[] = [
         desc: "Master switch for the per-player info drawn over each player on the map.",
       },
       {
-        name: "showMapTroopCounts",
-        title: "Troop bar",
-        desc: "Ratio bar over each player: home troops (green) + attacking (orange) vs max, with the /max count.",
-        parent: "showPlayerMapOverlays",
-      },
-      {
         name: "showMapMoney",
         title: "Money",
         desc: "Shows each player's gold above their name.",

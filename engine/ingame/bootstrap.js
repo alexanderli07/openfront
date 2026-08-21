@@ -28,10 +28,6 @@
       setPlayerMapOverlaysEnabled(data.payload?.enabled);
     }
 
-    if (data.type === "SHOW_MAP_TROOP_COUNTS") {
-      setMapTroopCountsEnabled(data.payload?.enabled);
-    }
-
     if (data.type === "SHOW_THREAT_INDICATORS") {
       setThreatIndicatorsEnabled(data.payload?.enabled);
     }

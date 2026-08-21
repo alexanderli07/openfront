@@ -1,7 +1,5 @@
 // Per-player on-map overlay — a single layer on the shared map-overlay scheduler
 // that draws, above each living player's name:
-//   • a troop RATIO BAR (home = relation color, attacking = orange, bg = max)
-//     plus the /10 troop count            — toggle: showMapTroopCounts
 //   • threat marks: ☢ nuke-capable icon,  — toggle: showThreatIndicators
 //     red "stronger than you" dot, amber "weak" dot (enemies only)
 //   • gold readout                        — toggle: showMapMoney
@@ -23,11 +21,6 @@
     return String(v);
   }
 
-  // Display helper: raw internal troops (10x) → shown value.
-  function troopsDisplay(rawTroops) {
-    return formatMapTroops((Number(rawTroops) || 0) / 10);
-  }
-
   function formatMapGold(value) {
     const v = Math.max(0, Math.floor(Number(value) || 0));
     if (v >= 1e6) {
@@ -42,7 +35,7 @@
   function playerOverlayEnabled() {
     return (
       playerMapOverlaysEnabled &&
-      (mapTroopCountsEnabled || threatIndicatorsEnabled || mapMoneyEnabled)
+      (threatIndicatorsEnabled || mapMoneyEnabled)
     );
   }
 
@@ -64,10 +57,9 @@
     const players = getCachedPlayerViews(game);
     const me = game.myPlayer ? game.myPlayer() : null;
     const nukeBuilders = threatIndicatorsEnabled ? advNukeBuilderIds(game) : null;
-    // maxTroops feeds the "/max" pill and the threat indicators. inCombat used to feed the
-    // troop bar's "attacking" segment and has no reader now that the bar is gone, so the
-    // per-player advTroopsInCombat() call goes with it.
-    const needMaxTroops = mapTroopCountsEnabled;
+    // maxTroops feeds only the threat indicators now — the "/max" readout is gone
+    // (the money line is plain text, USER request). inCombat used to feed the troop
+    // bar's "attacking" segment and has no reader now that the bar is gone.
     const out = [];
     for (let i = 0; i < players.length; i += 1) {
       const player = players[i];
@@ -99,7 +91,7 @@
         isEnemy,
         troops,
         skipOverlay: isRegularBot,
-        maxTroops: (needMaxTroops || threatIndicatorsEnabled) && !isRegularBot ? advMaxTroops(game, player) : 0,
+        maxTroops: threatIndicatorsEnabled && !isRegularBot ? advMaxTroops(game, player) : 0,
         gold: (mapMoneyEnabled && !isRegularBot) ? advGoldNumber(player) : 0,
         threat: null,
       };
@@ -124,7 +116,9 @@
   var _DYN_SIZE_FACTOR = 0.4;
   var _DYN_NAME_SCALE_FACTOR = 0.25;
   var _DYN_SCALE_CAP = 3;
-  var _DYN_MONEY_SIZE_MUL = 0.46;
+  // USER: match the game's own troop-count text — vanilla renders it at
+  // troopSizeMultiplier = 0.6 x the name size (render-settings.json).
+  var _DYN_MONEY_SIZE_MUL = 0.6;
   // Keep this LOW. Everything a player shows — money pill, troop bar, threat marks — is
   // behind the single `if (!dyn.visible) continue;` gate, so raising this hides all of it
   // at once. It was briefly 14 on the theory that fewer legible labels beat many illegible
@@ -149,23 +143,14 @@
     var lineH_world = _DYN_FONT_BASE * (nameWorldSize * nameScale / _DYN_FONT_SCALE);
     var cameraScale = Number(transform.scale) || 1.8;
     var nameScreenPx = lineH_world * cameraScale;
-    // The CEILING is the real fix here: there was none, so at high zoom the pill grew
-    // without bound. The floor stays at src's 6 — raising it to the type scale's 11 makes
-    // a small player's chip bigger than the name it belongs to, and pushing the
-    // visibility gate up to compensate hid most of the map.
-    var _sizeMax = OFH_OVERLAY_STYLE && OFH_OVERLAY_STYLE.sizeMax ? OFH_OVERLAY_STYLE.sizeMax : 18;
-    var moneyFontSize = Math.max(
-      6,
-      Math.min(_sizeMax, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL)),
-    );
+    // No ceiling: the game's plate text is world-anchored and grows with zoom, and
+    // the money line matches it (the old 18px cap was for the CHIP, which is gone).
+    // The floor stays at 6 so the smallest visible players stay legible.
+    var moneyFontSize = Math.max(6, Math.floor(nameScreenPx * _DYN_MONEY_SIZE_MUL));
 
     // Tighter spacing: money pill closer to troop bar.
     var moneyOffsetY = Math.max(10, Math.floor(nameScreenPx * 0.9));
 
-    // Fade background when zoomed close to see the map.
-    var zoomFade = nameScreenPx > 30 ? Math.max(0.4, 1.0 - (nameScreenPx - 30) / 80) : 1.0;
-    // The pill carries no alpha of its own — drawMapLabel owns that and applies one factor
-    // to fill, outline AND text.
     return {
       moneyFontSize: moneyFontSize,
       moneyOffsetY: moneyOffsetY,
@@ -174,49 +159,31 @@
     };
   }
 
-  // ── The three pills below are now thin wrappers over the shared map label. They keep
-  //    their names because the draw loop calls them by name. What they used to be: three
-  //    near-identical 20-line copies, each restating the font string, the padding, the
-  //    radius 4, the shadow and the +0.5 baseline nudge — and each setting ctx.shadowColor
-  //    for the BOX and then clearing it before drawing the TEXT, so the money numbers had
-  //    no legibility treatment at all over bright terrain. `accent` is the faction colour,
-  //    used for the outline so a teammate's pill reads differently from an enemy's at a
-  //    glance; the money itself stays amber so "gold" remains recognisable.
+  // USER (v1.53.0): the money readout is PLAIN OUTLINED TEXT, not a chip — styled
+  // like the game's own name plate. Vanilla draws the troop count under the name at
+  // troopSizeMultiplier (0.6) x the name size with a black outline
+  // (render-settings.json), and the money line mirrors that exactly one line ABOVE
+  // the name: gold-yellow fill, black outline, no background, zooming with the
+  // plate. The "/max" troop-cap readout is gone entirely. The faction accent lives
+  // on routes/markers now (magenta = mine), so dropping it here loses nothing.
   var MONEY_COLOR = "rgba(252, 211, 77, 0.98)";
-  var MAXTROOP_COLOR = "rgba(95, 178, 255, 0.98)";
 
-  function drawMoneyPill(ctx, cx, cy, text, dyn, accent) {
-    return drawMapLabel(ctx, cx, cy, text, MONEY_COLOR, {
-      size: dyn.moneyFontSize,
-      segments: [{ text: text, color: MONEY_COLOR }],
-      outlineColor: accent,
-    });
-  }
-
-  function drawMaxTroopPill(ctx, cx, cy, maxTroops, dyn, accent) {
-    // Keep the "/" — without it a lone "48k" reads as CURRENT troops rather than the
-    // maximum. It used to come from the combined pill's "/max" segment, and removing the
-    // troop bar took the prefix with it.
-    var label = "/" + troopsDisplay(maxTroops);
-    return drawMapLabel(ctx, cx, cy, label, MAXTROOP_COLOR, {
-      size: dyn.moneyFontSize,
-      segments: [{ text: label, color: MAXTROOP_COLOR }],
-      outlineColor: accent,
-    });
-  }
-
-  // Money + max troops on one line. The two-colour split is a `segments` list now; it
-  // used to be laid out by measuring the literal two-space string in "money  /max" and
-  // using that as the gap.
-  function drawMoneyTroopPill(ctx, cx, cy, moneyText, maxTroops, dyn, accent) {
-    return drawMapLabel(ctx, cx, cy, null, MONEY_COLOR, {
-      size: dyn.moneyFontSize,
-      segments: [
-        { text: moneyText, color: MONEY_COLOR },
-        { text: "/" + troopsDisplay(maxTroops), color: MAXTROOP_COLOR },
-      ],
-      outlineColor: accent,
-    });
+  function drawMoneyText(ctx, cx, cy, text, dyn) {
+    ctx.save();
+    try {
+      ctx.font = ofhOverlayFont(dyn.moneyFontSize);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
+      // The outline scales with the glyphs, like the plate's SDF outline does.
+      ctx.lineWidth = Math.max(1.5, dyn.moneyFontSize / 6);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+      ctx.strokeText(text, cx, cy);
+      ctx.fillStyle = MONEY_COLOR;
+      ctx.fillText(text, cx, cy);
+    } finally {
+      ctx.restore();
+    }
   }
 
   // Small rounded-rect helper (background + optional border).
@@ -237,10 +204,9 @@
     }
   }
 
-  // Troop ratio bar — 1:1 with Tactical Assistant name-overlay (lines 7942-7969).
-  // home troops = green (fixed, NOT faction color), attacking = orange, total bar
-  // length = total/max. The "/max" label is drawn as its own pill on the line
-  // above (drawMoneyTroopPill or drawMaxTroopPill), never on the bar itself.
+  // Per-player draw pass: the plain-text money line above the name (drawMoneyText)
+  // plus the threat marks. The troop ratio bar and the "/max" readout are gone
+  // (USER requests, v1.40 and v1.53).
   function drawPlayerOverlay(ctx, game, transform) {
     const me = game.myPlayer ? game.myPlayer() : null;
     let myTroops = 1;
@@ -275,15 +241,8 @@
       }
       var color = mapFactionColor(entry.relation);
 
-      if (!entry.skipOverlay) {
-        if (mapMoneyEnabled && mapTroopCountsEnabled) {
-          // Money and /max on one line.
-          drawMoneyTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), entry.maxTroops, dyn, color);
-        } else if (mapMoneyEnabled) {
-          drawMoneyPill(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn, color);
-        } else if (mapTroopCountsEnabled) {
-          drawMaxTroopPill(ctx, p.x, p.y - dyn.moneyOffsetY, entry.maxTroops, dyn, color);
-        }
+      if (!entry.skipOverlay && mapMoneyEnabled) {
+        drawMoneyText(ctx, p.x, p.y - dyn.moneyOffsetY, formatMapGold(entry.gold), dyn);
       }
 
       if (threatIndicatorsEnabled && entry.isEnemy && !entry.skipOverlay) {
@@ -336,13 +295,6 @@
     requestMapOverlayLoop();
   }
 
-  function setMapTroopCountsEnabled(enabled) {
-    mapTroopCountsEnabled = Boolean(enabled);
-    if (!playerOverlayEnabled()) {
-      _playerOverlayScan = [];
-    }
-    requestMapOverlayLoop();
-  }
 
   function setThreatIndicatorsEnabled(enabled) {
     threatIndicatorsEnabled = Boolean(enabled);

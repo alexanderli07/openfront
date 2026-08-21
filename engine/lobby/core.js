@@ -250,19 +250,6 @@ function syncPlayerMapOverlaysHelper() {
   );
 }
 
-function syncMapTroopCountsHelper() {
-  window.postMessage(
-    {
-      source: BRIDGE_SOURCE_EXTENSION,
-      type: "SHOW_MAP_TROOP_COUNTS",
-      payload: {
-        enabled: Boolean(settings.showMapTroopCounts),
-      },
-    },
-    "*",
-  );
-}
-
 function syncThreatIndicatorsHelper() {
   window.postMessage(
     {
@@ -755,7 +742,6 @@ function syncHelpers() {
   syncSosDefenseHelper();
   syncGameTimeAlertHelper();
   syncPlayerMapOverlaysHelper();
-  syncMapTroopCountsHelper();
   syncThreatIndicatorsHelper();
   syncMapMoneyHelper();
   syncAttackHighlightHelper();

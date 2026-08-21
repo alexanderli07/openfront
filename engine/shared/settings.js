@@ -61,7 +61,6 @@
     showGameTimeAlert: false,
     gameTimeAlertThresholdSec: 300,
     showPlayerMapOverlays: true,
-    showMapTroopCounts: true,
     showThreatIndicators: false,
     showMapMoney: true,
     showAttackHighlight: true,
