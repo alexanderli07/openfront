@@ -165,6 +165,21 @@
     // everything defensive are untouched.
     gentleNeighbors: true,
     neighborReserveFloor: 0.5,
+    // DIVERGENCE (encirclePockets, USER): "encircling movements so we get more
+    // value out of our captures". The game's PlayerExecution.removeClusters hands
+    // the surrounder a victim's WHOLE enclosed territory the moment one player
+    // owns every tile of its ring — no water contact, no map edge, no unowned
+    // gaps, no third party. Land attacks can't be steered tile-by-tile (they
+    // target a player), so this is a FINISHER: spot bordering enemies whose land
+    // perimeter is already mostly ours and sealable, and prioritise eating their
+    // remaining ring until the wholesale capture fires. "Enough space" = the
+    // game's own sealability rules, checked before committing anything.
+    encirclePockets: true,
+    // A pocket must be at most this share of the map's land — a huge empire's
+    // ring is a war, not a manoeuvre.
+    encircleMaxShare: 0.1,
+    // At least this fraction of the pocket's land perimeter must be OURS already.
+    encircleMinSealShare: 0.6,
     // Team games only: how many distinct hostile PLAYERS bordering us counts as
     // "spawned boxed in". Tribes are excluded (see hostileNeighborCount).
     openingSurroundedNeighbors: 2,
@@ -343,6 +358,9 @@
   const WARSHIP_THROTTLE_MS = 4000;
   const ALLIANCE_THROTTLE_MS = 2000;
   const BORDER_CACHE_MS = 2200;
+  // DIVERGENCE (encirclePockets): pocket scans fetch other players' borders
+  // (worker round-trips) — rescan at most once per this many game ticks.
+  const ENCIRCLE_SCAN_TICKS = 100;
 
   // Incoming-troops / own-troops ratio above which we start building defense posts.
   const UNDER_ATTACK_RATIO = 0.35;
@@ -471,6 +489,7 @@
       "counterAttackFirst",
       "combatReserve",
       "gentleNeighbors",
+      "encirclePockets",
       "nukeIncomeMinutes",
       "nukeArcRotate",
       "samUpgradeMargin",

@@ -1076,6 +1076,18 @@
         return false;
       };
 
+      // DIVERGENCE (encirclePockets, USER): finish nearly-sealed pockets FIRST —
+      // the game hands us the whole enclosed territory the tick the ring closes,
+      // the cheapest capture there is. force=true so shouldAttack's willingness
+      // rolls can't pass up a jackpot; the opening vetoes still apply (sendAttack
+      // checks them above force), so nations stay off-limits mid-opening.
+      const encircle = async () => {
+        if (!state.settings.encirclePockets) return false;
+        const pocket = await this.findSealablePocket();
+        if (!pocket) return false;
+        return await this.sendAttack(pocket, true);
+      };
+
       const bots = async () => await this.attackBots();
 
       const assist = async () => await this.assistAllies();
@@ -1176,11 +1188,13 @@
           break;
         case Difficulty.Hard:
           // prettier-ignore
-          order = [bots, retaliate, assist, betray, nuked, traitor, afk, hated, veryWeak, victim, weakest, island, donate];
+          // DIVERGENCE (encirclePockets): `encircle` inserted after retaliate.
+          order = [bots, retaliate, encircle, assist, betray, nuked, traitor, afk, hated, veryWeak, victim, weakest, island, donate];
           break;
         case Difficulty.Impossible:
           // prettier-ignore
-          order = [retaliate, bots, veryWeak, assist, traitor, afk, betray, victim, nuked, hated, weakest, island, donate];
+          // DIVERGENCE (encirclePockets): `encircle` inserted after retaliate.
+          order = [retaliate, encircle, bots, veryWeak, assist, traitor, afk, betray, victim, nuked, hated, weakest, island, donate];
           break;
         default:
           // src: assertNever(difficulty). currentDifficulty() defaults to Impossible
@@ -1670,6 +1684,112 @@
       } catch (_e) {
         return null;
       }
+    }
+
+    /**
+     * DIVERGENCE (encirclePockets, USER): find a bordering enemy whose territory
+     * is a SEALABLE POCKET. The game awards the capture only when ONE player owns
+     * the entire ring, the pocket touches no water and no map edge, and no unowned
+     * gap remains — so those are exactly the disqualifiers here, checked over the
+     * pocket's own border snapshot. Among qualifiers, the pocket closest to sealed
+     * wins. Returns a player or null. Throttled to ENCIRCLE_SCAN_TICKS (border
+     * fetches are worker round-trips); the throttle caches the WINNER's smallID
+     * and re-resolves it fresh so a stale wrapper is never attacked.
+     */
+    async findSealablePocket() {
+      let tick;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return null;
+      }
+      if (
+        this._pocketTick !== undefined &&
+        tick >= this._pocketTick &&
+        tick - this._pocketTick < ENCIRCLE_SCAN_TICKS
+      ) {
+        if (this._pocketSid === null || this._pocketSid === undefined) return null;
+        try {
+          const p = this.game.playerBySmallID(this._pocketSid);
+          if (p && p.isPlayer && p.isPlayer() && p.isAlive()) return p;
+        } catch (_e) {
+          /* stale — fall through to a fresh scan */
+        }
+      }
+      this._pocketTick = tick;
+      this._pocketSid = null;
+
+      const totalLand = Number(this.game.numLandTiles()) || 1;
+      const maxShare = state.settings.encircleMaxShare ?? 0.1;
+      const minSeal = state.settings.encircleMinSealShare ?? 0.6;
+      const mapW = this.game.width();
+      const mapH = this.game.height();
+      const mySid = this.player.smallID();
+
+      let best = null;
+      let bestShare = 0;
+      for (const e of this.player.nearby()) {
+        try {
+          if (!e.isPlayer || !e.isPlayer()) continue;
+          if (this.player.isFriendly(e)) continue;
+          if (e.isAlive && !e.isAlive()) continue;
+          const tiles = Number(e.numTilesOwned()) || 0;
+          if (tiles <= 0 || tiles / totalLand > maxShare) continue;
+
+          await this.game.ensureBorderTiles(e);
+          const border = e.borderTiles();
+          if (!border || border.size === 0) continue; // snapshot unknown
+
+          const sid = e.smallID();
+          let ours = 0;
+          let open = 0;
+          let sealable = true;
+          for (const bt of border) {
+            // Water or map-edge contact = permanently un-surroundable
+            // (the game checks isShore / isOnEdgeOfMap on the cluster).
+            if (this.game.isShore(bt)) {
+              sealable = false;
+              break;
+            }
+            const x = this.game.x(bt);
+            const y = this.game.y(bt);
+            if (x <= 0 || y <= 0 || x >= mapW - 1 || y >= mapH - 1) {
+              sealable = false;
+              break;
+            }
+            for (const nb of this.game.neighbors(bt)) {
+              if (!this.game.isLand(nb)) continue;
+              if (!this.game.hasOwner(nb)) {
+                open++;
+                continue;
+              }
+              const owner = this.game.ownerID(nb);
+              if (owner === sid) continue;
+              if (owner === mySid) {
+                ours++;
+              } else {
+                // Third player on the ring: only a SINGLE surrounder is awarded
+                // the capture, so this pocket can never fall to us cleanly.
+                sealable = false;
+                break;
+              }
+            }
+            if (!sealable) break;
+          }
+          if (!sealable) continue;
+          const ring = ours + open;
+          if (ring === 0) continue;
+          const share = ours / ring;
+          if (share >= minSeal && share > bestShare) {
+            best = e;
+            bestShare = share;
+          }
+        } catch (_e2) {
+          /* skip this neighbour */
+        }
+      }
+      this._pocketSid = best ? best.smallID() : null;
+      return best;
     }
 
     // hasTriggerRatioTroops — AiAttackBehavior (private).
