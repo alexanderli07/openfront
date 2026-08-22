@@ -82,6 +82,15 @@
       this.triggerRatio = triggerRatio;
       this.reserveRatio = reserveRatio;
       this.expandRatio = expandRatio;
+      // DIVERGENCE (gradualOpening, USER): the opening's standing-army band,
+      // 30-35% of max troops. Derived LINEARLY from the faithful reserveRatio
+      // roll (30-40%) rather than a fresh RNG draw — the constructor's RNG
+      // consumption order is contract-fixed (PORT-CONTRACT); an extra draw would
+      // shift every later roll off src parity.
+      this.openingReserve = Math.min(
+        0.35,
+        Math.max(0.3, 0.3 + (reserveRatio - 0.3) / 2),
+      );
       this.allianceBehavior = allianceBehavior;
       this.emojiBehavior = emojiBehavior;
 
@@ -1609,6 +1618,60 @@
       return val;
     }
 
+    /** DIVERGENCE (gradualOpening): share of the map's land nobody owns — the
+     *  land-race fuel gauge. Fallout is excluded from the denominator (nuked
+     *  ground is not free real estate for an overland grab). Memoised per tick;
+     *  null = unreadable (callers keep the gradual sizing, never full-send). */
+    freeLandShare() {
+      let tick = -1;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return null;
+      }
+      if (this._freeShareTick === tick) return this._freeShareVal;
+      let share = null;
+      try {
+        let total = Number(this.game.numLandTiles()) || 0;
+        try {
+          total -= Number(this.game.numTilesWithFallout()) || 0;
+        } catch (_e) {
+          /* fallout unreadable — use raw land */
+        }
+        if (total > 0) {
+          let owned = 0;
+          for (const p of this.game.players()) {
+            if (!p.isPlayer || !p.isPlayer()) continue;
+            owned += Number(p.numTilesOwned()) || 0;
+          }
+          share = Math.max(0, Math.min(1, (total - owned) / total));
+        }
+      } catch (_e) {
+        share = null;
+      }
+      this._freeShareTick = tick;
+      this._freeShareVal = share;
+      return share;
+    }
+
+    /** DIVERGENCE (gradualOpening): distinct live non-friendly BOT nations touching
+     *  us — the "last few tribes" trigger. null = unreadable (no full-send). */
+    borderingBotCount() {
+      try {
+        let count = 0;
+        for (const nb of this.player.nearby()) {
+          if (!nb.isPlayer || !nb.isPlayer()) continue;
+          if (nb.type() !== PlayerType.Bot) continue;
+          if (this.player.isFriendly(nb)) continue;
+          if (nb.isAlive && !nb.isAlive()) continue;
+          count++;
+        }
+        return count;
+      } catch (_e) {
+        return null;
+      }
+    }
+
     // hasTriggerRatioTroops — AiAttackBehavior (private).
     hasTriggerRatioTroops() {
       const maxTroops = this.game.config().maxTroops(this.player);
@@ -2215,6 +2278,67 @@
       let reserveRatio = useReserve
         ? this.effectiveReserveRatio()
         : this.expandRatio;
+
+      // DIVERGENCE (gradualOpening, USER): while the phased opening is live, the
+      // expansion waves are GRADUAL — keep openingReserve (30-35%) standing instead
+      // of expandRatio's 10-20% — with two all-in moments: the free-land endgame
+      // and the last few bordering tribes. Full-sends never fire while a real
+      // player's wave is inbound; bot-with-structures recapture and counter-attacks
+      // keep their faithful urgent sizing.
+      if (
+        state.settings.phasedOpening &&
+        !retaliating &&
+        !botWithStructures
+      ) {
+        try {
+          const snap = this.openingSnapshot();
+          if (snap && snap.applies && !snap.over && !snap.built) {
+            const isPlayerTarget = Boolean(
+              target && target.isPlayer && target.isPlayer(),
+            );
+            const fullSendOk = !this.underThreat();
+            if (!isPlayerTarget) {
+              // Phase 1 — free land.
+              const share = this.freeLandShare();
+              const lastBit =
+                share !== null &&
+                share <= (state.settings.openingFullSendFreeShare ?? 0.08);
+              reserveRatio =
+                lastBit && fullSendOk
+                  ? state.settings.fullSendReserve ?? 0.05
+                  : Math.max(reserveRatio, this.openingReserve);
+            } else if (target.type() === PlayerType.Bot) {
+              // Phase 2 — tribes only.
+              const bots = this.borderingBotCount();
+              const lastBots =
+                bots !== null &&
+                bots <= (state.settings.openingFullSendBotCount ?? 2);
+              reserveRatio =
+                lastBots && fullSendOk
+                  ? state.settings.fullSendReserve ?? 0.05
+                  : Math.max(reserveRatio, this.openingReserve);
+            }
+          }
+        } catch (_e) {
+          /* keep faithful sizing */
+        }
+      }
+
+      // DIVERGENCE (gentleNeighbors, USER): post-opening, a non-retaliation attack
+      // on a human/nation keeps at least neighborReserveFloor of max troops home.
+      if (useReserve && state.settings.gentleNeighbors) {
+        try {
+          if (target.type() !== PlayerType.Bot) {
+            reserveRatio = Math.max(
+              reserveRatio,
+              state.settings.neighborReserveFloor ?? 0.5,
+            );
+          }
+        } catch (_e) {
+          /* keep as-is */
+        }
+      }
+
       // DIVERGENCE (combatReserve, USER): expansion (terra nullius / bot-structure
       // recapture) sizes against expandRatio — 10-20% of max is fine in peacetime,
       // but mid-war every land grab drained the standing army to exactly the

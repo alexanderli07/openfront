@@ -148,6 +148,23 @@
     // Hard stall-breaker: after this many game ticks the opening is over no matter
     // what, so no veto can freeze the bot on a map where land never runs out. 0 = off.
     openingMaxTicks: 9000,
+    // DIVERGENCE (gradualOpening, USER): reshape the opening's aggression curve.
+    // Expansion waves keep a 30-35% standing army (the band itself is derived from
+    // the faithful reserveRatio roll in the constructor) instead of dumping to
+    // expandRatio's 10-20%; the two FULL-SEND moments drop the reserve to
+    // fullSendReserve: (a) the land race's endgame, when the map's free-land share
+    // falls below openingFullSendFreeShare, and (b) the tribe cleanup, when at most
+    // openingFullSendBotCount bot nations still border us. Full-sends are skipped
+    // while a real player's wave is inbound (underThreat) — defence first.
+    openingFullSendFreeShare: 0.08,
+    openingFullSendBotCount: 2,
+    fullSendReserve: 0.05,
+    // DIVERGENCE (gentleNeighbors, USER): after the opening, "don't attack
+    // neighbours as aggressively" — a non-retaliation attack on a human/nation
+    // keeps at least this fraction of max troops at home. Counter-attacks and
+    // everything defensive are untouched.
+    gentleNeighbors: true,
+    neighborReserveFloor: 0.5,
     // Team games only: how many distinct hostile PLAYERS bordering us counts as
     // "spawned boxed in". Tribes are excluded (see hostileNeighborCount).
     openingSurroundedNeighbors: 2,
@@ -453,6 +470,7 @@
       "reserveByNeighbors",
       "counterAttackFirst",
       "combatReserve",
+      "gentleNeighbors",
       "nukeIncomeMinutes",
       "nukeArcRotate",
       "samUpgradeMargin",
