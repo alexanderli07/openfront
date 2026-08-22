@@ -12,16 +12,29 @@
   const NUKE_TRAJ_PARABOLA_TYPES = new Set(["Atom Bomb", "Hydrogen Bomb"]);
   const NUKE_TRAJ_MAX_POINTS = 48;
 
-  // Scan cache: [{ relation, worldPts: [{x,y}...] }]. World coords resolved in the
-  // throttled scan; the per-frame draw only maps them to screen.
+  // Scan cache: [{ relation, color, worldPts: [{x,y}...] }]. World coords resolved
+  // in the throttled scan; the per-frame draw only maps them to screen.
   let _nukeTrajScan = [];
 
-  function nukeTrajColor(relation) {
-    if (relation === "ally") {
-      return "rgba(74, 222, 128, 0.85)";
+  // v1.60 (USER caught it): this file was missed by BOTH colour sweeps — self was
+  // still the pre-magenta cyan, allies the old flat green, and team nukes (rendering
+  // since v1.56) fell through to enemy RED. Now in lockstep with nuke-prediction:
+  // owner's on-map team colour for everyone except self (magenta), relation palette
+  // as the can't-read-colour fallback.
+  function nukeTrajColor(relation, owner) {
+    if (relation !== "self") {
+      const rgb =
+        typeof ofhOwnerOverlayRgb === "function" ? ofhOwnerOverlayRgb(owner) : null;
+      if (rgb) return ofhOwnerRgba(rgb, 0.85);
     }
     if (relation === "self") {
-      return "rgba(56, 189, 248, 0.85)"; // cyan — matches nuke-prediction's own-salvo color
+      return "rgba(240, 110, 255, 0.9)"; // magenta = mine
+    }
+    if (relation === "team") {
+      return "rgba(45, 212, 191, 0.85)";
+    }
+    if (relation === "ally") {
+      return "rgba(74, 222, 128, 0.85)";
     }
     return "rgba(248, 113, 113, 0.85)";
   }
@@ -106,7 +119,11 @@
       // Reuse the anchored path if we've already computed it for this nuke.
       let cached = _nukeTrajById.get(id);
       if (cached) {
-        cached.relation = relation; // relation may flip (self→ally), keep fresh
+        if (cached.relation !== relation) {
+          // relation may flip (e.g. an alliance breaks mid-flight) — recolour once.
+          cached.relation = relation;
+          cached.color = nukeTrajColor(relation, unit.owner ? unit.owner() : null);
+        }
         out.push(cached);
         continue;
       }
@@ -130,7 +147,11 @@
         worldPts.push({ x: game.x(fromTile), y: game.y(fromTile) });
         worldPts.push({ x: game.x(targetTile), y: game.y(targetTile) });
       }
-      cached = { relation, worldPts };
+      cached = {
+        relation,
+        color: nukeTrajColor(relation, unit.owner ? unit.owner() : null),
+        worldPts,
+      };
       _nukeTrajById.set(id, cached);
       out.push(cached);
     }
@@ -186,7 +207,7 @@
         }
       }
       if (anyVisible) {
-        ctx.strokeStyle = nukeTrajColor(traj.relation);
+        ctx.strokeStyle = traj.color || nukeTrajColor(traj.relation);
         ctx.stroke();
       }
     }
