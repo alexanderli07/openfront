@@ -95,6 +95,12 @@
     // place the post deep enough to FINISH building before the front gets there —
     // or don't buy one at all when nothing can finish in time.
     defensePostTiming: true,
+    // DIVERGENCE (defensePostPlayersOnly, USER): "our bot is placing shields on
+    // neighbouring BOTS, i dont want that. only on real players." Tribes neither
+    // trigger reactive posts with their trickle waves nor count as a hostile
+    // front for proactive ones. Humans and nations both count as real players
+    // (mirrors every other tribes-don't-count rule in this bot).
+    defensePostPlayersOnly: true,
     // DIVERGENCE (opt-in, NOT in src): aim nukes at the densest cluster we can
     // actually land on, saturating its SAM cover instead of avoiding it.
     nukeDensityFirst: true,
@@ -484,6 +490,7 @@
       "safePlacement",
       "defensePosts",
       "defensePostTiming",
+      "defensePostPlayersOnly",
       "nukeDensityFirst",
       "reserveByNeighbors",
       "counterAttackFirst",

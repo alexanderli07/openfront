@@ -596,6 +596,15 @@
           if (!other.isPlayer() || !other.isAlive()) continue;
           if (other.smallID() === player.smallID()) continue;
           if (player.isFriendly(other)) continue;
+          // DIVERGENCE (defensePostPlayersOnly, USER): tribes are no longer a
+          // "hostile front" for proactive posts — shields are for real players.
+          // (They previously counted on purpose: "regular bots do attack".)
+          if (
+            state.settings.defensePostPlayersOnly &&
+            other.type() === PlayerType.Bot
+          ) {
+            continue;
+          }
           hostileSids.add(other.smallID());
         }
       } catch (_e) {
@@ -690,10 +699,9 @@
       const player = this.player;
       // Land attacks only (src: sourceTile() === null). isLandAttack() uses the
       // exact sourceTile when present (harness) and reconstructs it via shared
-      // land border when the extension omits it.
-      const landAttacks = player
-        .incomingAttacks()
-        .filter((a) => this.isLandAttack(a));
+      // land border when the extension omits it. Tribe attacks are filtered under
+      // defensePostPlayersOnly (see dpLandAttacks).
+      const landAttacks = this.dpLandAttacks();
       const proactive = Boolean(state.settings.defensePosts);
       if (landAttacks.length === 0 && !proactive) return false;
 
@@ -851,13 +859,32 @@
       return false;
     }
 
+    /** DIVERGENCE (defensePostPlayersOnly, USER): the land attacks that count for
+     *  defense posts. Tribes (PlayerType.Bot) are filtered out under the setting —
+     *  their constant trickle was buying shields; posts are for real players. */
+    dpLandAttacks() {
+      let landAttacks = this.player
+        .incomingAttacks()
+        .filter((a) => this.isLandAttack(a));
+      if (state.settings.defensePostPlayersOnly) {
+        landAttacks = landAttacks.filter((a) => {
+          try {
+            const at = a.attacker();
+            if (!at || !at.isPlayer || !at.isPlayer()) return true;
+            return at.type() !== PlayerType.Bot;
+          } catch (_e) {
+            return true;
+          }
+        });
+      }
+      return landAttacks;
+    }
+
     // defensePostNeeded — NationStructureBehavior.ts:229.
     defensePostNeeded() {
       const difficulty = currentDifficulty();
       if (difficulty === Difficulty.Easy) return false;
-      const landAttacks = this.player
-        .incomingAttacks()
-        .filter((a) => this.isLandAttack(a));
+      const landAttacks = this.dpLandAttacks();
       if (landAttacks.length === 0) return false;
       const ourTroops = this.player.troops();
       if (ourTroops <= 0) return false;
