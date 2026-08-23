@@ -22,7 +22,7 @@
   // `remaining = duration + (staleAnchor - nowTicks)` has no upper clamp, so the label
   // would show a wildly inflated countdown. Detected by the tick going backwards.
   let _buildTimerLastTicks = null;
-  // Scan cache: [{ id, type, worldX, worldY, label, ready }].
+  // Scan cache: [{ id, type, worldX, worldY, label, state, halo }].
   let _buildTimerScan = [];
 
   function getConstructionDuration(game, type) {
@@ -46,6 +46,15 @@
       return;
     }
     const ticks = game.ticks ? game.ticks() : 0;
+    // USER (v1.63): the timer halo is the OWNER's identity colour — resolve my
+    // smallID once per scan for the mine-vs-others split.
+    let mySid = null;
+    try {
+      const me = game.myPlayer ? game.myPlayer() : null;
+      mySid = me && me.smallID ? me.smallID() : null;
+    } catch (_error) {
+      mySid = null;
+    }
     // Ticks running backwards means a new match started in this same page session; the
     // anchor Map outlives the match, so drop it or a reused unit id inherits a start tick
     // from the previous game.
@@ -71,6 +80,21 @@
         worldY = game.y(tile);
       } catch (_error) { continue; }
 
+      // Owner identity halo: magenta = mine, team colour for everyone else,
+      // null = unreadable (the draw falls back to the old state colours).
+      let halo = null;
+      try {
+        const owner = unit.owner ? unit.owner() : null;
+        if (owner && owner.smallID && mySid !== null && owner.smallID() === mySid) {
+          halo = "rgba(240, 110, 255, 0.95)"; // magenta = mine
+        } else {
+          const rgb = ofhOwnerOverlayRgb(owner);
+          if (rgb) halo = ofhOwnerRgba(rgb, 0.95);
+        }
+      } catch (_error) {
+        halo = null;
+      }
+
       const underConstruction = Boolean(unit.isUnderConstruction && unit.isUnderConstruction());
 
       if (underConstruction) {
@@ -93,7 +117,7 @@
         const remaining = Math.max(0, duration - (ticks - startTick));
         const sec = Math.round(ofhTicksToSeconds(game, remaining));
         const label = sec > 0 ? `🏗 ${sec}s` : tr("Building");
-        out.push({ id, type, worldX, worldY, label, state: "building" });
+        out.push({ id, type, worldX, worldY, label, state: "building", halo });
       } else {
         // Done building — remove from construction tracker.
         _buildTimerConstructionSeen.delete(id);
@@ -134,7 +158,7 @@
           }
           if (remaining > 0) {
             const sec = Math.round(ofhTicksToSeconds(game, remaining));
-            out.push({ id, type, worldX, worldY, label: `⟳ ${sec}s`, state: "cooldown" });
+            out.push({ id, type, worldX, worldY, label: `⟳ ${sec}s`, state: "cooldown", halo });
           }
           // Ready state draws NOTHING. The ✓ badge used to sit permanently over every
           // idle silo and SAM — which is their normal state almost all game — so it was
@@ -166,11 +190,14 @@
       const boxH = Math.max(OFH_OVERLAY_STYLE.minH, OFH_OVERLAY_STYLE.sizeMd + OFH_OVERLAY_STYLE.padY * 2);
       const by = p.y - boxH - 6; // above the unit
 
-      // Two states only: building (blue halo) and cooldown (white halo). Ready
-      // draws nothing. Since v1.57 drawPlainMapText renders BLACK glyphs with the
-      // colour as the OUTLINE (the real vanilla plate style), so the state colour
-      // is the halo here, not the fill.
-      const halo = entry.state === "building" ? "#60a5fa" : "#e2e8f0";
+      // USER (v1.63, "the SAM building timer when im on the red team has a blue
+      // shadow"): the halo is the OWNER's identity colour — magenta for ours, team
+      // colour for everyone else — matching the rest of the colour system. The
+      // STATE already lives in the glyph (🏗 building / ⟳ cooldown), so no
+      // information is lost; the old blue/white state colours survive only as the
+      // can't-read-colour fallback.
+      const halo =
+        entry.halo || (entry.state === "building" ? "#60a5fa" : "#e2e8f0");
       drawPlainMapText(ctx, p.x, by + boxH / 2, entry.label, halo, OFH_OVERLAY_STYLE.sizeMd);
     }
     ctx.restore();
