@@ -1037,7 +1037,9 @@
         } catch (_e) {
           beingInvaded = false;
         }
-        if (beingInvaded) {
+        // DIVERGENCE (absorbThenCounter): the hoisted counter now waits for the
+        // kill window instead of firing the moment a wave appears.
+        if (beingInvaded && this.counterReady()) {
           const attacker = this.findIncomingAttackPlayer();
           if (attacker && (await this.sendAttack(attacker, true, true))) return;
         }
@@ -1069,6 +1071,9 @@
 
       // Define all strategies as functions that return true if they attacked
       const retaliate = async () => {
+        // DIVERGENCE (absorbThenCounter): same kill-window gate as the hoisted
+        // counter — src fires the moment it can.
+        if (!this.counterReady()) return false;
         const attacker = this.findIncomingAttackPlayer();
         if (attacker) {
           return await this.sendAttack(attacker, true);
@@ -1522,6 +1527,20 @@
       } catch (_e) {
         /* keep r as-is */
       }
+      // DIVERGENCE (absorbThenCounter): while a hostile wave is LIVE (not just the
+      // sticky threat window), hold even more — standing troops are a verified
+      // divisor of the attacker's advance speed (src attackLogic), so every troop
+      // home is a brake on their front while we absorb.
+      try {
+        if (
+          state.settings.absorbThenCounter &&
+          this.hostileWaveRemaining() > 0
+        ) {
+          r = Math.max(r, state.settings.absorbReserveFloor ?? 0.55);
+        }
+      } catch (_e) {
+        /* keep r as-is */
+      }
       return Math.min(r, MAX_DEFENSE_RESERVE);
     }
 
@@ -1790,6 +1809,144 @@
       }
       this._pocketSid = best ? best.smallID() : null;
       return best;
+    }
+
+    /** DIVERGENCE (absorbThenCounter): total troops of LIVE hostile (non-tribe,
+     *  non-friendly) waves currently invading us. Memoised per tick. */
+    hostileWaveRemaining() {
+      let tick;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return 0;
+      }
+      if (this._waveTick === tick) return this._waveRemaining;
+      let remaining = 0;
+      try {
+        for (const a of this.player.incomingAttacks()) {
+          const at = a.attacker();
+          if (!at || !at.isPlayer || !at.isPlayer()) continue;
+          if (at.type() === PlayerType.Bot) continue;
+          if (this.player.isFriendly(at)) continue;
+          remaining += Number(a.troops()) || 0;
+        }
+      } catch (_e) {
+        remaining = 0;
+      }
+      this._waveTick = tick;
+      this._waveRemaining = remaining;
+      return remaining;
+    }
+
+    /** DIVERGENCE (absorbThenCounter): a hostile front tile within
+     *  SHIELD_GUARD_DIST of one of our defense posts — built OR still building
+     *  (protecting the in-progress shield is the point). Memoised per tick. */
+    shieldThreatened() {
+      let tick;
+      try {
+        tick = Number(this.game.ticks());
+      } catch (_e) {
+        return false;
+      }
+      if (this._shieldThreatTick === tick) return this._shieldThreatVal;
+      let threatened = false;
+      try {
+        const posts = this.player.units(UNIT.DefensePost);
+        if (posts && posts.length > 0) {
+          const sids = new Set();
+          for (const a of this.player.incomingAttacks()) {
+            const at = a.attacker();
+            if (!at || !at.isPlayer || !at.isPlayer()) continue;
+            if (at.type() === PlayerType.Bot) continue;
+            if (this.player.isFriendly(at)) continue;
+            sids.add(at.smallID());
+          }
+          if (sids.size > 0) {
+            const g2 = SHIELD_GUARD_DIST * SHIELD_GUARD_DIST;
+            outer: for (const bt of this.player.borderTiles()) {
+              let hostile = false;
+              for (const nb of this.game.neighbors(bt)) {
+                if (!this.game.hasOwner(nb) || !this.game.isLand(nb)) continue;
+                if (sids.has(this.game.ownerID(nb))) {
+                  hostile = true;
+                  break;
+                }
+              }
+              if (!hostile) continue;
+              for (const p of posts) {
+                if (this.game.euclideanDistSquared(p.tile(), bt) <= g2) {
+                  threatened = true;
+                  break outer;
+                }
+              }
+            }
+          }
+        }
+      } catch (_e) {
+        threatened = false;
+      }
+      this._shieldThreatTick = tick;
+      this._shieldThreatVal = threatened;
+      return threatened;
+    }
+
+    /**
+     * DIVERGENCE (absorbThenCounter, USER): is NOW the moment to counter-attack?
+     * Verified from src attackLogic: the defender's standing troops divide the
+     * attacker's speed and multiply their per-tile losses — so we ABSORB (hold
+     * home) while the wave is fresh and counter at the kill window:
+     *   (a) the wave has ground down to counterSpentFrac of its peak, or
+     *   (b) the attacker's HOME troops are exposed (< ours x counterWeakRatio) —
+     *       the "full-send gets countered" butter-knife moment, or
+     *   (d) we've absorbed absorbMaxTicks (never sit passive forever) —
+     * EXCEPT (c): while their front is near one of our defense posts, only (a)
+     * releases the counter — pulling troops out of the defence at that moment
+     * literally speeds their front up. Fails OPEN: a broken read must never
+     * disable retaliation outright.
+     */
+    counterReady() {
+      if (!state.settings.absorbThenCounter) return true;
+      try {
+        const tick = Number(this.game.ticks());
+        if (!Number.isFinite(tick)) return true;
+        const remaining = this.hostileWaveRemaining();
+        if (remaining <= 0) {
+          this._absorb = undefined;
+          return true;
+        }
+        if (!this._absorb || tick < this._absorb.startTick) {
+          this._absorb = { startTick: tick, peak: remaining };
+        } else if (remaining > this._absorb.peak) {
+          this._absorb.peak = remaining;
+        }
+        const abs = this._absorb;
+        // (a) wave spent — always releases, even with the shield threatened
+        // (the wave is dying anyway; the counter takes their exposed land).
+        if (remaining <= abs.peak * (state.settings.counterSpentFrac ?? 0.4)) {
+          return true;
+        }
+        // (c) shield-break guard outranks (b) and (d).
+        if (this.shieldThreatened()) return false;
+        // (b) their home is exposed.
+        const attacker = this.findIncomingAttackPlayer();
+        if (attacker) {
+          try {
+            if (
+              Number(attacker.troops()) <
+              Number(this.player.troops()) *
+                (state.settings.counterWeakRatio ?? 0.5)
+            ) {
+              return true;
+            }
+          } catch (_e) {
+            /* unreadable — fall through */
+          }
+        }
+        // (d) absorb timeout.
+        return tick - abs.startTick >= (state.settings.absorbMaxTicks ?? 300);
+      } catch (_e) {
+        return true;
+      }
     }
 
     // hasTriggerRatioTroops — AiAttackBehavior (private).

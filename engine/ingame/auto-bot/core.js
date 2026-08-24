@@ -110,6 +110,20 @@
     // DIVERGENCE (opt-in, NOT in src): let a counter-attack ignore the troop reserve,
     // so being invaded does not freeze us out of hitting back.
     counterAttackFirst: true,
+    // DIVERGENCE (absorbThenCounter, USER): verified from the game's attackLogic —
+    // the defender's STANDING troops divide the attacker's advance speed
+    // (tilesPerTick budget AND per-tile cost) and multiply their per-tile losses.
+    // So the best defence is: ABSORB first (hold the army home, let the wave grind
+    // itself down against the slow-aura), then COUNTER at the kill window — the
+    // wave spent, or their home exposed (a full-send leaves ~0 home troops, so the
+    // counter moves at the formula's speed cap). Countering immediately (the old
+    // behaviour) both speeds their front up and trades into their full mass.
+    // Never counter while their front is near one of our defense posts.
+    absorbThenCounter: true,
+    counterSpentFrac: 0.4, // counter once the wave falls to this frac of its peak
+    counterWeakRatio: 0.5, // ...or their home troops < ours x this (exposed)
+    absorbMaxTicks: 300, // ...or we've absorbed this long (~30s at baseline)
+    absorbReserveFloor: 0.55, // reserve floor while a hostile wave is LIVE
     // DIVERGENCE (economyFirst): a single warhead decision may consume at most this many
     // minutes of NET income. Warheads are otherwise UNCAPPED — the only hard rule is
     // that our gold must still be growing. See nukeSpendAllowed().
@@ -343,6 +357,9 @@
   // last hostile wave resolved. Bridges the gap BETWEEN an enemy's waves — which is
   // exactly when their next one is being sized — so the reserve floor doesn't flap.
   const COMBAT_THREAT_STICKY_TICKS = 150; // ~15s at baseline speed
+  // DIVERGENCE (absorbThenCounter): "the shield is threatened" = a hostile front
+  // tile within this many tiles of one of our defense posts (built or building).
+  const SHIELD_GUARD_DIST = 20;
   // Min fraction of ACTUAL troops to commit when grabbing SAFE empty land (no
   // bordering enemies). The maxTroops-based reserve has a ~100k floor while we
   // start with ~25k troops, so it would send only ~18% of our army — far slower
@@ -495,6 +512,7 @@
       "reserveByNeighbors",
       "counterAttackFirst",
       "combatReserve",
+      "absorbThenCounter",
       "gentleNeighbors",
       "encirclePockets",
       "nukeIncomeMinutes",
