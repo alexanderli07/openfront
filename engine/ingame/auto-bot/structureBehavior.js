@@ -414,9 +414,24 @@
    *  O(64 x 64) no matter how wide the war gets. */
   const DP_FRONT_SAMPLE_CAP = 64;
   /** defensePostTiming: the front must need DP_ETA_SAFETY x constructionDuration
-   *  (+ the tick margin) to reach a candidate before we'll buy a post there. */
-  const DP_ETA_SAFETY = 1.25;
-  const DP_ETA_MARGIN_TICKS = 10;
+   *  (+ the tick margin) to reach a candidate before we'll buy a post there.
+   *  v1.64: raised 1.25->1.6 and 10->20 after shields kept dying mid-build. */
+  const DP_ETA_SAFETY = 1.6;
+  const DP_ETA_MARGIN_TICKS = 20;
+  /** v1.64: plan against the SPEARHEAD, not the line — the game conquers the
+   *  cheapest tiles first, so one prong runs far ahead of the median front and
+   *  that prong is what reaches the shield. A real punch-through is a NARROW
+   *  corridor (a few tiles on a wide front), so a percentile dilutes it away —
+   *  use the mean of the top-K displacement samples instead: robust to a single
+   *  aliasing outlier, still catches a thin prong. */
+  const DP_SPEAR_TOPK = 3;
+  /** v1.64: a front whose latest reading is still climbing gets extrapolated by
+   *  this much — acceleration is the norm as the defence thins, and a trailing
+   *  average systematically loses the race. */
+  const DP_ACCEL_MULT = 1.5;
+  /** v1.64: incoming/our troop ratio at which the attack will cascade once the
+   *  border thins even if it measures slow RIGHT NOW — depth-floor it. */
+  const DP_BIG_ATTACK_RATIO = 1.0;
   /** defensePostTiming: give up (buy nothing) once the required depth exceeds this
    *  many border-spacings — a blitz that fast outruns any post anywhere. */
   const DP_MAX_DEPTH_SPACINGS = 4;
@@ -756,14 +771,21 @@
         // First sight of this attack: snapshot taken, no rate yet. Hold this pass
         // (~1s) rather than guess — the build takes ~10x longer than the wait.
         if (speed === null) return false;
-        if (speed > 0) {
+        // v1.64: an attack that OUTNUMBERS the standing defence will cascade once
+        // the border thins, even while it measures slow — depth-floor it instead
+        // of trusting the current reading.
+        const bigAttack = ratio >= DP_BIG_ATTACK_RATIO;
+        if (speed > 0 || bigAttack) {
           const buildTicks =
             typeof getConstructionDuration === "function"
               ? getConstructionDuration(this.game, UNIT.DefensePost)
               : 100;
           const needTicks = buildTicks * DP_ETA_SAFETY + DP_ETA_MARGIN_TICKS;
-          const requiredDepth = speed * needTicks;
           const { borderSpacing } = this.spacingConstants();
+          let requiredDepth = speed * needTicks;
+          if (bigAttack) {
+            requiredDepth = Math.max(requiredDepth, borderSpacing);
+          }
           if (requiredDepth > borderSpacing * DP_MAX_DEPTH_SPACINGS) {
             ofhDebug(
               "[DPost] front advancing " +
@@ -819,8 +841,11 @@
         depthPlan,
       );
       // With the timing gate live, keep only candidates the front cannot reach
-      // before the post finishes, closest-first (maximum useful coverage). Without
-      // it (peacetime / stalled front) the sampler's original order is preserved.
+      // before the post finishes — DEEPEST first (v1.64: the closest-safe pick was
+      // a knife-edge; any speed underestimate killed the shield mid-build, which
+      // is exactly what the user kept seeing). Coverage costs a little; a shield
+      // that survives to finish beats one that doesn't exist. Without the gate
+      // (peacetime / stalled front) the sampler's original order is preserved.
       let ordered = tiles;
       if (etaNeed > 0 && frontProbe && frontProbe.length > 0) {
         const g = this.game;
@@ -834,7 +859,7 @@
           const dist = Math.sqrt(best);
           if (dist >= etaNeed) withDist.push([dist, t]);
         }
-        withDist.sort((a, b) => a[0] - b[0]);
+        withDist.sort((a, b) => b[0] - a[0]);
         ordered = withDist.map((e) => e[1]);
         if (ordered.length === 0) {
           ofhDebug(
@@ -984,11 +1009,15 @@
           attTiles,
           sids,
           ema: null,
+          inst: null,
+          pess: null,
         };
         return null;
       }
       const elapsed = tick - prev.tick;
-      if (elapsed < DP_SPEED_MIN_WINDOW_TICKS) return prev.ema;
+      if (elapsed < DP_SPEED_MIN_WINDOW_TICKS) {
+        return prev.pess !== undefined ? prev.pess : prev.ema;
+      }
 
       const sample = this.dpSubsample(attackFront);
       const dists = [];
@@ -1001,7 +1030,16 @@
         if (Number.isFinite(best)) dists.push(Math.sqrt(best));
       }
       dists.sort((a, b) => a - b);
-      const disp = dists.length > 0 ? dists[Math.floor(dists.length / 2)] : 0;
+      // v1.64 (USER: "it punches through before the shield finishes"): a punch-
+      // through is a SPEARHEAD. The median line understates the prong that
+      // actually reaches the shield — track the mean of the top-K displacements.
+      let disp = 0;
+      if (dists.length > 0) {
+        const k = Math.min(DP_SPEAR_TOPK, dists.length);
+        let sum = 0;
+        for (let i = dists.length - k; i < dists.length; i++) sum += dists[i];
+        disp = sum / k;
+      }
       // Same attackers whose tile count did not grow → stalled front, or our own
       // counter-push moving the line the OTHER way — either way nothing is racing
       // our construction. A changed attacker set can't be compared by count, so
@@ -1012,8 +1050,14 @@
         prev.ema === null
           ? inst
           : prev.ema * (1 - DP_SPEED_EMA) + inst * DP_SPEED_EMA;
-      this._dpSpeed = { tick, sample, attTiles, sids, ema };
-      return ema;
+      // v1.64: plan against the WORSE of (smoothed, latest) — and when the latest
+      // reading is still climbing, extrapolate: the cascade is just starting.
+      let pess = Math.max(inst, ema);
+      if (prev.inst !== null && prev.inst !== undefined && inst > prev.inst) {
+        pess *= DP_ACCEL_MULT;
+      }
+      this._dpSpeed = { tick, sample, attTiles, sids, ema, inst, pess };
+      return pess;
     }
 
     /** Bounded every-k-th subsample of a front so snapshot comparisons stay cheap. */
