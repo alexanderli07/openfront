@@ -329,6 +329,32 @@
    *  launcher, or a pair of overlapping level-1/2s) is where that stops being cheap. */
   const UMBRELLA_RELEASE_SLOTS = 3;
 
+  /** safePlacement: weight of the "as deep behind the lines as we can get" term (USER: "if
+   *  im near the frontlines... place the buildings as far back and as deep into our teams
+   *  territory as possible").
+   *
+   *  This exists because SAFE_WEIGHT_THREAT SATURATES: it divides by `range` and clamps, so
+   *  once a tile is 3 blast radii (~90 tiles) clear of the front it stops earning anything
+   *  and a site 100 tiles back ranks identically to one 400 tiles back. Depth past that
+   *  point was invisible to the scorer, which is why buildings kept landing mid-territory.
+   *
+   *  The shape is d/(d+range), which never saturates - deeper ALWAYS scores higher, so the
+   *  deepest candidate on the list wins - while the marginal gain shrinks with depth (90 ->
+   *  0.5, 180 -> 0.67, 360 -> 0.8). That shrinking matters as much as the growth: between
+   *  two nearby back-country tiles the depth difference is worth a point or two, so the
+   *  LOCAL arrangement is still decided by separation, elevation and connectivity instead of
+   *  everything piling onto the single deepest tile.
+   *
+   *  Sized above the umbrella (90) and the separation swing (60) on purpose - the user put
+   *  depth first - but the umbrella still wins where it overlaps, since a covered deep tile
+   *  collects both. */
+  const SAFE_WEIGHT_DEPTH = 120;
+  /** deepPlacement: how many random territory tiles to probe for the back country, and how
+   *  many front tiles to measure them against. 200 x 32 is ~6.4k distance checks per
+   *  placement - bounded, and it runs at most once per build. */
+  const DEEP_PROBE_TILES = 200;
+  const DEEP_FRONT_SAMPLE = 32;
+
   /** samDefense: what each asset class is worth PROTECTING, independent of its level.
    *  Ports and Factories are the economy — they mint the gold that pays for the troops,
    *  the warheads and the SAMs themselves — so a launcher covering them is worth more than
@@ -441,15 +467,30 @@
     return out;
   }
 
-  /** safePlacement: types worth protecting from a shared blast. DefensePost is excluded on
-   *  purpose — posts are cheap and belong ON the border, so pairing rules would fight
-   *  their whole point and would fire constantly. */
+  /** safePlacement: types worth protecting from a shared blast.
+   *
+   *  DefensePost used to be excluded here, on the grounds that posts are cheap and belong ON
+   *  the border so a pairing rule would fight their whole point. That reasoning only holds
+   *  for placing a POST, and posts never come through this scorer - tryBuildDefensePost
+   *  ranks them with sampleTilesNearFront and its own front-distance ordering. The list is
+   *  read only when siting something else, so including posts pushes cities and factories
+   *  off them without moving a single post off the border.
+   *
+   *  USER asked for exactly that. Worth recording what it costs, because it is not free:
+   *  every tile within defensePostRange() = 30 of one of OUR posts multiplies an attacker's
+   *  per-tile troop loss by defensePostDefenseBonus() = 5 and their per-tile budget by
+   *  defensePostSpeedBonus() = 3 (attackLogic), so a building inside that aura is far harder
+   *  to GROUND-capture. But the aura radius and the atom blast radius are both 30, so the
+   *  bonus is unobtainable without sharing a blast with the post - and the user's call is to
+   *  take the nuke safety and get the buildings out of reach of the front entirely, which
+   *  the depth term below now actually delivers. */
   const BLAST_PAIR_TYPES = [
     UNIT.City,
     UNIT.Factory,
     UNIT.Port,
     UNIT.MissileSilo,
     UNIT.SAMLauncher,
+    UNIT.DefensePost,
   ];
 
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
@@ -2133,6 +2174,22 @@
       // that was never offered. Ports are left out on purpose: their candidates already
       // come from the (much smaller) set of valid shore sites, which is often below the
       // 25-tile sample size, so every coastal tile inside the umbrella gets scored anyway.
+      // DIVERGENCE (deepPlacement, USER: "place the buildings as far back and as deep into
+      // our teams territory as possible"). Same reason as the umbrella injection below: the
+      // depth term cannot choose the back country if the back country never makes it into
+      // the 25 random candidates. Cities and factories only - silos are pinned into SAM
+      // cover by samCoverageBonus, and ports have to sit on the coast.
+      if (
+        state.settings.safePlacement &&
+        (type === UNIT.City || type === UNIT.Factory)
+      ) {
+        try {
+          const deep = this.tilesDeepInTerritory(25);
+          if (deep.length > 0) tiles = deep.concat(tiles);
+        } catch (_e) {
+          /* fall back to the random sample */
+        }
+      }
       const injectUmbrella =
         state.settings.samUmbrella &&
         (type === UNIT.City || type === UNIT.Factory);
@@ -2268,56 +2325,11 @@
       const game = this.game;
       const player = this.player;
 
-      let myTeam = null;
-      try {
-        myTeam = player.team ? player.team() : null;
-      } catch (_e) {
-        myTeam = null;
-      }
-
-      // Split every other living player into trusted teammates and everyone else.
-      const teammateSids = new Set();
-      const untrustedSids = new Set();
-      try {
-        for (const other of game.players()) {
-          if (!other.isPlayer() || !other.isAlive()) continue;
-          if (other.smallID() === player.smallID()) continue;
-          let theirTeam = null;
-          try {
-            theirTeam = other.team ? other.team() : null;
-          } catch (_e) {
-            theirTeam = null;
-          }
-          if (myTeam !== null && theirTeam !== null && theirTeam === myTeam) {
-            teammateSids.add(other.smallID());
-          } else {
-            untrustedSids.add(other.smallID());
-          }
-        }
-      } catch (_e) {
-        return ZERO;
-      }
-
-      // ONE border walk, classifying each of our own border tiles by who it faces. A tile
-      // can face both (a pinch between a teammate and an enemy) and counts for both.
-      const threatFront = [];
-      const teamFront = [];
-      try {
-        for (const borderTile of player.borderTiles()) {
-          let facesThreat = false;
-          let facesTeam = false;
-          for (const neighbor of game.neighbors(borderTile)) {
-            if (!game.hasOwner(neighbor) || !game.isLand(neighbor)) continue;
-            const sid = game.ownerID(neighbor);
-            if (untrustedSids.has(sid)) facesThreat = true;
-            else if (teammateSids.has(sid)) facesTeam = true;
-          }
-          if (facesThreat) threatFront.push(borderTile);
-          if (facesTeam) teamFront.push(borderTile);
-        }
-      } catch (_e) {
-        return ZERO;
-      }
+      // Who is who, and which of our border tiles face them. Extracted + memoised per tick
+      // because the deep-candidate injector needs the same answer during the same build.
+      const border = this.classifyBorder();
+      if (!border.ok) return ZERO;
+      const { teammateSids, threatFront, teamFront } = border;
 
       const ourStructures = [];
       for (const type of BLAST_PAIR_TYPES) {
@@ -2369,14 +2381,18 @@
         let w = 0;
 
         // Normalised clearance from the nearest border we do not trust: 0 on the front,
-        // 1 once we are `range` tiles clear of it. Computed once and used twice - as the
-        // threat term itself, and to attenuate the umbrella term below.
+        // 1 once we are `range` tiles clear of it. Computed once and used three times - the
+        // threat term, the umbrella attenuation below, and the depth term.
         let frontSafety = 1;
         if (haveThreat) {
           const d = closestTile(game, threatFront, tile)[1];
           if (Number.isFinite(d)) {
             frontSafety = Math.min(d, range) / range;
             w += SAFE_WEIGHT_THREAT * frontSafety;
+            // DIVERGENCE (deepPlacement, USER): keep paying for depth after the threat term
+            // has saturated, so "as far back as possible" is a thing the scorer can express
+            // at all. Never saturates, so the deepest candidate always wins on this term.
+            w += SAFE_WEIGHT_DEPTH * (d / (d + range));
           }
         }
 
@@ -2467,6 +2483,130 @@
 
         return w;
       };
+    }
+
+    /** One border walk, classifying every one of our border tiles by who it faces, plus the
+     *  teammate/untrusted split behind it. A tile can face both (a pinch between a teammate
+     *  and an enemy) and counts for both. "Teammate" is keyed on team() and NEVER on
+     *  isFriendly(), which is also true for revocable alliances.
+     *
+     *  Memoised per game tick: safePlacementScorer and tilesDeepInTerritory both want it
+     *  within the same build, and borders only change on a tick. `ok: false` reproduces the
+     *  old behaviour of the callers bailing to a zero scorer when the views cannot be read. */
+    classifyBorder() {
+      const game = this.game;
+      const player = this.player;
+      let tick = -1;
+      try {
+        tick = Number(game.ticks());
+      } catch (_e) {
+        tick = -1;
+      }
+      const cached = this._borderClass;
+      if (cached && tick >= 0 && cached.tick === tick) return cached;
+
+      let myTeam = null;
+      try {
+        myTeam = player.team ? player.team() : null;
+      } catch (_e) {
+        myTeam = null;
+      }
+
+      const teammateSids = new Set();
+      const untrustedSids = new Set();
+      try {
+        for (const other of game.players()) {
+          if (!other.isPlayer() || !other.isAlive()) continue;
+          if (other.smallID() === player.smallID()) continue;
+          let theirTeam = null;
+          try {
+            theirTeam = other.team ? other.team() : null;
+          } catch (_e) {
+            theirTeam = null;
+          }
+          if (myTeam !== null && theirTeam !== null && theirTeam === myTeam) {
+            teammateSids.add(other.smallID());
+          } else {
+            untrustedSids.add(other.smallID());
+          }
+        }
+      } catch (_e) {
+        return { ok: false, tick: -1, teammateSids, threatFront: [], teamFront: [] };
+      }
+
+      const threatFront = [];
+      const teamFront = [];
+      try {
+        for (const borderTile of player.borderTiles()) {
+          let facesThreat = false;
+          let facesTeam = false;
+          for (const neighbor of game.neighbors(borderTile)) {
+            if (!game.hasOwner(neighbor) || !game.isLand(neighbor)) continue;
+            const sid = game.ownerID(neighbor);
+            if (untrustedSids.has(sid)) facesThreat = true;
+            else if (teammateSids.has(sid)) facesTeam = true;
+          }
+          if (facesThreat) threatFront.push(borderTile);
+          if (facesTeam) teamFront.push(borderTile);
+        }
+      } catch (_e) {
+        return { ok: false, tick: -1, teammateSids, threatFront: [], teamFront: [] };
+      }
+
+      const out = { ok: true, tick, teammateSids, threatFront, teamFront };
+      this._borderClass = out;
+      return out;
+    }
+
+    /** DIVERGENCE (deepPlacement, USER): the deepest land we own, measured from the
+     *  UNTRUSTED front only - so a teammate at our back reads as safe hinterland rather
+     *  than as exposure, which is what "deep into our team's territory" means when we can
+     *  only build on our own tiles.
+     *
+     *  Needed because a siting score can only rank the candidates it is handed, and the
+     *  default set is 25 tiles drawn at random from the whole territory: on a large map the
+     *  actual back country may not appear in it at all, and then the depth term has nothing
+     *  deep to pick. Draws a WIDER sample and keeps the deepest few, with both the sample
+     *  and the front subsample bounded so the cost stays flat as the territory grows. */
+    tilesDeepInTerritory(maxTiles) {
+      const game = this.game;
+      const border = this.classifyBorder();
+      if (!border.ok || border.threatFront.length === 0) return [];
+
+      // Bounded front subsample: the nearest of 32 spread-out front tiles is a good enough
+      // proxy for depth when we are only ranking candidates against each other.
+      const front = border.threatFront;
+      const step = Math.max(1, Math.floor(front.length / DEEP_FRONT_SAMPLE));
+      const probeFront = [];
+      for (let i = 0; i < front.length; i += step) probeFront.push(front[i]);
+      if (probeFront.length === 0) return [];
+
+      let probe;
+      try {
+        probe = randTerritoryTileArray(this.random, game, this.player, DEEP_PROBE_TILES);
+      } catch (_e) {
+        return [];
+      }
+      const scored = [];
+      for (const t of probe) {
+        let best = Infinity;
+        for (const f of probeFront) {
+          let d;
+          try {
+            d = game.euclideanDistSquared(t, f);
+          } catch (_e) {
+            continue;
+          }
+          if (Number.isFinite(d) && d < best) best = d;
+        }
+        if (Number.isFinite(best)) scored.push([best, t]);
+      }
+      scored.sort((a, b) => b[0] - a[0]); // deepest first
+      const out = [];
+      for (let i = 0; i < scored.length && out.length < maxTiles; i++) {
+        out.push(scored[i][1]);
+      }
+      return out;
     }
 
     // structureSpawnTileValue — NationStructureBehavior.ts:869.
