@@ -99,7 +99,7 @@
     showNukeSuggestions: ["Nuke Suggestions", "Hover-target nuke strike suggestions for optimal targets. Includes economic nuke suggestions and SAM burn logic."],
     autoNuke: ["Auto Nuke", "Automatically fires nukes at suggested targets."],
     autoNukeIncludeAllies: ["Include Allies", "Allow auto nuke to target allies."],
-    sosDefense: ["SOS Defense", "Auto-sends distress emoji (🆘) to allies/teammates when under attack and marks attackers in allied HUDs. SOS emoji rate-limited to 12s; attacker targeting every 16s."],
+    sosDefense: ["Auto SOS", "Sends the mass 🆘 to every teammate and ally on its own when you are under attack AND low on troops (incoming wave over 5% of your troop cap while your troops are under 35% of it). Held for ~4s before firing, then at most once a minute. Shift+S sends one manually any time."],
     attackRatioHotkey: ["Attack Ratio Hotkey", "Shift+1 through Shift+0 to set attack ratio slider to 10%-100%. Finds the slider in shadow DOM and updates it."],
     rightClickConquest: ["Right-click Conquest", "Right-click context menu near enemy shows capture assessment (easy/moderate/risky), one-click attack, and alliance policy buttons."],
     showEnemyIntent: ["Enemy Intent Warning", "Polls incomingAttacks() to maintain 15-second TTL warnings for enemy attacks. Shared data layer consumed by attack-highlight overlay and advisor panel. Does NOT detect boats."],
@@ -985,11 +985,15 @@
     return out;
   }
 
-  function _doSosCall() {
+  /** `silent` suppresses the REFUSAL toasts (not the success one) for the automatic
+   *  path - a solo player under a long siege must not be told "no teammates to call"
+   *  once a minute. Returns whether an SOS actually went out, so the auto path only
+   *  starts its repeat clock on a real send. */
+  function _doSosCall(silent) {
     var now = Date.now();
     if (now - _sosLastSentAt < SOS_COOLDOWN_MS) {
-      _toast("⏳ " + _tr("SOS on cooldown"), "rgba(120,120,120,0.92)");
-      return;
+      if (!silent) _toast("⏳ " + _tr("SOS on cooldown"), "rgba(120,120,120,0.92)");
+      return false;
     }
     var ctx = null;
     try { ctx = getOpenFrontGameContext(); } catch (_e) { ctx = null; }
@@ -997,19 +1001,19 @@
     var me = null;
     try { me = game && game.myPlayer ? game.myPlayer() : null; } catch (_e) { me = null; }
     if (!game || !me) {
-      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
-      return;
+      if (!silent) _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return false;
     }
     var ctors = null;
     try { ctors = discoverCtors(getEventBus()); } catch (_e) { ctors = null; }
     if (!ctors || !ctors.emoji) {
-      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
-      return;
+      if (!silent) _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return false;
     }
     var targets = _sosRecipients(game, me);
     if (targets.length === 0) {
-      _toast("✗ " + _tr("No teammates or allies to call"), "rgba(220,40,40,0.92)");
-      return;
+      if (!silent) _toast("✗ " + _tr("No teammates or allies to call"), "rgba(220,40,40,0.92)");
+      return false;
     }
     var id = _sosEmojiId();
     var sent = 0;
@@ -1022,12 +1026,100 @@
       } catch (_e) { /* one bad recipient must not abort the call */ }
     }
     if (sent === 0) {
-      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
-      return;
+      if (!silent) _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return false;
     }
     _sosLastSentAt = now;
     _toast("🆘 " + _tr("SOS sent to {n}").replace("{n}", String(sent)),
       "rgba(220,60,60,0.95)");
+    return true;
+  }
+
+  // ── automatic SOS (USER: "auto send the mass sos when we are under attack AND low
+  // on troops") ───────────────────────────────────────────────────────────────
+  // This is what the long-standing `sosDefense` switch was supposed to do. Its engine
+  // file was cut in the minimal strip, so setSosDefenseEnabled did not exist and the
+  // quick panel's `typeof fn === "function" ? fn : null` dispatch hid that silently;
+  // the popup row and the lobby's SET_SOS_DEFENSE message were equally inert. The
+  // switch is now live again on top of the v1.67 hotkey send path.
+  /** Poll interval. Cheap - a handful of property reads off the client views. */
+  var SOS_AUTO_POLL_MS = 2000;
+  /** At most one automatic call per minute while the siege lasts. The manual hotkey
+   *  keeps its own 8s cooldown; this is the separate "stop nagging the team" clock. */
+  var SOS_AUTO_REPEAT_MS = 60000;
+  /** "Under attack": the live incoming wave, as a share of OUR troop cap. Measured
+   *  against the cap rather than an absolute number so the trigger reads the same on a
+   *  tiny map and a huge one. 5% keeps tribe trickles and single boats out of it. */
+  var SOS_AUTO_WAVE_FRAC = 0.05;
+  /** "Low on troops": standing troops as a share of our cap. 0.35 is chosen to line up
+   *  with the bot's own defensive reserve floors (combatReserve 0.45 / absorb 0.55) -
+   *  by the time we are under those, the reserve meant to absorb this attack has
+   *  already been eaten, which is exactly when help is worth asking for. */
+  var SOS_AUTO_LOW_FRAC = 0.35;
+  /** Hold the condition for two consecutive polls (~4s) before firing, so a momentary
+   *  dip between a troop tick and an attack landing cannot set it off. */
+  var SOS_AUTO_CONFIRM_POLLS = 2;
+  var _sosAutoTimer = null;
+  var _sosAutoLastSentAt = 0;
+  var _sosAutoStreak = 0;
+
+  /** Under attack AND low on troops, per the user's rule - both, not either. Returns
+   *  the resolved views when we are in trouble, else null. Reuses advisor-intel's
+   *  helpers (bundle-wide function declarations) rather than re-reading the client
+   *  views by hand: advIncomingTroops already excludes RETREATING attacks, which a
+   *  naive sum would count as a threat. */
+  function _sosDistress() {
+    var ctx = null;
+    try { ctx = getOpenFrontGameContext(); } catch (_e) { return null; }
+    var game = ctx && ctx.game;
+    if (!game) return null;
+    try {
+      if (game.inSpawnPhase && game.inSpawnPhase()) return null;
+    } catch (_e) { /* treat an unreadable phase as in-game */ }
+    var me = null;
+    try { me = game.myPlayer ? game.myPlayer() : null; } catch (_e) { me = null; }
+    if (!me) return null;
+    try {
+      if (me.isAlive && !me.isAlive()) return null;   // nothing to defend any more
+    } catch (_e) { /* assume alive */ }
+    var wave = advIncomingTroops(me);
+    if (!(wave > 0)) return null;
+    var max = advMaxTroops(game, me);
+    if (!(max > 0)) return null;              // no cap available: cannot judge "low"
+    if (wave < max * SOS_AUTO_WAVE_FRAC) return null;      // a trickle, not an emergency
+    if (advTroops(me) > max * SOS_AUTO_LOW_FRAC) return null; // still holding comfortably
+    return { game: game, me: me };
+  }
+
+  function _sosAutoTick() {
+    var d = _sosDistress();
+    if (d === null) {
+      _sosAutoStreak = 0;
+      return;
+    }
+    _sosAutoStreak++;
+    if (_sosAutoStreak < SOS_AUTO_CONFIRM_POLLS) return;
+    var now = Date.now();
+    if (now - _sosAutoLastSentAt < SOS_AUTO_REPEAT_MS) return;
+    // Check for recipients BEFORE calling, so a solo player never even reaches the
+    // send path (and so a failed send does not start the repeat clock).
+    if (_sosRecipients(d.game, d.me).length === 0) return;
+    if (_doSosCall(true)) _sosAutoLastSentAt = now;
+  }
+
+  /** The name the quick panel's dispatch table and the lobby bridge both already look
+   *  for - defining it is what brings the existing `sosDefense` switch back to life. */
+  function setSosDefenseEnabled(enabled) {
+    if (Boolean(enabled)) {
+      if (_sosAutoTimer === null) {
+        _sosAutoStreak = 0;
+        _sosAutoTimer = window.setInterval(_sosAutoTick, SOS_AUTO_POLL_MS);
+      }
+    } else if (_sosAutoTimer !== null) {
+      clearInterval(_sosAutoTimer);
+      _sosAutoTimer = null;
+      _sosAutoStreak = 0;
+    }
   }
 
   function _installSosHotkey() {

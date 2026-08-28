@@ -404,8 +404,8 @@ const HELPER_SECTIONS: HelperSection[] = [
       },
       {
         name: "sosDefense",
-        title: "SOS when attacked",
-        desc: "When under attack, sends an SOS emoji to allies/teammates and marks the attacker for your team. Works with or without the auto-bot.",
+        title: "Auto SOS when losing",
+        desc: "Sends the mass SOS emoji to every teammate and ally on its own when you are under attack AND low on troops. Shift+S sends one manually any time.",
       },
       {
         name: "send1PercentBoat",
@@ -665,6 +665,17 @@ function renderAutoJoinMain(body: HTMLElement): void {
       Boolean(settings.autoLeaveOnTeamWin),
       (v) => {
         settings.autoLeaveOnTeamWin = v;
+        void persist();
+      },
+    ),
+  );
+  body.append(
+    switchRow(
+      "Auto-leave on loss",
+      "Leave the match automatically when you are eliminated or someone else wins.",
+      Boolean(settings.autoLeaveOnLoss),
+      (v) => {
+        settings.autoLeaveOnLoss = v;
         void persist();
       },
     ),
