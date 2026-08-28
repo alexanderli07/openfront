@@ -1347,6 +1347,11 @@
       if (!state.settings.phasedOpening) return false;
       if (this._badSpawnLatched) return true;
       try {
+        // DIVERGENCE (openingAllModes, USER): build up before fighting people in
+        // EVERY mode. Team games with open land used to skip the opening entirely
+        // (they fell through to the boxed-in check below and returned false), which
+        // is exactly the "too aggressive at the start" the user reported.
+        if (state.settings.openingAllModes) return true;
         if (this.isFFA()) return true;
         if (
           !openLand &&
@@ -2659,6 +2664,30 @@
         const keep = state.settings.counterKeepFrac ?? 0.45;
         if (keep > 0 && keep < 1) {
           troops = Math.min(troops, this.player.troops() * (1 - keep));
+        }
+      }
+
+      // DIVERGENCE (minAttackForce, USER): never dribble. A discretionary attack
+      // on a real player must be a real punch — otherwise hold and keep saving.
+      // Exempt: counter-attacks (defence must fire even when small), tribes
+      // (calculateBotAttackTroops already sizes those at 4x the defender), and
+      // terra nullius (unowned land does not fight back).
+      if (
+        state.settings.minAttackForce &&
+        !retaliating &&
+        target.isPlayer() &&
+        target.type() !== PlayerType.Bot
+      ) {
+        const minForce = maxTroops * (state.settings.minAttackFrac ?? 0.12);
+        if (troops < minForce) {
+          ofhDebug(
+            "[Attack] holding: " +
+              Math.round(troops) +
+              " < min force " +
+              Math.round(minForce) +
+              " — a trickle attack takes max losses for min ground",
+          );
+          return false;
         }
       }
 

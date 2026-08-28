@@ -203,6 +203,22 @@
     // Team games only: how many distinct hostile PLAYERS bordering us counts as
     // "spawned boxed in". Tribes are excluded (see hostileNeighborCount).
     openingSurroundedNeighbors: 2,
+    // DIVERGENCE (openingAllModes, USER: "dont engage if you dont have to at the
+    // beginning... build up your troop count"). The opening used to apply in FFA
+    // always but in TEAM games only when boxed in — so a team spawn with open land
+    // had NO build-up gate and picked fights with neighbours from minute one.
+    // Now it applies in every mode; the boxed-in latch stays as a separate reason.
+    openingAllModes: true,
+    // DIVERGENCE (minAttackForce, USER: "it just sends little amounts of troops").
+    // A discretionary attack on a human/nation must commit at least this share of
+    // MAX troops or we don't attack at all and keep saving. Why it matters: the
+    // trigger ratio (0.50-0.60 of max) sits barely above the gentleNeighbors
+    // reserve floor (0.50), so the bot could legally attack with ~5% of max — and
+    // by the game's own attackLogic a trickle is the worst possible attack (its
+    // per-tile losses clamp to the 2x MAXIMUM while its tile budget clamps to the
+    // 0.01 MINIMUM). Counter-attacks, tribe fights and land grabs are exempt.
+    minAttackForce: true,
+    minAttackFrac: 0.12,
     // How long an attacker stays exempt after its wave ends. incomingAttacks() lists
     // only IN-FLIGHT waves, so without a memory an invader becomes un-attackable
     // between waves and we could never retake our own ground.
@@ -523,6 +539,8 @@
       "openingMinCityLevels",
       "openingMaxTicks",
       "openingSurroundedNeighbors",
+      "openingAllModes",
+      "minAttackForce",
       "openingInvaderMemoryTicks",
       "smartSpawn",
       "minimized",
