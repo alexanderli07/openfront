@@ -77,6 +77,13 @@
     // atom blast (euclidean, unlike src's lenient manhattan spacing). See
     // safePlacementScorer() in structureBehavior.js.
     safePlacement: true,
+    // DIVERGENCE (samUmbrella, USER): "if a team SAM covers our land, prioritize that
+    // covered area over spreading it around our land. in the SAM territory, ignore the
+    // algorithm where we try to spread it out so an atom bomb cant hit it." Adds an
+    // umbrella term to the siting score (own AND teammate launchers, ally at half trust)
+    // and fades the anti-atom pairing gradient out underneath one. See
+    // safePlacementScorer() + collectFriendlyUmbrellas() in structureBehavior.js.
+    samUmbrella: true,
     // DIVERGENCE (opt-in, NOT in src): threat-scaled air defence. src fixes the SAM
     // target at a per-city ratio by difficulty, blind to how much nuclear threat
     // actually exists. samDefense instead sizes it from hostile Missile Silo levels
@@ -521,6 +528,7 @@
       "samCrack",
       "samDefense",
       "safePlacement",
+      "samUmbrella",
       "defensePosts",
       "defensePostTiming",
       "defensePostPlayersOnly",

@@ -274,6 +274,61 @@
   /** Exposure (summed magnet levels) at which the penalty saturates. */
   const SAM_MAGNET_FULL_LEVELS = 4;
 
+  /** samUmbrella: weight of the "sited under a friendly SAM umbrella" term.
+   *
+   *  USER: "if a team SAM covers our land, prioritize that covered area over spreading it
+   *  around our land."
+   *
+   *  Sized to OUTRANK the separation term (60) deliberately - that inversion IS the
+   *  request: a covered-but-clustered site should beat an uncovered-but-perfectly-spread
+   *  one.
+   *
+   *  Which means it also outranks the threat term (40), and that needed handling: taken
+   *  alone it would site cities on the enemy border whenever a SAM happened to reach there,
+   *  and a SAM stops warheads, not infantry - the commonest way to lose a city is still
+   *  ground capture. Hence UMBRELLA_FRONT_FLOOR: the bonus is attenuated toward the
+   *  untrusted front, so cover we may not be holding for long counts for less. At the floor
+   *  it drops below the separation term, which is the one case where spreading out should
+   *  still win.
+   *
+   *  Why a TEAMMATE's launcher counts as fully ours (SAMLauncherExecution.ts, verified):
+   *  isValidNukeTarget() rejects only nukes owned by the launcher itself or by one of the
+   *  launcher's own friendlies - it never asks whose territory the nuke is aimed at. And
+   *  checkDetonationInterception() gates on the nuke's FINAL tile being inside
+   *  dynamicSamRange, i.e. "aimed inside the umbrella" is itself the interception
+   *  condition. A teammate's SAM genuinely shoots down the bomb flying at our city. */
+  const SAFE_WEIGHT_SAM_UMBRELLA = 90;
+  /** samUmbrella: trust in an ALLY's launcher, relative to our own or a teammate's. It
+   *  really does protect us right now, but an alliance can be broken and the launcher
+   *  deleted, and the standing rule here is that allies are untrusted for strategy - so it
+   *  attracts buildings at half weight and never releases the pairing rule (below). */
+  const UMBRELLA_TRUST_ALLY = 0.5;
+  /** samUmbrella: share of the umbrella bonus that survives right on the untrusted front,
+   *  rising to the full bonus once we are `range` tiles clear of it.
+   *
+   *  The invariant that picks the number: SAFE_WEIGHT_SAM_UMBRELLA * this floor must come
+   *  out BELOW the threat swing (40) AND below the separation swing (60). 90 * 0.35 = 31.5
+   *  clears both. That is what guarantees our own terms never favour a front-line site on
+   *  their own - the first draft used 0.5, where the attenuated bonus (45) still beat the
+   *  threat swing, and only src's border-distance term (+30) was quietly saving us.
+   *  Away from the front the attenuation fades out and the umbrella takes priority over
+   *  spreading, which is the whole point.
+   *
+   *  Note the pairing RELEASE is deliberately NOT attenuated: the interception is just as
+   *  real on the front line, it is the ground underneath we might not keep. */
+  const UMBRELLA_FRONT_FLOOR = 0.35;
+  /** samUmbrella: trusted intercept slots at which we stop caring about atom-pairing.
+   *
+   *  A launcher's LEVEL is its number of simultaneous intercept slots, not a range stat:
+   *  UnitImpl.isInCooldown() is `missileTimerQueue.length === level`, and SAMLauncherExecution
+   *  fires at target after target in ONE tick until that is true, each slot then taking
+   *  SAMCooldown() = 90 ticks to reload. So an umbrella of N slots eats N warheads before
+   *  the (N+1)th lands, and to exploit a cluster underneath it the enemy has to buy AND
+   *  deliver N+1 atoms (750k gold each) inside a 9-second window - with silos on the same
+   *  90-tick reload clock, that also means N+1 silo levels. Three slots (one level-3
+   *  launcher, or a pair of overlapping level-1/2s) is where that stops being cheap. */
+  const UMBRELLA_RELEASE_SLOTS = 3;
+
   /** samDefense: what each asset class is worth PROTECTING, independent of its level.
    *  Ports and Factories are the economy — they mint the gold that pays for the troops,
    *  the warheads and the SAMs themselves — so a launcher covering them is worth more than
@@ -342,6 +397,48 @@
       if (dsq > m.innerSq && dsq <= m.outerSq) levels += m.level;
     }
     return levels;
+  }
+
+  /** samUmbrella: every friendly SAM launcher that can actually shoot for us, with the
+   *  range it covers, its slot count and how much we trust it to still be there.
+   *
+   *  Under-construction launchers are skipped because they shoot nothing - SAMLauncherExecution
+   *  returns early on isUnderConstruction() - so building under one that is still going up
+   *  buys no protection today. `teammateSids` is passed in rather than recomputed: the caller
+   *  has already classified every player, and "teammate" must stay keyed on team() rather
+   *  than isFriendly(), which is also true for revocable alliances. */
+  function collectFriendlyUmbrellas(game, player, teammateSids) {
+    const out = [];
+    let all = [];
+    let cfg;
+    try {
+      all = game.units(UNIT.SAMLauncher) || [];
+      cfg = game.config();
+    } catch (_e) {
+      return out;
+    }
+    if (!cfg || typeof cfg.samRange !== "function") return out;
+    const mySid = player.smallID();
+    for (const u of all) {
+      try {
+        if (u.isUnderConstruction && u.isUnderConstruction()) continue;
+        const owner = u.owner && u.owner();
+        if (!owner) continue;
+        const sid = owner.smallID ? owner.smallID() : null;
+        let trust = 0;
+        if (sid !== null && sid === mySid) trust = 1;
+        else if (sid !== null && teammateSids.has(sid)) trust = 1;
+        else if (player.isFriendly(owner) === true) trust = UMBRELLA_TRUST_ALLY;
+        if (trust <= 0) continue;
+        const level = Number(u.level && u.level()) || 1;
+        const range = Number(cfg.samRange(level)) || 0;
+        if (range <= 0) continue;
+        out.push({ tile: u.tile(), level: level, range: range, trust: trust });
+      } catch (_e) {
+        /* one unreadable launcher must not lose the rest */
+      }
+    }
+    return out;
   }
 
   /** safePlacement: types worth protecting from a shared blast. DefensePost is excluded on
@@ -2028,7 +2125,21 @@
       // WIN-FIX: for silos, PREPEND tiles that sit inside friendly SAM coverage (own SAMs
       // first, ally SAMs as fallback) so the ranked probe can actually pick a defended
       // spot — a plain 25-tile random sample often misses the SAM area entirely.
-      if (type === UNIT.MissileSilo && state.settings.winFixes) {
+      //
+      // DIVERGENCE (samUmbrella, USER): cities and factories need the same injection for
+      // the same reason. A siting SCORE can only rank the candidates it is handed, and the
+      // candidate set is 25 tiles drawn at random from the whole territory - on a large map
+      // that sample can miss the umbrella completely, and no weighting can rescue a tile
+      // that was never offered. Ports are left out on purpose: their candidates already
+      // come from the (much smaller) set of valid shore sites, which is often below the
+      // 25-tile sample size, so every coastal tile inside the umbrella gets scored anyway.
+      const injectUmbrella =
+        state.settings.samUmbrella &&
+        (type === UNIT.City || type === UNIT.Factory);
+      if (
+        (type === UNIT.MissileSilo && state.settings.winFixes) ||
+        injectUmbrella
+      ) {
         try {
           const samTiles = this.tilesNearFriendlySams(25);
           if (samTiles.length > 0) tiles = samTiles.concat(tiles);
@@ -2222,24 +2333,50 @@
       // Owner-blind: our own level-1..4 launchers are as much of a bullseye as an enemy's.
       const samMagnets = collectSamMagnets(game);
 
+      // DIVERGENCE (samUmbrella, USER): friendly SAM cover to build UNDER. Owner-aware,
+      // unlike the magnet list above - this one is about who shoots for us.
+      const umbrellas = state.settings.samUmbrella
+        ? collectFriendlyUmbrellas(game, player, teammateSids)
+        : [];
+
       const { borderSpacing } = this.spacingConstants();
       const range = Math.max(1, borderSpacing * SAFE_PLACEMENT_RANGE_MULT);
       // One bomb catches both when their separation is within 2x the outer radius, so that
       // distance is where the separation term stops earning credit.
       const blastPair = Math.max(1, borderSpacing * 2);
+      // borderSpacing IS the atom outer radius (spacingConstants), and the umbrella term
+      // measures depth in exactly those units - see the frac note below.
+      const atomOuter = Math.max(1, borderSpacing);
       const haveThreat = threatFront.length > 0;
       const haveTeam = teamFront.length > 0;
-      // Nothing to say about this tile if there is no threat border, no teammate border and
-      // nothing of ours to stay clear of.
-      if (!haveThreat && !haveTeam && ourStructures.length === 0) return ZERO;
+      // Nothing to say about this tile if there is no threat border, no teammate border,
+      // no friendly umbrella, no bullseye ring to avoid and nothing of ours to stay clear
+      // of. (The magnet check is a FIX, not part of the samUmbrella work: it was missing,
+      // so a player with no structures and no untrusted border yet - i.e. one who has just
+      // spawned - got a ZERO scorer and placed its first buildings straight into a
+      // neighbour's hydrogen bullseye. It is the one term that needs nothing of ours.)
+      if (
+        !haveThreat &&
+        !haveTeam &&
+        umbrellas.length === 0 &&
+        samMagnets.length === 0 &&
+        ourStructures.length === 0
+      ) {
+        return ZERO;
+      }
 
       return (tile) => {
         let w = 0;
 
+        // Normalised clearance from the nearest border we do not trust: 0 on the front,
+        // 1 once we are `range` tiles clear of it. Computed once and used twice - as the
+        // threat term itself, and to attenuate the umbrella term below.
+        let frontSafety = 1;
         if (haveThreat) {
           const d = closestTile(game, threatFront, tile)[1];
           if (Number.isFinite(d)) {
-            w += SAFE_WEIGHT_THREAT * (Math.min(d, range) / range);
+            frontSafety = Math.min(d, range) / range;
+            w += SAFE_WEIGHT_THREAT * frontSafety;
           }
         }
 
@@ -2259,10 +2396,56 @@
           }
         }
 
+        // DIVERGENCE (samUmbrella, USER): reward sites a friendly SAM already covers, and
+        // work out how much of the pairing rule to switch off there.
+        //
+        // Graded by DEPTH, not by mere containment, and the unit of depth is the atom blast
+        // radius for a concrete reason: an enemy who cannot fly a warhead INTO the umbrella
+        // can still aim at a tile just OUTSIDE it and splash `atomOuter` tiles past the
+        // boundary. Only tiles that deep inside are actually out of reach. (Note this is
+        // the same geometry as the SAM-magnet ring above, seen from the other side.)
+        // The gradient also does useful work against src's own spacing term: ours pushes
+        // inward, src's pushes outward, and the pair settles in the atom-proof interior
+        // instead of hugging the rim.
+        let release = 0;
+        if (umbrellas.length > 0) {
+          let bestCover = 0;
+          let slots = 0;
+          for (const um of umbrellas) {
+            let dsq;
+            try {
+              dsq = game.euclideanDistSquared(um.tile, tile);
+            } catch (_e) {
+              continue;
+            }
+            if (!Number.isFinite(dsq) || dsq > um.range * um.range) continue;
+            const frac = Math.min((um.range - Math.sqrt(dsq)) / atomOuter, 1);
+            if (frac <= 0) continue;
+            const cover = frac * um.trust;
+            if (cover > bestCover) bestCover = cover;
+            // Slots add up across overlapping umbrellas, but only launchers we cannot lose
+            // to a broken alliance are allowed to release the pairing rule.
+            if (um.trust >= 1) slots += um.level * frac;
+          }
+          if (bestCover > 0) {
+            const attenuation =
+              UMBRELLA_FRONT_FLOOR + (1 - UMBRELLA_FRONT_FLOOR) * frontSafety;
+            w += SAFE_WEIGHT_SAM_UMBRELLA * bestCover * attenuation;
+          }
+          release = Math.min(slots / UMBRELLA_RELEASE_SLOTS, 1);
+        }
+
         // EUCLIDEAN, unlike src's manhattan spacing term: manhattan lets dx = dy = R pass
         // (it sums to 2R) while the true separation is only R*sqrt(2), i.e. both structures
         // sit comfortably inside one blast. No early exit — we need the true nearest, since
         // the term is a gradient rather than a yes/no test.
+        //
+        // `release` (samUmbrella) is how the user's second ask is implemented: at release = 1
+        // the term pays the SAME full credit at every distance, and per the note on
+        // SAFE_WEIGHT_SEPARATION a constant cannot change a ranking - so the spread rule
+        // genuinely stops choosing the tile inside the umbrella. Paying full credit rather
+        // than zero matters: dropping the term instead would quietly hand every uncovered
+        // tile a 60-point head start and steer us back out of the cover we just bought.
         if (ourStructures.length > 0) {
           let nearestSq = Infinity;
           for (const other of ourStructures) {
@@ -2277,7 +2460,8 @@
           }
           if (Number.isFinite(nearestSq)) {
             const d = Math.sqrt(nearestSq);
-            w += SAFE_WEIGHT_SEPARATION * (Math.min(d, blastPair) / blastPair);
+            const spread = Math.min(d, blastPair) / blastPair;
+            w += SAFE_WEIGHT_SEPARATION * (release + (1 - release) * spread);
           }
         }
 
@@ -2399,8 +2583,9 @@
     }
 
     // tilesNearFriendlySams — OUR-territory tiles that lie inside a friendly SAM's range.
-    // Prefers OUR SAMs; only if we have none does it fall back to ALLY SAMs (user rule).
-    // Returns up to maxTiles candidate TileRefs to feed silo placement.
+    // Prefers OUR + TEAMMATE SAMs; only if we have neither does it fall back to ALLY SAMs
+    // (user rule: an alliance can be broken, a team cannot). Returns up to maxTiles
+    // candidate TileRefs to feed silo / city / factory placement.
     tilesNearFriendlySams(maxTiles) {
       const game = this.game;
       if (typeof game.nearbyUnits !== "function" && typeof game.units !== "function") {
@@ -2413,6 +2598,12 @@
       } catch (_e) {
         return [];
       }
+      let myTeam = null;
+      try {
+        myTeam = this.player.team ? this.player.team() : null;
+      } catch (_e) {
+        myTeam = null;
+      }
       const own = [];
       const ally = [];
       for (const u of allSams) {
@@ -2420,13 +2611,22 @@
           if (u.isUnderConstruction && u.isUnderConstruction()) continue;
           const owner = u.owner && u.owner();
           if (!owner) continue;
-          if (owner.smallID && owner.smallID() === mySid) own.push(u);
+          // Keyed on team(), never isFriendly() - the latter is true for alliances too.
+          let theirTeam = null;
+          try {
+            theirTeam = owner.team ? owner.team() : null;
+          } catch (_e) {
+            theirTeam = null;
+          }
+          const teammate =
+            myTeam !== null && theirTeam !== null && theirTeam === myTeam;
+          if ((owner.smallID && owner.smallID() === mySid) || teammate) own.push(u);
           else if (this.player.isFriendly(owner) === true) ally.push(u);
         } catch (_e) {
           /* skip */
         }
       }
-      const useSams = own.length > 0 ? own : ally; // OUR SAMs first, else allies
+      const useSams = own.length > 0 ? own : ally; // ours + teammates first, else allies
       if (useSams.length === 0) return [];
       let cfg;
       try {

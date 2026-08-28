@@ -463,6 +463,11 @@
             </div>
 
             <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip-desc="${tr("Build inside a SAM umbrella - ours or a teammate's, since a launcher shoots down any enemy nuke aimed underneath it no matter who owns the ground. Sites are pulled deep enough in that an atom fired from outside the umbrella cannot reach them, and once about three intercept slots cover a spot, buildings stop being spread apart there at all.")}" data-tip="${tr("SAM umbrella")}">${tr("SAM umbrella")}</span>
+              <div class="ab-cfg-sw ${state.settings.samUmbrella ? "on" : ""}" data-cfg="samUmbrella"></div>
+            </div>
+
+            <div class="ab-cfg-row">
               <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}" data-tip="${tr("Phased opening")}">${tr("Phased opening")}</span>
               <div class="ab-cfg-sw ${state.settings.phasedOpening ? "on" : ""}" data-cfg="phasedOpening"></div>
             </div>
