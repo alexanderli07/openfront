@@ -88,6 +88,18 @@
     }
 
 
+    if (data.type === "SET_AUTO_LEAVE_ON_LOSS") {
+      setAutoLeaveOnLossEnabled(data.payload?.enabled);
+    }
+
+
+    // The lobby has always posted this; nothing was listening, because the engine file
+    // that implemented sosDefense was cut in the minimal strip.
+    if (data.type === "SET_SOS_DEFENSE") {
+      setSosDefenseEnabled(data.payload?.enabled);
+    }
+
+
     if (data.type === "APPLY_SELECTIVE_TRADE_POLICY") {
       const requestedAt = Number(data.payload?.requestedAt);
       if (Number.isFinite(requestedAt) && requestedAt !== lastSelectiveTradePolicyRequestAt) {

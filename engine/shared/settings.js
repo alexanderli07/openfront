@@ -50,6 +50,9 @@
     maxTeamCount: 5,
     keepAutoJoinAfterMatch: true,
     autoLeaveOnTeamWin: false,
+    // USER: the counterpart to the win option. Covers being ELIMINATED mid-game as well
+    // as another player/team/nation winning - see checkAutoLeave() in auto-leave.js.
+    autoLeaveOnLoss: false,
     markBotNationsRed: false,
     showGoldPerMinute: true,
     showTopGoldPerMinute: true,

@@ -209,6 +209,19 @@ function syncSosDefenseHelper() {
   );
 }
 
+function syncAutoLeaveOnLossHelper() {
+  window.postMessage(
+    {
+      source: BRIDGE_SOURCE_EXTENSION,
+      type: "SET_AUTO_LEAVE_ON_LOSS",
+      payload: {
+        enabled: Boolean(settings.autoLeaveOnLoss),
+      },
+    },
+    "*",
+  );
+}
+
 function syncNukePredictionHelper() {
   window.postMessage(
     {
@@ -763,6 +776,7 @@ function syncHelpers() {
   syncWarshipRoutesHelper();
   syncEstatePanelHelper();
   syncAutoLeaveOnTeamWinHelper();
+  syncAutoLeaveOnLossHelper();
   syncNukeSuggestionsHelper();
   syncAutoNukeHelper();
   syncSend1PercentBoatHelper();
