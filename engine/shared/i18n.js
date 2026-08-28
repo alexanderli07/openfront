@@ -349,6 +349,11 @@
     enemy: "enemy",
     neutral: "neutral",
 
+    // ---- SOS hotkey ----
+    "SOS sent to {n}": "SOS sent to {n}",
+    "No teammates or allies to call": "No teammates or allies to call",
+    "SOS on cooldown": "SOS on cooldown",
+    "SOS unavailable": "SOS unavailable",
     // ---- SOS defense (TN2) ----
     "SOS when attacked": "SOS when attacked",
     "When under attack, sends an SOS emoji to allies/teammates and marks the attacker for your team. Works with or without the auto-bot.":

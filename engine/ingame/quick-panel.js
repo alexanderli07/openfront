@@ -888,11 +888,37 @@
 
   // Hotkey code → human-readable label
 
+  /** A hotkey must never fire while the user is typing — the game's chat box and
+   *  any panel input would otherwise trigger destructive actions mid-sentence. */
+  function _typingInInput() {
+    try {
+      var el = document.activeElement;
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      var tag = (el.tagName || "").toUpperCase();
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  /** Shared hotkey matcher: builds "Shift+Ctrl+Alt+Meta+Code" from the event. */
+  function _hotkeyCodeOf(e) {
+    var parts = [];
+    if (e.shiftKey) parts.push("Shift");
+    if (e.ctrlKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.metaKey) parts.push("Meta");
+    parts.push(e.code);
+    return parts.join("+");
+  }
+
   // Kill shot hotkey listener
   var _killShotListening = false;
   function _installKillShotHotkey() {
     document.addEventListener("keydown", function(e) {
       if (_killShotListening) return; // don't fire while rebinding
+      if (_typingInInput()) return;   // never fire mid-chat
       var code = _getSetting("killShotHotkey", "Shift+KeyK");
       if (!code) return;
       // Build actual code from event
@@ -911,6 +937,112 @@
     });
   }
   _installKillShotHotkey();
+
+  // ── SOS hotkey (USER) ────────────────────────────────────────────────────────
+  // One key → 🆘 to every teammate AND ally. NOTE: the separate `sosDefense`
+  // auto-toggle is DEAD in this build (its engine file was cut in the minimal
+  // strip; setSosDefenseEnabled is declared nowhere and the panel's typeof guard
+  // silently hides that), so this hotkey is the only working SOS.
+  var SOS_COOLDOWN_MS = 8000; // the game rate-limits emojis too; don't spam intents
+  var _sosLastSentAt = 0;
+
+  /** 🆘's numeric id. The engine's emoji intent takes an INDEX into the game's
+   *  flattened emoji table, which emojiBehavior.js already ports verbatim — use
+   *  it when present so a future table reorder can't desync us, else fall back to
+   *  the current index (row 5, col 1 → 26). */
+  function _sosEmojiId() {
+    try {
+      if (typeof flattenedEmojiTable !== "undefined" && flattenedEmojiTable) {
+        var i = flattenedEmojiTable.indexOf("🆘");
+        if (i >= 0) return i;
+      }
+    } catch (_e) { /* fall through */ }
+    return 26;
+  }
+
+  /** Teammates AND allies (the user wants both — an SOS to an ally is exactly
+   *  what asking for help is). Tribes and the dead are skipped. */
+  function _sosRecipients(game, me) {
+    var out = [];
+    var players = [];
+    try { players = game.players ? game.players() : []; } catch (_e) { return out; }
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      try {
+        if (!p || !p.isPlayer || !p.isPlayer()) continue;
+        if (p.isAlive && !p.isAlive()) continue;
+        if (p.smallID && me.smallID && p.smallID() === me.smallID()) continue;
+        if (p.type && p.type() === "BOT") continue;
+        var friend = false;
+        try {
+          if (me.isOnSameTeam && me.isOnSameTeam(p)) friend = true;
+          else if (me.isAlliedWith && me.isAlliedWith(p)) friend = true;
+          else if (!friend && me.isFriendly && me.isFriendly(p)) friend = true;
+        } catch (_e2) { friend = false; }
+        if (friend) out.push(p);
+      } catch (_e3) { /* skip */ }
+    }
+    return out;
+  }
+
+  function _doSosCall() {
+    var now = Date.now();
+    if (now - _sosLastSentAt < SOS_COOLDOWN_MS) {
+      _toast("⏳ " + _tr("SOS on cooldown"), "rgba(120,120,120,0.92)");
+      return;
+    }
+    var ctx = null;
+    try { ctx = getOpenFrontGameContext(); } catch (_e) { ctx = null; }
+    var game = ctx && ctx.game;
+    var me = null;
+    try { me = game && game.myPlayer ? game.myPlayer() : null; } catch (_e) { me = null; }
+    if (!game || !me) {
+      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return;
+    }
+    var ctors = null;
+    try { ctors = discoverCtors(getEventBus()); } catch (_e) { ctors = null; }
+    if (!ctors || !ctors.emoji) {
+      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return;
+    }
+    var targets = _sosRecipients(game, me);
+    if (targets.length === 0) {
+      _toast("✗ " + _tr("No teammates or allies to call"), "rgba(220,40,40,0.92)");
+      return;
+    }
+    var id = _sosEmojiId();
+    var sent = 0;
+    for (var i = 0; i < targets.length; i++) {
+      try {
+        // The intent wants the underlying client PlayerView, not our wrapper —
+        // same unwrap emojiBehavior.sendEmoji does.
+        var recipient = targets[i].__src || targets[i];
+        if (emitIntent(ctors.emoji, recipient, id)) sent++;
+      } catch (_e) { /* one bad recipient must not abort the call */ }
+    }
+    if (sent === 0) {
+      _toast("✗ " + _tr("SOS unavailable"), "rgba(220,40,40,0.92)");
+      return;
+    }
+    _sosLastSentAt = now;
+    _toast("🆘 " + _tr("SOS sent to {n}").replace("{n}", String(sent)),
+      "rgba(220,60,60,0.95)");
+  }
+
+  function _installSosHotkey() {
+    document.addEventListener("keydown", function(e) {
+      if (_killShotListening) return; // a rebind capture is in progress
+      if (_typingInInput()) return;
+      var code = _getSetting("sosHotkey", "Shift+KeyS");
+      if (!code) return;
+      if (_hotkeyCodeOf(e) !== code) return;
+      e.preventDefault();
+      e.stopPropagation();
+      _doSosCall();
+    });
+  }
+  _installSosHotkey();
 
   function _resetAllSettings() {
     if (!confirm(_tr("Reset all settings to default? This will reload the page."))) return;
@@ -1403,6 +1535,9 @@
         break;
       case "killShot":
         _doKillShot();
+        break;
+      case "sosCall":
+        _doSosCall();
         break;
     }
   }

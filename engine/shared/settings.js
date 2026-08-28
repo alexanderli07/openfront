@@ -113,6 +113,9 @@
     // WS-injected actions (Quick Panel Actions tab)
     killShotInstantSend: false,
     killShotHotkey: "Shift+KeyK",
+    // USER: one key that sends 🆘 to every teammate AND ally at once. Empty
+    // string disables it. Same code format as killShotHotkey ("Shift+KeyS").
+    sosHotkey: "Shift+KeyS",
     atomBatchHotkey: "Backslash",
     embargoAutoRepeat: false,
     autoWarshipEnabled: false,
