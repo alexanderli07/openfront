@@ -493,6 +493,11 @@
     UNIT.DefensePost,
   ];
 
+  /** dpTangentSpacing: how far the post-spacing requirement may relax when a front is too
+   *  crowded or a territory too narrow to honour tangency. Strictest first; the last tier is
+   *  src's unconstrained sampler, because a shield that exists beats perfect geometry. */
+  const DP_SPACING_TIERS = [1, 0.8, 0.6, 0];
+
   /** defensePosts: minutes of income we are willing to have tied up in posts. */
   const DEFENSE_POST_INCOME_MINUTES = 1;
   /** defensePosts: absolute ceiling regardless of income. */
@@ -1206,6 +1211,37 @@
       return out;
     }
 
+    /** DIVERGENCE (dpTangentSpacing, USER): centre-to-centre distance at which two of our
+     *  defense posts sit exactly TANGENT - their auras meeting at a single tile - which is
+     *  also precisely the distance at which one atom stops being able to take both.
+     *
+     *  Tangency is the EXACT threshold here, not a near-enough approximation, and it is worth
+     *  writing down why. A post's aura is defensePostRange() = 30, an atom's outer radius is
+     *  30, and NukeExecution destroys a unit only when
+     *      euclideanDistSquared(dst, unit.tile()) < outer * outer
+     *  - STRICTLY less than. With the centres 2r apart, the only tile in reach of both is the
+     *  midpoint, at exactly r from each, where that strict compare fails and BOTH posts
+     *  survive. One tile closer and a single warhead takes the pair. The same 2r is the most
+     *  border two posts can cover with zero wasted overlap, so the nuke-safety optimum and
+     *  the coverage optimum are the same number.
+     *
+     *  Read from the config, as the max of the two radii, so the rule stays correct if the
+     *  game rebalances either one. Note this is centre-to-centre in the plane: a post sited
+     *  DEEPER than r has an aura that no longer reaches the border at all (see the depth plan
+     *  in tryBuildDefensePost), so along-border coverage is a separate question from this. */
+    dpTangentSeparation() {
+      const { borderSpacing } = this.spacingConstants();
+      let r = borderSpacing; // borderSpacing IS the atom outer radius
+      try {
+        const cfg = this.game.config();
+        const aura = Number(cfg.defensePostRange ? cfg.defensePostRange() : 0);
+        if (Number.isFinite(aura) && aura > r) r = aura;
+      } catch (_e) {
+        /* keep the atom radius */
+      }
+      return 2 * Math.max(1, r);
+    }
+
     // countDefensePostsNearFront — NationStructureBehavior.ts:269.
     // DIVERGENCE (defensePostTiming): optional maxDepth widens "near the front" to
     // at least the depth the timing plan actually places posts at — a deep-sited
@@ -1260,58 +1296,94 @@
       const borderTiles = player.borderTiles();
       const mySid = player.smallID();
 
-      // Spread: prefer front tiles far from existing defense posts so successive
-      // posts don't cluster at the same spot along the attack line.
-      const spreadRangeSquared = (borderSpacing * 1.5) ** 2;
+      // DIVERGENCE (dpTangentSpacing, USER: "spread our shield placements as well so that
+      // atom bombs dont hit multiple shields, just make the shields circle exactly tangent
+      // touching at one area"). Two things were wrong with the old spread rule:
+      //
+      //   * the distance was borderSpacing * 1.5 = 45 tiles. Two posts share an atom blast
+      //     whenever they are under 2 x 30 = 60 apart, so 45 permitted exactly the pairing
+      //     the user is objecting to. It is now the tangent separation - see
+      //     dpTangentSeparation() for why tangency is the exact threshold; and
+      //   * it was enforced on the front ANCHOR, never on the chosen tile. That was the real
+      //     hole: the anchor filter only kept the sampling ORIGIN clear of existing posts,
+      //     and the site is then offset from that origin by up to searchRadius, so the post
+      //     itself could still land right on top of a neighbour.
+      //
+      // Tiered rather than absolute, so a crowded front or a narrow strip of land still gets
+      // a shield: strictest first, last tier is src's unconstrained sampler.
+      const tangentSep = this.dpTangentSeparation();
       const existingDPTiles = player
         .units(UNIT.DefensePost)
         .map((u) => u.tile());
 
-      let anchors;
-      if (existingDPTiles.length > 0) {
-        anchors = frontTiles.filter(
-          (ft) =>
-            !existingDPTiles.some(
-              (dp) => game.euclideanDistSquared(ft, dp) < spreadRangeSquared,
-            ),
-        );
-        if (anchors.length === 0) anchors = frontTiles;
-      } else {
-        anchors = frontTiles;
+      const farEnough = (t, sepSq) => {
+        if (sepSq <= 0) return true;
+        for (const dp of existingDPTiles) {
+          if (game.euclideanDistSquared(t, dp) < sepSq) return false;
+        }
+        return true;
+      };
+
+      for (let tier = 0; tier < DP_SPACING_TIERS.length; tier++) {
+        const frac = DP_SPACING_TIERS[tier];
+        const sep = tangentSep * frac;
+        const sepSq = sep * sep;
+
+        let anchors = frontTiles;
+        if (existingDPTiles.length > 0 && sepSq > 0) {
+          anchors = frontTiles.filter((ft) => farEnough(ft, sepSq));
+          // No part of this front is even that clear — no point sampling it, relax instead.
+          if (anchors.length === 0) continue;
+        }
+
+        const result = [];
+        for (
+          let attempt = 0;
+          attempt < count * 6 && result.length < count;
+          attempt++
+        ) {
+          const anchor = this.random.randElement(anchors);
+          const ax = game.x(anchor);
+          const ay = game.y(anchor);
+          const x = this.random.nextInt(ax - searchRadius, ax + searchRadius + 1);
+          const y = this.random.nextInt(ay - searchRadius, ay + searchRadius + 1);
+          if (!game.isValidCoord(x, y)) continue;
+          const t = game.ref(x, y);
+          // src: if (game.owner(t) !== player) continue; → smallID compare.
+          if (game.ownerID(t) !== mySid) continue;
+          const closest = closestTile(game, borderTiles, t);
+          const borderDist = closest[1];
+          if (borderDist < minBorderDist || borderDist > maxBorderDist) continue;
+          // THE FIX: the SITE has to clear the neighbours, not just the anchor.
+          if (!farEnough(t, sepSq)) continue;
+          // src: if (!player.canBuild(unitType, t)) continue; → moved to probe phase.
+          result.push(t);
+        }
+
+        if (result.length > 0) {
+          if (frac < 1) {
+            ofhDebug(
+              "[DPost] tangent spacing " +
+                Math.round(tangentSep) +
+                " unsatisfiable here — relaxed to " +
+                Math.round(sep) +
+                "; a shield inside a neighbour's blast beats no shield",
+            );
+          }
+          return result;
+        }
       }
 
-      const result = [];
-      for (
-        let attempt = 0;
-        attempt < count * 6 && result.length < count;
-        attempt++
-      ) {
-        const anchor = this.random.randElement(anchors);
-        const ax = game.x(anchor);
-        const ay = game.y(anchor);
-        const x = this.random.nextInt(ax - searchRadius, ax + searchRadius + 1);
-        const y = this.random.nextInt(ay - searchRadius, ay + searchRadius + 1);
-        if (!game.isValidCoord(x, y)) continue;
-        const t = game.ref(x, y);
-        // src: if (game.owner(t) !== player) continue; → smallID compare.
-        if (game.ownerID(t) !== mySid) continue;
-        const closest = closestTile(game, borderTiles, t);
-        const borderDist = closest[1];
-        if (borderDist < minBorderDist || borderDist > maxBorderDist) continue;
-        // src: if (!player.canBuild(unitType, t)) continue; → moved to probe phase.
-        result.push(t);
-      }
-
-      if (result.length > 0) return result;
-
-      // Fallback: relax border-depth constraint (territory too small for depth ring)
+      // Fallback: relax the border-DEPTH constraint too (territory too small for the depth
+      // ring). Spacing is already fully relaxed by the last tier above, and the anchor set
+      // goes back to the whole front — this is the last resort before building nothing.
       const fallback = [];
       for (
         let attempt = 0;
         attempt < count * 4 && fallback.length < count;
         attempt++
       ) {
-        const anchor = this.random.randElement(anchors);
+        const anchor = this.random.randElement(frontTiles);
         const ax = game.x(anchor);
         const ay = game.y(anchor);
         const x = this.random.nextInt(ax - searchRadius, ax + searchRadius + 1);
