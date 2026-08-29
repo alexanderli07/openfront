@@ -41,14 +41,30 @@
       }
       #${PANEL_ID} .ab-head:active { cursor: grabbing; }
       #${PANEL_ID} .ab-title { font-weight: 800; font-size: 11.5px; letter-spacing: 0.2px; color: var(--oh-panel-text, #e2e8f0); flex: 1; }
+      /* ---- shared panel-chrome tokens: see the note in floating-autojoin.js. Duplicated
+         VERBATIM across the three panels because the lobby and in-game layers are separate
+         IIFEs in the build. Change one, change all three. ---- */
+      :root {
+        --ofh-ctl-size: 22px; --ofh-ctl-radius: 6px; --ofh-ctl-font: 12px;
+        --ofh-dot-size: 8px;
+      }
+      @keyframes ofhStatusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
       #${PANEL_ID} .ab-head-btns { display: flex; align-items: center; gap: 1px; }
       #${PANEL_ID} .ab-mini, #${PANEL_ID} .ab-close {
-        background: transparent; border: none; color: var(--ab-muted);
-        cursor: pointer; font-size: 13px; line-height: 1; width: 20px; height: 20px;
-        border-radius: 6px; display: grid; place-items: center; transition: .14s;
+        background: transparent; border: 1px solid transparent; color: var(--oh-panel-text-dim, #94a3b8);
+        cursor: pointer; font-size: var(--ofh-ctl-font); font-weight: 700; line-height: 1;
+        width: var(--ofh-ctl-size); height: var(--ofh-ctl-size);
+        border-radius: var(--ofh-ctl-radius); display: grid; place-items: center;
+        transition: background .14s, color .14s, border-color .14s;
       }
-      #${PANEL_ID} .ab-mini:hover { color: #fff; background: var(--ab-surface-2); }
-      #${PANEL_ID} .ab-close:hover { color: #fca5a5; background: rgba(248,113,113,0.15); }
+      #${PANEL_ID} .ab-mini:hover {
+        color: var(--oh-panel-text, #e2e8f0);
+        background: var(--oh-accent-soft, rgba(96,165,250,0.15));
+        border-color: var(--oh-accent-muted, rgba(96,165,250,0.6));
+      }
+      #${PANEL_ID} .ab-close:hover {
+        color: #fca5a5; background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.6);
+      }
       #${PANEL_ID} .ab-switch {
         position: relative; width: 36px; height: 20px; border-radius: 999px;
         background: rgba(120,130,130,.3); cursor: pointer; transition: .18s; flex: none;
@@ -73,8 +89,14 @@
       #${PANEL_ID}.ab-collapsed .ab-body { display: none; }
       #${PANEL_ID}.ab-collapsed .ab-tabs { display: none; }
       #${PANEL_ID} .ab-gate-dot {
-        width: 8px; height: 8px; border-radius: 50%; flex: none; cursor: help;
+        width: var(--ofh-dot-size); height: var(--ofh-dot-size); border-radius: 50%;
+        flex: none; cursor: help;
         background: currentColor; box-shadow: 0 0 6px currentColor;
+      }
+      /* Waiting is the state that wants your eye, so that is the one that flashes;
+         once we are in the game it goes green and steady. setGateDot() sets the flag. */
+      #${PANEL_ID} .ab-gate-dot[data-live="waiting"] {
+        animation: ofhStatusPulse 1.4s ease-in-out infinite;
       }
       #${PANEL_ID} .ab-row {
         display: flex; align-items: center; justify-content: space-between;
@@ -329,7 +351,7 @@
     if (state.activeTab === "config") panel.classList.add("ab-tab-config");
     panel.innerHTML = `
       <div class="ab-head">
-        <div class="ab-gate-dot" data-role="gate-dot" style="color:#fbbf24;" data-tip="${tr("Lobby status")}" data-tip-desc="${tr("Checking lobby…")}"></div>
+        <div class="ab-gate-dot" data-role="gate-dot" data-live="waiting" style="color:#fbbf24;" data-tip="${tr("Lobby status")}" data-tip-desc="${tr("Checking lobby…")}"></div>
         <span class="ab-title">Auto-Bot</span>
         <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" data-tip="${tr("Toggle on/off")}" data-tip-desc="${tr("Start or stop the bot. Persists across reloads, so it resumes on the next game.")}"></div>
         <div class="ab-head-btns">
@@ -893,12 +915,14 @@
     const game = getGame();
     if (!game) {
       dot.style.color = "#fbbf24";
+      dot.dataset.live = "waiting";
       dot.dataset.tipDesc = tr("Waiting to enter game…");
       return;
     }
     const type = gameType(game);
     if (type) {
       dot.style.color = "#4ade80";
+      dot.dataset.live = "in-game";
       let label;
       if (type === "Singleplayer") label = tr("Singleplayer");
       else if (type === "Public") label = tr("Public lobby");
@@ -906,6 +930,7 @@
       dot.dataset.tipDesc = label;
     } else {
       dot.style.color = "#fbbf24";
+      dot.dataset.live = "waiting";
       dot.dataset.tipDesc = tr("Waiting to enter game…");
     }
   }

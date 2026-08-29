@@ -324,16 +324,42 @@
       "  flex:1; font-size:11.5px; font-weight:800; letter-spacing:0.2px;",
       "  color:var(--oh-panel-text);",
       "}",
-      ".ohqp-conn { font-size:8px; margin-right:2px; }",
-      ".ohqp-conn[data-status='connected'] { color:#4ade80; }",
-      ".ohqp-conn[data-status='disconnected'] { color:#f87171; }",
+      /* ---- shared panel-chrome tokens: see the note in floating-autojoin.js. The two
+         layers are separate IIFEs, so these values are duplicated VERBATIM in
+         floating-autojoin.js and auto-bot/panel.js. Change one, change all three. ---- */
+      ":root {",
+      "  --ofh-ctl-size:22px; --ofh-ctl-radius:6px; --ofh-ctl-font:12px;",
+      "  --ofh-dot-size:8px;",
+      "}",
+      "@keyframes ofhStatusPulse { 0%,100%{opacity:1;} 50%{opacity:0.28;} }",
+      /* A real circle, not a text bullet. The glyph rendered ~4px of ink at font-size:8px
+         while the other two panels drew 8px and 14px discs - the same status, three
+         different sizes. */
+      ".ohqp-conn {",
+      "  display:inline-block; width:var(--ofh-dot-size); height:var(--ofh-dot-size);",
+      "  border-radius:50%; margin-right:5px; flex:none; font-size:0; line-height:0;",
+      "}",
+      ".ohqp-conn[data-status='connected'] { background:#4ade80; box-shadow:0 0 6px #4ade80; }",
+      /* Disconnected is the state that wants your eye, so that is the one that flashes. */
+      ".ohqp-conn[data-status='disconnected'] {",
+      "  background:#f87171; box-shadow:0 0 6px #f87171;",
+      "  animation:ofhStatusPulse 1.4s ease-in-out infinite;",
+      "}",
       ".ohqp-min-btn {",
       "  display:inline-flex; align-items:center; justify-content:center;",
-      "  width:20px; height:20px; border:1px solid var(--oh-panel-border);",
-      "  border-radius:6px; background:rgba(15,23,42,0.5); color:var(--oh-panel-text);",
-      "  font-size:12px; font-weight:800; cursor:pointer;",
+      "  width:var(--ofh-ctl-size); height:var(--ofh-ctl-size);",
+      "  border:1px solid transparent; border-radius:var(--ofh-ctl-radius);",
+      "  background:transparent; color:var(--oh-panel-text-dim,#94a3b8);",
+      "  font-size:var(--ofh-ctl-font); font-weight:700; line-height:1; cursor:pointer;",
+      "  transition:background .14s, color .14s, border-color .14s;",
       "}",
-      ".ohqp-min-btn:hover { background:var(--oh-accent-soft); }",
+      ".ohqp-min-btn:hover {",
+      "  background:var(--oh-accent-soft); border-color:var(--oh-accent-muted);",
+      "  color:var(--oh-panel-text);",
+      "}",
+      ".ohqp-close-btn:hover {",
+      "  background:rgba(248,113,113,0.15); border-color:rgba(248,113,113,0.6); color:#fca5a5;",
+      "}",
       ".ohqp-tabs {",
       "  display:flex; gap:3px; padding:7px 10px; background:rgba(0,0,0,0.25);",
       "  border-bottom:1px solid var(--oh-panel-header-border); flex-shrink:0;",
@@ -772,7 +798,6 @@
     conn.id = "ohqp-connection";
     conn.className = "ohqp-conn";
     conn.dataset.status = "disconnected";
-    conn.textContent = "●";
     conn.title = "WebSocket status";
     var title = document.createElement("div");
     title.className = "ohqp-title";
@@ -781,19 +806,20 @@
     var minBtn = document.createElement("button");
     minBtn.type = "button";
     minBtn.className = "ohqp-min-btn";
-    minBtn.textContent = "▾";
+    // Same glyph pair as the other two panels: em dash collapses, ▢ restores.
+    minBtn.textContent = "—";
     minBtn.title = "Minimize / Restore";
     minBtn.addEventListener("click", function() {
       var p = document.getElementById(QUICK_PANEL_ID);
       if (!p) return;
       var isMin = p.dataset.minimized === "true";
       p.dataset.minimized = isMin ? "false" : "true";
-      minBtn.textContent = isMin ? "▾" : "▴";
+      minBtn.textContent = isMin ? "—" : "▢";
     });
     var xBtn = document.createElement("button");
     xBtn.type = "button";
-    xBtn.className = "ohqp-min-btn";
-    xBtn.textContent = "×";
+    xBtn.className = "ohqp-min-btn ohqp-close-btn";
+    xBtn.textContent = "✕";
     xBtn.title = "Close";
     xBtn.addEventListener("click", function() {
       var p = document.getElementById(QUICK_PANEL_ID);

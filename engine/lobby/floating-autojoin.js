@@ -15,6 +15,22 @@ function ensureFloatingAutoJoinStyles() {
   const style = document.createElement("style");
   style.id = FLOATING_AUTOJOIN_STYLE_ID;
   style.textContent = `
+    /* ---- shared panel-chrome tokens (USER: the three panels' window controls and
+       status dots must be identical). DUPLICATED VERBATIM in quick-panel.js and
+       auto-bot/panel.js: the lobby layer and the in-game layer are separate IIFEs in
+       the build, so they cannot share a JS constant - these tokens ARE the contract.
+       Change one, change all three. ---- */
+    :root {
+      --ofh-ctl-size: 22px;      /* window-control hit box */
+      --ofh-ctl-radius: 6px;
+      --ofh-ctl-font: 12px;
+      --ofh-dot-size: 8px;       /* every panel status dot */
+    }
+    @keyframes ofhStatusPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.28; }
+    }
+
     #${FLOATING_AUTOJOIN_PANEL_ID} {
       position: fixed;
       left: var(--ofh-aj-left, 18px);
@@ -83,32 +99,33 @@ function ensureFloatingAutoJoinStyles() {
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-iconbtn {
       display: grid;
       place-items: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 7px;
-      border: 1px solid var(--oh-panel-border, rgba(148,163,184,0.34));
-      background: var(--oh-panel-bg, rgba(12,18,20,0.92));
-      color: var(--oh-panel-text, #e2e8f0);
+      width: var(--ofh-ctl-size);
+      height: var(--ofh-ctl-size);
+      border-radius: var(--ofh-ctl-radius);
+      /* The border is always present and only changes COLOUR on hover - a transparent
+         border rather than none, so hovering never reflows the row by a pixel. */
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--oh-panel-text-dim, #94a3b8);
       cursor: pointer;
-      font-size: 13px;
-      font-weight: 900;
+      font-size: var(--ofh-ctl-font);
+      font-weight: 700;
       line-height: 1;
+      transition: background .14s, color .14s, border-color .14s;
     }
 
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-iconbtn:hover {
+      background: var(--oh-accent-soft, rgba(96,165,250,0.15));
       border-color: var(--oh-accent-muted, rgba(96,165,250,0.6));
       color: var(--oh-panel-text, #e2e8f0);
     }
 
-    #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-close {
-      border-color: rgba(248,113,113,0.34);
-      background: var(--oh-panel-bg, rgba(12,18,20,0.92));
-      color: var(--oh-panel-text, #e2e8f0);
-    }
-
+    /* Close keeps its red affordance - that distinction is meaningful, unlike the
+       size/glyph differences this change removes. */
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-close:hover {
+      background: rgba(248,113,113,0.15);
       border-color: rgba(248,113,113,0.6);
-      color: var(--oh-panel-text, #e2e8f0);
+      color: #fca5a5;
     }
 
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-body {
@@ -151,8 +168,8 @@ function ensureFloatingAutoJoinStyles() {
 
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-power-dot {
       flex: 0 0 auto;
-      width: 14px;
-      height: 14px;
+      width: var(--ofh-dot-size);
+      height: var(--ofh-dot-size);
       border-radius: 50%;
       background: var(--oh-panel-text-dim, rgba(148,163,184,0.85));
       box-shadow: 0 0 0 4px var(--oh-accent-soft, rgba(96,165,250,0.15));
@@ -170,6 +187,8 @@ function ensureFloatingAutoJoinStyles() {
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-power[data-enabled="true"] .ofh-aj-power-dot {
       background: var(--oh-accent, #60a5fa);
       box-shadow: 0 0 0 4px var(--oh-accent-soft, rgba(96,165,250,0.15)), 0 0 12px var(--oh-accent-muted, rgba(96,165,250,0.6));
+      /* Live = flashing, on every panel. Idle stays steady so the flash means something. */
+      animation: ofhStatusPulse 1.4s ease-in-out infinite;
     }
 
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-notif {
@@ -299,8 +318,8 @@ function ensureFloatingAutoJoinStyles() {
     }
 
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-timer-dot {
-      width: 8px;
-      height: 8px;
+      width: var(--ofh-dot-size);
+      height: var(--ofh-dot-size);
       border-radius: 50%;
       background: var(--oh-accent, #60a5fa);
       box-shadow: 0 0 8px var(--oh-accent, #60a5fa);
@@ -571,7 +590,7 @@ function createFloatingAutoJoinPanel() {
       <div class="ofh-aj-header-actions">
         <button class="ofh-aj-iconbtn" type="button" data-role="settings" title="${t("Open settings")}">⚙</button>
         <button class="ofh-aj-iconbtn" type="button" data-role="collapse" title="${t("Collapse")}">—</button>
-        <button class="ofh-aj-iconbtn ofh-aj-close" type="button" data-role="close" aria-label="${t("Close auto-join panel")}">x</button>
+        <button class="ofh-aj-iconbtn ofh-aj-close" type="button" data-role="close" aria-label="${t("Close auto-join panel")}">✕</button>
       </div>
     </div>
     <div class="ofh-aj-body">
