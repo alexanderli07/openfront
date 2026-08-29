@@ -46,10 +46,10 @@
          IIFEs in the build. Change one, change all three. ---- */
       :root {
         --ofh-ctl-size: 22px; --ofh-ctl-radius: 6px; --ofh-ctl-font: 12px;
-        --ofh-dot-size: 8px;
+        --ofh-dot-size: 8px; --ofh-ctl-gap: 6px;
       }
       @keyframes ofhStatusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
-      #${PANEL_ID} .ab-head-btns { display: flex; align-items: center; gap: 1px; }
+      #${PANEL_ID} .ab-head-btns { display: flex; align-items: center; gap: var(--ofh-ctl-gap, 6px); }
       #${PANEL_ID} .ab-mini, #${PANEL_ID} .ab-close {
         background: transparent; border: 1px solid transparent; color: var(--oh-panel-text-dim, #94a3b8);
         cursor: pointer; font-size: var(--ofh-ctl-font); font-weight: 700; line-height: 1;
@@ -93,8 +93,8 @@
         flex: none; cursor: help;
         background: currentColor; box-shadow: 0 0 6px currentColor;
       }
-      /* Waiting is the state that wants your eye, so that is the one that flashes;
-         once we are in the game it goes green and steady. setGateDot() sets the flag. */
+      /* Waiting is the state that wants your eye, so that is the one that flashes; once we
+         are in the game it goes green and steady. refreshGateBanner() sets the flag. */
       #${PANEL_ID} .ab-gate-dot[data-live="waiting"] {
         animation: ofhStatusPulse 1.4s ease-in-out infinite;
       }

@@ -226,8 +226,13 @@
   }
 
   /** safePlacement: distance at which the "away from a threat border" term saturates,
-   *  as a multiple of the atom blast radius. Past this, extra depth buys nothing real and
-   *  would just out-shout the elevation and spacing terms. */
+   *  as a multiple of the atom blast radius. Past this, extra THREAT credit buys nothing
+   *  real and would just out-shout the elevation and spacing terms.
+   *
+   *  Note this is about the threat term only. Depth past this point is NOT worthless — that
+   *  was the v1.70 bug: with this the only distance term, a site 100 tiles back scored the
+   *  same as one 400 tiles back. SAFE_WEIGHT_DEPTH now carries depth past the saturation
+   *  point, and reuses this same constant as the shape parameter of its own curve. */
   const SAFE_PLACEMENT_RANGE_MULT = 3;
   /** safePlacement: weight of the "far from any border we do not trust" term. Sized to
    *  compete with src's own terms rather than dominate them: elevation contributes ~0-10
@@ -1305,6 +1310,25 @@
       const borderTiles = player.borderTiles();
       const mySid = player.smallID();
 
+      // METRIC FIX: closestTile measures MANHATTAN distance (portutil), but the caller's
+      // timing gate in tryBuildDefensePost filters candidates with euclideanDistSquared.
+      // On a front running diagonally, manhattan overstates depth by up to sqrt(2), so a
+      // plan of {min:72,max:95} manhattan is only 51..67 euclidean — entirely below the
+      // gate's etaNeed of 72. Every candidate was then rejected and the bot logged "no
+      // candidate deep enough" on every pass for the whole attack while sitting on land
+      // that was deep enough. Use the caller's metric whenever the timing plan is driving
+      // the band; keep manhattan for the default band, which is 1:1 with src.
+      const depthOf = depthPlan
+        ? (t) => {
+            let best = Infinity;
+            for (const b of borderTiles) {
+              const d = game.euclideanDistSquared(b, t);
+              if (d < best) best = d;
+            }
+            return Math.sqrt(best);
+          }
+        : (t) => closestTile(game, borderTiles, t)[1];
+
       // DIVERGENCE (dpTangentSpacing, USER: "spread our shield placements as well so that
       // atom bombs dont hit multiple shields, just make the shields circle exactly tangent
       // touching at one area"). Two things were wrong with the old spread rule:
@@ -1340,9 +1364,18 @@
 
         let anchors = frontTiles;
         if (existingDPTiles.length > 0 && sepSq > 0) {
-          anchors = frontTiles.filter((ft) => farEnough(ft, sepSq));
-          // No part of this front is even that clear — no point sampling it, relax instead.
-          if (anchors.length === 0) continue;
+          const clear = frontTiles.filter((ft) => farEnough(ft, sepSq));
+          // Prefer clear anchors, but NEVER let them veto the tier. The anchor sits on the
+          // border at depth 0 while the SITE lives in [minBorderDist, maxBorderDist] and is
+          // offset from the anchor by up to searchRadius — so "every front tile is within
+          // 60 of a post" says nothing about whether a tangent-legal SITE exists in the
+          // band. It very often does, because v1.64's depthPlan can push the band far
+          // deeper than the posts themselves. Skipping the tier here silently relaxed the
+          // spacing rule to 48 or 36 and sited a post inside a neighbour's blast — the
+          // exact pairing this whole mechanism exists to prevent. The site filter below is
+          // the real test; this is only a sampling bias, and it is kept because it is also
+          // the fast path in the common same-depth case.
+          if (clear.length > 0) anchors = clear;
         }
 
         const result = [];
@@ -1360,8 +1393,7 @@
           const t = game.ref(x, y);
           // src: if (game.owner(t) !== player) continue; → smallID compare.
           if (game.ownerID(t) !== mySid) continue;
-          const closest = closestTile(game, borderTiles, t);
-          const borderDist = closest[1];
+          const borderDist = depthOf(t);
           if (borderDist < minBorderDist || borderDist > maxBorderDist) continue;
           // THE FIX: the SITE has to clear the neighbours, not just the anchor.
           if (!farEnough(t, sepSq)) continue;
@@ -2269,7 +2301,13 @@
       // cities and factories. Ports are left out on purpose: their candidates already come
       // from the much smaller set of valid shore sites, usually below the 25-tile sample
       // size, so every coastal tile inside the umbrella gets scored anyway.
+      // Co-gated on safePlacement: EVERY term that rewards an umbrella tile lives inside
+      // safePlacementScorer, which returns ZERO when safePlacement is off. The two are
+      // independent switches in the panel, so samUmbrella-on / safePlacement-off used to
+      // inject 25 SAM-ring tiles that nothing could score - biasing the pool toward the
+      // ring for no reason, and (before the dedupe) crowding out random candidates.
       const injectUmbrella =
+        state.settings.safePlacement &&
         state.settings.samUmbrella &&
         (type === UNIT.City || type === UNIT.Factory);
       if (
@@ -2384,7 +2422,9 @@
     }
 
     /** DIVERGENCE (safePlacement): a weighting system for WHERE to build, layered on top
-     *  of src's elevation / away-from-border / away-from-same-type terms. Three components:
+     *  of src's elevation / away-from-border / away-from-same-type terms. Six components -
+     *  the three below, plus the SAM-magnet ring penalty, the samUmbrella bonus (v1.68) and
+     *  the non-saturating depth term (v1.70). Each is documented at its own constant:
      *
      *    + far from any border we do NOT trust. "Untrusted" means everyone who is not an
      *      actual TEAMMATE — enemies obviously, but ALLIES too, because an alliance can be

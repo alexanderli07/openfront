@@ -25,6 +25,7 @@ function ensureFloatingAutoJoinStyles() {
       --ofh-ctl-radius: 6px;
       --ofh-ctl-font: 12px;
       --ofh-dot-size: 8px;       /* every panel status dot */
+      --ofh-ctl-gap: 6px;        /* spacing inside a window-control cluster */
     }
     @keyframes ofhStatusPulse {
       0%, 100% { opacity: 1; }

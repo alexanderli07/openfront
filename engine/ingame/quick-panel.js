@@ -329,7 +329,7 @@
          floating-autojoin.js and auto-bot/panel.js. Change one, change all three. ---- */
       ":root {",
       "  --ofh-ctl-size:22px; --ofh-ctl-radius:6px; --ofh-ctl-font:12px;",
-      "  --ofh-dot-size:8px;",
+      "  --ofh-dot-size:8px; --ofh-ctl-gap:6px;",
       "}",
       "@keyframes ofhStatusPulse { 0%,100%{opacity:1;} 50%{opacity:0.28;} }",
       /* A real circle, not a text bullet. The glyph rendered ~4px of ink at font-size:8px
@@ -340,11 +340,12 @@
       "  border-radius:50%; margin-right:5px; flex:none; font-size:0; line-height:0;",
       "}",
       ".ohqp-conn[data-status='connected'] { background:#4ade80; box-shadow:0 0 6px #4ade80; }",
-      /* Disconnected is the state that wants your eye, so that is the one that flashes. */
-      ".ohqp-conn[data-status='disconnected'] {",
-      "  background:#f87171; box-shadow:0 0 6px #f87171;",
-      "  animation:ofhStatusPulse 1.4s ease-in-out infinite;",
-      "}",
+      /* Deliberately NOT animated. 'disconnected' is the ordinary idle state - it is what
+         the home and lobby screens look like - so pulsing it would mean the header dot
+         flashed red the whole time nothing was wrong, which is worse than not flashing at
+         all. The shared keyframe is still the contract; the two panels whose live state IS
+         exceptional (auto-join armed, auto-bot waiting for a game) are the ones that use it. */
+      ".ohqp-conn[data-status='disconnected'] { background:#f87171; box-shadow:0 0 6px #f87171; }",
       ".ohqp-min-btn {",
       "  display:inline-flex; align-items:center; justify-content:center;",
       "  width:var(--ofh-ctl-size); height:var(--ofh-ctl-size);",
@@ -797,7 +798,16 @@
     var conn = document.createElement("span");
     conn.id = "ohqp-connection";
     conn.className = "ohqp-conn";
-    conn.dataset.status = "disconnected";
+    // Seed from the LIVE socket, not from a literal. ws-hook only writes this dot on a
+    // state TRANSITION, so a panel opened after the socket was already up used to sit on a
+    // hardcoded "disconnected" for the rest of the session.
+    var _connLive = false;
+    try {
+      _connLive = typeof isSocketConnected === "function" && isSocketConnected() === true;
+    } catch (_e) {
+      _connLive = false;
+    }
+    conn.dataset.status = _connLive ? "connected" : "disconnected";
     conn.title = "WebSocket status";
     var title = document.createElement("div");
     title.className = "ohqp-title";
@@ -965,10 +975,11 @@
   _installKillShotHotkey();
 
   // ── SOS hotkey (USER) ────────────────────────────────────────────────────────
-  // One key → 🆘 to every teammate AND ally. NOTE: the separate `sosDefense`
-  // auto-toggle is DEAD in this build (its engine file was cut in the minimal
-  // strip; setSosDefenseEnabled is declared nowhere and the panel's typeof guard
-  // silently hides that), so this hotkey is the only working SOS.
+  // One key → 🆘 to every teammate AND ally: the MANUAL send path. `sosDefense` was a dead
+  // toggle when this landed (its engine file was cut in the minimal strip, so
+  // setSosDefenseEnabled did not exist and the panel's typeof dispatch hid that silently) —
+  // v1.69 revived it on top of this path, so the automatic trigger now lives in
+  // _sosDistress / _sosAutoTick / setSosDefenseEnabled further down this file.
   var SOS_COOLDOWN_MS = 8000; // the game rate-limits emojis too; don't spam intents
   var _sosLastSentAt = 0;
 
