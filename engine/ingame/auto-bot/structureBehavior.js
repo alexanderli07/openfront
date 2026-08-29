@@ -354,6 +354,15 @@
    *  placement - bounded, and it runs at most once per build. */
   const DEEP_PROBE_TILES = 200;
   const DEEP_FRONT_SAMPLE = 32;
+  /** structureSpawnTile: how many ranked candidates we are willing to PROBE.
+   *
+   *  Scoring is sync and cheap, so every candidate is still scored; this only bounds the
+   *  async tail. Each probe is a buildables() worker round-trip wrapped in withTimeout, and
+   *  the two injections (deep + umbrella) can hand the loop 75 candidates where src handed
+   *  it 25 - so without a cap a single city placement could sit through 75 sequential worker
+   *  calls. The cap is generous rather than tight because dropping a candidate can only cost
+   *  us a placement this tick, and it logs when it truncates. */
+  const MAX_SPAWN_PROBES = 40;
 
   /** samDefense: what each asset class is worth PROTECTING, independent of its level.
    *  Ports and Factories are the economy — they mint the gold that pays for the troops,
@@ -2235,22 +2244,14 @@
         type === UNIT.Port
           ? this.randCoastalTileArray(25)
           : randTerritoryTileArray(this.random, this.game, this.player, 25);
-      // WIN-FIX: for silos, PREPEND tiles that sit inside friendly SAM coverage (own SAMs
-      // first, ally SAMs as fallback) so the ranked probe can actually pick a defended
-      // spot — a plain 25-tile random sample often misses the SAM area entirely.
-      //
-      // DIVERGENCE (samUmbrella, USER): cities and factories need the same injection for
-      // the same reason. A siting SCORE can only rank the candidates it is handed, and the
-      // candidate set is 25 tiles drawn at random from the whole territory - on a large map
-      // that sample can miss the umbrella completely, and no weighting can rescue a tile
-      // that was never offered. Ports are left out on purpose: their candidates already
-      // come from the (much smaller) set of valid shore sites, which is often below the
-      // 25-tile sample size, so every coastal tile inside the umbrella gets scored anyway.
+      // Both injections below exist for the SAME reason: a siting score can only rank the
+      // candidates it is handed, and the base set is 25 tiles drawn at random from the whole
+      // territory. On a large map that sample can miss the SAM umbrella, or the back country,
+      // entirely — and no weighting can rescue a tile that was never offered.
+
       // DIVERGENCE (deepPlacement, USER: "place the buildings as far back and as deep into
-      // our teams territory as possible"). Same reason as the umbrella injection below: the
-      // depth term cannot choose the back country if the back country never makes it into
-      // the 25 random candidates. Cities and factories only - silos are pinned into SAM
-      // cover by samCoverageBonus, and ports have to sit on the coast.
+      // our teams territory as possible"). Cities and factories only: silos are pinned into
+      // SAM cover by samCoverageBonus, and ports have to sit on the coast.
       if (
         state.settings.safePlacement &&
         (type === UNIT.City || type === UNIT.Factory)
@@ -2262,6 +2263,12 @@
           /* fall back to the random sample */
         }
       }
+
+      // WIN-FIX for silos (own SAMs first, ally SAMs as fallback) so the ranked probe can
+      // pick a defended spot; DIVERGENCE (samUmbrella, USER) extends the same injection to
+      // cities and factories. Ports are left out on purpose: their candidates already come
+      // from the much smaller set of valid shore sites, usually below the 25-tile sample
+      // size, so every coastal tile inside the umbrella gets scored anyway.
       const injectUmbrella =
         state.settings.samUmbrella &&
         (type === UNIT.City || type === UNIT.Factory);
@@ -2276,16 +2283,34 @@
           /* fall back to the random sample */
         }
       }
+      // DEDUPE. The three sources overlap by construction — a deep tile can also sit under
+      // the umbrella, and the random sample draws from the same territory as both — and every
+      // duplicate would cost its own async buildables() round-trip in the probe loop below.
+      if (tiles.length > 1) tiles = Array.from(new Set(tiles));
       if (tiles.length === 0) return null;
       const valueFunction = this.structureSpawnTileValue(type);
       if (valueFunction === null) return null;
 
-      // Score all candidates synchronously, then sort DESC by value.
+      // Score ALL candidates synchronously (cheap), then sort DESC by value.
       const scored = tiles.map((t) => ({ t, v: valueFunction(t) }));
       scored.sort((a, b) => b.v - a.v);
 
-      // Probe down the ranked list; first canBuild !== false wins.
-      for (const { t } of scored) {
+      // Probe down the ranked list; first canBuild !== false wins. Only the async tail is
+      // capped — the ranking above still saw every candidate, so the cap can only ever drop
+      // the WORST-scoring ones.
+      const probes = scored.length > MAX_SPAWN_PROBES ? scored.slice(0, MAX_SPAWN_PROBES) : scored;
+      if (probes.length < scored.length) {
+        ofhDebug(
+          "[Build] " +
+            type +
+            ": probing the top " +
+            probes.length +
+            " of " +
+            scored.length +
+            " candidates",
+        );
+      }
+      for (const { t } of probes) {
         const bu = await this.buildableFor(type, t);
         if (bu !== null && bu.canBuild !== false) {
           return bu;
