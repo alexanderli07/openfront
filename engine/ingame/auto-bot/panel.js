@@ -406,12 +406,6 @@
         </div>
         <div class="ab-pane" data-pane="config">
           <div class="ab-cfg-body">
-            <div class="ab-cfg-sec">${tr("General")}</div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Auto-bot enabled")}" data-tip-desc="${tr("Same as the header switch. Turn the whole bot on or off.")}">${tr("Auto-bot enabled")}</span>
-              <div class="ab-cfg-sw ${state.settings.enabled ? "on" : ""}" data-cfg="enabled"></div>
-            </div>
-
             <div class="ab-cfg-sec">${tr("Auto-build structures")}</div>
             <div class="ab-cfg-grid" data-role="cfg-structs">
               ${[
@@ -477,11 +471,6 @@
             <div class="ab-cfg-row">
               <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}" data-tip="${tr("Counter-attack first")}">${tr("Counter-attack first")}</span>
               <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Let the bot send the vanilla AI's reaction emojis \u2014 clown at a traitor, rat at a small player, a greeting to a neighbour, brag, congratulate, attack, ally-assist replies, and the nuke/warship broadcasts. Off by default: they carry no game effect and they make the account read as a bot. Your SOS is separate and always works.")}" data-tip="${tr("Bot emojis")}">${tr("Bot emojis")}</span>
-              <div class="ab-cfg-sw ${state.settings.botEmojis ? "on" : ""}" data-cfg="botEmojis"></div>
             </div>
 
             <div class="ab-cfg-row">
@@ -727,21 +716,18 @@
         saveSettings();
       });
     });
-    // advanced boolean switches (winFixes / smartSpawn / enabled)
+    // advanced boolean switches (winFixes / smartSpawn / ...)
     panel.querySelectorAll("[data-cfg]").forEach((el) => {
       el.addEventListener("click", () => {
         const key = el.dataset.cfg;
         const on = !el.classList.contains("on");
         el.classList.toggle("on", on);
-        if (key === "enabled") {
-          setEnabled(on);
-          // keep the header master switch in sync
-          const master = panel.querySelector('[data-role="switch"]');
-          if (master) master.classList.toggle("on", on);
-        } else {
-          state.settings[key] = on;
-          saveSettings();
-        }
+        // No `enabled` special case any more: the master switch lives in the header
+        // ([data-role="switch"], its own handler at the top of this function) and the
+        // duplicate config pill has been removed, so every remaining [data-cfg] is a
+        // plain boolean setting.
+        state.settings[key] = on;
+        saveSettings();
       });
     });
     // number inputs (tickMs)

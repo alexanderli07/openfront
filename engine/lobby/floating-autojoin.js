@@ -80,6 +80,25 @@ function ensureFloatingAutoJoinStyles() {
       border-bottom: 0;
     }
 
+    /* USER: "a flashing circle thing instead of the lightning emoji". Same 8px disc as
+       every other status dot (--ofh-dot-size), and it carries the panel's state rather
+       than just being decoration: it flashes on the accent colour while auto-join is
+       armed and sits dim and steady when it is off, so the header tells you at a glance
+       whether the thing is actually hunting. The lightning bolt said nothing. */
+    #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-title-dot {
+      flex: 0 0 auto;
+      width: var(--ofh-dot-size);
+      height: var(--ofh-dot-size);
+      border-radius: 50%;
+      background: var(--oh-panel-text-dim, rgba(148,163,184,0.85));
+    }
+
+    #${FLOATING_AUTOJOIN_PANEL_ID}[data-armed="true"] .ofh-aj-title-dot {
+      background: var(--oh-accent, #60a5fa);
+      box-shadow: 0 0 8px var(--oh-accent, #60a5fa);
+      animation: ofhStatusPulse 1.4s ease-in-out infinite;
+    }
+
     #${FLOATING_AUTOJOIN_PANEL_ID} .ofh-aj-title {
       margin: 0;
       display: inline-flex;
@@ -587,7 +606,7 @@ function createFloatingAutoJoinPanel() {
   panel.id = FLOATING_AUTOJOIN_PANEL_ID;
   panel.innerHTML = `
     <div class="ofh-aj-header">
-      <p class="ofh-aj-title"><span aria-hidden="true">⚡</span>${t("Auto-Join")}</p>
+      <p class="ofh-aj-title"><span class="ofh-aj-title-dot" aria-hidden="true"></span>${t("Auto-Join")}</p>
       <div class="ofh-aj-header-actions">
         <button class="ofh-aj-iconbtn" type="button" data-role="settings" title="${t("Open settings")}">⚙</button>
         <button class="ofh-aj-iconbtn" type="button" data-role="collapse" title="${t("Collapse")}">—</button>
@@ -800,6 +819,8 @@ function updateFloatingAutoJoinPanel(panel) {
   if (power instanceof HTMLButtonElement) {
     const enabled = Boolean(settings.enabled);
     power.dataset.enabled = String(enabled);
+    // Mirror the armed state onto the panel root so the header dot can flash with it.
+    panel.dataset.armed = String(enabled);
     power.disabled = !enabled && !canSearch;
     const label = power.querySelector(".ofh-aj-power-label");
     if (label) {

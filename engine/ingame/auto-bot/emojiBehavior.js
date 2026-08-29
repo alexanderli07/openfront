@@ -312,25 +312,31 @@
           : otherPlayer.__src ?? otherPlayer;
       const emojiNumber = this.random.randElement(emojisList);
 
-      // DIVERGENCE (botEmojis, USER: "can we just disable that entirely"). The single
-      // choke point for every automatic emoji in the port - the traitor clown, the rat,
-      // the greet, the brag, the congratulate, the attack pair, the ally-assist replies
-      // and the nuke/warship broadcasts all arrive here.
+      // DIVERGENCE (USER: "can we just disable that entirely... i dont even want the
+      // option to do that"). This is the single choke point for every automatic emoji in
+      // the port - the traitor clown, the rat, the greet, the brag, the congratulate, the
+      // attack pair, the ally-assist replies and the nuke/warship broadcasts all arrive
+      // here - and the send is now removed unconditionally. There is deliberately no
+      // setting: the user asked for the option itself to be gone.
       //
-      // The gate is placed AFTER randElement deliberately: this setting must not skip a
-      // draw. Every behaviour shares ONE PseudoRandom (nationExecution hands the same
-      // instance to all of them), so a skipped draw would shift unrelated decisions -
-      // which nuke gets picked, which boat target, whether an alliance roll passes. With
-      // the gate here only the outbound intent disappears. (The pre-existing
-      // `if (!ctors.emoji) return;` above CAN skip the draw, but only when the intent
-      // constructor was never discovered, in which case nothing was going to send anyway.) Emojis carry no game effect (they change no relation, alliance
-      // or troop count), so nothing strategic is lost either.
+      // Everything ABOVE this line is kept on purpose, the randElement draw included.
+      // Every behaviour shares ONE PseudoRandom (nationExecution hands the same instance
+      // to all of them), so deleting the draw would shift unrelated decisions - which nuke
+      // gets picked, which boat target, whether an alliance roll passes. Drawing and
+      // discarding keeps every other choice the bot makes bit-identical to the faithful
+      // port while nothing goes out on the wire.
       //
-      // The SOS is NOT affected: it is a separate emitter in quick-panel.js.
-      if (!state.settings.botEmojis) return;
+      // Emojis carry no game effect (they change no relation, alliance or troop count),
+      // so nothing strategic is lost.
+      //
+      // The SOS is NOT affected: it is a separate emitter in quick-panel.js, and both of
+      // its paths (Shift+S and the automatic under-attack call) still send.
+      return;
 
-      emitIntent(ctors.emoji, recipient, emojiNumber);
-      setLastAction(tr("💬 Emoji"), "diplo");
+      // The original emit, kept as a comment so this still reads 1:1 against
+      // NationEmojiBehavior.ts and is one line from being restored:
+      //   emitIntent(ctors.emoji, recipient, emojiNumber);
+      //   setLastAction(tr("💬 Emoji"), "diplo");
     }
 
     // canSendEmoji — src Player.canSendEmoji(recipient). Not surfaced on the gameApi
