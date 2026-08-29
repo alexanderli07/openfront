@@ -76,6 +76,18 @@
     // real teammates for mutual defence, and refuses to pair two structures inside a single
     // atom blast (euclidean, unlike src's lenient manhattan spacing). See
     // safePlacementScorer() in structureBehavior.js.
+    // DIVERGENCE (botEmojis, USER: "we sometimes randomly send emojis over to other
+    // people, can we just disable that entirely"). src's Nation AI chatters constantly -
+    // clown at a traitor, rat at a small player, greet at a neighbour, brag, congratulate
+    // the winner, attack/aggressive-attack, ally-assist replies, nuke and warship
+    // broadcasts. All of it is cosmetic: no emoji changes a relation, an alliance or a
+    // troop count, so silencing it costs nothing strategically and stops the account
+    // looking like a bot. OFF by default - the user asked for it off.
+    //
+    // This does NOT touch the SOS. That is a separate emitter (quick-panel.js) the user
+    // asked for, and both its paths - Shift+S and the automatic under-attack call - keep
+    // working with this off.
+    botEmojis: false,
     safePlacement: true,
     // DIVERGENCE (samUmbrella, USER): "if a team SAM covers our land, prioritize that
     // covered area over spreading it around our land. in the SAM territory, ignore the
@@ -529,6 +541,7 @@
       "samDefense",
       "safePlacement",
       "samUmbrella",
+      "botEmojis",
       "defensePosts",
       "defensePostTiming",
       "defensePostPlayersOnly",

@@ -480,6 +480,11 @@
             </div>
 
             <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip-desc="${tr("Let the bot send the vanilla AI's reaction emojis \u2014 clown at a traitor, rat at a small player, a greeting to a neighbour, brag, congratulate, attack, ally-assist replies, and the nuke/warship broadcasts. Off by default: they carry no game effect and they make the account read as a bot. Your SOS is separate and always works.")}" data-tip="${tr("Bot emojis")}">${tr("Bot emojis")}</span>
+              <div class="ab-cfg-sw ${state.settings.botEmojis ? "on" : ""}" data-cfg="botEmojis"></div>
+            </div>
+
+            <div class="ab-cfg-row">
               <span class="ab-cfg-label" data-tip-desc="${tr("Site buildings away from any border we don't trust — enemies, and allies too, since an alliance can be broken — and close to real teammates for mutual defence. Also weights sites by how far they are from our other buildings, so one atom bomb is less likely to destroy two.")}" data-tip="${tr("Safe placement")}">${tr("Safe placement")}</span>
               <div class="ab-cfg-sw ${state.settings.safePlacement ? "on" : ""}" data-cfg="safePlacement"></div>
             </div>
