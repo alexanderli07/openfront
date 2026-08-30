@@ -723,7 +723,13 @@ function renderAutoJoinMain(body: HTMLElement): void {
         el(
           "div",
           { class: "ofh-desc" },
-          t("Only join lobbies with at least this many players (blank = any)."),
+          // Wording must match the FILTER, which is strictly greater-than
+          // (auto-join.js: `maxPlayers <= settings.minLobbySize` rejects). The floating
+          // panel renders "> N" and the i18n string says "greater than", so the popup was
+          // the lone outlier promising "at least" — a 50-cap lobby was silently skipped
+          // at a setting of 50. Changing the comparison instead would have altered which
+          // lobbies everyone already auto-joins, so the description moves, not the rule.
+          t("Only join lobbies with MORE than this many players (blank = any)."),
         ),
       ),
       el("div", { class: "ofh-field" }, num),
@@ -863,7 +869,14 @@ function renderMaps(body: HTMLElement): void {
     void persist();
   });
   noneBtn.addEventListener("click", () => {
-    settings[key] = {};
+    // Write an explicit false for every map, mirroring "Select all" above. Writing {}
+    // did NOT clear anything: normalizeMapFilters treats an ABSENT key as "fall back to
+    // the configured default", and the defaults have baikal / baikalnukewars / luna /
+    // pluto set to true — so Clear silently resurrected those four on the very persist
+    // that was meant to remove them, and auto-join kept joining maps the grid showed as
+    // deselected. The absent-key fallback is right for a fresh install; it just must not
+    // be reachable from a deliberate Clear.
+    settings[key] = Object.fromEntries(maps.map((m) => [m.id, false]));
     renderActiveTab();
     void persist();
   });
@@ -973,18 +986,12 @@ function renderAutoBot(body: HTMLElement): void {
     ),
   );
 
-  body.append(el("div", { class: "ofh-section-title", style: "margin-top:16px" }, t("Difficulty")));
-  const diffChips = el("div", { class: "ofh-chips" });
-  for (const d of ab.DIFFICULTIES) {
-    const chip = el("div", { class: `ofh-chip${cfg.difficulty === d ? " on" : ""}` }, t(d));
-    chip.addEventListener("click", () => {
-      ab.set({ difficulty: d });
-      diffChips.querySelectorAll(".ofh-chip").forEach((c) => c.classList.remove("on"));
-      chip.classList.add("on");
-    });
-    diffChips.append(chip);
-  }
-  body.append(diffChips);
+  // The Difficulty chips were removed. The dial is DELIBERATELY dead in this build:
+  // portutil's currentDifficulty() is pinned to Impossible ("as an autopilot there is no
+  // reason to ever handicap ourselves"), so every Difficulty.* branch in the bot resolves
+  // to its strongest path no matter what is picked. On top of that, `difficulty` is in
+  // neither DEFAULTS nor PERSISTED_KEYS, so a click did not even survive a reload. It was
+  // a control that lied twice over; the bridge still carries the field for compatibility.
 
   body.append(el("div", { class: "ofh-section-title", style: "margin-top:16px" }, t("Behaviors")));
   const grid = el("div", { class: "ofh-grid" });
