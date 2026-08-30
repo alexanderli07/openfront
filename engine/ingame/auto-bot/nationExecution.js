@@ -445,7 +445,7 @@
         if (!g.isLand(tile) || g.hasOwner(tile) || g.isBorder(tile)) continue;
         if (tooClose(tile)) continue;
         if (!useSmart) return tile; // faithful: first valid wins
-        const score = this.scoreSpawnTile(tile, others, W, H);
+        const score = this.scoreSpawnTile(tile, others, W, H, area);
         if (score > bestScore) {
           bestScore = score;
           bestTile = tile;
@@ -458,7 +458,11 @@
     // tile by: land density in a 12-radius neighbourhood, distance from the
     // nearest enemy nameLocation (farther = better), and edge avoidance (centre
     // of map preferred). Team mode adds a pull toward the team spawn area centre.
-    scoreSpawnTile(tile, others, W, H) {
+    // `area` (the team spawn area, or null) MUST be passed: it is a local of the caller,
+    // so the team-pull block below used to read an unbound identifier and throw
+    // ReferenceError on the first scored candidate — which propagated out of the
+    // unguarded doSpawn() and killed smart spawn entirely.
+    scoreSpawnTile(tile, others, W, H, area) {
       const g = this.mg;
       const tx = g.x(tile);
       const ty = g.y(tile);

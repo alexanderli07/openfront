@@ -1258,18 +1258,23 @@
         const enemyScore = Math.min(dEnemy, SAFE_DISTANCE) * 50;
         const targetScore = -dTarget;
         let waterNeighbors = 0;
-        game.forEachNeighbor(tile, (n) => { if (game.isWater(n)) waterNeighbors++; });
+        // gameApi exposes `neighbors` (an array), never `forEachNeighbor` — the api is a
+        // plain object literal, so the old call threw TypeError and took the whole BFS
+        // with it.
+        for (const n of game.neighbors(tile)) {
+          if (game.isWater(n)) waterNeighbors++;
+        }
         const cornerPenalty = (4 - waterNeighbors) * 15;
         const score = enemyScore + targetScore - cornerPenalty;
         if (score > bestScore) { bestScore = score; bestTile = tile; }
 
         if (depth >= MAX_DEPTH) continue;
-        game.forEachNeighbor(tile, (neighbor) => {
+        for (const neighbor of game.neighbors(tile)) {
           if (game.isWater(neighbor) && game.getWaterComponent(neighbor) === myComponent && !visited.has(neighbor)) {
             visited.add(neighbor);
             queue.push({ tile: neighbor, depth: depth + 1 });
           }
-        });
+        }
       }
       return bestTile;
     }
@@ -1311,7 +1316,11 @@
         try {
           const owner = u.owner();
           if (!owner || owner.smallID() === mySid) continue;
-          if (u.isActive() && !u.isUnderConstruction() && !u.isFriendly(me)) {
+          // isFriendly is a PLAYER method; wrapUnit does not expose it. The old
+          // `u.isFriendly(me)` threw into the per-unit catch below, so this list came out
+          // empty every pass and no enemy warship was ever seen. Line ~1340 of this same
+          // function already had it right on the owner.
+          if (u.isActive() && !u.isUnderConstruction() && !owner.isFriendly(me)) {
             enemyWarships.push(u);
           }
         } catch (_e) {}
@@ -1326,7 +1335,8 @@
           try {
             const owner = u.owner();
             if (!owner || owner.smallID() === mySid) continue;
-            if (u.isActive() && !u.isFriendly(me)) enemyTradeShips.push(u);
+            // Same wrapped-unit mistake as the warship filter above.
+            if (u.isActive() && !owner.isFriendly(me)) enemyTradeShips.push(u);
           } catch (_e) {}
         }
       }
@@ -1346,7 +1356,12 @@
           const d = game.manhattanDist(myWarships[0].tile(), p.tile());
           if (d < minD) { minD = d; nearest = p; }
         }
-        game.forEachNeighbor(nearest.tile(), (n) => { if (baseTarget === null && game.isWater(n)) baseTarget = n; });
+        // UNGUARDED in this method: the old forEachNeighbor TypeError here aborted
+        // smartWarshipCombat before its per-warship loop on every pass that found a
+        // friendly port, i.e. essentially always in a team game.
+        for (const n of game.neighbors(nearest.tile())) {
+          if (game.isWater(n)) { baseTarget = n; break; }
+        }
         if (baseTarget === null) baseTarget = nearest.tile();
       }
 
