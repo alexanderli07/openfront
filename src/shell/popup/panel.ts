@@ -511,6 +511,50 @@ async function persist(): Promise<void> {
   await chromeApi().storage.local.set({ [s.STORAGE_KEY]: settings });
 }
 
+/** Keeps the popup's snapshot fresh while it is open.
+ *
+ *  The popup reads settings ONCE when it opens and every control's persist() writes the
+ *  whole object back. The engine writes the whole object too, from several places, while
+ *  the popup can be sitting open — auto-join.js alone does it on a one-shot join
+ *  (enabled:false), on resume, and on forecast updates. So a stale snapshot did not just
+ *  go stale, it got written back: with keepAutoJoinAfterMatch off, auto-join would
+ *  correctly disarm itself on joining a match, and then the next unrelated switch the user
+ *  flipped in the open popup re-armed it from the stale copy.
+ *
+ *  Subscribing costs nothing (the shim delivers same-tab writes as well as cross-tab) and
+ *  closes the window: by the time the user touches a control, `settings` already reflects
+ *  whatever the engine last wrote. */
+let unsubscribeStorage: (() => void) | null = null;
+
+function watchStoredSettings(): void {
+  const s = shared();
+  if (!s || unsubscribeStorage) return;
+  const listener = (changes: Record<string, { newValue?: unknown }>) => {
+    const change = changes[s.STORAGE_KEY];
+    if (!change || !change.newValue || !overlay) return;
+    // Adopt the engine's view, then re-render so the controls show what is actually
+    // stored rather than what was stored when the popup opened.
+    settings = s.normalizeSettings(change.newValue);
+    try {
+      renderActiveTab();
+    } catch {
+      /* a render failure must not break the subscription */
+    }
+  };
+  try {
+    chromeApi().storage.onChanged.addListener(listener);
+    unsubscribeStorage = () => {
+      try {
+        chromeApi().storage.onChanged.removeListener(listener);
+      } catch {
+        /* best effort */
+      }
+    };
+  } catch {
+    unsubscribeStorage = null;
+  }
+}
+
 // ---- reusable controls ------------------------------------------------------
 function switchRow(
   title: string,
@@ -1465,6 +1509,7 @@ async function openPanelInner(): Promise<void> {
 
   const stored = await chromeApi().storage.local.get(s.STORAGE_KEY);
   settings = s.normalizeSettings(stored[s.STORAGE_KEY]);
+  watchStoredSettings();
   // Opening the popup is a user gesture — if notifications are already enabled, this is a
   // good moment to (re)request OS-notification permission for users who turned it on before.
   if (settings.joinNotification) requestJoinNotificationPermission();
@@ -1488,6 +1533,8 @@ export function closePanel(): void {
   overlay?.remove();
   overlay = null;
   document.removeEventListener("keydown", onKey);
+  unsubscribeStorage?.();
+  unsubscribeStorage = null;
 }
 
 /** Open the popup focused on a specific tab / Auto-Join sub-tab. */

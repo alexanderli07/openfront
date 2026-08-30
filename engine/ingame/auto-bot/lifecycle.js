@@ -882,7 +882,14 @@
     let bu = null;
     let hu = null;
     try {
-      const buildables = await myPlayer.buildables(tile, [ATOM_UNIT, HYDROGEN_UNIT]);
+      // // withTimeout per CLAUDE.md's async-boundary rule: a worker query that never
+      // settles would suspend this forever. The Esc-cancel flag is checked between
+      // iterations, so a hang here also made the macro's own cancel unreachable.
+      const buildables = await withTimeout(
+        myPlayer.buildables(tile, [ATOM_UNIT, HYDROGEN_UNIT]),
+        WORKER_TIMEOUT_MS,
+        null,
+      );
       bu = Array.isArray(buildables)
         ? buildables.find((b) => b.type === ATOM_UNIT)
         : null;
@@ -1251,7 +1258,16 @@
     // Live descriptor for a nuke type (cost rises per bomb; silos cool) → or null.
     const probe = async (unitType) => {
       try {
-        const b = await myPlayer.buildables(tile, [unitType]);
+        // withTimeout per CLAUDE.md's async-boundary rule. This one mattered most: it is
+        // awaited once per shot inside the fire loop, so a stalled worker left the banner
+        // stuck on "Firing… (Esc to stop)" while Esc could never be observed — the loop was
+        // suspended inside the await. A timeout degrades to "can't fire now", which the
+        // caller already handles.
+        const b = await withTimeout(
+          myPlayer.buildables(tile, [unitType]),
+          WORKER_TIMEOUT_MS,
+          null,
+        );
         return Array.isArray(b) ? b.find((x) => x.type === unitType) : null;
       } catch (_e) {
         return null;
@@ -1649,7 +1665,12 @@
         const { myPlayer } = ctx;
         let bu = null;
         try {
-          const buildables = await myPlayer.buildables(tile, [ATOM_UNIT, HYDROGEN_UNIT]);
+          // withTimeout per CLAUDE.md's async-boundary rule.
+          const buildables = await withTimeout(
+            myPlayer.buildables(tile, [ATOM_UNIT, HYDROGEN_UNIT]),
+            WORKER_TIMEOUT_MS,
+            null,
+          );
           bu = Array.isArray(buildables) ? buildables.find((b) => b.type === ATOM_UNIT) : null;
         } catch (_e) {
           bu = null;
