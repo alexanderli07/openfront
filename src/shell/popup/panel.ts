@@ -238,11 +238,10 @@ const HELPER_SECTIONS: HelperSection[] = [
         title: "Alliance requests panel",
         desc: "Moves alliance requests into a side window.",
       },
-      {
-        name: "showHelperUsers",
-        title: "Script users panel",
-        desc: "Lists other players running this helper (detected via a 3-emoji signature broadcast once per match).",
-      },
+      // "Script users panel" row removed: its engine file was cut in the minimal strip
+      // (setHelperUsersEnabled exists nowhere), so the switch did nothing — and its own
+      // description advertised a 3-emoji signature broadcast, which is exactly the
+      // automatic emoji traffic the user asked to be rid of.
       {
         name: "showQuickPanel",
         title: "Quick Panel (floating)",

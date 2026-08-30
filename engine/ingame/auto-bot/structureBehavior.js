@@ -1257,25 +1257,80 @@
     }
 
     // countDefensePostsNearFront — NationStructureBehavior.ts:269.
-    // DIVERGENCE (defensePostTiming): optional maxDepth widens "near the front" to
-    // at least the depth the timing plan actually places posts at — a deep-sited
-    // post must still count here or the bot keeps buying more of them.
+    // DIVERGENCE (defensePostTiming): "near the front" must include deep-sited posts
+    // PERMANENTLY, not only on passes that happen to carry the same depth plan they were
+    // built under. The old widening was `maxDepth + 2` from the CURRENT pass's plan, so a
+    // post sited 106 deep during a fast attack became invisible the moment the front
+    // slowed and the plan disappeared — and the bot re-bought its whole quota.
+    //
+    // The fix is a PER-POST allowance: a post outside the base range still counts when
+    // this front is (within one band-width of) its NEAREST OWN BORDER — i.e. this is the
+    // front it was sited behind, at whatever depth the sampler chose. Deliberately NOT
+    // "widen the range to the deepest own post": that form is degenerate, because the max
+    // over posts makes every post pass by construction and a post on an unrelated border
+    // 200 tiles away would satisfy this front's quota.
     countDefensePostsNearFront(frontTiles, cap, maxDepth) {
       if (frontTiles.length === 0) return 0;
 
       const game = this.game;
       const { borderSpacing } = this.spacingConstants();
-      const range = Math.max(borderSpacing * 1.5, (maxDepth || 0) + 2);
-      const rangeSquared = range ** 2;
+      const baseRange = Math.max(borderSpacing * 1.5, (maxDepth || 0) + 2);
+      const baseRangeSquared = baseRange ** 2;
+      // The sampler's band width (defMin in tryBuildDefensePost): how much slack a post
+      // gets past its own siting depth before we stop crediting it to this front.
+      const depthSlack = Math.ceil(borderSpacing * 0.75);
+      // Nothing is ever sited deeper than the plan ceiling; farther than this is simply
+      // another front's post.
+      const maxCredit = borderSpacing * DP_MAX_DEPTH_SPACINGS + depthSlack;
+
+      let borderTiles = null; // fetched lazily — only deep posts need the depth test
 
       let count = 0;
       for (const dp of this.player.units(UNIT.DefensePost)) {
+        const t = dp.tile();
+        let bestSq = Infinity;
         for (const frontTile of frontTiles) {
-          if (game.euclideanDistSquared(dp.tile(), frontTile) <= rangeSquared) {
-            count++;
-            if (cap !== undefined && count >= cap) return count;
-            break;
+          const d = game.euclideanDistSquared(t, frontTile);
+          if (d < bestSq) bestSq = d;
+          if (bestSq <= baseRangeSquared) break;
+        }
+        let counted = bestSq <= baseRangeSquared;
+        // (When the loop broke early, bestSq may overestimate the true minimum — but only
+        // in the counted case, where the depth test below is never consulted.)
+        if (!counted && Number.isFinite(bestSq)) {
+          const distToFront = Math.sqrt(bestSq);
+          if (distToFront <= maxCredit) {
+            // DEPTH TEST: count iff NO own border tile is more than depthSlack closer to
+            // this post than the front is — equivalently, postDepth >= distToFront -
+            // slack, i.e. this front IS its nearest border and the post was sited exactly
+            // this deep behind it. Early-break on the first counterexample, which for a
+            // post belonging to some other border is found almost immediately. Front
+            // tiles are border tiles at >= distToFront, so they can never veto themselves.
+            const threshold = distToFront - depthSlack;
+            if (threshold <= 0) {
+              counted = true;
+            } else {
+              if (borderTiles === null) {
+                try {
+                  borderTiles = Array.from(this.player.borderTiles());
+                } catch (_e) {
+                  borderTiles = [];
+                }
+              }
+              const thSq = threshold * threshold;
+              counted = true;
+              for (const b of borderTiles) {
+                if (game.euclideanDistSquared(t, b) < thSq) {
+                  counted = false;
+                  break;
+                }
+              }
+            }
           }
+        }
+        if (counted) {
+          count++;
+          if (cap !== undefined && count >= cap) return count;
         }
       }
       return count;

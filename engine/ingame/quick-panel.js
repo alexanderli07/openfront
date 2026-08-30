@@ -54,8 +54,7 @@
     // === Helpers Tab - Section Keys ===
     panels: ["Panels", "Toggle floating panels: stats, trade, advisor, boat, estate, alliance, script users, auto-bot, auto-join."],
     map: ["Map Overlays", "Toggle visual overlays on the map: money, max troops, threats, nuke prediction, heatmaps, spawn markers."],
-    combat: ["Combat & Automation", "Toggle combat features: nuke suggestions, SOS defense, attack hotkey, right-click conquest, enemy intent."],
-    alerts: ["Alerts", "Toggle alert notifications: game-time alert, incoming boat warning."],
+    combat: ["Combat & Automation", "Automatic combat helpers. Auto SOS calls every teammate and ally when you are under attack and low on troops; Shift+S sends one manually any time."],
     tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
     companion: ["Companion", "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack)."],
 
@@ -340,12 +339,13 @@
       "  border-radius:50%; margin-right:5px; flex:none; font-size:0; line-height:0;",
       "}",
       ".ohqp-conn[data-status='connected'] { background:#4ade80; box-shadow:0 0 6px #4ade80; }",
-      /* Deliberately NOT animated. 'disconnected' is the ordinary idle state - it is what
-         the home and lobby screens look like - so pulsing it would mean the header dot
-         flashed red the whole time nothing was wrong, which is worse than not flashing at
-         all. The shared keyframe is still the contract; the two panels whose live state IS
-         exceptional (auto-join armed, auto-bot waiting for a game) are the ones that use it. */
-      ".ohqp-conn[data-status='disconnected'] { background:#f87171; box-shadow:0 0 6px #f87171; }",
+      /* GREY, not red, and never animated. 'disconnected' is the ORDINARY state - it is
+         what the home and lobby screens look like, because ws-hook only flips this dot on
+         game-socket traffic. v1.72 made it a pulsing red alarm, v1.74 stopped the pulse,
+         and the user still (rightly) read the steady red as 'something is broken'. Red is
+         simply the wrong colour for 'no game in progress': idle is dim and neutral like
+         every other panel's idle dot, green means in a game, and that is the whole story. */
+      ".ohqp-conn[data-status='disconnected'] { background:var(--oh-panel-text-dim,#94a3b8); opacity:.7; }",
       ".ohqp-min-btn {",
       "  display:inline-flex; align-items:center; justify-content:center;",
       "  width:var(--ofh-ctl-size); height:var(--ofh-ctl-size);",
@@ -808,7 +808,7 @@
       _connLive = false;
     }
     conn.dataset.status = _connLive ? "connected" : "disconnected";
-    conn.title = "WebSocket status";
+    conn.title = "Game connection — green while you are in a game, grey between games";
     var title = document.createElement("div");
     title.className = "ohqp-title";
     var _ver = (window.__OFH_ASSETS && window.__OFH_ASSETS.version) ? window.__OFH_ASSETS.version : "dev";
@@ -1243,11 +1243,14 @@
         ]
       },
       {
+        // Once a graveyard of toggles whose engine files were cut in the minimal strip
+        // (nuke suggestions, attack-ratio hotkey, right-click conquest, enemy intent, and
+        // the game-time alert that also emptied the old "Alerts" section) — it rendered
+        // as an EMPTY accordion whose tooltip still advertised all of them. Now it holds
+        // exactly the live features: notably Auto SOS, which until this row existed could
+        // only be toggled from the popup even though the quick panel ran its timer.
         key: "combat", title: _tr("Combat & Automation"), toggles: [
-        ]
-      },
-      {
-        key: "alerts", title: _tr("Alerts"), toggles: [
+          ["sosDefense", _tr("Auto SOS")],
         ]
       },
       {
