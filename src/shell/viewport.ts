@@ -19,6 +19,15 @@ const PANEL_SELECTORS = [
 
 const MARGIN = 8;
 
+// Panels that position themselves through CSS custom properties rather than inline
+// left/top. Writing inline styles on these WINS the cascade over their own
+// `left: var(--…)` rule, so one clamp would pin them permanently: every later drag
+// updates the custom property, the inline value keeps overriding it, and the panel stops
+// following the cursor. Clamp their own channel instead.
+const CUSTOM_POS_PANELS: Record<string, { left: string; top: string }> = {
+  "openfront-helper-floating-autojoin-panel": { left: "--ofh-aj-left", top: "--ofh-aj-top" },
+};
+
 function clampOne(el: HTMLElement): void {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return; // hidden / not laid out
@@ -27,6 +36,12 @@ function clampOne(el: HTMLElement): void {
   const left = Math.min(Math.max(rect.left, MARGIN), maxLeft);
   const top = Math.min(Math.max(rect.top, MARGIN), maxTop);
   if (Math.round(left) !== Math.round(rect.left) || Math.round(top) !== Math.round(rect.top)) {
+    const vars = CUSTOM_POS_PANELS[el.id];
+    if (vars) {
+      el.style.setProperty(vars.left, `${Math.round(left)}px`);
+      el.style.setProperty(vars.top, `${Math.round(top)}px`);
+      return;
+    }
     el.style.left = `${Math.round(left)}px`;
     el.style.top = `${Math.round(top)}px`;
     el.style.right = "auto";
