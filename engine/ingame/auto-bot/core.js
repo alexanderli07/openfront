@@ -13,7 +13,12 @@
     MissileSilo: "Missile Silo",
     DefensePost: "Defense Post",
     TransportShip: "Transport",
-    TradeShip: "Trade",
+    // Upstream Game.ts: `TradeShip = "Trade Ship"`. This read "Trade" and
+    // GameView.units() filters with types.includes(u.type()) -- a wrong string returns
+    // an EMPTY array instead of throwing, so every trade-ship query silently found
+    // nothing and three features were dead: trade-capture retaliation, the patrol
+    // raid-lane priority, and warship HUNT-trade.
+    TradeShip: "Trade Ship",
     Warship: "Warship",
     AtomBomb: "Atom Bomb",
     HydrogenBomb: "Hydrogen Bomb",

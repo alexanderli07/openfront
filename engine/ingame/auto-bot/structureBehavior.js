@@ -278,6 +278,17 @@
   const SAM_MAGNET_MAX_LEVEL = 5;
   /** Exposure (summed magnet levels) at which the penalty saturates. */
   const SAM_MAGNET_FULL_LEVELS = 4;
+  /** Half-saturation point for the OWN-ASSET magnet penalty, on the asset-weight scale
+   *  (samProtectWeight x level, so 2.5 per level-1 port or factory).
+   *
+   *  This penalty used to divide asset weight by SAM_MAGNET_FULL_LEVELS, which counts SAM
+   *  LEVELS — a different unit. One level-2 port already scores 5 and pinned the term at
+   *  its cap, so on any territory wider than ~200 tiles every candidate subtracted the
+   *  identical amount and the term stopped discriminating entirely: it could not tell "one
+   *  city in the bullseye" from "a port, two factories and the silo in the bullseye", which
+   *  is the only judgement it exists to make. A soft curve never saturates, so more
+   *  exposure always ranks worse. */
+  const SAM_MAGNET_HALF_WEIGHT = 5;
 
   /** samUmbrella: weight of the "sited under a friendly SAM umbrella" term.
    *
@@ -406,6 +417,10 @@
     }
     for (const u of all) {
       try {
+        // UnitGrid.nearbyUnits — which the targeting term this mirrors uses — excludes
+        // under-construction units, and collectFriendlyUmbrellas below already skips them.
+        // Without this we penalise a ring that will not be a target for another 300 ticks.
+        if (u.isUnderConstruction && u.isUnderConstruction()) continue;
         const level = Number(u.level && u.level()) || 1;
         if (level >= SAM_MAGNET_MAX_LEVEL) continue;
         const inner = Number(game.config().samRange(level)) || 0;
@@ -829,12 +844,24 @@
         this.placementsCount > 0 &&
         !this.game.config().isUnitDisabled(UNIT.DefensePost);
       if (postsAllowed && this.defensePostNeeded()) {
+        this.dpDeclinedOnTiming = false;
         if (await this.tryBuildDefensePost()) {
           return true;
         }
-        // Threshold met but placement failed (no tile / can't afford) — still block
-        // other structures, exactly as src does.
-        return false;
+        // Threshold met but placement failed — block other structures, exactly as src
+        // does. src can afford that because its tryBuildDefensePost only ever declines
+        // for "no gold" or "no sampled tile", and almost always places.
+        //
+        // Our defensePostTiming divergence added three more refusals that fire PRECISELY
+        // while defensePostNeeded() is true: no measured front rate yet, no site that can
+        // finish before the front arrives, and no candidate deep enough. Blocking on
+        // those froze every city, port, factory and SAM for the entire attack — and with
+        // absorbThenCounter holding the army home over the same window, the bot neither
+        // fought nor built. A timing decline is "not yet", not "no": fall through and
+        // spend the gold on the economy instead of sitting on it.
+        if (!this.dpDeclinedOnTiming) {
+          return false;
+        }
       }
 
       if (this.isOnStructureCooldown()) {
@@ -927,7 +954,7 @@
         const speed = this.measureAttackFrontSpeed(attackFront, landAttacks);
         // First sight of this attack: snapshot taken, no rate yet. Hold this pass
         // (~1s) rather than guess — the build takes ~10x longer than the wait.
-        if (speed === null) return false;
+        if (speed === null) { this.dpDeclinedOnTiming = true; return false; }
         // v1.64: an attack that OUTNUMBERS the standing defence will cascade once
         // the border thins, even while it measures slow — depth-floor it instead
         // of trusting the current reading.
@@ -949,6 +976,7 @@
                 speed.toFixed(2) +
                 " tiles/tick — no site can finish a post in time, keeping the gold",
             );
+            this.dpDeclinedOnTiming = true;
             return false;
           }
           etaNeed = requiredDepth;
@@ -1022,6 +1050,7 @@
           ofhDebug(
             "[DPost] no candidate deep enough to finish in time — keeping the gold",
           );
+          this.dpDeclinedOnTiming = true;
           return false;
         }
       }
@@ -1373,16 +1402,33 @@
       // candidate deep enough" on every pass for the whole attack while sitting on land
       // that was deep enough. Use the caller's metric whenever the timing plan is driving
       // the band; keep manhattan for the default band, which is 1:1 with src.
+      //
+      // SECOND METRIC FIX (same shape, one level up): the band is measured against the
+      // thing that SET it. depthPlan.min comes purely from front speed x build time, and
+      // the caller filters candidates against the ATTACK FRONT — but this used to measure
+      // every candidate against player.borderTiles(), i.e. coastline, teammate borders and
+      // quiet flanks too. Requiring `requiredDepth` clearance from ALL of them needs an
+      // inscribed disc of that radius (a 100-tile plan wants territory ~200 tiles across
+      // with no coast), so at a fast front every spacing tier returned [] and control fell
+      // through to the fallback below — which checks neither depth nor tangent spacing.
+      // Keep a floor against the real border so a shield still cannot land on the shoreline.
+      const frontRef = depthPlan && frontTiles.length > 0 ? frontTiles : borderTiles;
+      const euclidTo = (tiles, t) => {
+        let best = Infinity;
+        for (const b of tiles) {
+          const d = game.euclideanDistSquared(b, t);
+          if (d < best) best = d;
+        }
+        return Math.sqrt(best);
+      };
+      const borderFloor = Math.ceil(borderSpacing * 0.75);
       const depthOf = depthPlan
-        ? (t) => {
-            let best = Infinity;
-            for (const b of borderTiles) {
-              const d = game.euclideanDistSquared(b, t);
-              if (d < best) best = d;
-            }
-            return Math.sqrt(best);
-          }
+        ? (t) => euclidTo(frontRef, t)
         : (t) => closestTile(game, borderTiles, t)[1];
+      // Applied on top of the band, never instead of it.
+      const clearsBorderFloor = depthPlan
+        ? (t) => euclidTo(borderTiles, t) >= Math.min(borderFloor, minBorderDist)
+        : () => true;
 
       // DIVERGENCE (dpTangentSpacing, USER: "spread our shield placements as well so that
       // atom bombs dont hit multiple shields, just make the shields circle exactly tangent
@@ -1450,6 +1496,7 @@
           if (game.ownerID(t) !== mySid) continue;
           const borderDist = depthOf(t);
           if (borderDist < minBorderDist || borderDist > maxBorderDist) continue;
+          if (!clearsBorderFloor(t)) continue;
           // THE FIX: the SITE has to clear the neighbours, not just the anchor.
           if (!farEnough(t, sepSq)) continue;
           // src: if (!player.canBuild(unitType, t)) continue; → moved to probe phase.
@@ -1474,6 +1521,9 @@
       // ring). Spacing is already fully relaxed by the last tier above, and the anchor set
       // goes back to the whole front — this is the last resort before building nothing.
       const fallback = [];
+      const looseSep =
+        tangentSep * DP_SPACING_TIERS[Math.max(0, DP_SPACING_TIERS.length - 2)];
+      const looseSepSq = looseSep * looseSep;
       for (
         let attempt = 0;
         attempt < count * 4 && fallback.length < count;
@@ -1487,7 +1537,30 @@
         if (!game.isValidCoord(x, y)) continue;
         const t = game.ref(x, y);
         if (game.ownerID(t) !== mySid) continue;
+        // Even the last resort keeps the loosest tangent tier. Dropping spacing entirely
+        // here is how a post ended up 5 tiles from a neighbour: two posts under 60 apart
+        // die to ONE atom (the kill test is euclideanDistSquared < outer^2, outer = 30),
+        // which is the exact pairing dpTangentSeparation() exists to prevent. Preference,
+        // not veto — a second pass takes anything rather than build nothing.
+        if (looseSepSq > 0 && !farEnough(t, looseSepSq)) continue;
         fallback.push(t);
+      }
+      if (fallback.length === 0) {
+        for (
+          let attempt = 0;
+          attempt < count * 4 && fallback.length < count;
+          attempt++
+        ) {
+          const anchor = this.random.randElement(frontTiles);
+          const ax = game.x(anchor);
+          const ay = game.y(anchor);
+          const x = this.random.nextInt(ax - searchRadius, ax + searchRadius + 1);
+          const y = this.random.nextInt(ay - searchRadius, ay + searchRadius + 1);
+          if (!game.isValidCoord(x, y)) continue;
+          const t = game.ref(x, y);
+          if (game.ownerID(t) !== mySid) continue;
+          fallback.push(t);
+        }
       }
 
       return fallback;
@@ -2569,6 +2642,27 @@
         return ZERO;
       }
 
+      // EUCLIDEAN, like every constant that calibrates these terms (`range` is documented
+      // as "3 blast radii (~90 tiles)"), like every sibling term in this closure
+      // (separation, umbrella and magnet all use euclideanDistSquared), and like
+      // tilesDeepInTerritory — the injector that SUPPLIES the deep candidates this scorer
+      // then re-ranks. closestTile measures manhattan, which inflates diagonal depth by up
+      // to sqrt(2): on a diagonal front a tile 64 away read as 90 and saturated the threat
+      // term outright, so the injector's deepest tile was not the one that won.
+      const nearestEuclid = (tiles, tile) => {
+        let best = Infinity;
+        for (const t of tiles) {
+          let d;
+          try {
+            d = game.euclideanDistSquared(t, tile);
+          } catch (_e) {
+            continue;
+          }
+          if (Number.isFinite(d) && d < best) best = d;
+        }
+        return best === Infinity ? Infinity : Math.sqrt(best);
+      };
+
       return (tile) => {
         let w = 0;
 
@@ -2577,7 +2671,7 @@
         // threat term, the umbrella attenuation below, and the depth term.
         let frontSafety = 1;
         if (haveThreat) {
-          const d = closestTile(game, threatFront, tile)[1];
+          const d = nearestEuclid(threatFront, tile);
           if (Number.isFinite(d)) {
             frontSafety = Math.min(d, range) / range;
             w += SAFE_WEIGHT_THREAT * frontSafety;
@@ -2589,7 +2683,7 @@
         }
 
         if (haveTeam) {
-          const d = closestTile(game, teamFront, tile)[1];
+          const d = nearestEuclid(teamFront, tile);
           if (Number.isFinite(d)) {
             w += SAFE_WEIGHT_TEAM * (1 - Math.min(d, range) / range);
           }
@@ -2654,6 +2748,18 @@
         // genuinely stops choosing the tile inside the umbrella. Paying full credit rather
         // than zero matters: dropping the term instead would quietly hand every uncovered
         // tile a 60-point head start and steer us back out of the cover we just bought.
+        // `release` is NOT constant across candidates — it is 0 for an uncovered tile and
+        // 1 for a covered one — so paying it at full weight made the separation term a
+        // SECOND, un-attenuated umbrella bonus worth up to +60 on top of the +31.5 the
+        // umbrella term is capped at. That broke the invariant UMBRELLA_FRONT_FLOOR was
+        // chosen to guarantee (that umbrella credit stays under the threat and separation
+        // swings) and pulled cities onto the front line under SAM cover, where they are
+        // taken by ground capture — which a SAM does not stop. Attenuate it exactly as the
+        // umbrella bonus is attenuated, so cover can relax the spread rule without
+        // outbidding depth.
+        const releaseAtten =
+          UMBRELLA_FRONT_FLOOR + (1 - UMBRELLA_FRONT_FLOOR) * frontSafety;
+        const releasePaid = release * releaseAtten;
         if (ourStructures.length > 0) {
           let nearestSq = Infinity;
           for (const other of ourStructures) {
@@ -2669,7 +2775,7 @@
           if (Number.isFinite(nearestSq)) {
             const d = Math.sqrt(nearestSq);
             const spread = Math.min(d, blastPair) / blastPair;
-            w += SAFE_WEIGHT_SEPARATION * (release + (1 - release) * spread);
+            w += SAFE_WEIGHT_SEPARATION * (releasePaid + (1 - releasePaid) * spread);
           }
         }
 
@@ -3563,8 +3669,7 @@
           if (exposed > 0) {
             w -=
               structureSpacing *
-              Math.min(exposed, SAM_MAGNET_FULL_LEVELS) /
-              SAM_MAGNET_FULL_LEVELS;
+              (exposed / (exposed + SAM_MAGNET_HALF_WEIGHT));
           }
         }
 

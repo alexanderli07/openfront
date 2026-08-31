@@ -868,11 +868,24 @@
       if (!this.game.isWater(tile)) return false;
       const maxDist = state.settings.warshipMoveMaxDist || 160;
       const cooldownTicks = state.settings.warshipMoveCooldownTicks || 60;
+      // A destination in another sea is not a destination: MoveWarshipExecution.init
+      // drops the intent unless hasWaterComponent(warship.tile(), component(position)),
+      // silently and with no client feedback. Resolve the target's component once.
+      const targetComponent = this.game.getWaterComponent(tile);
       const idle = this.player.units(UNIT.Warship).filter((w) => {
         try {
-          const ps = w.warshipState().patrolTile;
+          const ws = w.warshipState();
+          const ps = ws ? ws.patrolTile : undefined;
           if (ps === undefined) return false;
+          // "Idle" has to mean patrolling. A docked ship healing at 20% HP also has a
+          // patrolTile it is sitting on, so it passed every test below and got yanked
+          // back out to sea -- and because upstream's handleManualPatrolOverride calls
+          // cancelRepairRetreat() the moment the patrolTile changes, tasking it also
+          // CANCELLED the repair. smartWarshipCombat guards this, but nationExecution
+          // runs smartWarshipPatrol first, so the guard came too late.
+          if (ws.state !== undefined && ws.state !== "patrolling") return false;
           if (this.game.manhattanDist(w.tile(), ps) >= 130) return false; // mid-voyage
+          if (this.game.getWaterComponent(w.tile()) !== targetComponent) return false;
           const last = s.cooldown.get(w.id());
           if (last !== undefined && tick - last < cooldownTicks) return false; // just tasked
           return true;
@@ -890,7 +903,10 @@
       if (this.game.manhattanDist(w.tile(), tile) > maxDist) return false; // too far
       const ctors = discoverCtors(getEventBus());
       if (!ctors.moveWarship) return false;
-      emitIntent(ctors.moveWarship, [w.id()], tile);
+      // Don't stamp the cooldown (or tell the caller the threat is serviced) for an
+      // intent that never left: that burned a 60-tick per-ship and 90-tick per-zone
+      // lockout on a no-op and starved the reachable threats behind it.
+      if (!emitIntent(ctors.moveWarship, [w.id()], tile)) return false;
       s.cooldown.set(w.id(), tick);
       setLastAction(tr("🚢 Patrol → {k}", { k: kind }), "naval");
       ofhDebug(
@@ -1177,22 +1193,49 @@
       const shellBaseDmg = shellInfo ? (shellInfo.damage || 250) : 250;
       const attackRate = typeof game.config === "function" && typeof game.config().warshipShellAttackRate === "function"
         ? game.config().warshipShellAttackRate() : 20;
-      const avgDmg = shellBaseDmg * 2.625;
-      const dmgPerTick = avgDmg / Math.max(1, attackRate);
+      // ShellExecution.effectOnTarget: roll = random.nextInt(1, 6) and PseudoRandom's
+      // nextInt is max-EXCLUSIVE (`Math.floor(next() * (hi - lo)) + lo`), so roll is
+      // 1..5, damageMultiplier = (roll-1)*25 + 200 is {200,225,250,275,300} with mean
+      // 250, and the return is Math.round((baseDamage / 250) * damageMultiplier) --
+      // i.e. expected damage is exactly baseDamage. The old 2.625 factor is the mean
+      // you get by reading nextInt as inclusive AND skipping the /250 normalisation;
+      // it made every simulated battle resolve in ~38% of its true length, which
+      // under-counts the staggered engageTick reinforcements the sim exists to model.
+      const cfgNum = (name, dflt) => {
+        try {
+          const c = game.config();
+          return typeof c[name] === "function" ? c[name]() : dflt;
+        } catch (_e) { return dflt; }
+      };
+      const vetHpBonus = cfgNum("warshipVeterancyHealthBonus", 20);
+      const vetDmgBonus = cfgNum("warshipVeterancyShellDamageBonus", 20);
+      const vetOf = (u) => {
+        try {
+          const ws = u.warshipState();
+          const v = ws ? ws.veterancy : 0;
+          return typeof v === "number" && v > 0 ? v : 0;
+        } catch (_e) { return 0; }
+      };
+      // Veterancy is a real multiplier on BOTH sides of a duel (+20% max health and
+      // +20% shell damage per level, to level 3), so a flat 1000/250 model rates a
+      // vet-3 ship as an even match for a fresh one when it actually wins with more
+      // than half its health left.
+      const maxHpOf = (u) => maxHp * (100 + vetHpBonus * vetOf(u)) / 100;
+      const dmgOf = (u) => (shellBaseDmg * (100 + vetDmgBonus * vetOf(u)) / 100) / Math.max(1, attackRate);
 
       const fLen = friendlies.length;
       const F = new Array(fLen);
       for (let i = 0; i < fLen; i++) {
         const u = friendlies[i];
         const dist = focalTile ? game.manhattanDist(focalTile, u.tile()) : range;
-        F[i] = { hp: u.health(), engageTick: Math.max(0, dist - range) };
+        F[i] = { hp: u.health(), dps: dmgOf(u), engageTick: Math.max(0, dist - range) };
       }
       const eLen = enemies.length;
       const E = new Array(eLen);
       for (let i = 0; i < eLen; i++) {
         const u = enemies[i];
         const dist = focalTile ? game.manhattanDist(focalTile, u.tile()) : range;
-        E[i] = { hp: u.health(), engageTick: Math.max(0, dist - range) };
+        E[i] = { hp: u.health(), dps: dmgOf(u), engageTick: Math.max(0, dist - range) };
       }
 
       let ticks = 0;
@@ -1210,8 +1253,9 @@
           if (next > ticks && next !== Infinity) { ticks = next; continue; }
         }
         if (activeF.length > 0 && activeE.length > 0) {
-          let fDmg = activeF.length * dmgPerTick;
-          let eDmg = activeE.length * dmgPerTick;
+          let fDmg = 0, eDmg = 0;
+          for (let i = 0; i < activeF.length; i++) fDmg += activeF[i].dps;
+          for (let i = 0; i < activeE.length; i++) eDmg += activeE[i].dps;
           activeE.sort((a, b) => a.hp - b.hp);
           activeF.sort((a, b) => a.hp - b.hp);
           for (let i = 0; i < activeE.length && fDmg > 0; i++) { const take = Math.min(activeE[i].hp, fDmg); activeE[i].hp -= take; fDmg -= take; }
@@ -1227,7 +1271,7 @@
 
       if (totalAliveF > 0 && totalAliveE === 0) {
         let totalMaxHp = 0;
-        for (let i = 0; i < friendlies.length; i++) totalMaxHp += typeof friendlies[i].maxHealth === "function" ? friendlies[i].maxHealth() : maxHp;
+        for (let i = 0; i < friendlies.length; i++) totalMaxHp += maxHpOf(friendlies[i]);
         return { win: true, survivalPct: (remainingHp / totalMaxHp) * 100 };
       }
       return { win: false, survivalPct: 0 };
@@ -1241,13 +1285,18 @@
       const myComponent = game.getWaterComponent(start);
       const MAX_DEPTH = 30;
       const queue = [{ tile: start, depth: 0 }];
+      // Head index, not shift(): open water at depth 30 over 4-connected neighbours is
+      // ~1861 tiles, and Array.shift() on a queue that long is O(n) per pop -- ~1.7M
+      // element moves per call, on the UI thread, once per evading warship per pass.
+      // gameApi.buildWaterLabels already uses this shape.
+      let head = 0;
       const visited = new Set();
       visited.add(start);
       let bestTile = start;
       let bestScore = -Infinity;
 
-      while (queue.length > 0) {
-        const { tile, depth } = queue.shift();
+      while (head < queue.length) {
+        const { tile, depth } = queue[head++];
         let dEnemy = Infinity;
         for (const ew of enemies) {
           const d = game.manhattanDist(tile, ew.tile());
@@ -1260,8 +1309,9 @@
         let waterNeighbors = 0;
         // gameApi exposes `neighbors` (an array), never `forEachNeighbor` — the api is a
         // plain object literal, so the old call threw TypeError and took the whole BFS
-        // with it.
-        for (const n of game.neighbors(tile)) {
+        // with it. One call, reused by both loops below.
+        const nbrs = game.neighbors(tile);
+        for (const n of nbrs) {
           if (game.isWater(n)) waterNeighbors++;
         }
         const cornerPenalty = (4 - waterNeighbors) * 15;
@@ -1269,7 +1319,7 @@
         if (score > bestScore) { bestScore = score; bestTile = tile; }
 
         if (depth >= MAX_DEPTH) continue;
-        for (const neighbor of game.neighbors(tile)) {
+        for (const neighbor of nbrs) {
           if (game.isWater(neighbor) && game.getWaterComponent(neighbor) === myComponent && !visited.has(neighbor)) {
             visited.add(neighbor);
             queue.push({ tile: neighbor, depth: depth + 1 });
@@ -1307,7 +1357,18 @@
 
       const unitInfo = typeof game.unitInfo === "function" ? game.unitInfo("Warship") : null;
       const maxHp = unitInfo ? (unitInfo.maxHealth || 1000) : 1000;
-      const retreatPct = (state.settings.warshipRetreatHealthPct || 50) / 100;
+      // Read the game's own threshold. The hard-coded 50 sat BELOW upstream's
+      // warshipRetreatHealthPercent() (75), so the engine had already flipped the ship
+      // to state "retreating" long before our branch could fire -- the setting never
+      // did anything in either direction. The setting still wins if the user moved it.
+      let retreatPct = (state.settings.warshipRetreatHealthPct || 0) / 100;
+      if (!retreatPct) {
+        try {
+          const c = game.config();
+          retreatPct = typeof c.warshipRetreatHealthPercent === "function"
+            ? c.warshipRetreatHealthPercent() / 100 : 0.75;
+        } catch (_e) { retreatPct = 0.75; }
+      }
 
       // Collect enemy warships
       const allWarships = game.units(UNIT.Warship) || [];
@@ -1347,7 +1408,16 @@
       const allPorts = game.units(UNIT.Port) || [];
       for (const u of allPorts) {
         try {
-          if (u.isActive() && !u.isUnderConstruction() && u.owner() && u.owner().isFriendly(me)) friendlyPorts.push(u);
+          // isFriendly() is isAlliedWith() || isOnSameTeam(), but healing is strictly
+          // owner-scoped: WarshipExecution.healWarship / findNearestPort both iterate
+          // `this.warship.owner().units(UnitType.Port)`. Retreating a damaged ship to
+          // an ALLY's harbour sends it on a long trip to a berth that will never heal
+          // it -- and allies can betray. Our own ports, plus real teammates only.
+          const o = u.owner();
+          if (!u.isActive() || u.isUnderConstruction() || !o) continue;
+          const mine = o.smallID() === mySid;
+          const sameTeam = !mine && typeof o.isOnSameTeam === "function" && o.isOnSameTeam(me);
+          if (mine || sameTeam) friendlyPorts.push(u);
         } catch (_e) {}
       }
       if (friendlyPorts.length > 0) {
@@ -1376,23 +1446,46 @@
           const wsMaxHp = typeof warship.maxHealth === "function" ? warship.maxHealth() : maxHp;
           const wsState = warship.warshipState();
           const isGameRetreating = wsState && (wsState.state === "retreating" || wsState.state === "docked");
-          if (isGameRetreating && friendlyPorts.length > 0) continue;
+          // The engine's own repair retreat is authoritative -- steering a ship it has
+          // already committed to a berth just cancels the repair (see the idle filter).
+          // This used to only skip when we happened to hold a port.
+          if (isGameRetreating) continue;
 
-          // Find nearby enemies (within 30 tiles)
+          // Engagement radius, matching the engine: warshipTargettingRange() is 130 and
+          // UnitGrid compares SQUARED EUCLIDEAN distance. The old 30-tile manhattan
+          // window left a blind band from 30 to 130 in which we were already being
+          // shelled while the bot believed it was at peace and dropped through to HUNT.
+          const engageRange = (() => {
+            try {
+              const c = game.config();
+              return typeof c.warshipTargettingRange === "function" ? c.warshipTargettingRange() : 130;
+            } catch (_e) { return 130; }
+          })();
+          const engageR2 = engageRange * engageRange;
           const nearbyEnemies = [];
           for (const ew of enemyWarships) {
-            if (game.manhattanDist(warship.tile(), ew.tile()) <= 30) nearbyEnemies.push(ew);
+            try {
+              // findBestTarget skips docked enemies; counting them as live combatants
+              // was one of three biases all pushing the same way (evade).
+              const es = ew.warshipState();
+              if (es && es.state === "docked") continue;
+              if (game.euclideanDistSquared(warship.tile(), ew.tile()) <= engageR2) nearbyEnemies.push(ew);
+            } catch (_e) {}
           }
 
           // Battle simulation: should we fight or evade?
           let wantsToEvade = false;
           if (nearbyEnemies.length > 0 && state.settings.warshipEvade !== false) {
+            // Symmetry. Enemies were collected within 30 with no HP filter; friendlies
+            // within 15 AND dropped below the retreat threshold -- so a 3-ship group
+            // repeatedly read as 1-vs-3 and evaded fights it would have won. Same
+            // radius, same rules, both sides.
             const activeFriendlies = myWarships.filter(fw => {
-              const fState = fw.warshipState();
-              if (fState && (fState.state === "retreating" || fState.state === "docked")) return false;
-              const fHp = fw.health();
-              if (fHp < wsMaxHp * retreatPct) return false;
-              return game.manhattanDist(warship.tile(), fw.tile()) <= 15;
+              try {
+                const fState = fw.warshipState();
+                if (fState && (fState.state === "retreating" || fState.state === "docked")) return false;
+                return game.euclideanDistSquared(warship.tile(), fw.tile()) <= engageR2;
+              } catch (_e) { return false; }
             });
             const result = this.simulateBattle(activeFriendlies, nearbyEnemies, wsMaxHp, warship.tile());
             if (!result.win || result.survivalPct < 15) wantsToEvade = true;
@@ -1429,7 +1522,20 @@
 
           if (targetTile !== null) {
             const currentPatrol = wsState ? wsState.patrolTile : undefined;
-            if (currentPatrol !== targetTile) {
+            // Hysteresis. Every MoveWarship intent clears the ship's target tile and
+            // re-rolls its patrol leg, and refreshes upstream's 50-tick
+            // lastManualMoveTickRetreatDisabled lockout. Re-issuing one every 800ms at
+            // a MOVING enemy therefore made the ship jitter in place AND permanently
+            // suppressed its repair retreat. Only re-task on a meaningful change.
+            const MOVE_HYSTERESIS = 20;
+            const moved = currentPatrol === undefined ||
+              game.manhattanDist(currentPatrol, targetTile) > MOVE_HYSTERESIS;
+            // Same sea, or the intent is dropped server-side with no feedback.
+            let reachable = true;
+            try {
+              reachable = game.getWaterComponent(targetTile) === game.getWaterComponent(warship.tile());
+            } catch (_e) { reachable = true; }
+            if (moved && reachable) {
               this.moveWarship(warship, targetTile);
               s.cooldown.set(wsId, game.ticks());
             }

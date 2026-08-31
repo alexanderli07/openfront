@@ -23,6 +23,53 @@
 //
 // The parabola path finder (ParabolaUniversalPathFinder) and the Bezier curve
 // helpers (CubicBezierCurve / DistanceBasedBezierCurve) are ported VERBATIM as
+/** Space salvo shots far enough apart to survive the server's intent rate limiter.
+ *
+ *  The atom macro in lifecycle.js documents (and paces around) the server silently
+ *  dropping build intents above ~10/sec -- "fired 52 but only 50 launched", with no
+ *  client feedback. A saturation salvo is precisely the case that cannot absorb a
+ *  dropped shot: its whole premise is Sigma(covering SAM levels) + 1 SIMULTANEOUS
+ *  arrivals, so losing one to the limiter means ZERO warheads land and the entire spend
+ *  is wasted.
+ *
+ *  The budget is generous: arrivals only have to fall inside floor(SAMCooldown()/2) = 45
+ *  ticks = 4.5s, so at 140ms a salvo could pace ~32 bombs -- far above any realistic
+ *  Sigma+1. No sleep after the last shot. */
+const SALVO_GAP_MS = 140;
+function salvoPace(i, total) {
+  if (i >= total - 1) return Promise.resolve();
+  return new Promise((r) => setTimeout(r, SALVO_GAP_MS));
+}
+
+/** Trajectory increment, in tiles of arc per tick.
+ *
+ *  NukeExecution builds its Parabola with `increment: config.nukeSpeed(this.nukeType)`
+ *  and advances one cached point per tick, so this value is BOTH the point spacing and
+ *  the divisor for flight time -- an error here scales every interception estimate.
+ *
+ *  This used to call `config().defaultNukeSpeed()` bare. That method is absent from the
+ *  current upstream Config, and gameApi's config Proxy forwards `t[prop]` unchanged, so
+ *  the call resolved to `undefined()` -> TypeError. Nothing on the path from
+ *  maybeSendNuke through chooseNukeArc catches, so the throw unwound all the way to the
+ *  decision-chain handler and the bot never scored a single nuke candidate.
+ *
+ *  Try the current API first, then the older one (in case the live server predates the
+ *  rename), then the upstream constant for Atom/Hydrogen. */
+function nukeArcSpeed(game, nukeType) {
+  try {
+    const c = game.config();
+    if (typeof c.nukeSpeed === "function") {
+      const v = Number(c.nukeSpeed(nukeType));
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+    if (typeof c.defaultNukeSpeed === "function") {
+      const v = Number(c.defaultNukeSpeed());
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+  } catch (_e) { /* fall through to the constant */ }
+  return 10;
+}
+
 // module-local helpers so isTrajectoryInterceptableBySam + maybeDestroyEnemySam
 // are faithful at Hard/Impossible (the default replicated difficulty). The path
 // finder uses the GameMap x/y/ref/height surface — all exposed on `game`.
@@ -576,6 +623,7 @@
             true,
             salvoPlan.arcUpPerBomb ? salvoPlan.arcUpPerBomb[i] !== false : true,
           );
+          await salvoPace(i, salvoPlan.bombsToFire);
         }
         setLastAction(
           tr("☢️ Salvo ×{n} → dense target", { n: salvoPlan.bombsToFire }),
@@ -1025,8 +1073,8 @@
 
     // ── isTrajectoryInterceptableBySam — NationNukeBehavior.ts:547 ────────────
     // mirroring NukeTrajectoryPreviewLayer.ts logic a bit
-    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds, directionUp = true, levelBump = 0) {
-      const speed = this.game.config().defaultNukeSpeed();
+    isTrajectoryInterceptableBySam(spawnTile, targetTile, excludedSamIds, directionUp = true, levelBump = 0, nukeType = UNIT.AtomBomb) {
+      const speed = nukeArcSpeed(this.game, nukeType);
       const pathFinder = UniversalPathFinding.Parabola(this.game, {
         increment: speed,
         distanceBasedHeight: true, // Atom/Hydrogen bombs use distance-based height
@@ -1515,7 +1563,7 @@
       // distance to target (via nukeSpawn). Our planning must mirror that order.
       // Silos with interceptable trajectories will still be picked first by
       // NukeExecution — their bombs launch but get intercepted, "wasting" slots.
-      const nukeSpeed = this.game.config().defaultNukeSpeed();
+      const nukeSpeed = nukeArcSpeed(this.game, UNIT.AtomBomb);
       const allAvailableSilos = [];
       for (const silo of ourSilos) {
         const availableSlots = silo.level() - silo.missileTimerQueue().length;
@@ -1762,13 +1810,19 @@
         // salvo we call sendNuke once per bomb (each consumes a silo slot; the
         // engine validates).
         for (let i = 0; i < plan.bombsToFire; i++) {
+          // The 6th argument is the ARC. Omitting it defaulted arcUp to true, so every
+          // bomb the planner cleared on the DOWN arc launched on the up arc it had just
+          // rejected as corridor-blocked -- the salvo lands under-strength, the SAM
+          // survives, and 750k per bomb is gone. The density-first path passes this.
           await this.sendNuke(
             targetTile,
             UNIT.AtomBomb,
             nukeTarget,
             plan.waitTicksPerBomb[i],
             true,
+            plan.arcUpPerBomb ? plan.arcUpPerBomb[i] !== false : true,
           );
+          await salvoPace(i, plan.bombsToFire);
         }
         setLastAction(
           tr("☢️ Salvo ×{n} → SAM break", { n: plan.bombsToFire }),

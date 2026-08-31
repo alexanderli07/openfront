@@ -1333,7 +1333,11 @@
         ) {
           break;
         }
-        if (!perMinuteOk()) await atomSleep(1000);
+        // `continue`, not fall-through. One second only evicts timestamps older than
+        // 60s; if the rolling window is genuinely at the cap the shot goes out OVER it
+        // and is dropped -- in the phase whose entire job is replacing dropped shots.
+        // Phase 1 already does it this way.
+        if (!perMinuteOk()) { await atomSleep(1000); continue; }
         if (fireOne(descriptor)) emitted++;
         scanAtoms();
         await atomSleep(gapMs);
@@ -1361,8 +1365,11 @@
           descriptor.canBuild !== false &&
           atomReadyShots(myPlayer) > 0
         ) {
-          if (!perMinuteOk()) await atomSleep(1000);
-          if (fireOne(descriptor)) emitted++;
+          if (!perMinuteOk()) {
+            await atomSleep(1000);
+          } else if (fireOne(descriptor)) {
+            emitted++;
+          }
         }
         await atomSleep(Math.max(gapMs, 700)); // settle before re-judging (avoid double-fire)
       }

@@ -2504,11 +2504,12 @@
 
         // src: game.addExecution(new TransportShipExecution(player, tile, troops)).
         const ctors = discoverCtors(getEventBus());
-        if (ctors.boat && emitIntent(ctors.boat, tile, troops)) {
+        const sent = Boolean(ctors.boat) && emitIntent(ctors.boat, tile, troops);
+        if (sent) {
           state.stats.attacks++;
           setLastAction(tr("⛵ Boat (land grab)"), "naval");
         }
-        return true;
+        return sent;
       }
       return false;
     }
@@ -2708,7 +2709,13 @@
       //   target.isPlayer() ? target.id() : terraNullius().id())).
       const ctors = discoverCtors(getEventBus());
       const targetId = target.isPlayer() ? target.id() : null;
-      if (ctors.attack && emitIntent(ctors.attack, targetId, troops)) {
+      // Report what actually happened. emitIntent returns false when the event bus is
+      // not mounted or the ctor was never discovered; the old `return true` sat OUTSIDE
+      // this if, so a failed emit still told attackBestTarget the tick was handled and
+      // every remaining strategy was skipped. Upstream can return true unconditionally
+      // because addExecution cannot fail -- an intent emit can.
+      const sent = Boolean(ctors.attack) && emitIntent(ctors.attack, targetId, troops);
+      if (sent) {
         state.stats.attacks++;
         // DIVERGENCE (counterAttackFirst): distinguish a reserve-ignoring counter-attack
         // from a normal one, otherwise there is no way to see the behaviour fire.
@@ -2717,7 +2724,7 @@
           "combat",
         );
       }
-      return true;
+      return sent;
     }
 
     // sendBoatAttack — AiAttackBehavior (private, now async).
@@ -2802,11 +2809,12 @@
 
       // src: game.addExecution(new TransportShipExecution(player, closest.y, troops)).
       const ctors = discoverCtors(getEventBus());
-      if (ctors.boat && emitIntent(ctors.boat, closest.y, troops)) {
+      const sent = Boolean(ctors.boat) && emitIntent(ctors.boat, closest.y, troops);
+      if (sent) {
         state.stats.attacks++;
         setLastAction(tr("⛵ Boat attack"), "naval");
       }
-      return true;
+      return sent;
     }
 
     // calculateBotAttackTroops — AiAttackBehavior (private).
