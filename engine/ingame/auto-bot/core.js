@@ -318,7 +318,12 @@
     warshipRaidWindowTicks: 400, // remember trade-raid tiles this long (raider may move on)
     warshipLossZoneMin: 2, // need ≥ this many losses clustered before committing a ship
     warshipLossZoneRadius: 35, // losses within this (manhattan) form one loss-lane cluster
-    warshipRetreatHealthPct: 50, // retreat when HP < this % of max (Blon port)
+    // The GAME's own threshold is warshipRetreatHealthPercent() = 75, and the engine
+    // flips a ship to state "retreating" at that point regardless of what we think. A
+    // setting of 50 therefore sat below it and could never fire — the combat pass had
+    // always already skipped the ship. Default to the game's value so the slider means
+    // something; warshipBehavior still falls back to reading the config if it is unset.
+    warshipRetreatHealthPct: 75, // retreat when HP < this % of max
     warshipHuntTrade: true, // hunt enemy trade ships when no enemies nearby (Blon port)
     warshipCombatThrottleMs: 800, // min gap between combat passes
     warshipAutoSpawn: true, // auto-build new warships (toggle OFF to only control existing ones)

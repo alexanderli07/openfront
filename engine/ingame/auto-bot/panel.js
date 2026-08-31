@@ -468,6 +468,80 @@
               <div class="ab-cfg-sw ${state.settings.reserveByNeighbors ? "on" : ""}" data-cfg="reserveByNeighbors"></div>
             </div>
 
+            <!-- These were all in PERSISTED_KEYS and read by the engine, but had no
+                 control anywhere — including the two that decide whether the bot ever
+                 attacks a neighbour at all. The generic [data-cfg] / [data-cfg-range]
+                 handlers already cover them, so this is markup only. -->
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Reserve while fighting")}" data-tip-desc="${tr("While a real fight is on, size expansion against a raised reserve floor instead of the plain expand ratio, and keep a share of the CURRENT army home after a counter-attack. Tribes do not count as a fight.")}">${tr("Reserve while fighting")}</span>
+              <div class="ab-cfg-sw ${state.settings.combatReserve ? "on" : ""}" data-cfg="combatReserve"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Go easy on neighbours")}" data-tip-desc="${tr("After the opening, a non-retaliation attack on a human or nation keeps at least half of max troops at home. Counter-attacks and everything defensive are untouched.")}">${tr("Go easy on neighbours")}</span>
+              <div class="ab-cfg-sw ${state.settings.gentleNeighbors ? "on" : ""}" data-cfg="gentleNeighbors"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("No trickle attacks")}" data-tip-desc="${tr("Refuse attacks too small to be worth making. By the game's own attack maths a trickle is the worst possible attack: its per-tile losses clamp to the 2x maximum while its tile budget clamps to the minimum. Counter-attacks, tribe fights and land grabs are exempt.")}">${tr("No trickle attacks")}</span>
+              <div class="ab-cfg-sw ${state.settings.minAttackForce ? "on" : ""}" data-cfg="minAttackForce"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Absorb, then counter")}" data-tip-desc="${tr("Wait out an incoming wave before countering, rather than trading into their full mass. Countering immediately also speeds their front up. Never counters while their front is near one of our defense posts.")}">${tr("Absorb, then counter")}</span>
+              <div class="ab-cfg-sw ${state.settings.absorbThenCounter ? "on" : ""}" data-cfg="absorbThenCounter"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Finish off pockets")}" data-tip-desc="${tr("Spot bordering enemies whose land perimeter is already mostly ours and sealable, and prioritise eating their remaining ring until the game's wholesale capture fires.")}">${tr("Finish off pockets")}</span>
+              <div class="ab-cfg-sw ${state.settings.encirclePockets ? "on" : ""}" data-cfg="encirclePockets"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Time defense posts")}" data-tip-desc="${tr("Measure how fast the attack front is advancing and place a post deep enough to FINISH building before the front arrives — or buy nothing at all when no site can finish in time.")}">${tr("Time defense posts")}</span>
+              <div class="ab-cfg-sw ${state.settings.defensePostTiming ? "on" : ""}" data-cfg="defensePostTiming"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Posts for real players only")}" data-tip-desc="${tr("Tribes neither trigger reactive defense posts with their trickle waves nor count as a hostile front for proactive ones. Humans and nations both count as real players.")}">${tr("Posts for real players only")}</span>
+              <div class="ab-cfg-sw ${state.settings.defensePostPlayersOnly ? "on" : ""}" data-cfg="defensePostPlayersOnly"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Test both nuke arcs")}" data-tip-desc="${tr("The game lets each launch pick its arc direction, but the Nation AI hardcodes 'up' and only corridor-checks that one. Test both and launch on whichever dodges enemy SAM rings.")}">${tr("Test both nuke arcs")}</span>
+              <div class="ab-cfg-sw ${state.settings.nukeArcRotate ? "on" : ""}" data-cfg="nukeArcRotate"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Aim past SAM upgrades")}" data-tip-desc="${tr("Trajectories that clear a SAM's current ring but sit inside its level+1 ring die to a single enemy upgrade. Prefer aim points clean against every SAM's upgraded ring.")}">${tr("Aim past SAM upgrades")}</span>
+              <div class="ab-cfg-sw ${state.settings.samUpgradeMargin ? "on" : ""}" data-cfg="samUpgradeMargin"></div>
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Nuke spend (minutes of income)")}" data-tip-desc="${tr("A single warhead decision may consume at most this many minutes of NET income. Warheads are otherwise uncapped — the only hard rule is that our gold must still be growing.")}">${tr("Nuke spend (minutes of income)")}</span>
+              <input class="ab-cfg-num" type="number" min="1" max="10" step="1" value="${state.settings.nukeIncomeMinutes ?? 2}" data-cfg-num="nukeIncomeMinutes">
+            </div>
+
+            <div class="ab-cfg-sec">${tr("Opening")}</div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Opening in every mode")}" data-tip-desc="${tr("Apply the early build-up gate in team games too, not only when boxed in. A team spawn with open land otherwise had no build-up gate at all and picked fights from minute one.")}">${tr("Opening in every mode")}</span>
+              <div class="ab-cfg-sw ${state.settings.openingAllModes ? "on" : ""}" data-cfg="openingAllModes"></div>
+            </div>
+            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;gap:2px;">
+              <div style="display:flex;justify-content:space-between;">
+                <span class="ab-cfg-label" data-tip="${tr("Army grown at")}" data-tip-desc="${tr("Troop fill (troops divided by max troops) that counts as 'army grown' and ends the build-up. Keep above 60% or it collapses into a restatement of the trigger ratio.")}">${tr("Army grown at")}</span>
+                <span class="ab-cfg-val" data-cfg-val="openingArmyFill">${Math.round((state.settings.openingArmyFill ?? 0.65) * 100)}%</span>
+              </div>
+              <input type="range" min="60" max="95" step="5" value="${Math.round((state.settings.openingArmyFill ?? 0.65) * 100)}" data-cfg-range="openingArmyFill" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Stocked up at (city levels)")}" data-tip-desc="${tr("Summed City LEVELS that count as 'stocked up on buildings' and end the opening.")}">${tr("Stocked up at (city levels)")}</span>
+              <input class="ab-cfg-num" type="number" min="1" max="20" step="1" value="${state.settings.openingMinCityLevels ?? 5}" data-cfg-num="openingMinCityLevels">
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Opening hard stop (ticks)")}" data-tip-desc="${tr("Stall-breaker: after this many game ticks the opening is over no matter what, so no veto can freeze the bot on a map where land never runs out. 0 turns it off.")}">${tr("Opening hard stop (ticks)")}</span>
+              <input class="ab-cfg-num" type="number" min="0" max="30000" step="500" value="${state.settings.openingMaxTicks ?? 9000}" data-cfg-num="openingMaxTicks">
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Boxed in at (hostile players)")}" data-tip-desc="${tr("Team games: how many distinct hostile PLAYERS bordering us counts as having spawned boxed in. Tribes are excluded.")}">${tr("Boxed in at (hostile players)")}</span>
+              <input class="ab-cfg-num" type="number" min="1" max="6" step="1" value="${state.settings.openingSurroundedNeighbors ?? 2}" data-cfg-num="openingSurroundedNeighbors">
+            </div>
+            <div class="ab-cfg-row">
+              <span class="ab-cfg-label" data-tip="${tr("Invader memory (ticks)")}" data-tip-desc="${tr("How long an attacker stays exempt from the no-trickle and gentle-neighbour rules after its wave ends. The game lists only in-flight waves, so without a memory an invader becomes un-attackable between waves and we could never retake our own ground.")}">${tr("Invader memory (ticks)")}</span>
+              <input class="ab-cfg-num" type="number" min="0" max="3000" step="100" value="${state.settings.openingInvaderMemoryTicks ?? 600}" data-cfg-num="openingInvaderMemoryTicks">
+            </div>
+
             <div class="ab-cfg-row">
               <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}" data-tip="${tr("Counter-attack first")}">${tr("Counter-attack first")}</span>
               <div class="ab-cfg-sw ${state.settings.counterAttackFirst ? "on" : ""}" data-cfg="counterAttackFirst"></div>
@@ -538,9 +612,9 @@
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Retreat HP %")}" data-tip-desc="${tr("Send a damaged warship back to port below this share of its health. The same threshold also decides which of our ships count as combat-effective in the fight-or-flee simulation.")}">${tr("Retreat HP %")}</span>
-                <span class="ab-cfg-val" data-cfg-val="warshipRetreatHealthPct">${state.settings.warshipRetreatHealthPct || 50}%</span>
+                <span class="ab-cfg-val" data-cfg-val="warshipRetreatHealthPct">${state.settings.warshipRetreatHealthPct || 75}%</span>
               </div>
-              <input type="range" min="10" max="90" step="5" value="${state.settings.warshipRetreatHealthPct || 50}" data-cfg-range="warshipRetreatHealthPct" style="width:100%;accent-color:var(--oh-accent);">
+              <input type="range" min="10" max="90" step="5" value="${state.settings.warshipRetreatHealthPct || 75}" data-cfg-range="warshipRetreatHealthPct" style="width:100%;accent-color:var(--oh-accent);">
             </div>
             <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -730,18 +804,31 @@
         saveSettings();
       });
     });
-    // number inputs (tickMs)
-    const tickInput = panel.querySelector('[data-cfg-num="tickMs"]');
-    if (tickInput) {
-      tickInput.addEventListener("change", () => {
-        const ms = Number(tickInput.value);
-        if (Number.isFinite(ms) && ms > 0) {
-          state.settings.tickMs = ms;
-          saveSettings();
-          if (typeof retuneEngine === "function") retuneEngine();
+    // Number inputs. This used to be a single hardcoded lookup for tickMs, so every
+    // other [data-cfg-num] control rendered as a dead input. Generic now, with the
+    // element's own min/max as the clamp and tickMs keeping its engine-retune side
+    // effect. A blank field reverts to the stored value rather than writing NaN.
+    panel.querySelectorAll("[data-cfg-num]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const key = input.dataset.cfgNum;
+        const raw = Number(input.value);
+        // Number("") is 0, NOT NaN — so an emptied field would sail past a plain
+        // isFinite check and get clamped to the element's min, silently rewriting the
+        // setting to something the user never chose. Test the text, then the number.
+        if (String(input.value).trim() === "" || !Number.isFinite(raw)) {
+          input.value = String(state.settings[key]);
+          return;
         }
+        const min = input.min === "" ? -Infinity : Number(input.min);
+        const max = input.max === "" ? Infinity : Number(input.max);
+        const v = Math.min(Math.max(raw, min), max);
+        if (v !== raw) input.value = String(v);
+        state.settings[key] = v;
+        saveSettings();
+        // tickMs drives the poll timer, so it has to be re-armed in place.
+        if (key === "tickMs" && typeof retuneEngine === "function") retuneEngine();
       });
-    }
+    });
     // range sliders (donate tuning)
     panel.querySelectorAll("[data-cfg-range]").forEach((input) => {
       input.addEventListener("input", () => {
