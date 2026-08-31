@@ -356,7 +356,7 @@
         <div class="ab-switch ${state.settings.enabled ? "on" : ""}" data-role="switch" data-tip="${tr("Toggle on/off")}" data-tip-desc="${tr("Start or stop the bot. Persists across reloads, so it resumes on the next game.")}"></div>
         <div class="ab-head-btns">
           <button class="ab-mini" data-role="mini" data-tip="${tr("Collapse")}" data-tip-desc="${tr("Fold the panel down to just its header. The bot keeps running.")}">${state.settings.minimized ? "▢" : "—"}</button>
-          <button class="ab-close" data-role="close" data-tip="${tr("Close")}" data-tip-desc="${tr("Hide the panel entirely. Reopen it from the ⊕ launcher.")}">✕</button>
+          <button class="ab-close" data-role="close" data-tip="${tr("Close")}" data-tip-desc="${tr("Hide the panel entirely. Reopen it from the ⊕ launcher → Panels → Auto-Bot panel.")}">✕</button>
         </div>
       </div>
       <div class="ab-tabs">

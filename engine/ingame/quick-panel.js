@@ -52,10 +52,10 @@
   // Descriptions based on actual code implementation.
   var QP_FEATURE_TIPS = {
     // === Helpers Tab - Section Keys ===
-    panels: ["Panels", "Toggle floating panels: stats, trade, advisor, boat, estate, alliance, script users, auto-bot, auto-join."],
+    panels: ["Panels", "Show or hide the Auto-Bot panel and the lobby Auto-Join panel."],
     map: ["Map Overlays", "Toggle visual overlays on the map: money, max troops, threats, nuke prediction, heatmaps, spawn markers."],
     combat: ["Combat & Automation", "Automatic combat helpers. Auto SOS calls every teammate and ally when you are under attack and low on troops; Shift+S sends one manually any time."],
-    tools: ["Tools", "Toggle utility tools: hide ads, round logger, network logger, mark bot nations red."],
+    tools: ["Tools", "Anti-AFK: sends a harmless input periodically so the game does not drop you for inactivity."],
     companion: ["Companion", "Toggle the Companion Bot: a slave tab that serves a named \"boss\" account via emoji commands (donate, ally, spawn nearby, follow-attack)."],
 
     // === Helpers Tab - Toggle Keys (Panels) ===
@@ -281,6 +281,11 @@
       // border inline !important every 2s, which erased that signal a moment after it
       // appeared.
       if (el.id.indexOf("atom-macro") !== -1) continue;
+      // The popup scrim is a radial gradient and the launcher ring carries the accent
+      // colour; stamping the flat panel background and the grey panel border over them
+      // every 2s erased both. Same id-based exclusion as the four cases above.
+      if (el.id.indexOf("-overlay") !== -1) continue;
+      if (el.id.indexOf("-launcher") !== -1) continue;
       el.style.setProperty("background", bg, "important");
       el.style.setProperty("border-color", border, "important");
     }
@@ -582,8 +587,11 @@
     showEstatePanel: "openfront-helper-estate-panel",
     showAllianceRequestsPanel: "openfront-helper-alliance-requests-panel",
     showHelperUsers: "openfront-helper-users-container",
-    showAutoBotPanel: "openfront-helper-autobot-panel",
-    showFloatingAutoJoinPanel: "openfront-helper-floating-autojoin",
+    // Both of these were wrong (missing a hyphen, and a truncated suffix), so
+    // _animatePanelToggle's getElementById returned null and the open/close animation
+    // silently no-opped. The real ids live in auto-bot/core.js and lobby/core.js.
+    showAutoBotPanel: "openfront-helper-auto-bot-panel",
+    showFloatingAutoJoinPanel: "openfront-helper-floating-autojoin-panel",
     showGameTimeAlert: "openfront-helper-game-time-alert",
   };
 
@@ -621,6 +629,21 @@
   }
 
   function _getSetting(key, fallback) {
+    // One level of dot path. collapsedHelperCategories.<section> is WRITTEN nested (the
+    // lobby's persist splits the key into the object) but was READ with a flat
+    // `key in cache`, which never matches -- so a collapsed section was saved correctly
+    // and never read back.
+    var dot = key.indexOf(".");
+    if (dot > 0) {
+      var head = key.slice(0, dot), tail = key.slice(dot + 1);
+      var obj = _quickPanelSettingsCache && _quickPanelSettingsCache[head];
+      if (obj && typeof obj === "object" && tail in obj) return obj[tail];
+      try {
+        var nd = window.OpenFrontHelperSettings && window.OpenFrontHelperSettings.DEFAULT_SETTINGS;
+        if (nd && nd[head] && typeof nd[head] === "object" && tail in nd[head]) return nd[head][tail];
+      } catch (e) {}
+      return fallback;
+    }
     if (_quickPanelSettingsCache && key in _quickPanelSettingsCache)
       return _quickPanelSettingsCache[key];
     // Fallback: read from DEFAULT_SETTINGS if cache is empty
@@ -632,9 +655,44 @@
   }
 
   function _setAndNotify(key, value) {
-    if (_quickPanelSettingsCache) _quickPanelSettingsCache[key] = value;
+    // Mirror the lobby's nested write locally, so the very next render reads back what
+    // was just set instead of a flat key nothing looks at.
+    if (_quickPanelSettingsCache) {
+      var dot = key.indexOf(".");
+      if (dot > 0) {
+        var head = key.slice(0, dot), tail = key.slice(dot + 1);
+        if (!_quickPanelSettingsCache[head] || typeof _quickPanelSettingsCache[head] !== "object") {
+          _quickPanelSettingsCache[head] = {};
+        }
+        _quickPanelSettingsCache[head][tail] = value;
+      } else {
+        _quickPanelSettingsCache[key] = value;
+      }
+    }
     _notifySettingChanged(key, value);
     _applySettingLocally(key, value);
+  }
+
+  /** Range inputs fire `input` on every pointer move. Each _setAndNotify from one is a
+   *  chrome.storage write, a ~40-message syncHelpers sweep, a storage.onChanged round
+   *  trip that re-normalises and syncs everything again, and a full auto-join re-match --
+   *  per pixel of slider travel. Apply locally at once (so the drag stays live) and
+   *  debounce only the persist. */
+  var _rangeNotifyTimer = null;
+  var _rangeNotifyPending = {};
+  function _setAndNotifyRange(key, value) {
+    if (_quickPanelSettingsCache) _quickPanelSettingsCache[key] = value;
+    _applySettingLocally(key, value);
+    _rangeNotifyPending[key] = value;
+    if (_rangeNotifyTimer) clearTimeout(_rangeNotifyTimer);
+    _rangeNotifyTimer = setTimeout(function() {
+      _rangeNotifyTimer = null;
+      var pending = _rangeNotifyPending;
+      _rangeNotifyPending = {};
+      for (var k in pending) {
+        if (Object.prototype.hasOwnProperty.call(pending, k)) _notifySettingChanged(k, pending[k]);
+      }
+    }, 120);
   }
 
   // Setter resolver: key → setter FUNCTION. Setters are top-level functions in
@@ -775,6 +833,10 @@
     var prevLang = _quickPanelSettingsCache ? _quickPanelSettingsCache.language : null;
     _quickPanelSettingsCache = settings || {};
     _themeFromSettings();
+    // Replay the settings that own live state. _toggleRainbowMode is otherwise only
+    // reachable from a click, so after a reload the switch read ON while the accent sat
+    // frozen -- and toggling off-then-on was the only way back.
+    _toggleRainbowMode(_getSetting("rainbowMode", false));
     // Only re-render when language actually changed (not on every setting sync).
     var newLang = _quickPanelSettingsCache.language;
     if (prevLang !== newLang && quickPanelEnabled && document.getElementById(QUICK_PANEL_ID)) {
@@ -788,6 +850,11 @@
     ensureQuickPanelStyles();
     var panel = document.getElementById(QUICK_PANEL_ID);
     if (panel) return panel;
+
+    // Seed the remembered tab. quickPanelActiveTab has always been a persisted setting;
+    // the panel simply never read it, so it reopened on Helpers no matter where you were.
+    var savedTab = _getSetting("quickPanelActiveTab", "helpers");
+    if (savedTab === "helpers" || savedTab === "config") quickPanelActiveTab = savedTab;
 
     panel = document.createElement("div");
     panel.id = QUICK_PANEL_ID;
@@ -846,7 +913,7 @@
     var tabs = document.createElement("div");
     tabs.className = "ohqp-tabs";
     var TAB_DEFS = [
-      { id: "helpers", emoji: "⚙️", title: "Helpers", tip: "Toggle panels, map overlays, combat features, alerts, and tools" },
+      { id: "helpers", emoji: "⚙️", title: "Helpers", tip: "Toggle panels, map overlays, combat features, and tools" },
       { id: "config",  emoji: "🔧", title: "Config", tip: "Theme, language, skin unlocker, low lag mode, and reset settings" },
     ];
     for (var i = 0; i < TAB_DEFS.length; i++) {
@@ -905,6 +972,8 @@
       bodies[i].classList.toggle("active", bodies[i].dataset.panel === quickPanelActiveTab);
     }
     _renderActiveTab();
+    // quickPanelActiveTab is a real persisted setting; the panel just never wrote it.
+    _setAndNotify("quickPanelActiveTab", quickPanelActiveTab);
   }
 
   function _renderActiveTab() {
@@ -955,6 +1024,11 @@
     document.addEventListener("keydown", function(e) {
       if (_killShotListening) return; // don't fire while rebinding
       if (_typingInInput()) return;   // never fire mid-chat
+      // This hotkey sends an attack sized up to 100% of your army at whoever is under
+      // the cursor, with no confirmation -- and it had no control anywhere in the panel,
+      // the auto-bot config or the popup, so there was no way to know it existed or to
+      // turn it off. Default unchanged (armed); it is now visible and switchable.
+      if (!_getSetting("killShotEnabled", true)) return;
       var code = _getSetting("killShotHotkey", "Shift+KeyK");
       if (!code) return;
       // Build actual code from event
@@ -1251,6 +1325,7 @@
         // only be toggled from the popup even though the quick panel ran its timer.
         key: "combat", title: _tr("Combat & Automation"), toggles: [
           ["sosDefense", _tr("Auto SOS")],
+          ["killShotEnabled", _tr("Kill-shot hotkey (Shift+K)")],
         ]
       },
       {
@@ -1291,40 +1366,10 @@
   }
 
   // ---- Tab: Theme ----
-  function _renderThemeTab() {
-    var el = document.querySelector("#" + QUICK_PANEL_ID + " [data-panel='theme']");
-    if (!el) return;
-    var presets = _themePresets;
-    var h = [];
-    h.push('<div class="ohqp-label-sm">' + _tr('Presets') + '</div>');
-    h.push('<div class="ohqp-presets">');
-    var pkeys = Object.keys(presets);
-    for (var i = 0; i < pkeys.length; i++) {
-      var hex = presets[pkeys[i]];
-      var name = pkeys[i].charAt(0).toUpperCase() + pkeys[i].slice(1);
-      h.push('<button data-qp-theme="' + hex + '" style="border-color:' + hex + ';color:' + hex + ';">' + name + '</button>');
-    }
-    h.push('</div>');
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;"><span class="ohqp-label-sm">' + _tr('Accent Hue') + '</span>');
-    h.push('<input type="color" data-qp-color="guiAccentColor" value="' + (_getSetting("guiAccentColor", "#00ff66") || "#00ff66") + '" style="width:24px;height:20px;border:none;padding:0;cursor:pointer;">');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="guiAccentHue" min="0" max="360" step="1" value="' + (_getSetting("guiAccentHue", 150) || 150) + '">');
-    h.push('</div>');
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;"><span class="ohqp-label-sm">' + _tr('GUI Opacity') + '</span>');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="guiOpacity" min="0.1" max="1" step="0.01" value="' + (_getSetting("guiOpacity", 1) || 1) + '">');
-    h.push('</div>');
-    h.push('<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;"><span class="ohqp-label-sm">' + _tr('Overlay Opacity') + '</span>');
-    h.push('<input class="ohqp-range" type="range" data-qp-range="overlayOpacity" min="0.1" max="1" step="0.01" value="' + (_getSetting("overlayOpacity", 1) || 1) + '">');
-    h.push('</div>');
-    h.push(_swHtmlWithTip("rainbowMode", _getSetting("rainbowMode", false), false, "Rainbow mode"));
-    h.push('<div class="ohqp-divider"></div>');
-    h.push('<div style="display:flex;gap:4px;">');
-    h.push('<button class="ohqp-btn" data-qp-action="resetColors" style="flex:1;">' + _tr('Reset Colors') + '</button>');
-    h.push('<button class="ohqp-btn" data-qp-action="resetLayout" style="flex:1;">' + _tr('Reset Layout') + '</button>');
-    h.push('</div>');
-
-    el.innerHTML = h.join("");
-    _bindThemeEvents(el);
-  }
+  // _renderThemeTab lived here. It was never called: TAB_DEFS has only `helpers` and
+  // `config`, _renderActiveTab's switch has only those two cases, and no
+  // [data-panel='theme'] element is ever created -- so its Overlay Opacity slider and
+  // Reset Layout button were unreachable. Both now render in _renderConfigTab.
 
   function _bindThemeEvents(el) {
     var presets = el.querySelectorAll("[data-qp-theme]");
@@ -1339,9 +1384,11 @@
     // NOTE: switches are handled by _bindEvents (called first) — do NOT rebind here.
     var ranges = el.querySelectorAll("[data-qp-range]");
     for (var i = 0; i < ranges.length; i++) {
+      if (ranges[i].dataset.qpRangeBound) continue;
+      ranges[i].dataset.qpRangeBound = "1";
       ranges[i].addEventListener("input", function() {
         var val = Number(this.value);
-        _setAndNotify(this.dataset.qpRange, val);
+        _setAndNotifyRange(this.dataset.qpRange, val);
         if (this.dataset.qpRange === "guiAccentHue") {
           // Convert hue to hex and apply.
           var h = ((val % 360) + 360) % 360;
@@ -1414,9 +1461,17 @@
     h.push('<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;"><span class="ohqp-label-sm" style="width:55px;">' + _tr("Opacity") + '</span>');
     h.push('<input class="ohqp-range" type="range" data-qp-range="guiOpacity" min="0.1" max="1" step="0.01" value="' + (_getSetting("guiOpacity", 1) || 1) + '" style="flex:1;">');
     h.push('</div>');
+    // Overlay Opacity and Reset Layout used to live only in _renderThemeTab, which no
+    // tab has ever rendered (TAB_DEFS has helpers and config, and there is no
+    // [data-panel='theme'] element) -- so the slider that drives ofhSetOverlayAlpha was
+    // unreachable and the canvas overlays were pinned at whatever _resetColors last set.
+    h.push('<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;"><span class="ohqp-label-sm" style="width:55px;">' + _tr("Overlay") + '</span>');
+    h.push('<input class="ohqp-range" type="range" data-qp-range="overlayOpacity" min="0.1" max="1" step="0.01" value="' + (_getSetting("overlayOpacity", 1) || 1) + '" style="flex:1;">');
+    h.push('</div>');
     h.push(_swHtmlWithTip("rainbowMode", _getSetting("rainbowMode", false), false, "Rainbow mode"));
     h.push('<div style="display:flex;gap:4px;margin-top:4px;">');
     h.push('<button class="ohqp-btn" data-qp-action="resetColors" style="flex:1;font-size:9px;">' + _tr("Reset Colors") + '</button>');
+    h.push('<button class="ohqp-btn" data-qp-action="resetLayout" style="flex:1;font-size:9px;">' + _tr("Reset Layout") + '</button>');
     h.push('</div>');
     h.push('</div></div>');
 
@@ -1466,8 +1521,11 @@
     h.push('</div>');
 
     el.innerHTML = h.join("");
-    _bindEvents(el);
+    // Theme first: its range handler is a SUPERSET of the generic one (it also drives the
+    // hue conversion and the live opacity apply). Both used to bind `input` on the same
+    // [data-qp-range] nodes, so every slider fired two persists per pointer move.
     _bindThemeEvents(el);
+    _bindEvents(el);
   }
 
   // ---- Event binding ----
@@ -1495,6 +1553,13 @@
     var secs = tabEl.querySelectorAll(".ohqp-sec-h");
     for (var i = 0; i < secs.length; i++) {
       var id = secs[i].dataset.qpSection || ("sec_" + quickPanelActiveTab + "_" + i);
+      // A key we have no saved state for keeps whatever the renderer just decided.
+      // _renderActiveTab snapshots BEFORE rendering, so on the first render the body is
+      // still empty, _saveAccordionState returns {}, and this else-branch then stripped
+      // `open` off every section the renderer had just opened. Every later render saved
+      // that collapsed state and restored it, so the panel opened fully collapsed forever
+      // and the `open` flag computed from settings was dead code.
+      if (!(id in states)) continue;
       if (states[id]) {
         secs[i].classList.add("open");
         var body = secs[i].nextElementSibling;
@@ -1563,8 +1628,10 @@
     }
     var ranges = el.querySelectorAll("[data-qp-range]");
     for (var i = 0; i < ranges.length; i++) {
+      if (ranges[i].dataset.qpRangeBound) continue; // already owned by _bindThemeEvents
+      ranges[i].dataset.qpRangeBound = "1";
       ranges[i].addEventListener("input", function() {
-        _setAndNotify(this.dataset.qpRange, Number(this.value));
+        _setAndNotifyRange(this.dataset.qpRange, Number(this.value));
       });
     }
     var inputs = el.querySelectorAll("[data-qp-input]");

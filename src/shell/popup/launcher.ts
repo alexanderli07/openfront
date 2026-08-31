@@ -105,7 +105,11 @@ function createIcon(): void {
     if (moved) {
       const r = icon.getBoundingClientRect();
       writePos({ left: r.left, top: r.top });
-      try { localStorage.removeItem("openfront-helper-quick-panel-pos"); } catch { /* ignore */ }
+      // Do NOT clear the quick panel's saved position here. _placePanel's contract is
+      // that once the user has dragged the panel it OWNS its position and is never
+      // yanked back beside the launcher -- wiping the key on any launcher nudge defeated
+      // exactly that, and the panel snapped back on its next open. "Reset Layout" in the
+      // Config tab is the deliberate way to clear it.
     } else {
       // Toggle Quick Panel with animation (instead of popup)
       window.dispatchEvent(new CustomEvent("ofh-toggle-quick-panel"));

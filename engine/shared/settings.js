@@ -115,6 +115,11 @@
     quickPanelActiveTab: "helpers",
     // WS-injected actions (Quick Panel Actions tab)
     killShotInstantSend: false,
+    // Whether the kill-shot hotkey is armed at all. It fires an attack of up to your
+    // ENTIRE army at the player under the cursor with no confirmation, and used to have
+    // no control anywhere -- default stays armed so behaviour is unchanged, but it is now
+    // visible in the quick panel's Combat section and can be switched off.
+    killShotEnabled: true,
     killShotHotkey: "Shift+KeyK",
     // USER: one key that sends 🆘 to every teammate AND ally at once. Empty
     // string disables it. Same code format as killShotHotkey ("Shift+KeyS").

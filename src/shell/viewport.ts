@@ -7,6 +7,7 @@
 
 const PANEL_SELECTORS = [
   "#openfront-helper-auto-bot-panel",
+  "#openfront-helper-quick-panel",
   "#openfront-helper-floating-autojoin-panel",
   "#openfront-helper-floating-helpers-panel",
   "#openfront-helper-team-build-stats",

@@ -1823,6 +1823,10 @@ async function handleStorageChange(changes, areaName) {
   selectiveTradePolicyAvailable = Boolean(settings.autoCancelDeniedTradesAvailable);
   cheatsAvailable = Boolean(settings.cheatsAvailable);
   syncHelpers();
+  // The quick panel was NOT resynced here, so any settings write from outside it (the
+  // popup's own switches, most of all) left its rows showing stale values -- and the
+  // first click on a stale row was then swallowed by the equality guard in the setter.
+  syncQuickPanelSettings();
   syncFloatingHelpersPanel();
   syncFloatingAutoJoinPanel();
   if (!settings.enabled) {
