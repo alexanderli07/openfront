@@ -14,11 +14,14 @@ npm run build        # → openfront-helper.user.js (minified)   — the committ
 npm run build:raw    # unminified build (readable engine + console.log); OFH_DEBUG=1 also triggers raw
 npm run check        # tsc --noEmit  (type-checks src/**/*.ts ONLY — engine JS is not type-checked)
 npm run check:i18n   # audit which locale keys are missing vs. engine t()/tr() usage
-npm test             # node test/smoke.mjs — builds the shell IIFE in a mocked DOM and asserts the shims wire up
+npm test             # node test/run.mjs — the shell smoke test + every test/*.test.mjs regression file
+npm run test:smoke   # just the shell smoke test (mocked DOM, asserts the shims wire up)
 npm run format       # prettier --write (engine/ and locales/ are prettier-ignored on purpose)
 ```
 
-There is no test runner/framework and no single-test command — `npm test` is one Node smoke script. The auto-bot has its own in-browser smoke check: run `window.__autoBotDiag()` in the page console; a full object back means the bot wiring is intact.
+There is no third-party test framework. `npm test` runs `test/run.mjs`, which spawns the shell smoke test plus every `test/*.test.mjs`; each file is also independently runnable (`node test/warship.test.mjs`), and `OFH_TEST_VERBOSE=1` prints every assertion instead of just the tally. **Read `test/README.md` before adding or trusting a test** — the engine has no modules to import, so these tests slice real function text out of the source and run it against stubs built to gameApi's true surface.
+
+**A green `npm test` does not mean the bot works.** It is a regression ratchet over ~20 functions out of ~18k lines, and it never runs the game. For that: load the userscript, run `window.__autoBotDiag()` in the page console (a full object back means the bot wiring is intact), and play a game — three bugs found in the last review round were in code that had never executed even once.
 
 **The build output `openfront-helper.user.js` is committed to the repo** (see `.gitignore`). After changing any source, rebuild and commit the regenerated file along with your changes — the published userscript is this file, not the sources.
 
