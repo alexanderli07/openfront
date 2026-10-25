@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.60
+// @version      1.84.61
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -1296,7 +1296,7 @@ function createTwoTeamOpening(deps) {
     if (!land || land.game !== game || land.tick !== tick || land.border !== border) {
       land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0 };
       for (const tile of border) {
-        if (game.isShore(tile)) land.coast = true;
+        if (game.isShore(tile)&&(!deps.portWaterAccess||deps.portWaterAccess.assess(game,tile).allowed)) land.coast = true;
         for (const neighbor of game.neighbors(tile)) {
           if (!game.isLand(neighbor)) continue;
           if (!game.hasOwner(neighbor)) {
@@ -1307,7 +1307,8 @@ function createTwoTeamOpening(deps) {
       geography.set(player, land);
     }
     const enabled = type => !config.isUnitDisabled(type) && (!deps.buildAllowed || deps.buildAllowed(type));
-    const count = type => player.units(type).filter(unit => !unit.isActive || unit.isActive()).length;
+    const count = type => player.units(type).filter(unit => (!unit.isActive || unit.isActive())&&
+      (type!==U.Port||!deps.portWaterAccess||deps.portWaterAccess.assess(game,unit.tile()).allowed)).length;
     const ports = count(U.Port), cities = count(U.City), factories = count(U.Factory), sams = count(U.SAMLauncher);
     const portTarget = enabled(U.Port) && land.coast && context.sharedWater !== false ? 2 : 0;
     const economyMode = portTarget ? 'coastal' : 'factory';
@@ -1326,6 +1327,68 @@ function createTwoTeamOpening(deps) {
 }
 
 
+
+'use strict';
+// A shared component/trade hint is not proof of access to open water. Verify
+// an ocean witness, including rivers that connect to it, before spending.
+function createPortWaterAccess({perCall=512,perTick=2048,maxTiles=16384}={}){
+  const states=new WeakMap();
+  function assess(game,tile){
+    const deny=reason=>({allowed:false,reason});
+    try{
+      if(!game.isLand(tile))return deny('Port must occupy a land shore');
+      const water=game.neighbors(tile).filter(t=>game.isWater(t));
+      if(!water.length)return deny('Port has no adjacent water');
+      const tick=game.ticks();let state=states.get(game);
+      if(!state||tick<state.tick){state={tick,spent:0,components:new Map()};states.set(game,state);}
+      if(tick!==state.tick){state.tick=tick;state.spent=0;}
+      let enclosed=true;
+      for(const start of water){
+        if(game.isOcean(start))return {allowed:true,reason:'Port has direct open-sea access'};
+        const id=game.getWaterComponent?.(start);
+        if(id===undefined||id===null){enclosed=false;continue;}
+        let r=state.components.get(id);
+        if(r?.witness!==undefined){
+          if(game.isWater(r.witness)&&game.isOcean(r.witness)&&game.getWaterComponent(r.witness)===id)
+            return {allowed:true,reason:'Port water component connects to open sea',component:id};
+          state.components.delete(id);r=null;
+        }
+        if(r&&(r.closed||r.truncated)&&tick-r.created>=40){state.components.delete(id);r=null;}
+        if(!r){
+          if(state.components.size>=64){
+            // Preserve unfinished flood progress across opening coast scans.
+            // Cheap completed lakes can be rediscovered without starvation.
+            const entries=[...state.components];
+            const victim=entries.find(([,v])=>v.closed)||entries.find(([,v])=>v.truncated)||
+              entries.find(([,v])=>v.witness!==undefined);
+            if(!victim){enclosed=false;continue;}
+            state.components.delete(victim[0]);
+          }
+          r={queue:[start],head:0,seen:new Set([start]),created:tick,closed:false,truncated:false};
+          state.components.set(id,r);
+        }
+        if(r.closed)continue;
+        let work=0;
+        while(r.head<r.queue.length&&work<perCall&&state.spent<perTick){
+          const current=r.queue[r.head++];work++;state.spent++;
+          if(game.isOcean(current)){
+            r.witness=current;r.queue=[];r.seen.clear();
+            return {allowed:true,reason:'Port water component connects to open sea',component:id};
+          }
+          for(const n of game.neighbors(current))if(game.isWater(n)&&game.getWaterComponent(n)===id&&!r.seen.has(n)){
+            if(r.seen.size>=maxTiles){r.truncated=true;continue;}
+            r.seen.add(n);r.queue.push(n);
+          }
+        }
+        if(r.head===r.queue.length&&!r.truncated){r.closed=true;r.queue=[];r.seen.clear();}
+        if(!r.closed)enclosed=false;
+      }
+      return deny(enclosed?'Enclosed water component: no open-sea connection':'Open-sea connection not yet proven');
+    }catch{return deny('Water topology unavailable: refuse unverified port');}
+  }
+  return {assess};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createPortWaterAccess;
 
 'use strict';
 
@@ -1715,7 +1778,7 @@ function defenseEconomyAffordable({ gold, cost, reserve = 0n, pendingCost = 0n }
 // Shared observations only: execution and reactive SAM upgrade decisions remain
 // with the runtime. Construction satisfies physical economic goals, while the
 // first SAM must finish before additional development begins.
-function createDefenseEconomy({ units: U, buildAllowed }) {
+function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
   const states = new WeakMap();
   function observe(game, player, opening) {
     if (!opening || opening.samEnabled !== true) return null;
@@ -1731,7 +1794,8 @@ function createDefenseEconomy({ units: U, buildAllowed }) {
     // A newly detected frontline keeps the ordinary policy. Once activated,
     // however, the reserve cannot disappear merely because geography changes.
     if (!safe && !state.reserveActivated) return null;
-    const active = type => (player.units(type) || []).filter(unit => !unit.isActive || unit.isActive());
+    const active = type => (player.units(type) || []).filter(unit => (!unit.isActive || unit.isActive())&&
+      (type!==U.Port||!portWaterAccess||portWaterAccess.assess(game,unit.tile()).allowed));
     const samUnits = active(U.SAMLauncher);
     const counts = { ports: active(U.Port).length, cities: active(U.City).length,
       factories: active(U.Factory).length, sams: samUnits.length };
@@ -2480,7 +2544,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.10.0-river-crossing',
+    version: '1.10.1-port-water',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -3655,6 +3719,7 @@ function createStructurePlacementPlanner(deps) {
     for (const tile of [...base, ...routeTiles, ...rearTiles, ...(sam?.tiles || [])]) {
       if (seen.has(tile)) continue;
       seen.add(tile);
+      if(unitType===U.Port&&deps.portWaterAccess&&!deps.portWaterAccess.assess(actor.game,tile).allowed)continue;
       let ownedFactoryRoutes = 0, alliedFactoryRoutes = 0;
       for (const anchor of anchors) {
         const distance = actor.game.euclideanDistSquared(tile, anchor.tile);
@@ -3819,6 +3884,12 @@ function createStructurePlacementPlanner(deps) {
           hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
             tile: selected.tile, status: 'unbuildable', probed });
           continue;
+        }
+        if(unitType===U.Port&&deps.portWaterAccess){
+          const tile=typeof buildable.canBuild==='number'?buildable.canBuild:selected.tile;
+          const water=deps.portWaterAccess.assess(actor.game,tile);
+          if(!water.allowed){hooks.record('structure-placement-result',{decisionId:choice.decisionId,unitType,
+            requestedTile:selected.tile,tile,status:'invalid-port-water',reason:water.reason});continue;}
         }
         hooks.remember(buildable, choice.decisionId);
         hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
@@ -7031,7 +7102,15 @@ function createBrainRuntime(deps) {
     const kind = safe(() => typeof bu?.canUpgrade === 'number' ? 'upgrade' : `build ${bu?.type || 'unit'}`, 'build');
     const placementDecisionId = bu && typeof bu === 'object' ? placementParents.get(bu) : undefined;
     const controller=owners.get(actor),adaptive=controller?.engine.selectedStrategy?.()==='adaptive-v1';
+    const port=!!deps.portWaterAccess&&bu?.type===deps.units?.Port;
     const request=()=>{
+      if(port){
+        const tile=typeof bu.canUpgrade==='number'?
+          controller.bot.player.units(deps.units.Port).find(unit=>unit.id()===bu.canUpgrade)?.tile():bu.canBuild;
+        if(typeof tile!=='number')return {allowed:false,reason:'Port site cannot be verified'};
+        const water=deps.portWaterAccess.assess(controller.bot.mg,tile);
+        if(!water.allowed)return {allowed:false,reason:water.reason};
+      }
       if(adaptive&&(deps.buildAllowed?.(bu.type)===false||controller.bot.mg.config().isUnitDisabled?.(bu.type)===true))
         return {allowed:false,reason:'Building type disabled before final dispatch'};
       const facts=defenseEconomyFacts(actor),upgrade=typeof bu?.canUpgrade==='number';
@@ -7053,16 +7132,17 @@ function createBrainRuntime(deps) {
     };
     const execute=()=>{
       const facts=request();
+      if(!facts.allowed)return false;
       if(facts.cost!==undefined&&controller.spending)return controller.spending.commit(facts,
         ()=>Reflect.apply(menu.sendBuildOrUpgrade, menu, args));
       return Reflect.apply(menu.sendBuildOrUpgrade, menu, args);
     };
     if (placementDecisionId === undefined) {
-      return submit(actor, source, kind, args, execute,false,false,adaptive?request:null);
+      return submit(actor, source, kind, args, execute,false,false,adaptive||port?request:null);
     }
     placementParents.delete(bu);
     return withPlan(actor, placementDecisionId,
-      () => submit(actor, source, kind, args, execute,false,false,adaptive?request:null));
+      () => submit(actor, source, kind, args, execute,false,false,adaptive||port?request:null));
   }
   function callback(actor, source, receiver, method, ...args) {
     return submit(actor, source, source.split('.').at(-1), args, () => Reflect.apply(receiver[method], receiver, args));
@@ -8226,8 +8306,10 @@ function createBrainRuntime(deps) {
 
 
 // Runs in the original Auto-Bot closure. No patches to the game's own event bus.
+const ofhPortWaterAccess=createPortWaterAccess();
 const ofhTeamGeography = createTeamGeography({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team});
 const ofhTeamOpening = createTwoTeamOpening({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team,
+  portWaterAccess:ofhPortWaterAccess,
   buildAllowed:type=>autoBotBuildAllowed(type)});
 const ofhMatchArchive=createMatchArchive({createSummary:createMatchSummary,
   onError:message=>pushLog('Match history storage warning: '+message,'system'),
@@ -8239,7 +8321,8 @@ const ofhBrainRuntime = createBrainRuntime({
   createCommandGuard,createSpendingLedger,createReactiveSam,createSamDevelopment,
   createSupportPosture:()=>createSupportPosture({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team}),
   wildernessCrossing:createWildernessCrossing(),
-  defenseEconomy:createDefenseEconomy({units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type)}),
+  portWaterAccess:ofhPortWaterAccess,
+  defenseEconomy:createDefenseEconomy({units:UNIT,portWaterAccess:ofhPortWaterAccess,buildAllowed:type=>autoBotBuildAllowed(type)}),
   samDefenseObserver:createSamDefenseObserver({units:UNIT}),
   sendSamUpgrade:(actor,quote)=>{
     const menu=getBuildMenu();if(!menu||typeof menu.sendBuildOrUpgrade!=='function')return false;
@@ -8254,7 +8337,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.60'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.61'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -8279,6 +8362,7 @@ const ofhBrainRuntime = createBrainRuntime({
   structurePlanner: createStructurePlanner({ units: UNIT, settings: () => state.settings, difficulty: currentDifficulty,
     spendableGold: actor => { const gold = actor.player.gold(); const hold = mirvReserveHold(gold); return gold > hold ? gold - hold : 0n; } }),
   structurePlacementPlanner: createStructurePlacementPlanner({ units: UNIT, settings: () => state.settings,
+    portWaterAccess:ofhPortWaterAccess,
     opening:ofhTeamOpening,samPlacement:createSamPlacement({units:UNIT}),
     geography:ofhTeamGeography,
     randomTerritoryTiles: randTerritoryTileArray, maxProbes: MAX_SPAWN_PROBES }),
@@ -8702,7 +8786,7 @@ class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=
                      </div>`).join("")}
             </div>
 
-
+            
             <p class="ab-cfg-label" style="margin:8px 0 12px;opacity:.8;">${tr("Action switches are in Controls. The bot manages its strategy rules automatically.")}</p>
             <details class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
               <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:10px 0;">${tr("Advanced tuning")}</summary>
