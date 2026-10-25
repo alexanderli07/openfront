@@ -56,7 +56,8 @@ function createMatchSummary(options={}) {
       structures=next;return;
     }
     if(/^transport-reservation-/.test(e.kind))add({kind:e.kind,tile:e.tile,age:e.age});
-    if(e.kind==='support-posture')add({kind:'support-posture',conserve:e.conserve,ready:e.ready,reason:e.reason,anchor:e.anchor});
+    if(e.kind==='support-posture')add({kind:'support-posture',conserve:e.conserve,ready:e.ready,donationReady:e.donationReady,
+      donationHoldReason:e.donationHoldReason,reason:e.reason,anchor:e.anchor});
     if(e.kind==='wilderness-crossing-result'){
       if(e.status==='submitted'||e.status==='landed')add({kind:e.kind,status:e.status,tile:e.tile,
         crossingSteps:e.crossingSteps,room:e.room,reason:e.reason});

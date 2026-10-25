@@ -7,9 +7,13 @@ function createSupportPosture({units:U,botType,teamMode}){
     if(!opening||call(call(game,'config'),'gameConfig')?.gameMode!==teamMode)return null;
     const tick=call(game,'ticks');let state=states.get(self);
     if(!state||state.game!==game||tick<state.tick){state={game,tick:-1,lastDanger:-Infinity};states.set(self,state);}
-    if(state.tick===tick)return state.facts;
+    const expansionKey=[opening.borderKnown,opening.wilderness,opening.expansionPending].join('|');
+    if(state.tick===tick&&state.expansionKey===expansionKey)return state.facts;
+    state.expansionKey=expansionKey;
     const ready=opening?.borderKnown===true&&!opening.wilderness;
-    const base={ready,keepFraction:.25,probeThrottleMs:600,donationThrottleMs:1000};
+    const donationReady=ready&&!opening.expansionPending;
+    const base={ready,donationReady,donationHoldReason:donationReady?undefined:
+      'Save troops for local expansion before donating',keepFraction:.25,probeThrottleMs:600,donationThrottleMs:1000};
     const finish=(conserve,reason,anchor=null)=>{
       state.tick=tick;state.facts={...base,conserve,reason,anchor};return state.facts;
     };

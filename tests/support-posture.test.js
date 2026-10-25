@@ -18,6 +18,13 @@ test('safe home supports donations/probes after wilderness without waiting for b
  const f=fixture(),p=f.observe();assert.equal(p.ready,true);assert.equal(p.conserve,false);assert.equal(p.keepFraction,.25);
 });
 
+test('safe home still saves for adjacent conquests before donating',()=>{
+ const f=fixture();f.opening.expansionPending=true;const p=f.observe();
+ assert.equal(p.conserve,false);assert.equal(p.ready,true);assert.equal(p.donationReady,false);
+ assert.match(p.donationHoldReason,/expan/i);
+ f.opening.expansionPending=false;f.next();assert.equal(f.observe().donationReady,true);
+});
+
 test('games outside the two-team opening observer retain their existing support rules',()=>{
  const f=fixture();assert.equal(create({units:{},botType:'BOT',teamMode:'Team'}).observe(f.game,f.self,null),null);
 });

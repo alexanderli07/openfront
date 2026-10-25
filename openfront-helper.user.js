@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.62
+// @version      1.84.63
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.62","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.63","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -1286,24 +1286,29 @@ function createTwoTeamOpening(deps) {
   function observe(game, player, context = {}) {
     const config = game.config();
     if (config.gameConfig().gameMode !== deps.teamMode) return null;
-    const roster = game.players().filter(p => p.type() !== deps.botType);
+    const players=game.players(),roster = players.filter(p => p.type() !== deps.botType);
     const teams = new Set(roster.map(p => p.team()).filter(t => t !== null && t !== undefined));
     if (teams.size !== 2 || !teams.has(player.team())) return null;
     const enemies = new Set(roster.filter(p => p.isAlive() && !player.isFriendly(p)).map(p => p.smallID()));
+    const expansionEnemies=new Set(players.filter(p=>p.isAlive()&&p.smallID()!==player.smallID()&&!player.isFriendly(p)).map(p=>p.smallID()));
     const border = player.borderTiles();
     const tick = game.ticks();
     let land = geography.get(player);
     // The view's border set can refresh between ticks. Threat ownership also
     // changes each tick, so retain measurements only within that exact view.
     if (!land || land.game !== game || land.tick !== tick || land.border !== border) {
-      land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0 };
+      land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0,expansionTargets:new Set() };
       for (const tile of border) {
         if (game.isShore(tile)&&(!deps.portWaterAccess||deps.portWaterAccess.assess(game,tile).allowed)) land.coast = true;
         for (const neighbor of game.neighbors(tile)) {
           if (!game.isLand(neighbor)) continue;
           if (!game.hasOwner(neighbor)) {
             if (!game.hasFallout(neighbor)) land.wilderness = true;
-          } else if (enemies.has(game.ownerID(neighbor))) land.enemyBorder = true;
+          } else {
+            const owner=game.ownerID(neighbor);
+            if(enemies.has(owner))land.enemyBorder=true;
+            if(expansionEnemies.has(owner))land.expansionTargets.add(owner);
+          }
         }
       }
       geography.set(player, land);
@@ -1321,6 +1326,7 @@ function createTwoTeamOpening(deps) {
     const frontline = land.enemyBorder || player.incomingAttacks().some(a => Number(a.troops()) > 0);
     const economyReady = ports >= portTarget && cities >= cityTarget && factories >= factoryTarget;
     return { frontline, wilderness: land.wilderness, borderKnown: land.borderKnown,
+      expansionPending:land.wilderness||land.expansionTargets.size>0,expansionTargets:[...land.expansionTargets],
       ports, cities, factories, sams, portTarget, cityTarget, factoryTarget, samEnabled, economyReady, economyMode,
       stage: frontline ? 'frontline' : !land.borderKnown ? 'survey' : land.wilderness ? 'wilderness' :
         !economyReady ? 'economy' : samEnabled && !sams ? 'first-sam' : 'development' };
@@ -2117,9 +2123,13 @@ function createSupportPosture({units:U,botType,teamMode}){
     if(!opening||call(call(game,'config'),'gameConfig')?.gameMode!==teamMode)return null;
     const tick=call(game,'ticks');let state=states.get(self);
     if(!state||state.game!==game||tick<state.tick){state={game,tick:-1,lastDanger:-Infinity};states.set(self,state);}
-    if(state.tick===tick)return state.facts;
+    const expansionKey=[opening.borderKnown,opening.wilderness,opening.expansionPending].join('|');
+    if(state.tick===tick&&state.expansionKey===expansionKey)return state.facts;
+    state.expansionKey=expansionKey;
     const ready=opening?.borderKnown===true&&!opening.wilderness;
-    const base={ready,keepFraction:.25,probeThrottleMs:600,donationThrottleMs:1000};
+    const donationReady=ready&&!opening.expansionPending;
+    const base={ready,donationReady,donationHoldReason:donationReady?undefined:
+      'Save troops for local expansion before donating',keepFraction:.25,probeThrottleMs:600,donationThrottleMs:1000};
     const finish=(conserve,reason,anchor=null)=>{
       state.tick=tick;state.facts={...base,conserve,reason,anchor};return state.facts;
     };
@@ -2279,7 +2289,8 @@ function createMatchSummary(options={}) {
       structures=next;return;
     }
     if(/^transport-reservation-/.test(e.kind))add({kind:e.kind,tile:e.tile,age:e.age});
-    if(e.kind==='support-posture')add({kind:'support-posture',conserve:e.conserve,ready:e.ready,reason:e.reason,anchor:e.anchor});
+    if(e.kind==='support-posture')add({kind:'support-posture',conserve:e.conserve,ready:e.ready,donationReady:e.donationReady,
+      donationHoldReason:e.donationHoldReason,reason:e.reason,anchor:e.anchor});
     if(e.kind==='wilderness-crossing-result'){
       if(e.status==='submitted'||e.status==='landed')add({kind:e.kind,status:e.status,tile:e.tile,
         crossingSteps:e.crossingSteps,room:e.room,reason:e.reason});
@@ -2546,7 +2557,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.10.1-port-water',
+    version: '1.11.0-expansion-priority',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -2638,9 +2649,9 @@ function createAdaptiveStrategy(legacyStrategy) {
           'Safe two-team opening: this pass may only expand reachable wilderness');
       }
       if(snapshot.domain==='attack-sequence'&&snapshot.supportPosture?.ready&&!snapshot.supportPosture.conserve){
-        const chosen=['takeover','opening-bots','donation','river-crossing','opportunistic-boat','far-alliance','open-land','random-boat','enemy-alliance','main']
+        const chosen=['takeover','opening-bots','river-crossing','open-land','main','donation','opportunistic-boat','far-alliance','random-boat','enemy-alliance']
           .map(phase=>eligible('sequence:'+phase)).find(Boolean);
-        return select(chosen||wait(),candidates,'Safe rear: support frontline teammates before slow naval searches');
+        return select(chosen||wait(),candidates,'Expand local territory and save for conquests before donating; support precedes distant naval searches');
       }
       const incomeOpening = safeOpening && !opening.sams && (opening.samEnabled ||
         opening.ports < opening.portTarget || opening.cities < opening.cityTarget || opening.factories < opening.factoryTarget);
@@ -4645,7 +4656,8 @@ function createAttackSequencePlanner(deps) {
           // Original observation occurs even when donation is disabled.
           try { const snap = actor.openingSnapshot(); opening = !!(snap && snap.applies && !snap.over && !snap.built); } catch {}
           const posture=hooks.supportPosture?.();
-          if(posture){opening=!posture.ready;if(posture.conserve)return {...result('skipped'),reason:posture.reason};}
+          if(posture){opening=!(posture.donationReady??posture.ready);
+            if(posture.conserve||opening)return {...result('skipped'),reason:posture.donationHoldReason||posture.reason};}
           if (!(settings().winFixes && settings().features.donate && !opening)) return {...result('skipped'),
             reason:!settings().winFixes?'Donation automation requires win fixes':!settings().features.donate?'Troop donation disabled':'Opening economy is still protected'};
           const now = deps.now();
@@ -4994,8 +5006,8 @@ function createDiplomacyDetailsPlanner(deps) {
   function donate(actor,targets,hooks) {
     if(!hooks.allowed())return false;
     const posture=hooks.supportPosture?.();
-    if(posture&&(!posture.ready||posture.conserve)){
-      hooks.record('donation-amount-result',{status:'home-conservation',reason:posture.reason});return false;
+    if(posture&&(!(posture.donationReady??posture.ready)||posture.conserve)){
+      hooks.record('donation-amount-result',{status:'home-conservation',reason:posture.donationHoldReason||posture.reason});return false;
     }
     const settings=deps.settings();
     const ordered=targets.map(teammate=>{
@@ -7021,8 +7033,8 @@ function createBrainRuntime(deps) {
     const controller=owners.get(actor);
     const request=()=>{
       const p=supportPosture(actor);if(!p)return {allowed:true};
-      if(p.conserve||donation&&!p.ready)return {allowed:false,reason:p.reason};
-      if(!p.ready||!controller.supportSpending)return {allowed:true};
+      if(p.conserve||donation&&!(p.donationReady??p.ready))return {allowed:false,reason:p.donationHoldReason||p.reason};
+      if(!p.ready&&!donation||!controller.supportSpending)return {allowed:true};
       const troops=controller.bot.player.troops(),capacity=controller.bot.mg.config().maxTroops(controller.bot.player),amount=args[1];
       if(!Number.isFinite(troops)||!Number.isFinite(capacity)||!Number.isFinite(amount)||amount<=0)return {allowed:false,reason:'Invalid support troop quote'};
       const q={tick:controller.bot.mg.ticks(),gold:BigInt(Math.floor(troops)),cost:BigInt(Math.ceil(amount)),
@@ -8084,8 +8096,14 @@ function createBrainRuntime(deps) {
     const controller=owners.get(actor);
     if(!controller?.supportObserver||controller.engine.selectedStrategy?.()!=='adaptive-v1')return null;
     const game=actor.game||actor.mg||controller.bot.mg,player=actor.player||controller.bot.player;
-    const facts=controller.supportObserver.observe(game,player,openingFacts({game,player}));
-    if(facts){const key=[facts.ready,facts.conserve,facts.reason,facts.anchor].join('|');
+    let facts=controller.supportObserver.observe(game,player,openingFacts({game,player}));
+    if(facts){
+      const expanding=deps.settings().features?.expand!==false;
+      if(!expanding)facts={...facts,donationReady:true,donationHoldReason:undefined};
+      const river=controller.riverState,pending=river?.inFlight||[...(river?.pending||[])].some(([tile,at])=>
+        game.ticks()-at<200&&(!game.hasOwner(tile)||game.ownerID(tile)!==player.smallID()));
+      if(expanding&&pending)facts={...facts,donationReady:false,donationHoldReason:'Wait for the river landing and continue expansion before donating'};
+      const key=[facts.ready,facts.conserve,facts.donationReady,facts.donationHoldReason,facts.reason,facts.anchor].join('|');
       if(key!==controller.lastSupportKey){controller.lastSupportKey=key;controller.engine.record('support-posture',{tick:game.ticks(),...facts});}}
     return facts;
   }
@@ -8339,7 +8357,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.62'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.63'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

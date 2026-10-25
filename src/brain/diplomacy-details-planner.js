@@ -17,8 +17,8 @@ function createDiplomacyDetailsPlanner(deps) {
   function donate(actor,targets,hooks) {
     if(!hooks.allowed())return false;
     const posture=hooks.supportPosture?.();
-    if(posture&&(!posture.ready||posture.conserve)){
-      hooks.record('donation-amount-result',{status:'home-conservation',reason:posture.reason});return false;
+    if(posture&&(!(posture.donationReady??posture.ready)||posture.conserve)){
+      hooks.record('donation-amount-result',{status:'home-conservation',reason:posture.donationHoldReason||posture.reason});return false;
     }
     const settings=deps.settings();
     const ordered=targets.map(teammate=>{

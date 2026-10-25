@@ -23,6 +23,13 @@ test('tribes do not classify a safe spawn as an enemy front; enemy teams and att
   f.owner(2);assert.equal(f.observer.observe(f.game,f.self).frontline,true);
   f.owner(1);f.self.incomingAttacks=()=>[{troops:()=>100}];assert.equal(f.observer.observe(f.game,f.self).frontline,true);
 });
+
+test('adjacent Bot territory remains an expansion priority without becoming a human frontline',()=>{
+ const f=fixture(),bot={...f.enemy,type:()=> 'Bot',team:()=>null,smallID:()=>3};
+ f.game.players=()=>[f.self,f.enemy,bot];f.owner(3);
+ const facts=f.observer.observe(f.game,f.self);assert.equal(facts.frontline,false);
+ assert.equal(facts.expansionPending,true);assert.deepEqual(facts.expansionTargets,[3]);
+});
 test('economy goals count physical active buildings including construction, not levels',()=>{
   const f=fixture();f.self.units=type=>type===units.Port?[{isActive:()=>true,isUnderConstruction:()=>true,level:()=>5}]:[];
   const facts=f.observer.observe(f.game,f.self);assert.equal(facts.ports,1);assert.equal(facts.portTarget,2);assert.equal(facts.cityTarget,1);

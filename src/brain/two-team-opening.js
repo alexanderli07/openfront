@@ -7,24 +7,29 @@ function createTwoTeamOpening(deps) {
   function observe(game, player, context = {}) {
     const config = game.config();
     if (config.gameConfig().gameMode !== deps.teamMode) return null;
-    const roster = game.players().filter(p => p.type() !== deps.botType);
+    const players=game.players(),roster = players.filter(p => p.type() !== deps.botType);
     const teams = new Set(roster.map(p => p.team()).filter(t => t !== null && t !== undefined));
     if (teams.size !== 2 || !teams.has(player.team())) return null;
     const enemies = new Set(roster.filter(p => p.isAlive() && !player.isFriendly(p)).map(p => p.smallID()));
+    const expansionEnemies=new Set(players.filter(p=>p.isAlive()&&p.smallID()!==player.smallID()&&!player.isFriendly(p)).map(p=>p.smallID()));
     const border = player.borderTiles();
     const tick = game.ticks();
     let land = geography.get(player);
     // The view's border set can refresh between ticks. Threat ownership also
     // changes each tick, so retain measurements only within that exact view.
     if (!land || land.game !== game || land.tick !== tick || land.border !== border) {
-      land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0 };
+      land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0,expansionTargets:new Set() };
       for (const tile of border) {
         if (game.isShore(tile)&&(!deps.portWaterAccess||deps.portWaterAccess.assess(game,tile).allowed)) land.coast = true;
         for (const neighbor of game.neighbors(tile)) {
           if (!game.isLand(neighbor)) continue;
           if (!game.hasOwner(neighbor)) {
             if (!game.hasFallout(neighbor)) land.wilderness = true;
-          } else if (enemies.has(game.ownerID(neighbor))) land.enemyBorder = true;
+          } else {
+            const owner=game.ownerID(neighbor);
+            if(enemies.has(owner))land.enemyBorder=true;
+            if(expansionEnemies.has(owner))land.expansionTargets.add(owner);
+          }
         }
       }
       geography.set(player, land);
@@ -42,6 +47,7 @@ function createTwoTeamOpening(deps) {
     const frontline = land.enemyBorder || player.incomingAttacks().some(a => Number(a.troops()) > 0);
     const economyReady = ports >= portTarget && cities >= cityTarget && factories >= factoryTarget;
     return { frontline, wilderness: land.wilderness, borderKnown: land.borderKnown,
+      expansionPending:land.wilderness||land.expansionTargets.size>0,expansionTargets:[...land.expansionTargets],
       ports, cities, factories, sams, portTarget, cityTarget, factoryTarget, samEnabled, economyReady, economyMode,
       stage: frontline ? 'frontline' : !land.borderKnown ? 'survey' : land.wilderness ? 'wilderness' :
         !economyReady ? 'economy' : samEnabled && !sams ? 'first-sam' : 'development' };

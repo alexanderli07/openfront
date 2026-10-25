@@ -65,6 +65,19 @@ test('mainland danger skips support donation but leaves the main attack phase ru
  f.hooks.supportPosture=()=>({ready:true,conserve:true,reason:'Enemy near home'});
  await f.planner.run(f.actor,f.context,f.hooks);assert.ok(!f.calls.includes('donate'));assert.ok(f.calls.includes('main'));
 });
+
+test('local expansion can accumulate an army across turns instead of donating it away',async()=>{
+ let troops=500,donations=0,attacks=0;
+ const opening={frontline:false,borderKnown:true,wilderness:false,expansionPending:true};
+ const posture={ready:true,conserve:false,donationReady:false,donationHoldReason:'Expand local territory first',donationThrottleMs:1000};
+ const f=fixture({winFixes:true,donate:true,boat:false,
+  choose:(domain,cs)=>adaptiveOpening.decide({domain,teamOpening:opening,supportPosture:posture},cs)});
+ f.context.teamOpening=opening;f.hooks.supportPosture=()=>posture;
+ f.actor.donateTroops=()=>{donations++;troops=250;return false;};
+ f.actor.attackBestTarget=async()=>{if(troops>=700){attacks++;troops-=300;}};
+ for(let i=0;i<3;i++){await f.planner.run(f.actor,f.context,f.hooks);troops+=100;}
+ assert.equal(donations,0);assert.equal(attacks,1);
+});
 test('takeover policy hold and stale send completion stop the rest of the pass',async()=>{
   for(const options of [{choose:(domain,candidates)=>domain==='takeover-target'?{selectedId:'$wait',reason:'hold'}:legacy.decide({domain},candidates)},
     {stopOnSend:true}]) {

@@ -271,8 +271,8 @@ function createBrainRuntime(deps) {
     const controller=owners.get(actor);
     const request=()=>{
       const p=supportPosture(actor);if(!p)return {allowed:true};
-      if(p.conserve||donation&&!p.ready)return {allowed:false,reason:p.reason};
-      if(!p.ready||!controller.supportSpending)return {allowed:true};
+      if(p.conserve||donation&&!(p.donationReady??p.ready))return {allowed:false,reason:p.donationHoldReason||p.reason};
+      if(!p.ready&&!donation||!controller.supportSpending)return {allowed:true};
       const troops=controller.bot.player.troops(),capacity=controller.bot.mg.config().maxTroops(controller.bot.player),amount=args[1];
       if(!Number.isFinite(troops)||!Number.isFinite(capacity)||!Number.isFinite(amount)||amount<=0)return {allowed:false,reason:'Invalid support troop quote'};
       const q={tick:controller.bot.mg.ticks(),gold:BigInt(Math.floor(troops)),cost:BigInt(Math.ceil(amount)),
@@ -1334,8 +1334,14 @@ function createBrainRuntime(deps) {
     const controller=owners.get(actor);
     if(!controller?.supportObserver||controller.engine.selectedStrategy?.()!=='adaptive-v1')return null;
     const game=actor.game||actor.mg||controller.bot.mg,player=actor.player||controller.bot.player;
-    const facts=controller.supportObserver.observe(game,player,openingFacts({game,player}));
-    if(facts){const key=[facts.ready,facts.conserve,facts.reason,facts.anchor].join('|');
+    let facts=controller.supportObserver.observe(game,player,openingFacts({game,player}));
+    if(facts){
+      const expanding=deps.settings().features?.expand!==false;
+      if(!expanding)facts={...facts,donationReady:true,donationHoldReason:undefined};
+      const river=controller.riverState,pending=river?.inFlight||[...(river?.pending||[])].some(([tile,at])=>
+        game.ticks()-at<200&&(!game.hasOwner(tile)||game.ownerID(tile)!==player.smallID()));
+      if(expanding&&pending)facts={...facts,donationReady:false,donationHoldReason:'Wait for the river landing and continue expansion before donating'};
+      const key=[facts.ready,facts.conserve,facts.donationReady,facts.donationHoldReason,facts.reason,facts.anchor].join('|');
       if(key!==controller.lastSupportKey){controller.lastSupportKey=key;controller.engine.record('support-posture',{tick:game.ticks(),...facts});}}
     return facts;
   }

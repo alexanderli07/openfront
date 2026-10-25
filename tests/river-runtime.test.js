@@ -8,21 +8,22 @@ function fixture(options={}){
  const config={gameConfig:()=>({difficulty:'Medium'}),isUnitDisabled:()=>!!options.disabled,maxTroops:()=>1000};
  const game={ticks:()=>f.tick,myPlayer:()=>self,players:()=>[self],config:()=>config,inSpawnPhase:()=>false,
   isLand:()=>true,hasFallout:()=>false,hasOwner:t=>f.owners.has(t),ownerID:t=>f.owners.get(t),manhattanDist:(a,b)=>Math.abs(a-b)};
- const actor={game,player:self,boatTargetTaken:()=>false};const bot={mg:game,player:self,attackBehavior:actor};function Boat(){}
+ const actor={game,player:self,boatTargetTaken:()=>false};const bot={mg:game,player:self,attackBehavior:actor};function Boat(){}function Donate(){}
  const runtime=createRuntime({createEngine:require('../src/brain/engine'),createLegacyStrategy:legacy,
   strategies:[require('../src/brain/adaptive-strategy')(legacy())],defaultStrategy:options.legacy?'legacy-v1':'adaptive-v1',
   createCommandGuard:require('../src/brain/command-guard'),createSpendingLedger:require('../src/brain/spending-ledger'),
-  createSupportPosture:options.posture?()=>({observe:()=>({ready:false,conserve:f.conserve,keepFraction:.25})}):undefined,
+  createSupportPosture:options.posture?()=>({observe:()=>({ready:options.ready??false,conserve:f.conserve,keepFraction:.25})}):undefined,
   wildernessCrossing:{sites:()=>[{tile:12,origin:10,crossingSteps:3,room:64,dist:9}]},
   openingExpansion:{resumeAfterCrossing:()=>f.resumed++},twoTeamOpening:{observe:()=>({borderKnown:true,wilderness:true,frontline:false})},
-  units:{TransportShip:'Transport'},transportType:'Transport',isTransportIntent:c=>c===Boat,
+  units:{TransportShip:'Transport'},transportType:'Transport',isTransportIntent:c=>c===Boat,isDonationIntent:c=>c===Donate,
   navalLandingPlanner:require('../src/brain/naval-landing-planner')(),boatPlanner:require('../src/brain/boat-planner')({state:{settings:{boatProbeMinTroops:8000}}}),
   probeCrossing:async()=>{f.queries++;return options.probe?options.probe(f):10;},landingDiagnostics:()=>{},
   enabled:()=>true,isCurrent:()=>f.active,isPublic:()=>false,settings:()=>({features:{boat:options.boat!==false}}),
   emitIntent:(ctor,...args)=>{f.sent.push(args);return true;}});
  actor.emitBoat=(tile,troops)=>runtime.intent(actor,'river-test',Boat,tile,troops);
  runtime.attach(bot);runtime.begin(bot);runtime.attachBehaviors(bot);
- return Object.assign(f,{actor,runtime,run:()=>runtime.planWildernessCrossing(actor)});
+ return Object.assign(f,{actor,runtime,run:()=>runtime.planWildernessCrossing(actor),
+  donate:()=>runtime.intent(actor,'donation-test',Donate,{id:()=> 'ally'},100)});
 }
 test('nearby wilderness crossing launches an exact 1 percent boat below the old 8000 minimum',async()=>{
  const f=fixture();assert.equal(await f.run(),true);assert.deepEqual(f.sent,[[12,10]]);
@@ -66,4 +67,10 @@ test('only a confirmed owned river landing resumes expansion once',async()=>{
  const f=fixture();await f.run();assert.equal(f.resumed,0);
  f.tick+=10;f.owners.set(12,1);await f.run();assert.equal(f.resumed,1);
  f.tick+=10;await f.run();assert.equal(f.resumed,1);
+});
+
+test('donations wait for a pending river landing and release after confirmed ownership',async()=>{
+ const f=fixture({posture:true,ready:true});assert.equal(await f.run(),true);
+ assert.equal(f.donate(),false);assert.equal(f.sent.length,1);
+ f.tick++;f.owners.set(12,1);assert.equal(f.donate(),true);assert.equal(f.sent.length,2);
 });

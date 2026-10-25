@@ -61,7 +61,8 @@ function createAttackSequencePlanner(deps) {
           // Original observation occurs even when donation is disabled.
           try { const snap = actor.openingSnapshot(); opening = !!(snap && snap.applies && !snap.over && !snap.built); } catch {}
           const posture=hooks.supportPosture?.();
-          if(posture){opening=!posture.ready;if(posture.conserve)return {...result('skipped'),reason:posture.reason};}
+          if(posture){opening=!(posture.donationReady??posture.ready);
+            if(posture.conserve||opening)return {...result('skipped'),reason:posture.donationHoldReason||posture.reason};}
           if (!(settings().winFixes && settings().features.donate && !opening)) return {...result('skipped'),
             reason:!settings().winFixes?'Donation automation requires win fixes':!settings().features.donate?'Troop donation disabled':'Opening economy is still protected'};
           const now = deps.now();

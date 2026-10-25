@@ -44,7 +44,7 @@ function fixture(options = {}) {
     turnPlanner: createTurnPlanner(),
     strategies: options.strategies || [], defaultStrategy: options.defaultStrategy,
     isCurrent: () => f.current, enabled: () => f.enabled, isPublic: () => f.public,
-    settings: () => ({ features: { build: true } }),
+    settings: () => ({ features: { build: true,...options.features } }),
     emitIntent: (ctor, ...args) => { f.sent.push([ctor, ...args]); return options.emitIntent?options.emitIntent(ctor,...args):true; }, log: () => {} });
   if (runtime) { runtime.attach(bot); runtime.begin(bot); }
   return Object.assign(f, { runtime, bot, game, player });
@@ -148,6 +148,28 @@ test('a new home threat blocks automatic support at dispatch but allows ordinary
  assert.equal(f.runtime.intent(f.bot,'support',Donate,{id:()=> 'ally'},100),false);
  assert.equal(f.runtime.intent(f.bot,'probe',Boat,20,6),false);
  assert.equal(f.runtime.intent(f.bot,'counter',Attack,'enemy',300),true);
+ assert.equal(f.sent.length,1);
+});
+
+test('a donation cannot bypass the live local expansion lock at final dispatch',()=>{
+ function Donate(){}
+ const f=fixture({strategies:[createAdaptiveStrategy(createLegacyStrategy())],defaultStrategy:'adaptive-v1',
+  createSupportPosture:()=>({observe:()=>({ready:true,conserve:false,keepFraction:.25,donationReady:false,
+   donationHoldReason:'Expand local territory first'})}),
+  createSpendingLedger:require('../src/brain/spending-ledger'),isDonationIntent:c=>c===Donate});
+ f.player.troops=()=>900;f.game.config=()=>({maxTroops:()=>1000,gameConfig:()=>({})});
+ assert.equal(f.runtime.intent(f.bot,'donation',Donate,{id:()=> 'ally'},400),false);
+ assert.equal(f.sent.length,0);
+});
+
+test('explicitly disabling expansion does not leave donations permanently locked',()=>{
+ function Donate(){}
+ const f=fixture({strategies:[createAdaptiveStrategy(createLegacyStrategy())],defaultStrategy:'adaptive-v1',features:{expand:false},
+  createSupportPosture:()=>({observe:()=>({ready:false,conserve:false,keepFraction:.25,donationReady:false})}),
+  createSpendingLedger:require('../src/brain/spending-ledger'),isDonationIntent:c=>c===Donate});
+ f.player.troops=()=>600;f.game.config=()=>({maxTroops:()=>1000,gameConfig:()=>({})});
+ assert.equal(f.runtime.intent(f.bot,'donation',Donate,{id:()=> 'ally'},100),true);
+ assert.equal(f.runtime.intent(f.bot,'donation',Donate,{id:()=> 'other'},400),false);
  assert.equal(f.sent.length,1);
 });
 

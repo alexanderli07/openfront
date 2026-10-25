@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.10.1-port-water',
+    version: '1.11.0-expansion-priority',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -158,9 +158,9 @@ function createAdaptiveStrategy(legacyStrategy) {
           'Safe two-team opening: this pass may only expand reachable wilderness');
       }
       if(snapshot.domain==='attack-sequence'&&snapshot.supportPosture?.ready&&!snapshot.supportPosture.conserve){
-        const chosen=['takeover','opening-bots','donation','river-crossing','opportunistic-boat','far-alliance','open-land','random-boat','enemy-alliance','main']
+        const chosen=['takeover','opening-bots','river-crossing','open-land','main','donation','opportunistic-boat','far-alliance','random-boat','enemy-alliance']
           .map(phase=>eligible('sequence:'+phase)).find(Boolean);
-        return select(chosen||wait(),candidates,'Safe rear: support frontline teammates before slow naval searches');
+        return select(chosen||wait(),candidates,'Expand local territory and save for conquests before donating; support precedes distant naval searches');
       }
       const incomeOpening = safeOpening && !opening.sams && (opening.samEnabled ||
         opening.ports < opening.portTarget || opening.cities < opening.cityTarget || opening.factories < opening.factoryTarget);
