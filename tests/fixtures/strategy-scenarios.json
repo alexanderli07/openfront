@@ -1,0 +1,1387 @@
+[
+  {
+    "name": "early game prefers the first eligible structure plan",
+    "phase": "early",
+    "snapshot": {
+      "tick": 240,
+      "domain": "structure-plan",
+      "self": {
+        "gold": "850",
+        "troops": 1400,
+        "tiles": 120
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure:defense-post",
+        "kind": "structure-plan",
+        "eligible": false,
+        "priority": 0,
+        "reason": "No threatened border"
+      },
+      {
+        "id": "structure:city",
+        "kind": "structure-plan",
+        "eligible": true,
+        "priority": 1,
+        "reason": "Opening city is affordable"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Wait"
+      }
+    ]
+  },
+  {
+    "name": "mid game keeps the established attack purpose order",
+    "phase": "mid",
+    "snapshot": {
+      "tick": 4100,
+      "domain": "attack-plan",
+      "self": {
+        "gold": "24000",
+        "troops": 92000,
+        "tiles": 1800
+      }
+    },
+    "candidates": [
+      {
+        "id": "attack:normal:counter",
+        "kind": "attack-plan",
+        "eligible": true,
+        "priority": 2,
+        "reason": "Check priority counterattack"
+      },
+      {
+        "id": "attack:normal:pocket",
+        "kind": "attack-plan",
+        "eligible": true,
+        "priority": 1,
+        "reason": "Check sealable pocket"
+      },
+      {
+        "id": "attack:normal:weak",
+        "kind": "attack-plan",
+        "eligible": true,
+        "priority": 5,
+        "reason": "Check weak neighbor"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Stop attack pass"
+      }
+    ]
+  },
+  {
+    "name": "late game keeps structures ahead of attack and ordinary nukes",
+    "phase": "late",
+    "snapshot": {
+      "tick": 12500,
+      "domain": "turn-plan",
+      "self": {
+        "gold": "1800000",
+        "troops": 6400000,
+        "tiles": 22000
+      }
+    },
+    "candidates": [
+      {
+        "id": "turn:attack",
+        "kind": "turn-plan",
+        "eligible": true,
+        "priority": 6,
+        "reason": "Run attack phase"
+      },
+      {
+        "id": "turn:nukes",
+        "kind": "turn-plan",
+        "eligible": true,
+        "priority": 8,
+        "reason": "Run ordinary nuke phase"
+      },
+      {
+        "id": "turn:structures",
+        "kind": "turn-plan",
+        "eligible": true,
+        "priority": 3,
+        "reason": "Run structure phase"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Stop turn pass"
+      }
+    ]
+  },
+  {
+    "name": "late game preserves strike target ranking",
+    "phase": "late",
+    "snapshot": {
+      "tick": 12700,
+      "domain": "nuke-player",
+      "self": {
+        "gold": "2100000",
+        "troops": 5900000,
+        "tiles": 20500
+      }
+    },
+    "candidates": [
+      {
+        "id": "nuke-player:alpha",
+        "kind": "nuke-player",
+        "eligible": true,
+        "priority": 1,
+        "reason": "Highest eligible density"
+      },
+      {
+        "id": "nuke-player:beta",
+        "kind": "nuke-player",
+        "eligible": true,
+        "priority": 2,
+        "reason": "Second eligible density"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Hold strike"
+      }
+    ]
+  },
+  {
+    "name": "command gateway keeps the proposed action",
+    "phase": "all",
+    "snapshot": {
+      "tick": 5000,
+      "self": {
+        "gold": "50000",
+        "troops": 120000,
+        "tiles": 2400
+      }
+    },
+    "candidates": [
+      {
+        "id": "command-1",
+        "kind": "attack",
+        "source": "AttackBehavior.sendAttack",
+        "arguments": [
+          "enemy",
+          35
+        ]
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "reason": "Do not dispatch"
+      }
+    ]
+  },
+  {
+    "name": "mid game saves for the first due SAM",
+    "phase": "mid",
+    "expectedAdaptiveChoice": "$wait",
+    "snapshot": {
+      "tick": 5200,
+      "domain": "structure-plan",
+      "self": {
+        "gold": "1000000",
+        "troops": 150000,
+        "tiles": 3200
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure:normal:Port",
+        "kind": "structure-plan",
+        "unitType": "Port",
+        "eligible": true,
+        "priority": 0,
+        "reason": "Port due"
+      },
+      {
+        "id": "structure:normal:SAMLauncher",
+        "kind": "structure-plan",
+        "unitType": "SAMLauncher",
+        "eligible": true,
+        "priority": 2,
+        "firstSamReserve": true,
+        "affordable": false,
+        "reason": "First SAM due"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Wait"
+      }
+    ]
+  },
+  {
+    "name": "late game groups a city on an allied factory line",
+    "phase": "late",
+    "expectedAdaptiveChoice": "placement:line",
+    "snapshot": {
+      "tick": 13000,
+      "domain": "structure-placement",
+      "self": {
+        "gold": "2000000",
+        "troops": 6000000,
+        "tiles": 21000
+      }
+    },
+    "candidates": [
+      {
+        "id": "placement:spread",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "tile": 101,
+        "eligible": true,
+        "priority": 0,
+        "originalScore": 500,
+        "hasOwnSam": true,
+        "ownedFactoryRoutes": 0,
+        "alliedFactoryRoutes": 0,
+        "ownSamCoverage": 2,
+        "alliedSamCoverage": 0,
+        "reason": "Spread tile"
+      },
+      {
+        "id": "placement:line",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "tile": 202,
+        "eligible": true,
+        "priority": 1,
+        "originalScore": 20,
+        "hasOwnSam": true,
+        "ownedFactoryRoutes": 0,
+        "alliedFactoryRoutes": 1,
+        "ownSamCoverage": 1,
+        "alliedSamCoverage": 0,
+        "reason": "Allied factory line"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "priority": 999,
+        "reason": "Wait"
+      }
+    ]
+  },
+  {
+    "name": "donate to a needy enemy-border teammate instead of a rear teammate",
+    "phase": "mid",
+    "expectedAdaptiveChoice": "donation:border",
+    "snapshot": {
+      "tick": 6000,
+      "domain": "donation-target",
+      "diplomacy": {
+        "threshold": 0.8
+      }
+    },
+    "candidates": [
+      {
+        "id": "donation:rear",
+        "kind": "donation-target",
+        "eligible": true,
+        "fill": 0.2,
+        "frontline": false,
+        "bordersEnemy": false
+      },
+      {
+        "id": "donation:border",
+        "kind": "donation-target",
+        "eligible": true,
+        "fill": 0.6,
+        "frontline": false,
+        "bordersEnemy": true
+      },
+      {
+        "id": "donation:skip",
+        "kind": "donation-target",
+        "eligible": true,
+        "skipDonation": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true
+      }
+    ]
+  },
+  {
+    "name": "keep troops when the front-line teammate already has 70 percent capacity",
+    "phase": "late",
+    "expectedAdaptiveChoice": "donation:skip",
+    "snapshot": {
+      "tick": 10000,
+      "domain": "donation-target",
+      "diplomacy": {
+        "threshold": 0.8
+      }
+    },
+    "candidates": [
+      {
+        "id": "donation:healthy",
+        "kind": "donation-target",
+        "eligible": true,
+        "fill": 0.7,
+        "frontline": true
+      },
+      {
+        "id": "donation:skip",
+        "kind": "donation-target",
+        "eligible": true,
+        "skipDonation": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true
+      }
+    ]
+  },
+  {
+    "name": "safe two-team wilderness blocks country takeovers",
+    "phase": "early",
+    "snapshot": {
+      "domain": "attack-sequence",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": true,
+        "sams": 0,
+        "samEnabled": true,
+        "ports": 0,
+        "cities": 0,
+        "factories": 0,
+        "portTarget": 2,
+        "cityTarget": 1,
+        "factoryTarget": 0
+      }
+    },
+    "candidates": [
+      {
+        "id": "sequence:takeover",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "priority": 0,
+        "reason": "Original takeover"
+      },
+      {
+        "id": "sequence:wilderness-only",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "priority": 100,
+        "adaptiveOnly": true,
+        "reason": "Wilderness only"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold pass"
+      }
+    ],
+    "expectedAdaptiveChoice": "sequence:wilderness-only"
+  },
+  {
+    "name": "safe two-team economy precedes the old first-SAM reserve",
+    "phase": "early",
+    "snapshot": {
+      "domain": "structure-plan",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": true,
+        "sams": 0,
+        "samEnabled": true,
+        "ports": 0,
+        "cities": 0,
+        "factories": 0,
+        "portTarget": 2,
+        "cityTarget": 1,
+        "factoryTarget": 0
+      }
+    },
+    "candidates": [
+      {
+        "id": "old:sam",
+        "kind": "structure-plan",
+        "eligible": true,
+        "priority": 0,
+        "firstSamReserve": true,
+        "affordable": false,
+        "reason": "Original SAM reserve"
+      },
+      {
+        "id": "structure:opening:Port",
+        "kind": "structure-plan",
+        "eligible": true,
+        "priority": 100,
+        "adaptiveOnly": true,
+        "stage": "team-opening",
+        "openingRole": "Port",
+        "affordable": true,
+        "reason": "Opening port"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold pass"
+      }
+    ],
+    "expectedAdaptiveChoice": "structure:opening:Port"
+  },
+  {
+    "name": "safe two-team exhausted wilderness releases country expansion",
+    "phase": "early",
+    "snapshot": {
+      "domain": "team-opening-attack",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": false,
+        "sams": 0,
+        "samEnabled": true,
+        "ports": 0,
+        "cities": 0,
+        "factories": 0,
+        "portTarget": 2,
+        "cityTarget": 1,
+        "factoryTarget": 0
+      }
+    },
+    "candidates": [
+      {
+        "id": "team-attack:legacy",
+        "kind": "team-opening-attack",
+        "eligible": true,
+        "priority": 0,
+        "reason": "legacy"
+      },
+      {
+        "id": "team-attack:allow",
+        "kind": "team-opening-attack",
+        "eligible": true,
+        "priority": 1,
+        "reason": "allow"
+      },
+      {
+        "id": "team-attack:defer",
+        "kind": "team-opening-attack",
+        "eligible": true,
+        "priority": 2,
+        "reason": "defer"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold pass"
+      }
+    ],
+    "expectedAdaptiveChoice": "team-attack:allow"
+  },
+  {
+    "name": "two-team spawning favors an open group coast over cramped water",
+    "phase": "early",
+    "snapshot": {
+      "domain": "team-spawn-site"
+    },
+    "candidates": [
+      {
+        "id": "cramped",
+        "kind": "team-spawn-site",
+        "eligible": true,
+        "priority": 0,
+        "openSpace": 0.1,
+        "waterAccess": true,
+        "allyDistance": 60,
+        "enemyDistance": 300,
+        "edgeDistance": 40
+      },
+      {
+        "id": "group-coast",
+        "kind": "team-spawn-site",
+        "eligible": true,
+        "priority": 1,
+        "openSpace": 1,
+        "waterAccess": true,
+        "allyDistance": 80,
+        "enemyDistance": 300,
+        "edgeDistance": 40
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "group-coast"
+  },
+  {
+    "name": "front-line city safety beats an exposed factory route",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "structure-placement"
+    },
+    "candidates": [
+      {
+        "id": "front-route",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "eligible": true,
+        "priority": 0,
+        "frontline": true,
+        "rearBand": 0,
+        "ownedFactoryRoutes": 2,
+        "originalScore": 999
+      },
+      {
+        "id": "rear-city",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "eligible": true,
+        "priority": 1,
+        "frontline": true,
+        "rearBand": 3,
+        "originalScore": 1
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "rear-city"
+  },
+  {
+    "name": "island defense deployment precedes routine structure spending",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "turn-plan",
+      "teamNaval": {
+        "island": true,
+        "fleetNeeded": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure",
+        "kind": "turn-plan",
+        "phase": "structure",
+        "eligible": true,
+        "priority": 0
+      },
+      {
+        "id": "fleet",
+        "kind": "turn-plan",
+        "phase": "warship-deployment",
+        "eligible": true,
+        "priority": 1
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "fleet"
+  },
+  {
+    "name": "same-team transport interception precedes trade hunting",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "warship-combat",
+      "teamNaval": {
+        "twoTeam": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "trade",
+        "kind": "warship-combat",
+        "purpose": "trade-hunt",
+        "eligible": true,
+        "priority": 0
+      },
+      {
+        "id": "transport",
+        "kind": "warship-combat",
+        "purpose": "intercept",
+        "eligible": true,
+        "priority": 1,
+        "adaptiveOnly": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "transport"
+  },
+  {
+    "name": "fund the bounded island fleet after opening protection is established",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "structure-plan",
+      "teamNaval": {
+        "island": true,
+        "fleetNeeded": true
+      },
+      "teamOpening": {
+        "frontline": false,
+        "economyReady": true,
+        "sams": 1,
+        "samEnabled": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "city",
+        "kind": "structure-plan",
+        "eligible": true,
+        "priority": 0
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "$wait"
+  },
+  {
+    "name": "factory economy follows existing lines before the first SAM",
+    "phase": "early",
+    "snapshot": {
+      "domain": "structure-placement"
+    },
+    "candidates": [
+      {
+        "id": "spread",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "eligible": true,
+        "priority": 0,
+        "originalScore": 999,
+        "hasOwnSam": false,
+        "factoryLinePriority": true
+      },
+      {
+        "id": "line",
+        "kind": "structure-placement",
+        "unitType": "City",
+        "eligible": true,
+        "priority": 1,
+        "originalScore": 1,
+        "hasOwnSam": false,
+        "factoryLinePriority": true,
+        "alliedFactoryRoutes": 1
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "line"
+  },
+  {
+    "name": "coastal SAM stays close to ports instead of maximizing all-structure score",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "structure-placement"
+    },
+    "candidates": [
+      {
+        "id": "central-sam",
+        "kind": "structure-placement",
+        "unitType": "SAM Launcher",
+        "eligible": true,
+        "priority": 0,
+        "originalScore": 999,
+        "samAnchorKind": "Port",
+        "samAnchorProtection": 0,
+        "samAnchorDistance": 40
+      },
+      {
+        "id": "port-sam",
+        "kind": "structure-placement",
+        "unitType": "SAM Launcher",
+        "eligible": true,
+        "priority": 1,
+        "originalScore": 1,
+        "samAnchorKind": "Port",
+        "samAnchorProtection": 0,
+        "samAnchorDistance": 6
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "port-sam"
+  },
+  {
+    "name": "factory SAM stays close to cities instead of distant factory coverage",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "structure-placement"
+    },
+    "candidates": [
+      {
+        "id": "factory-center-sam",
+        "kind": "structure-placement",
+        "unitType": "SAM Launcher",
+        "eligible": true,
+        "priority": 0,
+        "originalScore": 999,
+        "samAnchorKind": "City",
+        "samAnchorProtection": 0,
+        "samAnchorDistance": 40
+      },
+      {
+        "id": "city-sam",
+        "kind": "structure-placement",
+        "unitType": "SAM Launcher",
+        "eligible": true,
+        "priority": 1,
+        "originalScore": 1,
+        "samAnchorKind": "City",
+        "samAnchorProtection": 0,
+        "samAnchorDistance": 6
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "city-sam"
+  },
+  {
+    "name": "distant enemy probes precede disconnected grabs after wilderness",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "naval-action",
+      "teamOpening": {
+        "borderKnown": true,
+        "wilderness": false,
+        "frontline": false
+      }
+    },
+    "candidates": [
+      {
+        "id": "naval:disconnected",
+        "kind": "naval-action",
+        "purpose": "disconnected",
+        "priority": 1,
+        "eligible": true,
+        "reason": "Original order"
+      },
+      {
+        "id": "naval:enemy-probe",
+        "kind": "naval-action",
+        "purpose": "enemy-probe",
+        "priority": 7,
+        "eligible": true,
+        "adaptiveOnly": true,
+        "reason": "Distant 1% probe"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "naval:enemy-probe"
+  },
+  {
+    "name": "wilderness opening retains existing naval rules",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "naval-action",
+      "teamOpening": {
+        "borderKnown": true,
+        "wilderness": true,
+        "frontline": false
+      }
+    },
+    "candidates": [
+      {
+        "id": "naval:disconnected",
+        "kind": "naval-action",
+        "purpose": "disconnected",
+        "priority": 1,
+        "eligible": true,
+        "reason": "Original order"
+      },
+      {
+        "id": "naval:enemy-probe",
+        "kind": "naval-action",
+        "purpose": "enemy-probe",
+        "priority": 7,
+        "eligible": true,
+        "adaptiveOnly": true,
+        "reason": "Distant 1% probe"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "naval:disconnected"
+  },
+  {
+    "name": "frontline retains existing naval priorities",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "naval-action",
+      "teamOpening": {
+        "borderKnown": true,
+        "wilderness": false,
+        "frontline": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "naval:disconnected",
+        "kind": "naval-action",
+        "purpose": "disconnected",
+        "priority": 1,
+        "eligible": true,
+        "reason": "Original order"
+      },
+      {
+        "id": "naval:enemy-probe",
+        "kind": "naval-action",
+        "purpose": "enemy-probe",
+        "priority": 7,
+        "eligible": true,
+        "adaptiveOnly": true,
+        "reason": "Distant 1% probe"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Hold"
+      }
+    ],
+    "expectedAdaptiveChoice": "naval:disconnected"
+  },
+  {
+    "name": "early wilderness wave bypasses the original capacity reserve",
+    "phase": "early",
+    "snapshot": {
+      "domain": "opening-expansion",
+      "openingExpansion": {
+        "applies": true,
+        "ready": true,
+        "troops": 2000,
+        "threshold": 2000
+      }
+    },
+    "candidates": [
+      {
+        "id": "opening-expansion:original",
+        "kind": "opening-expansion",
+        "eligible": true,
+        "priority": 0,
+        "reason": "Original reserve"
+      },
+      {
+        "id": "opening-expansion:wave",
+        "kind": "opening-expansion",
+        "eligible": true,
+        "adaptiveOnly": true,
+        "priority": 1,
+        "amount": 400,
+        "reason": "20% wilderness wave"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "opening-expansion:wave"
+  },
+  {
+    "name": "wilderness schedule rebuilds rather than repeating waves",
+    "phase": "early",
+    "snapshot": {
+      "domain": "opening-expansion",
+      "openingExpansion": {
+        "applies": true,
+        "ready": false,
+        "troops": 1600,
+        "threshold": 2000
+      }
+    },
+    "candidates": [
+      {
+        "id": "opening-expansion:original",
+        "kind": "opening-expansion",
+        "eligible": true,
+        "priority": 0,
+        "reason": "Original reserve"
+      },
+      {
+        "id": "opening-expansion:wave",
+        "kind": "opening-expansion",
+        "eligible": false,
+        "adaptiveOnly": true,
+        "priority": 1,
+        "amount": 400,
+        "reason": "20% wilderness wave"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "$wait"
+  },
+  {
+    "name": "staged coastal economy chooses first SAM before optional development",
+    "phase": "early",
+    "snapshot": {
+      "domain": "structure-plan",
+      "defenseEconomy": {
+        "stage": "first-sam",
+        "reserve": "0"
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure:port",
+        "kind": "structure-plan",
+        "eligible": true,
+        "affordable": true,
+        "priority": 0,
+        "unitType": "Port"
+      },
+      {
+        "id": "structure:defense-economy",
+        "kind": "structure-plan",
+        "eligible": true,
+        "affordable": true,
+        "adaptiveOnly": true,
+        "priority": 1,
+        "unitType": "SAM Launcher"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "structure:defense-economy"
+  },
+  {
+    "name": "completed economy holds when optional build would spend emergency reserve",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "structure-plan",
+      "defenseEconomy": {
+        "stage": "reserve",
+        "reserve": "3000000"
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure:port",
+        "kind": "structure-plan",
+        "eligible": true,
+        "affordable": false,
+        "priority": 0,
+        "unitType": "Port"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "$wait"
+  },
+  {
+    "name": "surplus above the emergency reserve funds continued development",
+    "phase": "late",
+    "snapshot": {
+      "domain": "structure-plan",
+      "defenseEconomy": {
+        "stage": "reserve",
+        "reserve": "3000000"
+      }
+    },
+    "candidates": [
+      {
+        "id": "structure:port",
+        "kind": "structure-plan",
+        "eligible": true,
+        "affordable": true,
+        "priority": 0,
+        "unitType": "Port"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "structure:port"
+  },
+  {
+    "name": "reactive SAM chooses only the useful affordable upgrade",
+    "phase": "late",
+    "snapshot": {
+      "domain": "reactive-sam-upgrade"
+    },
+    "candidates": [
+      {
+        "id": "sam:unused",
+        "kind": "reactive-sam-upgrade",
+        "eligible": false,
+        "canDefend": false,
+        "cost": "3000000"
+      },
+      {
+        "id": "sam:useful",
+        "kind": "reactive-sam-upgrade",
+        "eligible": true,
+        "canDefend": true,
+        "cost": "3000000"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sam:useful"
+  },
+  {
+    "name": "impossible interception does not spend on a SAM upgrade",
+    "phase": "late",
+    "snapshot": {
+      "domain": "reactive-sam-upgrade"
+    },
+    "candidates": [
+      {
+        "id": "sam:late",
+        "kind": "reactive-sam-upgrade",
+        "eligible": false,
+        "canDefend": false,
+        "cost": "3000000"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "$wait"
+  },
+  {
+    "name": "developed economy prepares SAM before an incoming nuke exists",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "reactive-sam-upgrade"
+    },
+    "candidates": [
+      {
+        "id": "sam:prepare",
+        "kind": "reactive-sam-upgrade",
+        "eligible": true,
+        "mode": "planned",
+        "priority": 1,
+        "targetLevel": 2,
+        "reason": "developed-economy",
+        "cost": "3000000"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sam:prepare"
+  },
+  {
+    "name": "urgent proven interception precedes a cheaper preparation upgrade",
+    "phase": "late",
+    "snapshot": {
+      "domain": "reactive-sam-upgrade"
+    },
+    "candidates": [
+      {
+        "id": "sam:prepare",
+        "kind": "reactive-sam-upgrade",
+        "eligible": true,
+        "mode": "planned",
+        "priority": 1,
+        "targetLevel": 3,
+        "reason": "coverage",
+        "cost": "1500000"
+      },
+      {
+        "id": "sam:urgent",
+        "kind": "reactive-sam-upgrade",
+        "eligible": true,
+        "canDefend": true,
+        "mode": "emergency",
+        "priority": 0,
+        "cost": "3000000"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sam:urgent"
+  },
+  {
+    "name": "planned SAM upgrade holds until emergency reserve can survive the purchase",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "reactive-sam-upgrade"
+    },
+    "candidates": [
+      {
+        "id": "sam:prepare",
+        "kind": "reactive-sam-upgrade",
+        "eligible": false,
+        "mode": "planned",
+        "priority": 1,
+        "targetLevel": 2,
+        "reason": "developed-economy",
+        "cost": "3000000"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "$wait"
+  },
+  {
+    "name": "safe mainland prioritizes 1 percent probes over large reinforcements",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "naval-action",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": false
+      },
+      "supportPosture": {
+        "ready": true,
+        "conserve": false
+      }
+    },
+    "candidates": [
+      {
+        "id": "naval:surge",
+        "kind": "naval-action",
+        "eligible": true,
+        "priority": 0
+      },
+      {
+        "id": "naval:enemy-probe",
+        "kind": "naval-action",
+        "eligible": true,
+        "priority": 7,
+        "adaptiveOnly": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "naval:enemy-probe"
+  },
+  {
+    "name": "safe mainland donates before potentially slow boat searches",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "attack-sequence",
+      "supportPosture": {
+        "ready": true,
+        "conserve": false
+      }
+    },
+    "candidates": [
+      {
+        "id": "sequence:opportunistic-boat",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "priority": 2
+      },
+      {
+        "id": "sequence:donation",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "priority": 3
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sequence:donation"
+  },
+  {
+    "name": "distant colony combat does not suppress safe rear probes",
+    "phase": "late",
+    "snapshot": {
+      "domain": "naval-action",
+      "teamOpening": {
+        "frontline": true,
+        "borderKnown": true,
+        "wilderness": false
+      },
+      "supportPosture": {
+        "ready": true,
+        "conserve": false
+      }
+    },
+    "candidates": [
+      {
+        "id": "naval:surge",
+        "kind": "naval-action",
+        "eligible": true,
+        "priority": 0
+      },
+      {
+        "id": "naval:enemy-probe",
+        "kind": "naval-action",
+        "eligible": true,
+        "priority": 7,
+        "adaptiveOnly": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "naval:enemy-probe"
+  },
+  {
+    "name": "river crossing runs alongside early wilderness expansion",
+    "phase": "early",
+    "snapshot": {
+      "domain": "attack-sequence",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "sequence:river-crossing",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "adaptiveOnly": true,
+        "priority": 99
+      },
+      {
+        "id": "sequence:wilderness-only",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "adaptiveOnly": true,
+        "priority": 100
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sequence:river-crossing"
+  },
+  {
+    "name": "unavailable river crossing leaves the wilderness land wave intact",
+    "phase": "early",
+    "snapshot": {
+      "domain": "attack-sequence",
+      "teamOpening": {
+        "frontline": false,
+        "borderKnown": true,
+        "wilderness": true
+      }
+    },
+    "candidates": [
+      {
+        "id": "sequence:river-crossing",
+        "kind": "attack-sequence",
+        "eligible": false,
+        "adaptiveOnly": true,
+        "priority": 99
+      },
+      {
+        "id": "sequence:wilderness-only",
+        "kind": "attack-sequence",
+        "eligible": true,
+        "adaptiveOnly": true,
+        "priority": 100
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true,
+        "reason": "Wait"
+      }
+    ],
+    "expectedAdaptiveChoice": "sequence:wilderness-only"
+  }
+]

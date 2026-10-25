@@ -4,7 +4,13 @@ node_modules/
 # Skill / tooling working dirs — planning notes, agent scratch, browser
 # captures. Not part of the userscript; keep them local, out of the repo.
 .superpowers/
-docs/superpowers/
 .playwright-mcp/
 
 # the built userscript (openfront-helper.user.js) IS committed
+
+# Local match exports, temporary verification output and unrelated workspace files
+work/
+outputs/
+.*.txt
+openfront-match-*.json*
+openfront-decisions-*.json*

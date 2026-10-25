@@ -6,3 +6,7 @@ openfront-helper.user.js linguist-generated -diff
 
 # Large translation data — skip diffs.
 locales/**/common.json -diff
+
+# Immutable build input: preserve exact bytes for SHA256 verification.
+vendor/openfront-helper-1.84.0.user.js -text -diff
+openfront-helper.meta.js linguist-generated

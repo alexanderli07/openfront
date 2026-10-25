@@ -1,0 +1,13 @@
+# Nearby wilderness river crossings
+
+User approved a dedicated short neutral crossing alongside early land expansion, prioritised before distant enemy probes. Preserve enemy-probe behavior, main-land conservation, two automatic transport slots and manual third slot. Header metadata remains the user's Saxien/Auto OpenFront template, without third-party header credits.
+
+Design: bounded water BFS from up to24 owned shoreline samples, at most12 water steps and256 visited water tiles per origin, with a global20,000-neighbour-check budget. Collect neutral, non-fallout opposite shores with at least8 reachable free tiles (local flood capped64); exclude local wilderness already connected to our land. Prefer shorter water paths, then more room. This is a local crossing search, not a global map exploration algorithm.
+
+Add an adaptive attack-sequence crossing phase before the existing wilderness-only phase; a failed/no crossing must not suppress the land wave. Outside that opening, try short crossings before distant probes. Validate at most2 sites per pass using worker spawn lookup, a500ms timeout per query and a maximum24 Manhattan distance from actual spawn to destination. Recheck neutral ownership/fallout and safety after async work. Negative results back off30ticks; scans/submissions are spaced10ticks. Reuse centralized naval landing, troop allocation and command gateways. Allocate floor(currentTroops*.01), without old minimum/fill gates. Do not reinforce this neutral landing with a25% surge.
+
+Track submitted crossing destinations until owned (or200ticks expire). Only a confirmed owned landing can reactivate the previously finished opening-wave state, preserving its checkpoints and spacing. Ordinary later wilderness appearances do not restart opening waves.
+
+Checks: geometry short/long/owned/fallout/same bank/room and scan bound; opening phase ordering and failure fall-through; low-troop allocation; actual spawn too far, target race, danger, disabled feature, capacity and retry; landing resumption. Full tests/scenarios/build/syntax/gateway/freshness; live match performance remains unverified.
+
+Completed in 1.84.60, adaptive1.10.0-river-crossing. Review found the async zero-troop allocation edge; now troop amount, permissions and capacity are rechecked after lookup before allocation. Red/green race regression and concurrent-query deduplication pass. Full1,847tests pass;38strategy scenarios have zero unexpected outcomes. Native TransportShipExecution and TransportShipUtils were inspected for shoreline targeting/landing behavior. Exact travel time remains heuristic; live gameplay unverified.

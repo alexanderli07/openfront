@@ -1,0 +1,13 @@
+# Safe rear support and mainland conservation
+
+User authorised more aggressive 1% enemy probes and troop donations, conserving when enemies approach the main land. Alliance automation remains off; no diplomacy redesign in this increment.
+
+Match c3asCgciTa (1.84.58): three donation submissions near the end; 175 opening-economy skips; one insufficient-excess and three minimum-20%-chunk holds. Repeated unreachable landing checks also limited probes. Preserve the two automatic transport slots and manual third slot, 1% probe amount, and below-65%-frontline recipient policy.
+
+Implementation: add a bounded support posture observer. Anchor the home area on the oldest owned SAM/city/port (or an owned border before construction), considering border tiles within 220 tiles. Detect hostile non-Bot land adjacent to these borders and at sampled offsets up to 48 tiles; detect incoming hostile attacks and enemy transports within 60 tiles of a landing in the home area. Hold support for 50 ticks after local danger. This is a bounded home-area approximation, not an exact owned-component analysis; remote colonies do not automatically count as the main front. Unknown geometry conserves.
+
+Once reachable wilderness is cleared and home is safe, allow donations before economic development finishes. Keep 25% troop capacity, permit 1%-of-capacity chunks, and cap a gift to the recipient's room below the existing 65% threshold. Try every second rather than three seconds. Prefer 1% enemy probes before reinforcement; reduce opportunistic throttle to 600ms. Local danger pauses automatic transports/donations without stopping normal land/counterattack phases. Recheck posture and shared pending troop commitments immediately before dispatch. Legacy strategy retains its previous behavior.
+
+Tests: posture safe/near land/remote enclave/transport/incoming/sticky/unknown states; small donation and receiver cap; opening donation release; probe priority; operational hold propagation and stale async decisions; troop spending cannot reuse the same army. Build/version/docs, full suite, scenarios, syntax, audit and freshness. Live behavior remains unverified.
+
+Completed in 1.84.59, adaptive policy 1.9.0-rear-support. Source review findings for non-two-team applicability and remote-colony naval priority were fixed with failing-then-passing regressions. Replayed the retained donor state at tick4034 (1,092,788 troops; capacity2,295,890.437): old policy holds below its114,794 minimum excess; new policy permits a150,000 top-up to a synthetic eligible recipient without crossing the donor keep line. This is a decision regression, not a replay of match outcomes. Full suite1,831pass;36strategy scenarios,zero unexpected outcomes. No live match validation.

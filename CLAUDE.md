@@ -1,3 +1,11 @@
+# Current decision-framework build (1.84.62)
+
+The active userscript is built from the immutable vendor baseline plus src/brain/ using node scripts/build.js (npm run build). Run npm test for the active regression suite and npm run check:build to verify both generated userscript and lightweight update metadata. Metadata lives in src/userscript-header.txt. Updates publish from the minimal branch to the raw GitHub URLs in that template. Bump the release version in scripts/build.js and the history version in src/brain/bootstrap.js, rebuild, and commit both openfront-helper.user.js and openfront-helper.meta.js.
+
+The older engine/ and src/shell/ implementation below is retained as a historical source. Its build is available only as npm run build:legacy or build:legacy:raw and will overwrite the published artifact; regenerate the active build afterward. Strategy design and implementation docs under docs/superpowers/ are now versioned project documentation. Match exports and temporary verification logs remain local.
+
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
