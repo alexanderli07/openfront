@@ -1,14 +1,12 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.0
-// @description  Auto-join lobbies + in-game helper overlays and a private-lobby auto-bot for OpenFront.io. Standalone userscript build with a multi-language UI.
+// @version      1.84.56
+// @description  Auto-join lobbies + in-game helper overlays and a private-lobby auyeah to-bot for OpenFront.io. Standalone userscript build with a multi-language UI.
 // @author       TheFaix (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
 // @homepageURL  https://github.com/alexanderli07/openfront
 // @supportURL   https://github.com/alexanderli07/openfront/issues
-// @updateURL    https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 // @contributionURL https://greasyfork.org/en/scripts/581664-openfront-tactical-assistant
 // Credits: in-game overlays adapted from phil0010-gh/openfront-helper; several
 // helper/auto-bot features (spawn scoring/heatmap, advisor, threat intel, map
@@ -1031,7 +1029,7028 @@ try {
         border-width: 3px;
         box-shadow: 0 0 8px var(--ws-color), 0 0 3px var(--ws-color);
       }
-    `;(document.head||document.documentElement).appendChild(n)}function ensureWarshipRouteContainer(){ensureWarshipRouteStyles();let n=document.getElementById(WARSHIP_ROUTES_CONTAINER_ID);if(!n){n=document.createElement("div");n.id=WARSHIP_ROUTES_CONTAINER_ID;n.setAttribute("aria-hidden","true");(document.body||document.documentElement).appendChild(n)}return n}function ensureWarshipRouteSvg(n){let e=n.querySelector(".openfront-helper-warship-route-svg");if(!e){e=document.createElementNS("http://www.w3.org/2000/svg","svg");e.classList.add("openfront-helper-warship-route-svg");e.setAttribute("aria-hidden","true");n.prepend(e)}return e}function collectWarshipRoutes(n){const e=[];for(const t of n.units("Warship")){if(!t?.isActive?.())continue;const a=getBoatPredictionRelation(n,t);if(!a)continue;if(!warshipFactionEnabled(a))continue;let i=null;try{const u=t.warshipState?.()?.patrolTile;if(u!==void 0&&u!==null)i=asFiniteTileRef(u)}catch(u){}const s=Number(t.id?.());if(i===null&&Number.isFinite(s)){try{const u=n.motionPlans?.()?.get(s);if(u?.path?.length){i=asFiniteTileRef(u.path[u.path.length-1])}}catch(u){}}if(i===null)continue;let r=null;let o=null;try{r=n.x(i);o=n.y(i)}catch(u){continue}try{const u=t.tile?.();if(u!==void 0&&u!==null){const c=Math.abs(n.x(u)-r)+Math.abs(n.y(u)-o);if(c<WARSHIP_ROUTE_MIN_DIST)continue}}catch(u){}let l=warshipRouteColor(a);if(a!=="self"){const u=ofhOwnerOverlayRgb(t.owner?.());if(u)l=ofhOwnerRgba(u,.95)}e.push({id:String(t.id?.()??`dest:${i}`),unit:t,self:a==="self",color:l,motionPlanUnitId:Number.isFinite(s)?s:null,destWorldX:r,destWorldY:o})}return e}function getWarshipRouteEntry(n,e,t){let a=warshipRouteDomCache.get(t.id);if(!a){const s=document.createElementNS("http://www.w3.org/2000/svg","polyline");s.classList.add("openfront-helper-warship-route-line");s.style.display="none";e.appendChild(s);const r=document.createElement("div");r.className="openfront-helper-warship-dest";r.hidden=true;n.appendChild(r);a={routeLine:s,marker:r,signature:"",routePoints:"",markerX:"",markerY:""};warshipRouteDomCache.set(t.id,a)}const i=t.color+(t.self?"|self":"");if(a.signature!==i){a.routeLine.style.stroke=t.color;a.marker.style.setProperty("--ws-color",t.color);a.routeLine.classList.toggle("ofh-ws-self",!!t.self);a.marker.classList.toggle("ofh-ws-self",!!t.self);a.signature=i}return a}function cleanupWarshipRouteDom(n){for(const[e,t]of warshipRouteDomCache){if(!n.has(e)){t.routeLine.remove();t.marker.remove();warshipRouteDomCache.delete(e)}}}function syncWarshipRoutes(){if(!warshipRoutesEnabled){teardownWarshipRoutes();return}_wsFrameCounter=(_wsFrameCounter+1)%3;if(_wsFrameCounter!==0&&_isLowLagMode()){warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes);return}const n=ensureWarshipRouteContainer();const e=getOpenFrontGameContext();if(!e?.game||!e?.transform){n.replaceChildren();warshipRouteDomCache.clear();warshipRouteScan=[];lastWarshipRouteScanAt=0;warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes);return}const t=ensureWarshipRouteSvg(n);const a=Date.now();if(!lastWarshipRouteScanAt||a-lastWarshipRouteScanAt>=WARSHIP_ROUTES_SCAN_MS){warshipRouteScan=collectWarshipRoutes(e.game);const i=new Set;for(const s of warshipRouteScan)i.add(s.id);cleanupWarshipRouteDom(i);lastWarshipRouteScanAt=a}resetScreenPointPool();for(let i=0;i<warshipRouteScan.length;i+=1){const s=warshipRouteScan[i];const r=toScreenPointFromWorld(e.transform,s.destWorldX,s.destWorldY);const o=isNearViewport(r,240);const l=toScreenPoint(e.game,e.transform,asFiniteTileRef(s.unit?.tile?.()));const u=l!=null;const c=u?l.x:0;const d=u?l.y:0;const f=u&&isNearViewport({x:c,y:d},240);const h=getWarshipRouteEntry(n,t,s);if(!o&&!f){h.routeLine.style.display="none";if(!h.marker.hidden)h.marker.hidden=true;continue}const p=r?r.x:0;const g=r?r.y:0;const m=getBoatRouteScreenPoints(e.game,e.transform,s.unit,s.motionPlanUnitId,u?{x:c,y:d}:null,r?{x:p,y:g}:null);if(m.length>=2){let y="";for(let b=0;b<m.length;b+=1){y+=b===0?`${m[b].x},${m[b].y}`:` ${m[b].x},${m[b].y}`}if(h.routePoints!==y){h.routeLine.setAttribute("points",y);h.routePoints=y}h.routeLine.style.display=""}else{h.routeLine.style.display="none"}if(r&&o){const y=`${p}px`;const b=`${g}px`;if(h.markerX!==y){h.marker.style.setProperty("--ws-tx",y);h.markerX=y}if(h.markerY!==b){h.marker.style.setProperty("--ws-ty",b);h.markerY=b}if(h.marker.hidden)h.marker.hidden=false}else if(!h.marker.hidden){h.marker.hidden=true}}warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes)}function teardownWarshipRoutes(){if(warshipRoutesAnimationFrame!==null){cancelAnimationFrame(warshipRoutesAnimationFrame)}warshipRoutesAnimationFrame=null;lastWarshipRouteScanAt=0;warshipRouteScan=[];warshipRouteDomCache.clear();document.getElementById(WARSHIP_ROUTES_CONTAINER_ID)?.remove()}function setWarshipRoutesEnabled(n,e){warshipRoutesEnabled=Boolean(n);if(e&&typeof e==="object"){if(e.own!==void 0)warshipShowOwn=Boolean(e.own);if(e.team!==void 0)warshipShowTeam=Boolean(e.team);if(e.ally!==void 0)warshipShowAlly=Boolean(e.ally);if(e.enemy!==void 0)warshipShowEnemy=Boolean(e.enemy)}teardownWarshipRoutes();if(warshipRoutesEnabled){syncWarshipRoutes()}}let autoLeaveOnTeamWin=false;let autoLeaveOnLoss=false;let autoLeaveTimer=null;let autoLeaveFired=false;function checkAutoLeave(){if(autoLeaveFired||!autoLeaveOnTeamWin&&!autoLeaveOnLoss){return}let n=null;try{n=document.querySelector("win-modal")}catch(t){return}if(!n||n.isVisible!==true){return}const e=n.isWin===true;if(e?!autoLeaveOnTeamWin:!autoLeaveOnLoss){return}autoLeaveFired=true;try{window.location.href="/"}catch(t){}}function syncAutoLeaveTimer(){if(autoLeaveOnTeamWin||autoLeaveOnLoss){if(autoLeaveTimer===null){autoLeaveTimer=window.setInterval(checkAutoLeave,1e3)}}else if(autoLeaveTimer!==null){clearInterval(autoLeaveTimer);autoLeaveTimer=null}}function setAutoLeaveOnTeamWinEnabled(n){autoLeaveOnTeamWin=Boolean(n);syncAutoLeaveTimer()}function setAutoLeaveOnLossEnabled(n){autoLeaveOnLoss=Boolean(n);syncAutoLeaveTimer()}"use strict";const UNIT={City:"City",Port:"Port",Factory:"Factory",SAMLauncher:"SAM Launcher",MissileSilo:"Missile Silo",DefensePost:"Defense Post",TransportShip:"Transport",TradeShip:"Trade Ship",Warship:"Warship",AtomBomb:"Atom Bomb",HydrogenBomb:"Hydrogen Bomb",MIRV:"MIRV",MIRVWarhead:"MIRV Warhead"};const PANEL_ID="openfront-helper-auto-bot-panel";const STYLE_ID="openfront-helper-auto-bot-styles";const STORAGE_KEY="openfront-helper-autobot-v1";const DEFAULTS={enabled:true,features:{spawn:true,expand:true,build:true,boat:true,nuke:true,warship:true,alliance:true,embargo:true,donate:true,betray:true},buildStructures:{[UNIT.City]:true,[UNIT.Port]:true,[UNIT.Factory]:true,[UNIT.DefensePost]:true,[UNIT.SAMLauncher]:true,[UNIT.MissileSilo]:true},winFixes:true,economyFirst:true,samCrack:true,safePlacement:true,samUmbrella:true,samDefense:true,defensePosts:true,defensePostTiming:true,defensePostPlayersOnly:true,nukeDensityFirst:true,reserveByNeighbors:true,counterAttackFirst:true,absorbThenCounter:true,counterSpentFrac:.4,counterWeakRatio:.5,absorbMaxTicks:300,absorbReserveFloor:.55,nukeIncomeMinutes:2,nukeArcRotate:true,samUpgradeMargin:true,combatReserve:true,combatReserveFloor:.45,counterKeepFrac:.45,phasedOpening:true,openingArmyFill:.65,openingMinCityLevels:5,openingMaxTicks:9e3,openingFullSendFreeShare:.08,openingFullSendBotCount:2,fullSendReserve:.05,gentleNeighbors:true,neighborReserveFloor:.5,encirclePockets:true,encircleMaxShare:.1,encircleMinSealShare:.6,openingSurroundedNeighbors:2,openingAllModes:true,minAttackForce:true,minAttackFrac:.12,openingInvaderMemoryTicks:600,smartSpawn:true,combatCadenceScale:.6,sizeReserveScale:1.5,sizeReserveCap:.6,mirvLeaderShare:.4,mirvPreemptFrac:.85,mirvTargetMinShare:.35,mirvTargetTopN:3,mirvEarlyGameTicks:6e3,teamWonShare:null,factoryRailShare:.75,boatProbeFrac:.01,boatProbeMinTroops:1e3,boatSurgeFrac:.25,oppBoatThrottleMs:350,maxConcurrentBoats:3,boatSpreadRadius:30,mirvBoatWindowTicks:150,donateThrottleMs:1200,donateNeedThreshold:.8,donateKeepFrac:.45,farAllyThrottleMs:4e3,warshipPatrolThrottleMs:1500,warshipMoveMaxDist:160,warshipMoveCooldownTicks:60,warshipLossMinDist:25,warshipLossWindowTicks:900,warshipRaidWindowTicks:400,warshipLossZoneMin:2,warshipLossZoneRadius:35,warshipRetreatHealthPct:75,warshipHuntTrade:true,warshipCombatThrottleMs:800,warshipAutoSpawn:true,warshipEvade:true,warshipNukeDodge:true,warshipServiceCellSize:40,warshipZoneServiceTicks:90,warshipNukeDodgeMargin:8,warshipNukeDodgeBuffer:20,warshipNukeDodgeSamples:8,warshipNukeDodgeRings:3,donateMinExcessFrac:.05,donateMinDonatePct:.2,boatWeakTroopFrac:.6,distantBoatProbeMax:12,boatSurplusFill:.4,boatIslandFill:.15,islandScanRadius:40,islandScanStep:2,islandScanSamples:6,islandProbeMax:4,tickMs:200,minimized:false,hidden:false,statusOpen:false,featsOpen:true,pos:null};const MAX_DEFENSE_RESERVE=.8;const EMBARGO_DENIAL_SHARE=.4;const RESERVE_PER_EXTRA_NEIGHBOR=.07;const RESERVE_NEIGHBOR_CAP=.65;const COMBAT_THREAT_STICKY_TICKS=150;const SHIELD_GUARD_DIST=20;const EARLY_EXPAND_COMMIT=.6;const BUILD_THROTTLE_MS=1800;const NUKE_THROTTLE_MS=6e3;const MIRV_COOLDOWN_MS=3e4;const MIRV_DOMINANCE_SHARE=.5;const MIRV_STEAMROLL_MIN_CITIES=10;const MIRV_STEAMROLL_GAP=1.25;const WARSHIP_THROTTLE_MS=4e3;const ALLIANCE_THROTTLE_MS=2e3;const BORDER_CACHE_MS=2200;const ENCIRCLE_SCAN_TICKS=100;const UNDER_ATTACK_RATIO=.35;const state={settings:loadSettings(),tickTimer:null,tickIntervalMs:0,tickInFlight:false,tickStartedAt:0,lastCombatMs:0,income:{lastGold:null,earned:0,samples:[]},lastSeenTick:null,lastPlayerAttackMs:0,lastRetaliateMs:0,lastBuildMs:0,lastNukeMs:0,lastWarshipMs:0,lastWarshipMoveMs:0,lastWarshipPatrolMs:0,lastAllianceMs:0,lastEmbargoMs:0,lastDonateMs:0,beachhead:null,recentMirvHits:[],lastOppBoatMs:0,lastNuker:null,recentNukes:[],hostility:new Map,nukeReserveGold:0,nukeWantSlots:null,lastMirv:null,navalThreatAt:0,speed:{lastTick:null,lastMs:0,factor:1},border:{tiles:null,atMs:0},landBorderEnemySids:new Set,status:"",lastAction:"—",stats:{spawns:0,attacks:0,builds:0,nukes:0},live:{troops:0,gold:0,tiles:0,fill:0},log:[],activeTab:"control",logFilter:"all"};const LOG_CATS={spawn:{label:"Spawn",emoji:"🏁"},combat:{label:"Combat",emoji:"⚔️"},naval:{label:"Naval",emoji:"🚢"},build:{label:"Building",emoji:"🏗️"},nuke:{label:"Strikes",emoji:"☢️"},diplo:{label:"Diplomacy",emoji:"🤝"}};const LOG_CAP=200;function maybeResetForNewGame(n){if(typeof n!=="number"||!Number.isFinite(n))return false;const e=state.lastSeenTick;state.lastSeenTick=n;if(typeof e!=="number"||n>=e)return false;state.income={lastGold:null,earned:0,samples:[]};state.nukeReserveGold=0n;state.recentMirvHits=[];state.recentNukes=[];state.nukeWantSlots=null;state.lastNuker=null;state.lastMirv=null;state.beachhead=null;state.hostility=new Map;return true}function loadSettings(){const n=["enabled","winFixes","economyFirst","samCrack","samDefense","safePlacement","samUmbrella","defensePosts","defensePostTiming","defensePostPlayersOnly","nukeDensityFirst","reserveByNeighbors","counterAttackFirst","combatReserve","absorbThenCounter","gentleNeighbors","encirclePockets","nukeIncomeMinutes","nukeArcRotate","samUpgradeMargin","phasedOpening","openingArmyFill","openingMinCityLevels","openingMaxTicks","openingSurroundedNeighbors","openingAllModes","minAttackForce","openingInvaderMemoryTicks","smartSpawn","minimized","hidden","statusOpen","featsOpen","pos","tickMs","donateKeepFrac","donateNeedThreshold","donateThrottleMs","donateMinDonatePct","warshipRetreatHealthPct","warshipHuntTrade","warshipCombatThrottleMs","warshipAutoSpawn","warshipEvade","warshipNukeDodge","warshipPatrolThrottleMs"];const e=JSON.parse(JSON.stringify(DEFAULTS));try{const t=window.localStorage.getItem(STORAGE_KEY);if(t){const a=JSON.parse(t);for(const i of n){if(a[i]!==void 0)e[i]=a[i]}e.features={...DEFAULTS.features,...a.features||{}};e.buildStructures={...DEFAULTS.buildStructures,...a.buildStructures||{}}}}catch(t){console.warn("[AutoBot] failed to load settings:",t)}return e}function saveSettings(){try{window.localStorage.setItem(STORAGE_KEY,JSON.stringify(state.settings))}catch(n){console.warn("[AutoBot] failed to save settings:",n)}}"use strict";let autoBotBundle=null;let autoBotLang="en";let autoBotBundleSignature="";function tr(n,e){let t=autoBotBundle&&autoBotBundle[n]||n;if(e){for(const a in e){t=t.split("{"+a+"}").join(String(e[a]))}}return t}function setAutoBotI18n(n,e){const t=n||"en";const a=t!==autoBotLang;const i=e&&typeof e==="object";let s=autoBotBundleSignature;if(i){try{s=JSON.stringify(e)}catch(o){s=autoBotBundleSignature}}const r=i&&s!==autoBotBundleSignature;autoBotLang=t;if(i){autoBotBundle=e;autoBotBundleSignature=s}if(a||r){relocalizeAutoBotPanel()}}function relocalizeAutoBotPanel(){if(!state.settings.enabled){state.status=""}const n=document.getElementById(PANEL_ID);if(n&&typeof buildPanel==="function"){n.remove();buildPanel()}if(typeof renderStatus==="function")renderStatus();if(typeof renderLog==="function")renderLog()}"use strict";function gameType(n){try{return n?.config?.().gameConfig?.().gameType??null}catch(e){return null}}function isPublicLobby(n){return false}function randInt(n,e){return Math.floor(Math.random()*(e-n+1))+n}function clamp(n,e,t){return Math.max(e,Math.min(t,n))}function shuffleInPlace(n){for(let e=n.length-1;e>0;e--){const t=Math.floor(Math.random()*(e+1));[n[e],n[t]]=[n[t],n[e]]}return n}function toNum(n){if(typeof n==="bigint")return Number(n);const e=Number(n);return Number.isFinite(e)?e:0}function withTimeout(n,e,t){return Promise.race([Promise.resolve(n).catch(()=>t),new Promise(a=>window.setTimeout(()=>a(t),e))])}const WORKER_TIMEOUT_MS=2500;function updateSpeedFactor(n){let e=NaN;try{e=Number(n.ticks?.())}catch(r){e=NaN}if(!Number.isFinite(e))return;const t=performance.now();const a=state.speed;if(a.lastTick===null){a.lastTick=e;a.lastMs=t;return}const i=e-a.lastTick;const s=t-a.lastMs;if(s>=1500){if(i>0){const r=i/s*1e3;const o=clamp(r/10,.25,12);a.factor=a.factor*.6+o*.4}a.lastTick=e;a.lastMs=t}}function scaled(n){return n/Math.max(.25,state.speed.factor||1)}function safeMaxTroops(n,e){try{const t=n.config().maxTroops(e);return Number.isFinite(t)&&t>0?t:0}catch(t){return 0}}function safeName(n){try{return String(n.displayName?.()??n.name?.()??"?")}catch(e){return"?"}}"use strict";function findContext(){try{if(typeof getOpenFrontGameContext==="function"){const e=getOpenFrontGameContext();if(e?.game?.myPlayer)return e}}catch(e){}try{if(lastOpenFrontGameContext?.game?.myPlayer){return lastOpenFrontGameContext}}catch(e){}const n=["main-radial-menu","build-menu","control-panel","leader-board","options-menu"];for(const e of n){const t=document.querySelector(e);if(t?.game?.myPlayer){return{game:t.game,transform:t.transformHandler||t.transform||null}}}return null}function getGame(){return findContext()?.game??null}function getRadialMenu(){return document.querySelector("main-radial-menu")}function getBuildMenu(){return document.querySelector("build-menu")||getRadialMenu()?.buildMenu||null}function getEventBus(){const n=getBuildMenu();if(n?.eventBus)return n.eventBus;const e=document.querySelector("control-panel");if(e?.eventBus)return e.eventBus;const t=document.querySelector("leader-board");if(t?.eventBus)return t.eventBus;return getRadialMenu()?.eventBus??null}const _ctors={bus:null,spawn:null,attack:null,boat:null,moveWarship:null,embargo:null,donateTroops:null,emoji:null,target:null,allianceRequest:null};const _alliancesActioned=new WeakSet;function getListenersMap(n){if(n?.listeners instanceof Map)return n.listeners;for(const e of Object.getOwnPropertyNames(n||{})){try{if(n[e]instanceof Map)return n[e]}catch(t){}}return null}function discoverCtors(n){if(_ctors.bus===n&&_ctors.attack&&_ctors.spawn&&_ctors.boat&&_ctors.moveWarship&&_ctors.embargo&&_ctors.donateTroops){return _ctors}const e=getListenersMap(n);if(!e)return _ctors;_ctors.bus=n;for(const t of e.keys()){if(typeof t!=="function")continue;if(!_ctors.moveWarship){try{const a=new t([7,8],99);if(a&&Array.isArray(a.unitIds)&&a.unitIds[0]===7&&a.tile===99){_ctors.moveWarship=t;continue}}catch(a){}}if(!_ctors.embargo){try{const a={__probe:1};const i=new t(a,"start");if(i&&i.target===a&&i.action==="start"){_ctors.embargo=t;continue}}catch(a){}}if(!_ctors.donateTroops){try{const a={__probe:1};const i=new t(a,123);if(i&&i.recipient===a&&i.troops===123){_ctors.donateTroops=t;continue}}catch(a){}}if(!_ctors.emoji){try{const a={__probe:1};const i=new t(a,7);if(i&&i.recipient===a&&i.emoji===7&&i.troops===void 0&&i.action===void 0){_ctors.emoji=t;continue}}catch(a){}}if(!_ctors.target){try{const a=new t("§tp",456);if(a&&a.targetID==="§tp"&&a.troops===void 0&&a.recipient===void 0&&a.dst===void 0&&a.emoji===void 0){_ctors.target=t;continue}}catch(a){}}if(!_ctors.attack){try{const a=new t("§p",123);if(a&&a.targetID==="§p"&&a.troops===123&&a.dst===void 0){_ctors.attack=t;continue}}catch(a){}}if(!_ctors.boat){try{const a=new t(77,123);if(a&&a.dst===77&&a.troops===123){_ctors.boat=t;continue}}catch(a){}}if(!_ctors.spawn){try{const a=new t(55);if(a&&a.tile===55&&a.targetID===void 0&&a.dst===void 0&&a.unit===void 0&&a.troops===void 0){_ctors.spawn=t;continue}}catch(a){}}}return _ctors}function emitIntent(n,...e){const t=getEventBus();if(!t||typeof n!=="function")return false;try{t.emit(new n(...e));return true}catch(a){console.error("[AutoBot] emit failed:",a);return false}}function diagnose(){const n=getGame();const e=getEventBus();const t=e?discoverCtors(e):_ctors;const a=getBuildMenu();const i=n?.myPlayer?.();const s={game:!!n,gameType:n?gameType(n):null,inSpawnPhase:n?.inSpawnPhase?.()??null,myPlayer:!!i,hasSpawned:i?.hasSpawned?.()??null,buildMenu:!!a,sendBuildOrUpgrade:typeof a?.sendBuildOrUpgrade,eventBus:!!e,ctorSpawn:!!t.spawn,ctorAttack:!!t.attack,ctorBoat:!!t.boat,ctorMoveWarship:!!t.moveWarship,ctorEmbargo:!!t.embargo,ctorDonateTroops:!!t.donateTroops,ctorEmoji:!!t.emoji,ctorAllianceRequest:!!t.allianceRequest,speedFactor:Math.round((state.speed?.factor??1)*100)/100,gold:i?Math.round(toNum(i.gold?.())):0,troops:i?Math.round(toNum(i.troops?.())):0,tiles:i?toNum(i.numTilesOwned?.()):0,botStatus:(()=>{try{return typeof _bot!=="undefined"&&_bot?_bot.status:"no-bot"}catch(r){return"n/a"}})(),eventsDisplayEvents:(()=>{try{return document.querySelector("events-display")?.events?.length??null}catch(r){return null}})()};console.log("[AutoBot] DIAG",s);return s}window.__autoBotDiag=diagnose;"use strict";async function getBorderTiles(n,e){const t=performance.now();if(state.border.tiles&&t-state.border.atMs<scaled(BORDER_CACHE_MS)){return state.border.tiles}let a=[];try{const i=await withTimeout(e.borderTiles(),WORKER_TIMEOUT_MS,null);const s=i?.borderTiles??i;a=s?Array.from(s):[]}catch(i){console.warn("[AutoBot] borderTiles failed:",i);a=[]}state.border={tiles:a,atMs:t};return a}function isOceanAdjacent(n,e){try{if(typeof n.isOceanShore==="function")return n.isOceanShore(e)}catch(t){}for(const t of n.neighbors(e)){if(n.isOcean?.(t))return true}return false}function analyzeBorder(n,e,t){const a=e.smallID?.();let i=false;let s=false;let r=false;let o=false;const l=new Map;const u=new Map;for(const c of t){if(!r&&n.isShore?.(c))r=true;if(!o&&isOceanAdjacent(n,c))o=true;for(const d of n.neighbors(c)){if(!n.isLand(d))continue;if(n.ownerID(d)===a)continue;if(!n.hasOwner(d)){if(n.hasFallout?.(d)){s=true}else{i=true}continue}const f=n.owner(d);if(!f?.isPlayer?.())continue;if(f.smallID?.()===a)continue;if(e.isFriendly?.(f)){u.set(f.smallID(),f);continue}l.set(f.smallID(),f)}}return{hasOpenLand:i,hasNukedLand:s,hasShore:r,hasCoastal:o,enemies:Array.from(l.values()),friends:Array.from(u.values())}}function boundingBox(n,e){let t=Infinity;let a=Infinity;let i=-Infinity;let s=-Infinity;for(const r of e){const o=n.x(r);const l=n.y(r);if(o<t)t=o;if(o>i)i=o;if(l<a)a=l;if(l>s)s=l}if(!Number.isFinite(t))return null;return{minX:t,minY:a,maxX:i,maxY:s}}"use strict";const Difficulty={Easy:"Easy",Medium:"Medium",Hard:"Hard",Impossible:"Impossible"};const GameType={Singleplayer:"Singleplayer",Public:"Public",Private:"Private"};const GameMode={FFA:"Free For All",Team:"Team"};const PlayerType={Bot:"BOT",Human:"HUMAN",Nation:"NATION"};const TerrainType={Plains:0,Highland:1,Mountain:2,Lake:3,Ocean:4};function currentDifficulty(){return Difficulty.Impossible}class PseudoRandom{constructor(e){let t=Number(e)>>>0||1;this._next01=function(){t|=0;t=t+1831565813|0;let a=Math.imul(t^t>>>15,1|t);a=a+Math.imul(a^a>>>7,61|a)^a;return((a^a>>>14)>>>0)/4294967296}}next(){return this._next01()}nextInt(e,t){const a=Math.floor(e);const i=Math.floor(t);return Math.floor(this._next01()*(i-a))+a}nextFloat(e,t){return this._next01()*(t-e)+e}randElement(e){if(e.length===0)throw new Error("array must not be empty");return e[this.nextInt(0,e.length)]}randFromSet(e){const t=e.size;if(t===0)throw new Error("set must not be empty");const a=this.nextInt(0,t);let i=0;for(const s of e){if(i===a)return s;i++}throw new Error("Unexpected error selecting element from set")}chance(e){return this.nextInt(0,e)===0}shuffleArray(e){const t=[...e];for(let a=t.length-1;a>0;a--){const i=this.nextInt(0,a+1);[t[a],t[i]]=[t[i],t[a]]}return t}}function simpleHash(n){let e=0;for(let t=0;t<n.length;t++){const a=n.charCodeAt(t);e=(e<<5)-e+a;e=e&e}return Math.abs(e)}function within(n,e,t){return Math.min(Math.max(n,e),t)}function closestTile(n,e,t){let a=Infinity;let i=null;for(const s of e){const r=n.manhattanDist(s,t);if(r<a){a=r;i=s}}return[i,a]}function closestTwoTiles(n,e,t){const a=Array.from(e).sort((u,c)=>n.x(u)-n.x(c));const i=Array.from(t).sort((u,c)=>n.x(u)-n.x(c));if(a.length===0||i.length===0)return null;let s=0;let r=0;let o=Infinity;let l={x:a[0],y:i[0]};while(s<a.length&&r<i.length){const u=a[s];const c=i[r];const d=Math.abs(n.x(u)-n.x(c))+Math.abs(n.y(u)-n.y(c));if(d<o){o=d;l={x:u,y:c}}if(s===a.length-1){r++}else if(r===i.length-1){s++}else if(n.x(u)<n.x(c)){s++}else{r++}}return l}function calculateBoundingBox(n,e){let t=Infinity,a=Infinity,i=-Infinity,s=-Infinity;for(const r of e){const o=n.x(r);const l=n.y(r);t=Math.min(t,o);a=Math.min(a,l);i=Math.max(i,o);s=Math.max(s,l)}return{min:{x:t,y:a},max:{x:i,y:s}}}function boundingBoxCenter(n){return{x:n.min.x+Math.floor((n.max.x-n.min.x)/2),y:n.min.y+Math.floor((n.max.y-n.min.y)/2)}}function calculateBoundingBoxCenter(n,e){return boundingBoxCenter(calculateBoundingBox(n,e))}function boundingBoxTiles(n,e,t){const a=[];const i=n.x(e);const s=n.y(e);const r=i-t;const o=i+t;const l=s-t;const u=s+t;for(let c=r;c<=o;c++){if(n.isValidCoord(c,l))a.push(n.ref(c,l));if(n.isValidCoord(c,u)&&l!==u)a.push(n.ref(c,u))}for(let c=l+1;c<u;c++){if(n.isValidCoord(r,c))a.push(n.ref(r,c));if(n.isValidCoord(o,c)&&r!==o)a.push(n.ref(o,c))}return a}function calculateTerritoryCenter(n,e){const t=e.borderTiles();if(t.size===0)return null;let a=Infinity,i=-Infinity,s=Infinity,r=-Infinity;for(const h of t){const p=n.x(h);const g=n.y(h);if(p<a)a=p;if(p>i)i=p;if(g<s)s=g;if(g>r)r=g}const o=Math.floor((a+i)/2);const l=Math.floor((s+r)/2);const u=n.ref(o,l);const c=n.owner(u);if(c&&c.isPlayer&&c.isPlayer()&&c.smallID()===e.smallID()){return u}let d=null;let f=Infinity;for(const h of t){const p=n.x(h)-o;const g=n.y(h)-l;const m=p*p+g*g;if(m<f){f=m;d=h}}return d}function randTerritoryTileArray(n,e,t,a){const i=calculateBoundingBox(e,t.borderTiles());const s=[];for(let r=0;r<a;r++){const o=randTerritoryTile(n,e,t,i);if(o!==null)s.push(o)}return s}function randTerritoryTile(n,e,t,a){if(a==null){a=calculateBoundingBox(e,t.borderTiles())}for(let s=0;s<100;s++){const r=n.nextInt(a.min.x,a.max.x);const o=n.nextInt(a.min.y,a.max.y);if(!e.isValidCoord(r,o))continue;const l=e.ref(r,o);const u=e.owner(l);if(u&&u.isPlayer&&u.isPlayer()&&u.smallID()===t.smallID()){return l}}const i=t.borderTiles();if(t.numTilesOwned()>0&&t.numTilesOwned()<=100&&i.size>0){return n.randElement(Array.from(i))}return null}"use strict";const Relation={Hostile:0,Distrustful:1,Neutral:2,Friendly:3};function relationFromValue(n){if(n<-50)return Relation.Hostile;if(n<0)return Relation.Distrustful;if(n<50)return Relation.Neutral;return Relation.Friendly}function bucketMidpoint(n){switch(n){case Relation.Hostile:return-75;case Relation.Distrustful:return-25;case Relation.Friendly:return 75;default:return 25}}function createGameApi(n){const e=new Map;const t=new Map;const a=new Map;let i=new Map;let s=[];let r=null;let o=-1;const l=S=>S&&S.__src?S.__src:S;function u(S){try{return!!(S&&typeof S.isPlayer==="function"&&S.isPlayer())}catch(P){return false}}function c(S){if(S==null)return S;const P=(q,L)=>(...W)=>typeof S[q]==="function"?S[q](...W):L;return{__src:S,owner:()=>p(S.owner()),type:P("type",null),tile:P("tile",null),level:P("level",1),id:P("id",null),isActive:P("isActive",false),isUnderConstruction:P("isUnderConstruction",false),isInCombat:P("isInCombat",false),hasTrainStation:P("hasTrainStation",false),missileTimerQueue:P("missileTimerQueue",[]),targetTile:P("targetTile",void 0),patrolTile:P("patrolTile",void 0),warshipState:P("warshipState",void 0),transportShipState:P("transportShipState",void 0),health:P("health",void 0),ticksLeftInCooldown:P("ticksLeftInCooldown",0),lastSetSafeFromPirates:P("lastSetSafeFromPirates",void 0)}}function d(S){const P=q=>typeof q==="function"?q():q;return{__src:S,troops:()=>Number(P(S.troops)??0),attacker:()=>p(typeof S.attacker==="function"?S.attacker():f(S.attackerID)),target:()=>p(typeof S.target==="function"?S.target():f(S.targetID)),retreating:()=>P(S.retreating)??false,id:()=>P(S.id),hasSourceTile:()=>S.sourceTile!==void 0,sourceTile:()=>S.sourceTile!==void 0?P(S.sourceTile):null}}function f(S){if(S==null)return null;try{return n.playerBySmallID(S)}catch(P){return null}}function h(S){const P=i.has(S)?i.get(S):Relation.Neutral;const q=a.get(S)??0;return bucketMidpoint(P)+q}function p(S){if(S==null)return null;if(!u(S)){return S}const P=S.smallID();let q=e.get(P);if(q){q.__src=S;return q}q=g(S);e.set(P,q);return q}function g(S){const P=(L,W)=>(...z)=>typeof S[L]==="function"?S[L](...z.map(ee=>ee&&ee.__src?ee.__src:ee)):W;const q={__src:S,isPlayer:()=>true,isAlive:P("isAlive",false),hasSpawned:P("hasSpawned",false),smallID:()=>S.smallID(),id:()=>S.id(),clientID:P("clientID",null),type:P("type",null),name:P("name","?"),displayName:P("displayName","?"),troops:()=>Number(S.troops?.()??0),gold:()=>S.gold?.()??0n,numTilesOwned:()=>Number(S.numTilesOwned?.()??0),team:P("team",null),maxTroops:()=>F.config().maxTroops(q),isTraitor:P("isTraitor",false),isDisconnected:P("isDisconnected",false),betrayals:P("betrayals",0),getTraitorRemainingTicks:P("getTraitorRemainingTicks",0),units:(...L)=>S.units(...L).map(c),unitCount:L=>S.units(L).length,unitsOwned:L=>S.units(L).filter(W=>!(W.isUnderConstruction?.()??false)).length,unitsConstructed:L=>S.units(L).some(W=>!(W.isUnderConstruction?.()??false)),totalUnitLevels:L=>S.units(L).filter(W=>!(W.isUnderConstruction?.()??false)).reduce((W,z)=>W+(z.level?.()??1),0),incomingAttacks:()=>S.incomingAttacks().map(d),outgoingAttacks:()=>S.outgoingAttacks().map(d),targets:()=>S.targets?S.targets().map(p):[],allies:()=>S.allies?S.allies().map(p):[],transitiveTargets:()=>S.transitiveTargets?S.transitiveTargets().map(p):[],alliances:()=>S.alliances?S.alliances():[],isFriendly:L=>S.isFriendly(l(L)),isAlliedWith:L=>S.isAlliedWith(l(L)),isOnSameTeam:L=>S.isOnSameTeam(l(L)),isRequestingAllianceWith:L=>S.isRequestingAllianceWith?S.isRequestingAllianceWith(l(L)):false,hasEmbargoAgainst:L=>S.hasEmbargoAgainst?S.hasEmbargoAgainst(l(L)):false,nameLocation:()=>S.nameLocation?S.nameLocation():{x:0,y:0},borderTiles:()=>{const L=t.get(S.smallID());return L&&L.set?L.set:new Set},relation:L=>{const W=m(L);return relationFromValue(within(h(W),-100,100))},allRelationsSorted:()=>{const L=new Set;for(const z of i.keys())L.add(z);for(const z of a.keys())L.add(z);const W=[];for(const z of L){if(z===S.smallID())continue;const ee=F.playerBySmallID(z);if(!ee||!ee.isPlayer||!ee.isPlayer()||!ee.isAlive())continue;W.push({player:ee,raw:h(z),sid:z})}W.sort((z,ee)=>z.raw-ee.raw||z.sid-ee.sid);return W.map(z=>({player:z.player,relation:relationFromValue(within(z.raw,-100,100))}))},updateRelation:(L,W)=>{const z=m(L);if(z==null||z===S.smallID())return;a.set(z,within((a.get(z)??0)+W,-100,100))},nearby:()=>y(q),sharesBorderWith:L=>b(q,L),borderTilesAsync:()=>S.borderTiles(),buildables:(L,W)=>S.buildables(L,W),bestTransportShipSpawn:L=>S.bestTransportShipSpawn(L),profile:()=>S.profile(),actions:(L,W)=>S.actions?S.actions(L,W):Promise.resolve(null)};return q}function m(S){if(S==null)return null;if(typeof S==="number")return S;if(typeof S.smallID==="function")return S.smallID();return null}function y(S){const P=new Map;const q=S.smallID();const L=Y=>{if(Y===q)return;if(Y==null){const ne=F.terraNullius();P.set("TN",ne)}else{const ne=F.playerBySmallID(Y);if(ne)P.set(Y,ne)}};const W=S.borderTiles();for(const Y of W){for(const ne of n.neighbors(Y)){if(!n.isLand(ne))continue;const re=n.hasOwner(ne)?n.ownerID(ne):null;if(re!==q)L(re)}}const z=[];for(const Y of W)if(n.isShore(Y))z.push(Y);const ee=[[0,-1],[0,1],[-1,0],[1,0]];for(let Y=0;Y<z.length;Y+=10){const ne=z[Y];const re=n.x(ne);const be=n.y(ne);for(const[oe,de]of ee){const ke=re+oe;const he=be+de;if(!n.isValidCoord(ke,he)||!n.isWater(n.ref(ke,he)))continue;const Le=re+oe*5;const Oe=be+de*5;if(!n.isValidCoord(Le,Oe))continue;const ve=n.ref(Le,Oe);if(!n.isLand(ve))continue;if(!n.hasOwner(ve)&&n.hasFallout(ve))continue;const Fe=n.hasOwner(ve)?n.ownerID(ve):null;if(Fe!==q)L(Fe)}}return Array.from(P.values())}function b(S,P){const q=m(P);if(q==null){for(const L of S.borderTiles()){for(const W of n.neighbors(L)){if(n.isLand(W)&&!n.hasOwner(W))return true}}return false}for(const L of S.borderTiles()){for(const W of n.neighbors(L)){if(n.isLand(W)&&n.hasOwner(W)&&n.ownerID(W)===q)return true}}return false}let v=null;let T=null;function x(){const S=n.config();if(T&&v===S)return T;v=S;T=new Proxy(S,{get(P,q){if(q==="maxTroops")return W=>S.maxTroops(l(W));const L=P[q];return typeof L==="function"?L.bind(P):L}});return T}let I=null;let M=null;let _=null;function k(){const S=n.width();const P=n.height();const q=S*P;const L=new Int32Array(q).fill(-2);const W=[];const z=[];let ee=0;for(let Y=0;Y<q;Y++){if(!n.isWater(Y)||L[Y]!==-2)continue;const ne=ee++;let re=false;const be=new Set;const oe=[Y];L[Y]=ne;let de=0;while(de<oe.length){const ke=oe[de++];if(n.isOcean(ke))re=true;for(const he of n.neighbors(ke)){if(n.isWater(he)){if(L[he]===-2){L[he]=ne;oe.push(he)}}else if(n.isLand(he)){be.add(he)}}}W[ne]=re;z[ne]=re?null:Array.from(be)}I=L;M=W;_=z}function N(){if(I===null)k()}function B(S){N();if(S<0||S>=I.length)return null;const P=I[S];return P>=0?P:null}const G=-1;function V(S){if(S==null)return null;try{if(S.type&&S.type()===PlayerType.Bot)return null}catch(ee){}N();const P=S.borderTiles();const q=S.smallID();let L=false;const W=new Set;for(const ee of P){if(!n.isShore(ee))continue;for(const Y of n.neighbors(ee)){if(!n.isWater(Y))continue;if(n.isOcean(Y)){L=true;continue}const ne=I[Y];if(ne>=0)W.add(ne)}}const z=new Set;if(L)z.add(G);for(const ee of W){const Y=_[ee];if(!Y)continue;let ne=false;const re=new Set;for(const be of Y){if(!n.hasOwner(be))continue;const oe=n.ownerID(be);if(oe==null||oe===q)continue;if(re.has(oe))continue;re.add(oe);const de=p(n.playerBySmallID(oe));if(!de||!de.isPlayer||!de.isPlayer())continue;if(de.type&&de.type()===PlayerType.Bot)continue;if(S.id()!==de.id()&&!S.hasEmbargoAgainst(de)&&!de.hasEmbargoAgainst(S)){ne=true;break}}if(ne)z.add(ee)}return z.size>0?z:null}function O(){try{if(typeof n.frameData!=="function")return null;const S=n.frameData();return S&&S.railroadState?S.railroadState:null}catch(S){return null}}const C=S=>(...P)=>n[S](...P);const F={__src:n,ticks:()=>n.ticks(),inSpawnPhase:()=>n.inSpawnPhase(),isSpawnImmunityActive:(...S)=>typeof n.isSpawnImmunityActive==="function"?n.isSpawnImmunityActive(...S):false,config:()=>x(),myPlayer:()=>r,players:()=>n.players().map(p),playerViews:()=>n.players().map(p),playerBySmallID:S=>p(n.playerBySmallID(S)),nations:()=>(n.nations?n.nations():n.players().filter(S=>S.type?.()==="Nation")).map(p),terraNullius:()=>{if(typeof n.terraNullius==="function")return n.terraNullius();return{isPlayer:()=>false,smallID:()=>0,id:()=>"TerraNullius"}},owner:S=>p(n.owner(S)),ownerID:S=>n.ownerID(S),hasOwner:S=>n.hasOwner(S),numLandTiles:()=>n.numLandTiles(),numTilesWithFallout:()=>typeof n.numTilesWithFallout==="function"?n.numTilesWithFallout():0,getWinner:()=>typeof n.getWinner==="function"?n.getWinner():null,units:(...S)=>n.units(...S).map(c),unitCount:S=>n.units(S).length,ref:C("ref"),x:C("x"),y:C("y"),cell:C("cell"),width:C("width"),height:C("height"),isValidCoord:C("isValidCoord"),isOnMap:S=>typeof n.isOnMap==="function"?n.isOnMap(S):n.isValidCoord(S.x,S.y),isLand:C("isLand"),isWater:C("isWater"),isOcean:C("isOcean"),isShore:C("isShore"),isOceanShore:C("isOceanShore"),isBorder:S=>typeof n.isBorder==="function"?n.isBorder(S):false,magnitude:C("magnitude"),hasFallout:C("hasFallout"),neighbors:C("neighbors"),manhattanDist:C("manhattanDist"),euclideanDistSquared:C("euclideanDistSquared"),terrainType:S=>typeof n.terrainType==="function"?n.terrainType(S):null,nearbyUnits:(...S)=>typeof n.nearbyUnits==="function"?n.nearbyUnits(...S):[],hasUnitNearby:(...S)=>typeof n.hasUnitNearby==="function"?n.hasUnitNearby(...S):false,ensureBorderTiles:S=>J(S),getWaterComponent:S=>B(S),sharedWaterComponents:S=>V(S),railroadState:()=>O(),_wrapPlayer:p,_wrapUnit:c};async function J(S){const P=l(S);const q=P.smallID();const L=n.ticks();const W=t.get(q);const z=typeof performance!=="undefined"&&performance.now?performance.now():Date.now();const ee=1500;if(W&&W.set&&W.set.size>0&&z-(W.at||0)<ee){return W.set}if(W&&W.inFlight){return W.set||new Set}const Y=W||{at:0,set:new Set,inFlight:false};Y.inFlight=true;t.set(q,Y);let ne=null;try{const re=await withTimeout(P.borderTiles(),4e3,null);const be=re&&re.borderTiles?re.borderTiles:re;if(be){const oe=new Set(be);if(oe.size>0)ne=oe}}catch(re){}Y.inFlight=false;if(ne!==null){Y.set=ne;Y.at=typeof performance!=="undefined"&&performance.now?performance.now():Date.now()}t.set(q,Y);return Y.set||new Set}async function ue(S){r=p(S);const P=n.ticks();if(o>=0&&P>o){const q=Math.min(P-o,50);for(const[L,W]of a){let z=W;for(let ee=0;ee<q;ee++){const Y=-1*Math.sign(z);z+=Y*.05;if(Math.abs(z)<.1){z=0;break}}if(z===0)a.delete(L);else a.set(L,z)}}o=P;await J(r);try{const q=await withTimeout(l(r).profile(),WORKER_TIMEOUT_MS,null);if(q&&q.relations){i=new Map(Object.entries(q.relations).map(([L,W])=>[Number(L),Number(W)]));s=(q.alliances||[]).map(Number)}}catch(q){}return r}return{game:F,beginTick:ue,ensureBorderTiles:J,wrapPlayer:p,overlay:a}}"use strict";const emojiTable=[["😀","😊","🥰","😇","😎"],["😞","🥺","😭","😱","😡"],["😈","🤡","🥱","🫡","🖕"],["👋","👏","✋","🙏","💪"],["👍","👎","🫴","🤌","🤦‍♂️"],["🤝","🆘","🕊️","🏳️","⏳"],["🔥","💥","💀","☢️","⚠️"],["↖️","⬆️","↗️","👑","🥇"],["⬅️","🎯","➡️","🥈","🥉"],["↙️","⬇️","↘️","❤️","💔"],["💰","⚓","⛵","🏡","🛡️"],["🏭","🚂","❓","🐔","🐀"]];const flattenedEmojiTable=emojiTable.flat();const emojiId=n=>flattenedEmojiTable.indexOf(n);const EMOJI_ASSIST_ACCEPT=["👍","🤝","🎯"].map(emojiId);const EMOJI_ASSIST_RELATION_TOO_LOW=["🥱","🤦‍♂️"].map(emojiId);const EMOJI_ASSIST_TARGET_ME=["🥺","💀"].map(emojiId);const EMOJI_ASSIST_TARGET_ALLY=["🕊️","👎"].map(emojiId);const EMOJI_AGGRESSIVE_ATTACK=["😈"].map(emojiId);const EMOJI_ATTACK=["😡"].map(emojiId);const EMOJI_WARSHIP_RETALIATION=["⛵"].map(emojiId);const EMOJI_NUKE=["☢️","💥"].map(emojiId);const EMOJI_GOT_INSULTED=["🖕","😡","🤡","😞","😭"].map(emojiId);const EMOJI_LOVE=["❤️","😊","🥰"].map(emojiId);const EMOJI_CONFUSED=["❓","🤡"].map(emojiId);const EMOJI_BRAG=["👑","🥇","💪"].map(emojiId);const EMOJI_CHARM_ALLIES=["🤝","😇","💪"].map(emojiId);const EMOJI_CLOWN=["🤡","🤦‍♂️"].map(emojiId);const EMOJI_RAT=["🐀"].map(emojiId);const EMOJI_OVERWHELMED=["💀","🆘","😱","🥺","😭","😞","🫡","👋"].map(emojiId);const EMOJI_CONGRATULATE=["👏"].map(emojiId);const EMOJI_SCARED_OF_THREAT=["🙏","🥺"].map(emojiId);const EMOJI_BORED=["🥱"].map(emojiId);const EMOJI_HANDSHAKE=["🤝"].map(emojiId);const EMOJI_DONATION_OK=["👍"].map(emojiId);const EMOJI_DONATION_TOO_SMALL=["❓","🥱"].map(emojiId);const EMOJI_GREET=["👋"].map(emojiId);const AllPlayers="AllPlayers";class EmojiBehavior{constructor(e,t,a){this.random=e;this.game=t;this.player=a;this.lastEmojiSent=new Map;this.gameOver=false}maybeSendCasualEmoji(){if(this.gameOver)return;this.checkOverwhelmedByAttacks();this.checkVerySmallAttack();this.congratulateWinner();this.brag();this.charmAllies();this.annoyTraitors();this.findRat();this.greetNearbyPlayers()}checkOverwhelmedByAttacks(){if(!this.random.chance(16))return;const e=this.player.incomingAttacks();if(e.length===0)return;const t=e.reduce((i,s)=>i+s.troops(),0);const a=this.player.troops();if(t>=a*3){this.sendEmoji(AllPlayers,EMOJI_OVERWHELMED)}}checkVerySmallAttack(){if(!this.random.chance(8))return;const e=this.player.incomingAttacks();if(e.length===0)return;const t=this.player.troops();if(t<=0)return;for(const a of e){const i=a.attacker();if(i.type()!==PlayerType.Human)continue;if(a.troops()<t*.1){this.maybeSendEmoji(i,this.random.chance(2)?EMOJI_CONFUSED:EMOJI_BORED)}}}congratulateWinner(){const e=this.game.getWinner();if(e===null)return;this.gameOver=true;const t=this.game.config().gameConfig().gameMode===GameMode.Team;if(t){if(e===this.player.team())return;this.sendEmoji(AllPlayers,EMOJI_CONGRATULATE)}else{if(typeof e==="string")return;const a=this.game.players().filter(i=>i.type()===PlayerType.Nation).sort((i,s)=>s.numTilesOwned()-i.numTilesOwned())[0];if(!a||a.smallID()!==this.player.smallID())return;this.sendEmoji(e,EMOJI_CONGRATULATE)}}brag(){if(!this.random.chance(300))return;const e=this.game.players().sort((t,a)=>a.numTilesOwned()-t.numTilesOwned());if(e.length===0||e[0].smallID()!==this.player.smallID())return;this.sendEmoji(AllPlayers,EMOJI_BRAG)}charmAllies(){if(!this.random.chance(250))return;const e=this.player.allies().filter(i=>i.type()===PlayerType.Human);if(e.length===0)return;const t=this.random.randElement(e);const a=this.random.chance(3)?EMOJI_LOVE:EMOJI_CHARM_ALLIES;this.sendEmoji(t,a)}annoyTraitors(){if(!this.random.chance(40))return;const e=this.game.players().filter(a=>a.type()===PlayerType.Human&&!a.isFriendly(this.player)&&a.isTraitor());if(e.length===0)return;const t=this.random.randElement(e);this.sendEmoji(t,EMOJI_CLOWN)}findRat(){if(this.game.ticks()<6e3)return;if(!this.random.chance(1e4))return;const e=this.game.numLandTiles();const t=e*.01;const a=this.game.players().filter(s=>s.type()===PlayerType.Human&&s.numTilesOwned()<t&&s.numTilesOwned()>0);if(a.length===0)return;const i=this.random.randElement(a);this.sendEmoji(i,EMOJI_RAT)}greetNearbyPlayers(){if(this.game.ticks()>600)return;if(!this.random.chance(250))return;const e=this.player.nearby().filter(a=>a.isPlayer()&&a.type()===PlayerType.Human);if(e.length===0)return;const t=this.random.randElement(e);this.sendEmoji(t,EMOJI_GREET)}maybeSendEmoji(e,t){if(!this.shouldSendEmoji(e))return;return this.sendEmoji(e,t)}maybeSendAttackEmoji(e){if(!this.shouldSendEmoji(e))return;if(this.player.relation(e)>=Relation.Neutral){if(!this.random.chance(2))return;this.sendEmoji(e,EMOJI_AGGRESSIVE_ATTACK);return}if(!this.random.chance(4))return;this.sendEmoji(e,EMOJI_ATTACK)}sendEmoji(e,t){if(!this.shouldSendEmoji(e,false))return;if(!this.canSendEmoji(e))return;const a=discoverCtors(getEventBus());if(!a.emoji)return;const i=e===AllPlayers?AllPlayers:e.__src??e;const s=this.random.randElement(t);return}canSendEmoji(e){const t=this.player.__src;if(t&&typeof t.canSendEmoji==="function"){const a=e===AllPlayers?AllPlayers:e.__src??e;try{return t.canSendEmoji(a)}catch(i){return true}}return true}shouldSendEmoji(e,t=true){if(e===AllPlayers)return true;if(this.player.type()===PlayerType.Bot)return false;if(e.type()!==PlayerType.Human)return false;if(t){const a=e.smallID();const i=this.lastEmojiSent.get(a)??-300;if(this.game.ticks()-i<=300)return false;this.lastEmojiSent.set(a,this.game.ticks())}return true}}function respondToEmoji(n,e,t,a,i){if(a===AllPlayers||a.type()!==PlayerType.Nation){return}if(!recipientCanSendEmoji(a,t))return;if(i==="🖕"){a.updateRelation(t,-100);e.randElement(EMOJI_GOT_INSULTED)}if(i==="🤡"){a.updateRelation(t,-10);e.randElement(EMOJI_CONFUSED)}if(["🕊️","🏳️","❤️","🥰","👏"].includes(i)){if(currentDifficulty()===Difficulty.Easy){a.updateRelation(t,15)}t.relation(a)>=Relation.Neutral?e.randElement(EMOJI_LOVE):e.randElement(EMOJI_CONFUSED)}}function respondToMIRV(n,e,t){if(!e.chance(8))return;if(!recipientCanSendEmoji(t,AllPlayers))return;e.randElement(EMOJI_OVERWHELMED)}function recipientCanSendEmoji(n,e){const t=n&&n.__src;if(t&&typeof t.canSendEmoji==="function"){const a=e===AllPlayers?AllPlayers:e&&e.__src||e;try{return t.canSendEmoji(a)}catch(i){return true}}return true}"use strict";const ALLIANCE_REQUEST_TYPES=new Set([15,16]);const RENEW_TYPES=new Set([22,24]);const _allianceBehaviorActioned=new WeakSet;function runAndCaptureAllianceCtor(n){const e=getEventBus();if(!e||typeof e.emit!=="function"||_ctors.allianceRequest){n();return}const t=e.emit;e.emit=function(a){try{if(a&&a.requestor!==void 0&&a.recipient!==void 0&&typeof a.constructor==="function"){_ctors.allianceRequest=a.constructor}}catch(i){}return t.call(this,a)};try{n()}finally{e.emit=t}}function getAllianceShapeCtors(n){if(_ctors.allianceShapeBus===n&&_ctors.allianceShape){return _ctors.allianceShape}const e=[];const t=getListenersMap(n);if(t){const a={__probe:1};const i={__probe:2};for(const s of t.keys()){if(typeof s!=="function")continue;try{const r=new s(a,i);if(r&&r.requestor===a&&r.recipient===i){e.push(s)}}catch(r){}}}_ctors.allianceShape=e;_ctors.allianceShapeBus=n;return e}function collectAllianceEvents(){const n=[];for(const e of["events-display","actionable-events"]){try{const t=document.querySelector(e);if(Array.isArray(t?.events))n.push(...t.events)}catch(t){}}try{if(typeof allianceRequestsPanelEvents!=="undefined"&&Array.isArray(allianceRequestsPanelEvents)){n.push(...allianceRequestsPanelEvents)}}catch(e){}return n}function pickAllianceButton(n,e,t){return n.find(a=>a?.className===e&&typeof a.action==="function")||(typeof n[t]?.action==="function"?n[t]:null)}class AllianceBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i}isRegularBot(e){if(!e)return false;try{if(typeof e.type==="function"&&e.type()==="BOT")return true;if(e.data&&e.data.playerType==="BOT")return true}catch(t){}return false}handleAllianceRequests(){if(this.game.config().disableAlliances())return;for(const e of this.incomingAllianceRequests()){const t=e.requestor();if(t&&this.isRegularBot(t)){e.reject();continue}if(typeof companionAllianceVeto==="function"&&companionAllianceVeto(t)){e.reject();continue}if(e.createdAt()<=this.game.config().numSpawnPhaseTurns()+1){e.reject();continue}if(this.getAllianceDecision(t,true)){e.accept()}else{e.reject()}}}handleAllianceRequestsFromBots(){for(const e of collectAllianceEvents()){try{const t=this.resolveEventPlayer(e);if(!t)continue;if(this.isRegularBot(t)){_allianceBehaviorActioned.add(e)}}catch(t){}}}handleAllianceExtensionRequests(){if(this.game.config().disableAlliances())return;for(const e of collectAllianceEvents()){const t=Number(e?.type);if(!RENEW_TYPES.has(t))continue;if(_allianceBehaviorActioned.has(e))continue;const a=Array.isArray(e.buttons)?e.buttons:[];if(a.length===0)continue;const i=this.resolveEventPlayer(e);if(!i||!i.isPlayer||!i.isPlayer())continue;if(typeof companionAllianceVeto==="function"&&companionAllianceVeto(i)){continue}if(!this.getAllianceDecision(i,true))continue;const s=pickAllianceButton(a,"btn",1);if(s){try{s.action();_allianceBehaviorActioned.add(e);setLastAction(tr("🔁 Renew alliance {name}",{name:safeName(i)}),"diplo")}catch(r){}}}}maybeSendAllianceRequests(e){if(this.game.config().disableAlliances())return;for(const t of e){if(this.random.chance(30)&&!(typeof companionAllianceVeto==="function"&&companionAllianceVeto(t))&&!this.isRegularBot(t)&&this.canSendAllianceRequest(t)&&this.getAllianceDecision(t,false)){const a=discoverCtors(getEventBus());if(a.allianceRequest){emitIntent(a.allianceRequest,this.player.__src??this.player,t.__src??t);setLastAction(tr("🤝➡️ Send alliance {name}",{name:safeName(t)}),"diplo")}}}}isFarNation(e){try{const t=e.smallID();for(const a of this.player.nearby()){if(a&&a.isPlayer&&a.isPlayer()&&a.smallID()===t){return false}}return true}catch(t){return false}}isDominantForDiplomacy(){if(!state.settings.winFixes)return false;if(typeof state.dominant==="boolean")return state.dominant;try{const e=String(this.game.config().gameConfig().gameMode)==="Team";const t=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const a=(this.game.numLandTiles()||0)-t;if(a<=0)return false;let i=0;if(e){for(const r of this.game.players()){try{if(r.isPlayer()&&this.player.isOnSameTeam(r)){i+=r.numTilesOwned()}}catch(o){}}}else{i=this.player.numTilesOwned()}const s=Number.isFinite(state.settings.factoryRailShare)?state.settings.factoryRailShare:.75;return i/a>s}catch(e){return false}}reachOutToFarNations(){const e=performance.now();const t=state.settings.farAllyThrottleMs||4e3;if(e-(state.lastFarAllyMs||0)<t)return;if(this.isDominantForDiplomacy())return;const a=discoverCtors(getEventBus());if(!a.allianceRequest)return;const i=this.player.smallID();const s=[];for(const o of this.game.players()){try{if(!o.isPlayer||!o.isPlayer())continue;if(o.smallID()===i)continue;if(!o.isAlive||!o.isAlive())continue;if(o.type()===PlayerType.Bot)continue;if(this.player.isFriendly(o)===true)continue;if(o.isTraitor&&o.isTraitor())continue;if(!this.isFarNation(o))continue;if(!this.canSendAllianceRequest(o))continue;s.push(o)}catch(l){}}if(s.length===0)return;const r=this.random.randElement(s);if(typeof companionAllianceVeto==="function"&&companionAllianceVeto(r))return;emitIntent(a.allianceRequest,this.player.__src??this.player,r.__src??r);setLastAction(tr("🤝➡️ Trade-ally {name}",{name:safeName(r)}),"diplo");state.lastFarAllyMs=e;ofhDebug("[Diplo] reach out far →",safeName(r))}getAllianceDecision(e,t){if(this.isRegularBot(e))return false;if(this.isConfused()){return this.random.chance(2)}if(e.isTraitor()&&this.random.nextInt(0,100)>=10){if(t&&this.random.chance(3)){this.emojiBehavior.sendEmoji(e,EMOJI_CONFUSED)}return false}if(state.settings.winFixes&&this.isFarNation(e)){if(this.isDominantForDiplomacy()){return false}if(t){ofhDebug("[Diplo] far accept →",safeName(e))}return true}if(this.hasTooManyAlliances(e)){return false}if(this.isAlliancePartnerThreat(e)){if(!t&&this.random.chance(6)){this.emojiBehavior.sendEmoji(e,EMOJI_SCARED_OF_THREAT)}if(t&&this.random.chance(6)){this.emojiBehavior.sendEmoji(e,EMOJI_LOVE)}return true}if(this.shouldRejectInTeamGame()){return false}if(this.player.relation(e)<Relation.Neutral){if(t&&this.random.chance(3)){this.emojiBehavior.sendEmoji(e,EMOJI_CONFUSED)}return false}if(this.isAlliancePartnerFriendly(e)){if(this.random.chance(3)){this.emojiBehavior.sendEmoji(e,EMOJI_HANDSHAKE)}return true}if(this.checkAlreadyEnoughAlliances(e)){return false}if(this.isEarlygame()){return true}return this.isAlliancePartnerSimilarlyStrong(e)}hasTooManyAlliances(e){const t=currentDifficulty();if(t!==Difficulty.Hard&&t!==Difficulty.Impossible){return false}const a=this.game.players().filter(s=>s.type()!==PlayerType.Bot).length;const i=e.alliances().length;if(t===Difficulty.Hard){return i>=a*.5}else{return i>=a*.25}}isConfused(){const e=currentDifficulty();switch(e){case Difficulty.Easy:return this.random.chance(10);case Difficulty.Medium:return this.random.chance(20);case Difficulty.Hard:return this.random.chance(40);case Difficulty.Impossible:return false;default:return assertNever(e)}}isEarlygame(){const e=this.game.config().numSpawnPhaseTurns();const t=currentDifficulty();switch(t){case Difficulty.Easy:return this.game.ticks()<3e3+e&&this.random.nextInt(0,100)>=10;case Difficulty.Medium:return this.game.ticks()<1800+e&&this.random.nextInt(0,100)>=30;case Difficulty.Hard:return this.game.ticks()<1800+e&&this.random.nextInt(0,100)>=50;case Difficulty.Impossible:return this.game.ticks()<600+e&&this.random.nextInt(0,100)>=70;default:return assertNever(t)}}isAlliancePartnerThreat(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:return false;case Difficulty.Medium:return e.troops()>this.player.troops()*2.5;case Difficulty.Hard:return e.troops()>this.player.troops()&&this.game.config().maxTroops(e)>this.game.config().maxTroops(this.player)*2;case Difficulty.Impossible:{const a=e.troops()>this.player.troops()*1.5;const i=e.troops()>this.player.troops()&&this.game.config().maxTroops(e)>this.game.config().maxTroops(this.player)*1.5;const s=e.troops()>this.player.troops()&&e.numTilesOwned()>this.player.numTilesOwned()*1.5;return a||i||s}default:return assertNever(t)}}shouldRejectInTeamGame(){if(this.game.config().gameConfig().gameMode!==GameMode.Team){return false}const e=currentDifficulty();switch(e){case Difficulty.Easy:return this.random.nextInt(0,100)<25;case Difficulty.Medium:return this.random.nextInt(0,100)<50;case Difficulty.Hard:return this.random.nextInt(0,100)<75;case Difficulty.Impossible:return true;default:return assertNever(e)}}checkAlreadyEnoughAlliances(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:return false;case Difficulty.Medium:return this.player.alliances().length>=this.random.nextInt(4,6);case Difficulty.Hard:case Difficulty.Impossible:{const a=this.player.nearby().filter(s=>s.isPlayer()&&s.type()!==PlayerType.Bot);const i=a.filter(s=>this.player?.isFriendly(s)===true);if(a.length>=2&&a.some(s=>s.smallID()===e.smallID())){return a.length<=i.length+1}if(t===Difficulty.Hard){return this.player.alliances().length>=this.random.nextInt(3,5)}return this.player.alliances().length>=this.random.nextInt(2,4)}default:return assertNever(t)}}isAlliancePartnerFriendly(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:case Difficulty.Medium:return this.player.relation(e)===Relation.Friendly;case Difficulty.Hard:return this.player.relation(e)===Relation.Friendly&&this.random.nextInt(0,100)>=17;case Difficulty.Impossible:return this.player.relation(e)===Relation.Friendly&&this.random.nextInt(0,100)>=33;default:return assertNever(t)}}isAlliancePartnerSimilarlyStrong(e){const t=currentDifficulty();const a={[Difficulty.Easy]:[60,70],[Difficulty.Medium]:[70,80],[Difficulty.Hard]:[75,85],[Difficulty.Impossible]:[80,90]};const i={[Difficulty.Easy]:[70,80],[Difficulty.Medium]:[80,90],[Difficulty.Hard]:[85,95],[Difficulty.Impossible]:[90,100]};const s=a[t];const r=i[t];const o=this.player.outgoingAttacks().reduce((g,m)=>g+m.troops(),0);const l=e.outgoingAttacks().reduce((g,m)=>g+m.troops(),0);const u=this.player.troops()+o;const c=e.troops()+l;const d=u*(this.random.nextInt(s[0],s[1])/100);const f=this.player.numTilesOwned()*(this.random.nextInt(r[0],r[1])/100);const h=c>d;const p=e.numTilesOwned()>f&&c>u*.5;return h||p}maybeBetray(e,t){if(state.settings.features&&state.settings.features.betray===false){return false}if(!this.player.isAlliedWith(e))return false;const a=currentDifficulty();if(a!==Difficulty.Easy&&a!==Difficulty.Medium){const i=this.game.config().maxTroops(e);const s=e.outgoingAttacks().reduce((r,o)=>r+o.troops(),0);if(e.troops()+s<i*.2&&e.troops()<this.player.troops()){this.betray(e);return true}}if((a===Difficulty.Easy||a===Difficulty.Medium)&&!(a===Difficulty.Easy&&e.type()===PlayerType.Human)&&this.player.troops()>=e.troops()*10){this.betray(e);return true}if(a!==Difficulty.Easy&&e.isTraitor()&&e.troops()<this.player.troops()*1.2){this.betray(e);return true}if(a!==Difficulty.Easy&&t===1&&e.troops()*3<this.player.troops()){this.betray(e);return true}return false}betray(e){if(!this.player.isAlliedWith(e))return;const t=getEventBus();if(!t)return;if(!_ctors.allianceRequest)return;const a=getAllianceShapeCtors(t);const i=a.find(s=>s!==_ctors.allianceRequest);if(!i)return;emitIntent(i,this.player.__src??this.player,e.__src??e);setLastAction(tr("🗡️ Betray {name}",{name:safeName(e)}),"diplo")}incomingAllianceRequests(){const e=[];const t=(()=>{try{return this.game.inSpawnPhase()===true}catch(a){return false}})();for(const a of collectAllianceEvents()){const i=Number(a?.type);if(!ALLIANCE_REQUEST_TYPES.has(i))continue;if(_allianceBehaviorActioned.has(a))continue;const s=Array.isArray(a.buttons)?a.buttons:[];if(s.length===0)continue;const r=this.resolveEventPlayer(a);if(!r||!r.isPlayer||!r.isPlayer())continue;let o=false;let l;const u=Number(a?.createdAt);if(Number.isFinite(u)){l=u}else if(t){l=0;o=true}else{l=(()=>{try{return this.game.ticks()}catch(c){return this.game.config().numSpawnPhaseTurns()+2}})()}e.push({__ev:a,__createdInSpawnPhase:o,requestor:()=>r,createdAt:()=>l,accept:()=>{const c=pickAllianceButton(s,"btn",1);if(!c)return;try{runAndCaptureAllianceCtor(()=>c.action());_allianceBehaviorActioned.add(a);setLastAction(tr("🤝 Alliance {name}",{name:safeName(r)}),"diplo")}catch(d){console.error("[AutoBot] alliance accept failed:",d)}},reject:()=>{const c=pickAllianceButton(s,"btn-info",2);if(!c)return;try{c.action();_allianceBehaviorActioned.add(a)}catch(d){}}})}return e}canSendAllianceRequest(e){const t=this.player.__src;if(t&&typeof t.canSendAllianceRequest==="function"){try{return t.canSendAllianceRequest(e.__src??e)}catch(a){}}try{if(e.isAlive&&e.isAlive()===false)return false;if(this.player.isAlliedWith(e))return false;if(this.player.isOnSameTeam&&this.player.isOnSameTeam(e)){return false}if(this.player.isRequestingAllianceWith&&this.player.isRequestingAllianceWith(e)){return false}}catch(a){return false}return true}resolveEventPlayer(e){const t=Number(e?.focusID);if(!Number.isFinite(t))return null;let a=null;try{a=this.game.playerBySmallID?this.game.playerBySmallID(t):null}catch(i){a=null}if(a&&a.isPlayer&&a.isPlayer())return a;try{for(const i of this.game.players()){if(i.smallID()===t)return i}}catch(i){}return null}}function assertNever(n){throw new Error("Unexpected difficulty: "+String(n))}"use strict";const MIRV_COOLDOWN_TICKS=300;class MirvBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i;this.recentMirvTargets=new Map}get hesitationOdds(){switch(currentDifficulty()){case Difficulty.Easy:return 2;case Difficulty.Medium:return 4;case Difficulty.Hard:return 8;case Difficulty.Impossible:return 16;default:return 16}}get victoryDenialTeamThreshold(){switch(currentDifficulty()){case Difficulty.Easy:return .9;case Difficulty.Medium:return .8;case Difficulty.Hard:return .7;case Difficulty.Impossible:return .6;default:return .6}}get victoryDenialIndividualThreshold(){switch(currentDifficulty()){case Difficulty.Easy:return .75;case Difficulty.Medium:return .65;case Difficulty.Hard:return .55;case Difficulty.Impossible:return .4;default:return .4}}get steamrollCityGapMultiplier(){switch(currentDifficulty()){case Difficulty.Easy:return 2;case Difficulty.Medium:return 1.5;case Difficulty.Hard:return 1.25;case Difficulty.Impossible:return 1.15;default:return 1.15}}get steamrollMinLeaderCities(){switch(currentDifficulty()){case Difficulty.Easy:return 20;case Difficulty.Medium:case Difficulty.Hard:return 10;case Difficulty.Impossible:return 8;default:return 8}}async considerMIRV(){if(this.player===null)throw new Error("not initialized");if(this.game.config().isUnitDisabled(UNIT.MIRV)){if(state.nukeReserveGold)state.nukeReserveGold=0n;return false}if(this.player.units(UNIT.MissileSilo).length===0){if(state.nukeReserveGold)state.nukeReserveGold=0n;return false}const e=await this.cost(UNIT.MIRV);if(state.settings.winFixes){if(this.teamHasWon()){if(state.nukeReserveGold)state.nukeReserveGold=0n;return false}const s=this.selectWinFixMirvTarget(e);if(s&&!this.wasRecentlyMirved(s)){if(this.player.gold()>=e){state.nukeReserveGold=0n;await this.maybeSendMIRV(s);return true}const r=state.settings.mirvEarlyGameTicks??6e3;if(this.game.ticks()>=r){state.nukeReserveGold=e}else if(state.nukeReserveGold){state.nukeReserveGold=0n}return false}if(state.nukeReserveGold)state.nukeReserveGold=0n}if(this.player.gold()<e){return false}const t=this.selectCounterMirvTarget();if(t&&!this.wasRecentlyMirved(t)){await this.maybeSendMIRV(t);return true}const a=this.selectVictoryDenialTarget();if(a&&!this.wasRecentlyMirved(a)){await this.maybeSendMIRV(a);return true}const i=this.selectSteamrollStopTarget();if(i&&!this.wasRecentlyMirved(i)){await this.maybeSendMIRV(i);return true}return false}selectCounterMirvTarget(){if(this.player===null)throw new Error("not initialized");const e=this.getValidMirvTargetPlayers().filter(t=>this.isInboundMIRVFrom(t));if(e.length===0)return null;e.sort((t,a)=>a.numTilesOwned()-t.numTilesOwned());return e[0]}selectVictoryDenialTarget(){if(this.player===null)throw new Error("not initialized");const e=this.game.numLandTiles();if(e===0)return null;let t=null;for(const a of this.getValidMirvTargetPlayers()){let i=0;const s=a.team();if(s!==null){const r=this.game.players().filter(u=>u.team()===s&&u.isPlayer());const o=r.map(u=>u.numTilesOwned()).reduce((u,c)=>u+c,0);const l=o/e;if(l>=this.victoryDenialTeamThreshold){let u=null;let c=-1;for(const d of r){const f=d.numTilesOwned();if(f>c){c=f;u=d}}if(u!==null&&u.smallID()===a.smallID()){i=l}else{i=0}}}else{const r=a.numTilesOwned()/e;if(r>=this.victoryDenialIndividualThreshold)i=r}if(i>0){if(t===null||i>t.severity)t={p:a,severity:i}}}return t?t.p:null}selectSteamrollStopTarget(){if(this.player===null)throw new Error("not initialized");const e=this.getValidMirvTargetPlayers();if(e.length===0)return null;const t=this.game.players().filter(r=>r.isPlayer()).map(r=>({p:r,cityCount:this.countCities(r)})).sort((r,o)=>o.cityCount-r.cityCount);if(t.length<2)return null;const a=t[0];if(a.cityCount<=this.steamrollMinLeaderCities)return null;const i=t[1].cityCount;const s=i*this.steamrollCityGapMultiplier;if(a.cityCount>=s){return e.some(r=>r.smallID()===a.p.smallID())?a.p:null}return null}teamHasWon(){if(this.player===null)return false;try{if(String(this.game.config().gameConfig().gameMode)!=="Team"){return false}}catch(s){return false}const e=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const t=(this.game.numLandTiles()||0)-e;if(t<=0)return false;let a=0;for(const s of this.game.players()){try{if(s.isPlayer()&&this.player.isOnSameTeam(s)){a+=s.numTilesOwned()}}catch(r){}}let i=.95;try{const s=Number(this.game.config().percentageTilesOwnedToWin());if(Number.isFinite(s))i=s/100}catch(s){}if(Number.isFinite(state.settings.teamWonShare)){i=state.settings.teamWonShare}return a/t>i}selectWinFixMirvTarget(e){if(this.player===null)return null;const t=this.getValidMirvTargetPlayers().filter(l=>l.isAlive());if(t.length===0)return null;const a=this.game.numLandTiles()||1;const i=state.settings.mirvTargetMinShare??.35;const s=state.settings.mirvTargetTopN??3;const r=new Set(this.game.players().filter(l=>l.isAlive()).sort((l,u)=>u.numTilesOwned()-l.numTilesOwned()).slice(0,s).map(l=>l.smallID()));const o=t.filter(l=>r.has(l.smallID())&&l.numTilesOwned()/a>i).sort((l,u)=>u.numTilesOwned()-l.numTilesOwned());return o.length>0?o[0]:null}wasRecentlyMirved(e){const t=this.recentMirvTargets.get(e.id());if(t===void 0)return false;return this.game.ticks()-t<MIRV_COOLDOWN_TICKS}recordMirvHit(e){this.recentMirvTargets.set(e.id(),this.game.ticks())}getValidMirvTargetPlayers(){if(this.player===null)throw new Error("not initialized");return this.game.players().filter(e=>{return e.smallID()!==this.player.smallID()&&e.isPlayer()&&e.type()!==PlayerType.Bot&&!this.player.isOnSameTeam(e)})}isInboundMIRVFrom(e){if(this.player===null)throw new Error("not initialized");const t=e.units(UNIT.MIRV);for(const a of t){const i=a.targetTile();if(!i)continue;if(!this.game.hasOwner(i))continue;const s=this.game.owner(i);if(s&&s.isPlayer&&s.isPlayer()&&s.smallID()===this.player.smallID()){return true}}return false}async maybeSendMIRV(e){if(this.player===null)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e);const t=await this.calculateTerritoryCenter(e);if(!t)return;let a;try{a=await withTimeout(this.player.buildables(t,[UNIT.MIRV]),WORKER_TIMEOUT_MS,null)}catch(s){return}const i=Array.isArray(a)?a.find(s=>s.type===UNIT.MIRV):null;if(i===null||i===void 0)return;if(i.canBuild!==false&&this.player.gold()>=i.cost){const s=getBuildMenu();if(!s||typeof s.sendBuildOrUpgrade!=="function")return;s.sendBuildOrUpgrade(i,t);this.recordMirvHit(e);if(state.settings.winFixes){if(!Array.isArray(state.recentMirvHits))state.recentMirvHits=[];state.recentMirvHits.push({sid:e.smallID(),tile:t,at:this.game.ticks()})}state.stats.nukes++;setLastAction(tr("☢️ MIRV"),"nuke");this.emojiBehavior.sendEmoji(AllPlayers,EMOJI_NUKE);respondToMIRV(this.game,this.random,e)}}countCities(e){return e.unitCount(UNIT.City)}async calculateTerritoryCenter(e){let t;try{const h=await withTimeout(e.borderTilesAsync(),WORKER_TIMEOUT_MS,null);t=h&&h.borderTiles?h.borderTiles:h}catch(h){return null}if(!t)return null;const a=Array.from(t);if(a.length===0)return null;let i=Infinity,s=-Infinity;let r=Infinity,o=-Infinity;for(const h of a){const p=this.game.x(h);const g=this.game.y(h);if(p<i)i=p;if(p>s)s=p;if(g<r)r=g;if(g>o)o=g}const l=Math.floor((i+s)/2);const u=Math.floor((r+o)/2);const c=this.game.ref(l,u);if(this.game.hasOwner(c)&&this.game.ownerID(c)===e.smallID()){return c}let d=null;let f=Infinity;for(const h of a){const p=this.game.x(h)-l;const g=this.game.y(h)-u;const m=p*p+g*g;if(m<f){f=m;d=h}}return d}async cost(e){if(this.player===null)throw new Error("not initialized");const t=this.player.borderTiles();const a=t&&t.size>0?t.values().next().value:null;if(a===null||a===void 0)return 0n;let i;try{i=await withTimeout(this.player.buildables(a,[e]),WORKER_TIMEOUT_MS,null)}catch(r){return 0n}const s=Array.isArray(i)?i.find(r=>r.type===e):null;return s&&s.cost!==void 0&&s.cost!==null?s.cost:0n}}"use strict";class WarshipBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i;this.trackedTransportShips=new Set;this.trackedTradeShips=new Set;this.trackedIncomingTransportShips=new Set;this.dealtWithTransportShip=new Set}indexById(e){const t=new Map;for(const a of e)t.set(a.id(),a);return t}async maybeSpawnWarship(){if(this.player===null)throw new Error("not initialized");if(this.game.config().isUnitDisabled(UNIT.Warship)){return false}if(!this.random.chance(50)){return false}const e=this.player.units(UNIT.Port);const t=this.player.units(UNIT.Warship);if(e.length>0&&t.length===0&&this.player.gold()>this.cost(UNIT.Warship)){const a=this.random.randElement(e);const i=this.warshipSpawnTile(a.tile(),250);if(i===null){return false}const s=await this.buildableWarship(i);if(s===null||s===void 0||s.canBuild===false){return false}const r=getBuildMenu();if(!r||typeof r.sendBuildOrUpgrade!=="function"){return false}r.sendBuildOrUpgrade(s,i);state.stats.builds++;setLastAction(tr("🚢 Deploy warship"),"naval");return true}return false}warshipSpawnTile(e,t){for(let a=0;a<50;a++){const i=this.random.nextInt(this.game.x(e)-t,this.game.x(e)+t);const s=this.random.nextInt(this.game.y(e)-t,this.game.y(e)+t);if(!this.game.isValidCoord(i,s)){continue}const r=this.game.ref(i,s);if(!this.game.isWater(r)){continue}return r}return null}trackShipsAndRetaliate(){this.trackTransportShipsAndRetaliate();this.trackTradeShipsAndRetaliate();this.trackIncomingTransportsAndRetaliate()}trackTransportShipsAndRetaliate(){if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return}this.player.units(UNIT.TransportShip).forEach(t=>this.trackedTransportShips.add(t.id()));const e=this.indexById(this.game.units(UNIT.TransportShip));for(const t of Array.from(this.trackedTransportShips)){const a=e.get(t);const i=a!==void 0&&a.isActive();if(!i){if(a!==void 0&&typeof a.wasDestroyedByEnemy==="function"&&typeof a.destroyer==="function"&&a.wasDestroyedByEnemy()&&a.destroyer()!==void 0){this.maybeRetaliateWithWarship(a.tile(),a.destroyer(),"transport")}this.trackedTransportShips.delete(t)}}}trackTradeShipsAndRetaliate(){this.player.units(UNIT.TradeShip).forEach(t=>this.trackedTradeShips.add(t.id()));const e=this.indexById(this.game.units(UNIT.TradeShip));for(const t of Array.from(this.trackedTradeShips)){const a=e.get(t);if(a===void 0||!a.isActive()){this.trackedTradeShips.delete(t);continue}if(a.owner().id()!==this.player.id()){this.maybeRetaliateWithWarship(a.tile(),a.owner(),"trade");this.trackedTradeShips.delete(t)}}}trackIncomingTransportsAndRetaliate(){this.game.units(UNIT.TransportShip).filter(t=>{const a=t.targetTile();return a&&t.isActive()&&!t.transportShipState()?.isRetreating&&this.game.ownerID(a)===this.player?.smallID()&&t.owner().smallID()!==this.player?.smallID()}).forEach(t=>this.trackedIncomingTransportShips.add(t.id()));const e=this.indexById(this.game.units(UNIT.TransportShip));for(const t of Array.from(this.trackedIncomingTransportShips)){const a=e.get(t);const i=a!==void 0?a.targetTile():void 0;if(a===void 0||!a.isActive()||i===void 0||a.transportShipState()?.isRetreating){this.trackedIncomingTransportShips.delete(t);this.dealtWithTransportShip.delete(t);continue}if(this.dealtWithTransportShip.has(t)){continue}const s=this.game.manhattanDist(a.tile(),i);if(s<20){this.dealtWithTransportShip.add(t);continue}if(!a.owner().isAlliedWith(this.player)){if(this.game.hasUnitNearby(i,90,UNIT.Warship,this.player.id(),true)||this.player.units(UNIT.Warship).filter(o=>{const l=o.warshipState().patrolTile;return l!==void 0&&this.game.manhattanDist(i,l)<90}).length>0){this.dealtWithTransportShip.add(t);continue}const r=this.warshipSpawnTile(i,30);if(r===null)continue;this.maybeRetaliateWithWarship(r,a.owner(),"transport");this.dealtWithTransportShip.add(t);break}}}maybeRetaliateWithWarship(e,t,a){if(t.smallID()===this.player.smallID()){return}if(this.player.units(UNIT.Warship).length>=10){this.maybeMoveWarship(e);return}const i=currentDifficulty();if(i===Difficulty.Medium&&this.random.nextInt(0,100)<15||i===Difficulty.Hard&&this.random.nextInt(0,100)<50||i===Difficulty.Impossible&&this.random.nextInt(0,100)<100){void this._retaliateBuildAsync(e,t,a)}}async _retaliateBuildAsync(e,t,a){try{const i=await this.buildableWarship(e);if(i===null||i===void 0||i.canBuild===false){this.maybeMoveWarship(e);return}const s=getBuildMenu();if(!s||typeof s.sendBuildOrUpgrade!=="function"){this.maybeMoveWarship(e);return}s.sendBuildOrUpgrade(i,e);state.stats.builds++;setLastAction(tr("🚢 Retaliate warship"),"naval");this.emojiBehavior.maybeSendEmoji(t,EMOJI_WARSHIP_RETALIATION);this.player.updateRelation(t,a==="trade"?-7.5:-15)}catch(i){}}maybeMoveWarship(e){if(this.game.isWater(e)){const t=this.player.units(UNIT.Warship).filter(a=>{const i=a.warshipState().patrolTile;return i!==void 0&&this.game.manhattanDist(a.tile(),i)<130}).sort((a,i)=>{const s=this.game.manhattanDist(a.tile(),e);const r=this.game.manhattanDist(i.tile(),e);return s-r})[0];if(t){const a=discoverCtors(getEventBus());if(a.moveWarship){emitIntent(a.moveWarship,[t.id()],e)}}}}async counterWarshipInfestation(){if(!this.shouldCounterWarshipInfestation()){return}const e=this.player.team()!==null;if(!this.isRichPlayer(e)){return}const t=this.findWarshipInfestationCounterTarget(e);if(t!==null){await this.buildCounterWarship(t)}}shouldCounterWarshipInfestation(){if(this.game.config().isUnitDisabled(UNIT.Warship)){return false}const e=currentDifficulty();if(e!==Difficulty.Hard&&e!==Difficulty.Impossible){return false}if(this.game.unitCount(UNIT.Warship)<=10){return false}if(this.cost(UNIT.Warship)>this.player.gold()){return false}if(this.player.units(UNIT.Port).length===0){return false}if(this.player.units(UNIT.Warship).length>=10){return false}return true}isRichPlayer(e){const t=this.game.players().filter(i=>{if(i.type()===PlayerType.Human)return false;return e?i.team()===this.player.team():true});const a=t.sort((i,s)=>Number(s.gold()-i.gold())).slice(0,3);return a.some(i=>i.id()===this.player.id())}findWarshipInfestationCounterTarget(e){return e?this.findTeamGameWarshipTarget():this.findFreeForAllWarshipTarget()}findTeamGameWarshipTarget(){const e=new Map;for(const t of this.game.players()){if(this.player.isFriendly(t)||t.id()===this.player.id()){continue}const a=t.team();if(a===null)continue;const i=a.toString();const s=t.units(UNIT.Warship).length;if(!e.has(i)){e.set(i,{count:0,team:i,players:[]})}const r=e.get(i);r.count+=s;r.players.push(t)}for(const[,t]of e.entries()){if(t.count>15){const a=t.players.reduce((i,s)=>{const r=s.units(UNIT.Warship).length;const o=i?i.units(UNIT.Warship).length:0;return r>o?s:i},null);if(a){const i=a.units(UNIT.Warship);if(i.length>3){return{player:a,warship:this.random.randElement(i)}}}}}return null}findFreeForAllWarshipTarget(){const e=this.game.players().filter(t=>!this.player.isFriendly(t)&&t.id()!==this.player.id());for(const t of e){const a=t.units(UNIT.Warship);if(a.length>10){return{player:t,warship:this.random.randElement(a)}}}return null}async buildCounterWarship(e){const t=e.warship.tile();const a=await this.buildableWarship(t);if(a===null||a===void 0||a.canBuild===false){this.maybeMoveWarship(t);return}const i=getBuildMenu();if(!i||typeof i.sendBuildOrUpgrade!=="function"){this.maybeMoveWarship(t);return}i.sendBuildOrUpgrade(a,t);state.stats.builds++;setLastAction(tr("🚢 Counter warship"),"naval");this.emojiBehavior.sendEmoji(AllPlayers,EMOJI_WARSHIP_RETALIATION)}async buildableWarship(e){let t;try{t=await withTimeout(this.player.buildables(e,[UNIT.Warship]),WORKER_TIMEOUT_MS,null)}catch(a){return null}return Array.isArray(t)?t.find(a=>a.type===UNIT.Warship)??null:null}cost(e){if(e===UNIT.Warship){const t=this.player.unitsOwned(UNIT.Warship);return BigInt(Math.min(1e6,(t+1)*25e4))}return 0n}ensureSmartState(){return this.smartState=this.smartState||{transportPos:new Map,tradePos:new Map,losses:[],raids:[],cooldown:new Map,serviced:new Map,lastPassMs:0}}smartWarshipPatrol(){if(this.player===null)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.ensureSmartState();const t=performance.now();const a=state.settings.warshipPatrolThrottleMs||1500;if(t-e.lastPassMs<a)return;e.lastPassMs=t;const i=this.game.ticks();const s=this.player.smallID();const r=this.player.id();const o=this.indexById(this.game.units(UNIT.TransportShip));for(const y of this.player.units(UNIT.TransportShip)){try{const b=y.targetTile?y.targetTile():null;e.transportPos.set(y.id(),{x:this.game.x(y.tile()),y:this.game.y(y.tile()),tx:b!=null?this.game.x(b):null,ty:b!=null?this.game.y(b):null})}catch(b){}}const l=state.settings.warshipLossMinDist||25;for(const[y,b]of Array.from(e.transportPos)){const v=o.get(y);const T=v!==void 0&&v.isActive()&&v.owner().smallID()===s;if(T)continue;if(b.tx!=null&&b.ty!=null){const x=Math.abs(b.x-b.tx)+Math.abs(b.y-b.ty);if(x>l)e.losses.push({x:b.x,y:b.y,at:i})}e.transportPos.delete(y)}const u=this.indexById(this.game.units(UNIT.TradeShip));for(const y of this.player.units(UNIT.TradeShip)){try{e.tradePos.set(y.id(),{x:this.game.x(y.tile()),y:this.game.y(y.tile())})}catch(b){}}for(const[y]of Array.from(e.tradePos)){const b=u.get(y);if(b===void 0||!b.isActive()){e.tradePos.delete(y);continue}if(b.owner().id()!==r){try{e.raids.push({x:this.game.x(b.tile()),y:this.game.y(b.tile()),at:i})}catch(v){}e.tradePos.delete(y)}}const c=state.settings.warshipLossWindowTicks||900;const d=state.settings.warshipRaidWindowTicks||400;e.losses=e.losses.filter(y=>i-y.at<=c);e.raids=e.raids.filter(y=>i-y.at<=d);const f=[];const h=this.findInvasionThreat();if(h!==null)f.push(h);if(e.raids.length>0){const y=e.raids[e.raids.length-1];if(this.game.isValidCoord(y.x,y.y)){const b=this.game.ref(y.x,y.y);if(this.game.isWater(b)){f.push({tile:b,kind:"trade-lane"})}}}const p=this.findLossZone(e.losses);if(p!==null)f.push({tile:p,kind:"loss-zone"});if(f.length===0)return;const g=state.settings.warshipServiceCellSize||40;const m=state.settings.warshipZoneServiceTicks||90;for(const[y,b]of Array.from(e.serviced)){if(i-b>m)e.serviced.delete(y)}for(const y of f){const b=Math.floor(this.game.x(y.tile)/g)+","+Math.floor(this.game.y(y.tile)/g);const v=e.serviced.get(b);if(v!==void 0&&i-v<m)continue;if(this.moveBestWarshipTo(y.tile,y.kind,e,i)){e.serviced.set(b,i);break}}}findInvasionThreat(){const e=this.player.smallID();let t=null;let a=Infinity;for(const i of this.game.units(UNIT.TransportShip)){try{if(!i.isActive())continue;const s=i.targetTile();if(s==null)continue;if(i.transportShipState&&i.transportShipState()?.isRetreating)continue;if(this.game.ownerID(s)!==e)continue;if(i.owner().smallID()===e)continue;if(i.owner().isAlliedWith(this.player))continue;const r=this.game.manhattanDist(i.tile(),s);if(r<20)continue;if(this.game.hasUnitNearby(s,90,UNIT.Warship,this.player.id(),true)){continue}if(r<a){a=r;t=i.tile()}}catch(s){}}return t===null?null:{tile:t,kind:"invasion"}}findLossZone(e){const t=state.settings.warshipLossZoneMin||2;const a=state.settings.warshipLossZoneRadius||35;if(e.length<t)return null;let i=null;let s=0;for(const r of e){let o=0;let l=0;let u=0;for(const c of e){if(Math.abs(r.x-c.x)+Math.abs(r.y-c.y)<=a){o+=c.x;l+=c.y;u++}}if(u>=t&&u>s){const c=Math.round(o/u);const d=Math.round(l/u);if(this.game.isValidCoord(c,d)){const f=this.game.ref(c,d);if(this.game.isWater(f)){s=u;i=f}}}}return i}moveBestWarshipTo(e,t,a,i){if(!this.game.isWater(e))return false;const s=state.settings.warshipMoveMaxDist||160;const r=state.settings.warshipMoveCooldownTicks||60;const o=this.game.getWaterComponent(e);const l=this.player.units(UNIT.Warship).filter(d=>{try{const f=d.warshipState();const h=f?f.patrolTile:void 0;if(h===void 0)return false;if(f.state!==void 0&&f.state!=="patrolling")return false;if(this.game.manhattanDist(d.tile(),h)>=130)return false;if(this.game.getWaterComponent(d.tile())!==o)return false;const p=a.cooldown.get(d.id());if(p!==void 0&&i-p<r)return false;return true}catch(f){return false}});if(l.length===0)return false;l.sort((d,f)=>this.game.manhattanDist(d.tile(),e)-this.game.manhattanDist(f.tile(),e));const u=l[0];if(this.game.manhattanDist(u.tile(),e)>s)return false;const c=discoverCtors(getEventBus());if(!c.moveWarship)return false;if(!emitIntent(c.moveWarship,[u.id()],e))return false;a.cooldown.set(u.id(),i);setLastAction(tr("🚢 Patrol → {k}",{k:t}),"naval");ofhDebug("[Warship] patrol →",t,"@",this.game.x(e),this.game.y(e));return true}computeNukeRemainingTicks(e,t){try{if(typeof UniversalPathFinding==="undefined"||!UniversalPathFinding.Parabola||e===void 0||e===null||t===void 0||t===null){return null}const a=this.game.config?.().defaultNukeSpeed?.()??8;const i=UniversalPathFinding.Parabola(this.game,{increment:a,distanceBasedHeight:true,directionUp:true});const s=i.findPath(e,t);if(!Array.isArray(s)||s.length===0)return null;if(s.length===1)return 1;let r=0;for(let o=1;o<s.length;o++){const l=this.game.x(s[o]);const u=this.game.y(s[o]);const c=this.game.x(s[o-1]);const d=this.game.y(s[o-1]);r+=Math.hypot(l-c,u-d)}return Math.floor(r/(a>0?a:8))+1}catch(a){return null}}nukeEtaTicks(e,t){const a=e.type?.();if(a===UNIT.MIRVWarhead)return 0;const i=e.id?.();if(i===void 0)return 0;if(!this.nukeEtaById)this.nukeEtaById=new Map;let s=this.nukeEtaById.get(i);if(s===void 0){let r=this.computeNukeRemainingTicks(e.tile?.(),e.targetTile?.());if(r===null){try{const o=this.game.config?.().defaultNukeSpeed?.()??8;const l=this.game.euclideanDistSquared(e.tile(),e.targetTile());r=Math.floor(Math.sqrt(l)/(o>0?o:8))+1}catch(o){r=1}}s={firstTick:t,remainTicks:r};this.nukeEtaById.set(i,s)}return Math.max(0,s.remainTicks-(t-s.firstTick))}nukeOuterRadius(e){try{const t=this.game.config().nukeMagnitudes(e.type());const a=Number(t?.outer??t?.inner);if(Number.isFinite(a)&&a>0)return a}catch(t){}return e.type&&e.type()===UNIT.HydrogenBomb?160:70}findNukeEscapeTile(e,t,a,i){let s=null;let r=Infinity;for(const p of a){const g=e-p.tx;const m=t-p.ty;const y=g*g+m*m;if(y<r){r=y;s=p}}if(s===null)return null;const o=state.settings.warshipNukeDodgeBuffer||20;const l=Math.max(1,state.settings.warshipNukeDodgeSamples||8);const u=Math.max(1,state.settings.warshipNukeDodgeRings||3);let c=Math.atan2(t-s.ty,e-s.tx);if(!Number.isFinite(c))c=0;let d=null;let f=-Infinity;let h=Infinity;for(let p=1;p<=u;p++){const g=s.radius+o*p;for(let m=0;m<l;m++){const y=Math.ceil(m/2);const b=m%2===0?1:-1;const v=c+b*y*(Math.PI/4);const T=Math.round(s.tx+Math.cos(v)*g);const x=Math.round(s.ty+Math.sin(v)*g);if(!this.game.isValidCoord(T,x))continue;const I=this.game.ref(T,x);if(!this.game.isWater(I))continue;const M=i(T,x);const _=Math.abs(T-e)+Math.abs(x-t);if(M>f||M===f&&_<h){f=M;h=_;d=I}}}if(d===null)return null;return{tile:d,eta:f}}dodgeNukes(){if(this.player===null)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.player.units(UNIT.Warship);if(e.length===0)return;const t=this.game.ticks();const a=state.settings.warshipNukeDodgeMargin||8;const i=[];const s=new Set;for(const u of this.game.units(UNIT.AtomBomb,UNIT.HydrogenBomb,UNIT.MIRVWarhead)){try{if(!u.isActive())continue;const c=u.targetTile();if(c===void 0||c===null)continue;const d=u.id?.();if(d!==void 0)s.add(d);const f=this.nukeOuterRadius(u)+a;i.push({tx:this.game.x(c),ty:this.game.y(c),radius:f,r2:f*f,owner:u.owner()?.smallID?.(),eta:this.nukeEtaTicks(u,t)})}catch(c){}}if(this.nukeEtaById&&this.nukeEtaById.size>0){for(const u of Array.from(this.nukeEtaById.keys())){if(!s.has(u))this.nukeEtaById.delete(u)}}if(i.length===0)return;const r=(u,c)=>{let d=Infinity;for(const f of i){const h=u-f.tx;const p=c-f.ty;if(h*h+p*p<=f.r2&&f.eta<d)d=f.eta}return d};const o=performance.now();if(o-(this._dodgeLogAtMs||0)>1e3){this._dodgeLogAtMs=o;const u=this.player.smallID();ofhDebug("[Warship] nuke-dodge scan:",i.length,"zone(s)",i.map(c=>({owner:c.owner,mine:c.owner===u,eta:c.eta})))}const l=this.ensureSmartState();for(const u of e){try{const c=u.tile();const d=this.game.x(c);const f=this.game.y(c);const h=r(d,f);if(h===Infinity)continue;const p=this.findNukeEscapeTile(d,f,i,r);if(p===null)continue;if(p.eta<=h)continue;const g=u.warshipState().patrolTile;if(g!==void 0&&r(this.game.x(g),this.game.y(g))>=p.eta){continue}const m=discoverCtors(getEventBus());if(!m.moveWarship)continue;emitIntent(m.moveWarship,[u.id()],p.tile);l.cooldown.set(u.id(),t);setLastAction(tr("🚢 Dodge nuke"),"naval")}catch(c){}}}simulateBattle(e,t,a,i){if(t.length===0)return{win:true,survivalPct:100};if(e.length===0)return{win:false,survivalPct:0};const s=this.game;const r=typeof s.config==="function"&&typeof s.config().warshipTargettingRange==="function"?s.config().warshipTargettingRange():8;const o=typeof s.config==="function"&&typeof s.config().unitInfo==="function"?s.config().unitInfo("Shell"):null;const l=o?o.damage||250:250;const u=typeof s.config==="function"&&typeof s.config().warshipShellAttackRate==="function"?s.config().warshipShellAttackRate():20;const c=(_,k)=>{try{const N=s.config();return typeof N[_]==="function"?N[_]():k}catch(N){return k}};const d=c("warshipVeterancyHealthBonus",20);const f=c("warshipVeterancyShellDamageBonus",20);const h=_=>{try{const k=_.warshipState();const N=k?k.veterancy:0;return typeof N==="number"&&N>0?N:0}catch(k){return 0}};const p=_=>a*(100+d*h(_))/100;const g=_=>l*(100+f*h(_))/100/Math.max(1,u);const m=e.length;const y=new Array(m);for(let _=0;_<m;_++){const k=e[_];const N=i?s.manhattanDist(i,k.tile()):r;y[_]={hp:k.health(),dps:g(k),engageTick:Math.max(0,N-r)}}const b=t.length;const v=new Array(b);for(let _=0;_<b;_++){const k=t[_];const N=i?s.manhattanDist(i,k.tile()):r;v[_]={hp:k.health(),dps:g(k),engageTick:Math.max(0,N-r)}}let T=0;while(T<1e3){let _=0,k=Infinity;for(let O=0;O<m;O++){if(y[O].hp>.01){_++;if(y[O].engageTick<k)k=y[O].engageTick}}let N=0,B=Infinity;for(let O=0;O<b;O++){if(v[O].hp>.01){N++;if(v[O].engageTick<B)B=v[O].engageTick}}if(N===0||_===0)break;const G=y.filter(O=>O.hp>.01&&O.engageTick<=T);const V=v.filter(O=>O.hp>.01&&O.engageTick<=T);if(G.length===0&&V.length===0){const O=Math.min(k,B);if(O>T&&O!==Infinity){T=O;continue}}if(G.length>0&&V.length>0){let O=0,C=0;for(let F=0;F<G.length;F++)O+=G[F].dps;for(let F=0;F<V.length;F++)C+=V[F].dps;V.sort((F,J)=>F.hp-J.hp);G.sort((F,J)=>F.hp-J.hp);for(let F=0;F<V.length&&O>0;F++){const J=Math.min(V[F].hp,O);V[F].hp-=J;O-=J}for(let F=0;F<G.length&&C>0;F++){const J=Math.min(G[F].hp,C);G[F].hp-=J;C-=J}}T++}let x=0,I=0;for(let _=0;_<m;_++){if(y[_].hp>.01){x++;I+=Math.max(0,y[_].hp)}}let M=0;for(let _=0;_<b;_++){if(v[_].hp>.01)M++}if(x>0&&M===0){let _=0;for(let k=0;k<e.length;k++)_+=p(e[k]);return{win:true,survivalPct:I/_*100}}return{win:false,survivalPct:0}}findSafeWaypoint(e,t,a){const i=this.game;const s=i.getWaterComponent(e);const r=30;const o=[{tile:e,depth:0}];let l=0;const u=new Set;u.add(e);let c=e;let d=-Infinity;while(l<o.length){const{tile:f,depth:h}=o[l++];let p=Infinity;for(const M of a){const _=i.manhattanDist(f,M.tile());if(_<p)p=_}const g=t?i.manhattanDist(f,t):0;const m=15;const y=Math.min(p,m)*50;const b=-g;let v=0;const T=i.neighbors(f);for(const M of T){if(i.isWater(M))v++}const x=(4-v)*15;const I=y+b-x;if(I>d){d=I;c=f}if(h>=r)continue;for(const M of T){if(i.isWater(M)&&i.getWaterComponent(M)===s&&!u.has(M)){u.add(M);o.push({tile:M,depth:h+1})}}}return c}smartWarshipCombat(){if(this.player===null)return;if(!state.settings.winFixes)return;if(!state.settings.features.warship)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.game;const t=this.player;const a=t.smallID();const i=this.ensureSmartState();const s=performance.now();const r=state.settings.warshipCombatThrottleMs||800;if(s-(i.lastCombatPassMs||0)<r)return;i.lastCombatPassMs=s;const o=[];for(const b of t.units(UNIT.Warship)){try{if(b.isActive()&&!b.isUnderConstruction())o.push(b)}catch(v){}}if(o.length===0)return;const l=typeof e.unitInfo==="function"?e.unitInfo("Warship"):null;const u=l?l.maxHealth||1e3:1e3;let c=(state.settings.warshipRetreatHealthPct||0)/100;if(!c){try{const b=e.config();c=typeof b.warshipRetreatHealthPercent==="function"?b.warshipRetreatHealthPercent()/100:.75}catch(b){c=.75}}const d=e.units(UNIT.Warship)||[];const f=[];for(const b of d){try{const v=b.owner();if(!v||v.smallID()===a)continue;if(b.isActive()&&!b.isUnderConstruction()&&!v.isFriendly(t)){f.push(b)}}catch(v){}}const h=state.settings.warshipHuntTrade!==false;const p=[];if(h){const b=e.units(UNIT.TradeShip)||[];for(const v of b){try{const T=v.owner();if(!T||T.smallID()===a)continue;if(v.isActive()&&!T.isFriendly(t))p.push(v)}catch(T){}}}let g=null;const m=[];const y=e.units(UNIT.Port)||[];for(const b of y){try{const v=b.owner();if(!b.isActive()||b.isUnderConstruction()||!v)continue;const T=v.smallID()===a;const x=!T&&typeof v.isOnSameTeam==="function"&&v.isOnSameTeam(t);if(T||x)m.push(b)}catch(v){}}if(m.length>0){let b=m[0],v=Infinity;for(const T of m){const x=e.manhattanDist(o[0].tile(),T.tile());if(x<v){v=x;b=T}}for(const T of e.neighbors(b.tile())){if(e.isWater(T)){g=T;break}}if(g===null)g=b.tile()}for(const b of o){try{const v=b.id();const T=i.cooldown.get(v);if(T!==void 0&&e.ticks()-T<3)continue;const x=b.health();const I=typeof b.maxHealth==="function"?b.maxHealth():u;const M=b.warshipState();const _=M&&(M.state==="retreating"||M.state==="docked");if(_)continue;const k=(()=>{try{const O=e.config();return typeof O.warshipTargettingRange==="function"?O.warshipTargettingRange():130}catch(O){return 130}})();const N=k*k;const B=[];for(const O of f){try{const C=O.warshipState();if(C&&C.state==="docked")continue;if(e.euclideanDistSquared(b.tile(),O.tile())<=N)B.push(O)}catch(C){}}let G=false;if(B.length>0&&state.settings.warshipEvade!==false){const O=o.filter(F=>{try{const J=F.warshipState();if(J&&(J.state==="retreating"||J.state==="docked"))return false;return e.euclideanDistSquared(b.tile(),F.tile())<=N}catch(J){return false}});const C=this.simulateBattle(O,B,I,b.tile());if(!C.win||C.survivalPct<15)G=true}let V=null;if(x<I*c){if(G&&B.length>0){V=this.findSafeWaypoint(b.tile(),g,B)}else{V=g}}else if(G&&B.length>0){V=this.findSafeWaypoint(b.tile(),g,B)}else if(!G&&B.length>0){let O=null,C=Infinity;for(const F of B){if(F.health()<C){C=F.health();O=F}}if(O)V=O.tile()}else if(h&&p.length>0){let O=p[0],C=Infinity;for(const F of p){const J=e.manhattanDist(b.tile(),F.tile());if(J<C){C=J;O=F}}V=O.tile()}if(V!==null){const O=M?M.patrolTile:void 0;const C=20;const F=O===void 0||e.manhattanDist(O,V)>C;let J=true;try{J=e.getWaterComponent(V)===e.getWaterComponent(b.tile())}catch(ue){J=true}if(F&&J){this.moveWarship(b,V);i.cooldown.set(v,e.ticks())}}}catch(v){}}}moveWarship(e,t){try{const a=typeof discoverCtors==="function"?discoverCtors(getEventBus()):{};if(a.moveWarship){emitIntent(a.moveWarship,[e.id()],t)}}catch(a){}}}"use strict";const SAM_RATIO_BY_DIFFICULTY={[Difficulty.Easy]:.15,[Difficulty.Medium]:.2,[Difficulty.Hard]:.25,[Difficulty.Impossible]:.3};function getStructureRatios(n){const e=Boolean(state.settings.economyFirst);const t=e?2:.75;const a=e?.05:1;return{[UNIT.Port]:{ratioPerCity:t,perceivedCostIncreasePerOwned:a},[UNIT.Factory]:{ratioPerCity:t,perceivedCostIncreasePerOwned:a},[UNIT.SAMLauncher]:{ratioPerCity:SAM_RATIO_BY_DIFFICULTY[n],perceivedCostIncreasePerOwned:.3},[UNIT.MissileSilo]:{ratioPerCity:.2,perceivedCostIncreasePerOwned:1}}}const CITY_PERCEIVED_COST_INCREASE_PER_OWNED=1;const FACTORY_COASTAL_RATIO_MULTIPLIER=.33;const MAX_MISSILE_SILOS=3;const SAM_PER_HOSTILE_SILO_LEVEL=.75;const SAM_MAX_LEVELS=24;const INCOME_WINDOW_TICKS=600;const INCOME_MIN_SPAN_TICKS=300;function sampleBotIncome(n,e){let t;let a;try{t=Number(n.ticks());a=Number(e.gold())}catch(o){return}if(!Number.isFinite(t)||!Number.isFinite(a))return;const i=state.income;const s=i.samples[i.samples.length-1];if(s&&s.tick===t)return;if(i.lastGold!==null&&a>i.lastGold)i.earned+=a-i.lastGold;i.lastGold=a;i.samples.push({tick:t,earned:i.earned,gold:a});const r=t-INCOME_WINDOW_TICKS;while(i.samples.length>1&&i.samples[0].tick<r)i.samples.shift()}function incomeWindow(){const n=state.income;if(!n||n.samples.length<2)return null;const e=n.samples[0];const t=n.samples[n.samples.length-1];const a=t.tick-e.tick;if(a<INCOME_MIN_SPAN_TICKS)return null;return{first:e,last:t,dt:a}}function estimatedGoldPerMinute(){const n=incomeWindow();if(n===null)return 0;return(n.last.earned-n.first.earned)/n.dt*600}function mirvReserveHold(n){if(!state.settings.winFixes)return 0n;if(state.settings.economyFirst)return 0n;let e=0n;let t=0n;try{e=BigInt(state.nukeReserveGold||0);t=BigInt(n||0)}catch(a){return 0n}if(e<=0n||t<=0n)return 0n;return e}const SAFE_PLACEMENT_RANGE_MULT=3;const SAFE_WEIGHT_THREAT=40;const SAFE_WEIGHT_TEAM=25;const SAFE_WEIGHT_SEPARATION=60;const SAFE_WEIGHT_SAM_MAGNET=50;const SAM_MAGNET_MAX_LEVEL=5;const SAM_MAGNET_FULL_LEVELS=4;const SAM_MAGNET_HALF_WEIGHT=5;const SAFE_WEIGHT_SAM_UMBRELLA=90;const UMBRELLA_TRUST_ALLY=.5;const UMBRELLA_FRONT_FLOOR=.35;const UMBRELLA_RELEASE_SLOTS=3;const SAFE_WEIGHT_DEPTH=120;const DEEP_PROBE_TILES=200;const DEEP_FRONT_SAMPLE=32;const MAX_SPAWN_PROBES=40;const SAM_PROTECT_WEIGHT={};SAM_PROTECT_WEIGHT[UNIT.Port]=2.5;SAM_PROTECT_WEIGHT[UNIT.Factory]=2.5;SAM_PROTECT_WEIGHT[UNIT.City]=1;SAM_PROTECT_WEIGHT[UNIT.MissileSilo]=1;function samProtectWeight(n){const e=SAM_PROTECT_WEIGHT[n];return typeof e==="number"&&e>0?e:1}function collectSamMagnets(n){const e=[];let t=0;try{t=Number(n.config().nukeMagnitudes(UNIT.HydrogenBomb).outer)||0}catch(i){return e}if(t<=0)return e;let a=[];try{a=n.units(UNIT.SAMLauncher)||[]}catch(i){return e}for(const i of a){try{if(i.isUnderConstruction&&i.isUnderConstruction())continue;const s=Number(i.level&&i.level())||1;if(s>=SAM_MAGNET_MAX_LEVEL)continue;const r=Number(n.config().samRange(s))||0;if(r<=0||r>=t)continue;e.push({tile:i.tile(),level:s,innerSq:r*r,outerSq:t*t})}catch(s){}}return e}function samMagnetExposure(n,e,t){let a=0;for(const i of e){let s;try{s=n.euclideanDistSquared(t,i.tile)}catch(r){continue}if(!Number.isFinite(s))continue;if(s>i.innerSq&&s<=i.outerSq)a+=i.level}return a}function collectFriendlyUmbrellas(n,e,t){const a=[];let i=[];let s;try{i=n.units(UNIT.SAMLauncher)||[];s=n.config()}catch(o){return a}if(!s||typeof s.samRange!=="function")return a;const r=e.smallID();for(const o of i){try{if(o.isUnderConstruction&&o.isUnderConstruction())continue;const l=o.owner&&o.owner();if(!l)continue;const u=l.smallID?l.smallID():null;let c=0;if(u!==null&&u===r)c=1;else if(u!==null&&t.has(u))c=1;else if(e.isFriendly(l)===true)c=UMBRELLA_TRUST_ALLY;if(c<=0)continue;const d=Number(o.level&&o.level())||1;const f=Number(s.samRange(d))||0;if(f<=0)continue;a.push({tile:o.tile(),level:d,range:f,trust:c})}catch(l){}}return a}const BLAST_PAIR_TYPES=[UNIT.City,UNIT.Factory,UNIT.Port,UNIT.MissileSilo,UNIT.SAMLauncher,UNIT.DefensePost];const DP_SPACING_TIERS=[1,.8,.6,0];const DEFENSE_POST_INCOME_MINUTES=1;const DEFENSE_POST_MAX=12;const FIRST_MISSILE_SILO_RATIO=.4;const UPGRADE_DENSITY_THRESHOLD=1/1500;const TILES_PER_CITY_EQUIVALENT=2e3;const HIGH_NATION_DENSITY_THRESHOLD=1/7500;const HIGH_STARTING_GOLD_THRESHOLD=3000000n;const HIGH_GOLD_STRUCTURE_COOLDOWN_TICKS=[0,0,250,150,100];const TEAM_POST_SAVE_UP_PHASE_TICKS=150;const UNDER_ATTACK_THREAT_RATIO=.35;const DEFENSE_POST_RATIO_PER_POST=.4;const DP_SPEED_MIN_WINDOW_TICKS=20;const DP_SPEED_EMA=.5;const DP_FRONT_SAMPLE_CAP=64;const DP_ETA_SAFETY=1.6;const DP_ETA_MARGIN_TICKS=20;const DP_SPEAR_TOPK=3;const DP_ACCEL_MULT=1.5;const DP_BIG_ATTACK_RATIO=1;const DP_MAX_DEPTH_SPACINGS=4;const STRUCTURES_TYPES=[UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory];function autoBotBuildAllowed(n){const e=state.settings&&state.settings.buildStructures;return!e||e[n]!==false}function shimCanTrade(n,e){if(n==null||e==null)return false;if(n.id()===e.id())return false;return!n.hasEmbargoAgainst(e)&&!e.hasEmbargoAgainst(n)}function shimSharedWaterComponents(n,e){try{if(typeof n.sharedWaterComponents==="function"){return n.sharedWaterComponents(e)}}catch(t){}return null}class StationUnionFind{constructor(){this.parent=new Map}add(e){if(!this.parent.has(e))this.parent.set(e,e)}find(e){let t=e;while(this.parent.get(t)!==t)t=this.parent.get(t);let a=e;while(this.parent.get(a)!==t){const i=this.parent.get(a);this.parent.set(a,t);a=i}return t}union(e,t){const a=this.find(e);const i=this.find(t);if(a!==i)this.parent.set(a,i)}}class StructureBehavior{constructor(e,t,a){this.random=e;this.game=t;this.player=a;this.reachableStationsCache=null;this._sharedWaterComponents=null;this.lastStructureTick=null;this.placementsCount=0;this._hasHighStartingGold=null;this._postSaveUpStartTick=null}ownedLevels(e){let t=0;for(const a of this.player.units(e)){if(a.isUnderConstruction()){t+=1}else{t+=a.level()}}return t}getEnemyFrontTiles(){const e=this.game;const t=this.player;const a=new Set;try{for(const s of e.players()){if(!s.isPlayer()||!s.isAlive())continue;if(s.smallID()===t.smallID())continue;if(t.isFriendly(s))continue;if(state.settings.defensePostPlayersOnly&&s.type()===PlayerType.Bot){continue}a.add(s.smallID())}}catch(s){return[]}if(a.size===0)return[];const i=[];e:for(const s of t.borderTiles()){for(const r of e.neighbors(s)){if(!e.hasOwner(r)||!e.isLand(r))continue;if(a.has(e.ownerID(r))){i.push(s);continue e}}}return i}affordableDefensePosts(){const e=estimatedGoldPerMinute();if(!(e>0))return 0;const t=e*DEFENSE_POST_INCOME_MINUTES;let a=0;let i=0;while(a<DEFENSE_POST_MAX){const s=Math.min(25e4,(a+1)*5e4);if(i+s>t)break;i+=s;a+=1}return a}async handleStructures(){const e=this.placementsCount>0&&!this.game.config().isUnitDisabled(UNIT.DefensePost);if(e&&this.defensePostNeeded()){this.dpDeclinedOnTiming=false;if(await this.tryBuildDefensePost()){return true}if(!this.dpDeclinedOnTiming){return false}}if(this.isOnStructureCooldown()){return false}if(this.isInPostSaveUpBlockedPhase()){return false}const t=await this.doHandleStructures();if(!t&&e&&state.settings.defensePosts){if(await this.tryBuildDefensePost()){return true}}if(t){this.lastStructureTick=this.game.ticks();this.placementsCount++}return t}async tryBuildDefensePost(){if(!autoBotBuildAllowed(UNIT.DefensePost))return false;const e=currentDifficulty();if(e===Difficulty.Easy)return false;if(e===Difficulty.Medium&&!this.random.chance(2)){return false}const t=this.player;const a=this.dpLandAttacks();const i=Boolean(state.settings.defensePosts);if(a.length===0&&!i)return false;const s=t.troops();if(s<=0&&!i)return false;const r=a.reduce((T,x)=>T+x.troops(),0);const o=s>0?r/s:0;let l=0;if(a.length>0&&o>=UNDER_ATTACK_THREAT_RATIO){l=e===Difficulty.Medium?1:Math.ceil(o/DEFENSE_POST_RATIO_PER_POST)}let u=[];let c=0;if(i){u=this.getEnemyFrontTiles();if(u.length>0)c=this.affordableDefensePosts()}const d=Math.max(l,c);if(d<=0)return false;const f=a.length>0?this.getAttackFrontTiles(a):[];const h=f.length>0?f:u;if(h.length===0)return false;let p=null;let g=0;let m=null;if(f.length>0&&state.settings.defensePostTiming){const T=this.measureAttackFrontSpeed(f,a);if(T===null){this.dpDeclinedOnTiming=true;return false}const x=o>=DP_BIG_ATTACK_RATIO;if(T>0||x){const I=typeof getConstructionDuration==="function"?getConstructionDuration(this.game,UNIT.DefensePost):100;const M=I*DP_ETA_SAFETY+DP_ETA_MARGIN_TICKS;const{borderSpacing:_}=this.spacingConstants();let k=T*M;if(x){k=Math.max(k,_)}if(k>_*DP_MAX_DEPTH_SPACINGS){ofhDebug("[DPost] front advancing "+T.toFixed(2)+" tiles/tick — no site can finish a post in time, keeping the gold");this.dpDeclinedOnTiming=true;return false}g=k;m=this.dpSubsample(f);const N=Math.ceil(_*.75);if(k>N){const B=Math.ceil(k);p={min:B,max:B+N};ofhDebug("[DPost] front "+T.toFixed(2)+" tiles/tick, build "+I+"t → placing ≥"+B+" tiles back")}}}if(this.countDefensePostsNearFront(h,d,p?p.max:void 0)>=d){return false}const y=this.cost(UNIT.DefensePost);if(t.gold()<y)return false;const b=this.sampleTilesNearFront(h,25,UNIT.DefensePost,p);let v=b;if(g>0&&m&&m.length>0){const T=this.game;const x=[];for(const I of b){let M=Infinity;for(const k of m){const N=T.euclideanDistSquared(I,k);if(N<M)M=N}const _=Math.sqrt(M);if(_>=g)x.push([_,I])}x.sort((I,M)=>M[0]-I[0]);v=x.map(I=>I[1]);if(v.length===0){ofhDebug("[DPost] no candidate deep enough to finish in time — keeping the gold");this.dpDeclinedOnTiming=true;return false}}for(const T of v){const x=await this.buildableFor(UNIT.DefensePost,T);if(x===null||x.canBuild===false)continue;const I=getBuildMenu();if(!I||typeof I.sendBuildOrUpgrade!=="function"){return false}I.sendBuildOrUpgrade(x,x.canBuild);state.stats.builds++;setLastAction(tr("🛡️ Defense post"),"build");return true}return false}dpLandAttacks(){let e=this.player.incomingAttacks().filter(t=>this.isLandAttack(t));if(state.settings.defensePostPlayersOnly){e=e.filter(t=>{try{const a=t.attacker();if(!a||!a.isPlayer||!a.isPlayer())return true;return a.type()!==PlayerType.Bot}catch(a){return true}})}return e}defensePostNeeded(){const e=currentDifficulty();if(e===Difficulty.Easy)return false;const t=this.dpLandAttacks();if(t.length===0)return false;const a=this.player.troops();if(a<=0)return false;const i=t.reduce((s,r)=>s+r.troops(),0);return i/a>=UNDER_ATTACK_THREAT_RATIO}isLandAttack(e){if(e.hasSourceTile&&e.hasSourceTile()){return e.sourceTile()===null}const t=e.attacker();if(!t||!(t.isPlayer&&t.isPlayer()))return true;return this.player.sharesBorderWith(t)}getAttackFrontTiles(e){const t=this.game;const a=this.player;const i=new Set(e.map(r=>{const o=r.attacker();return o&&o.isPlayer&&o.isPlayer()?o.smallID():null}).filter(r=>r!==null));if(i.size===0)return[];const s=[];e:for(const r of a.borderTiles()){for(const o of t.neighbors(r)){const l=t.hasOwner(o)?t.ownerID(o):null;if(l!==null&&i.has(l)){s.push(r);continue e}}}return s}measureAttackFrontSpeed(e,t){const a=this.game;let i;try{i=Number(a.ticks())}catch(y){return 0}if(!Number.isFinite(i))return 0;if(this._dpSpeed&&i<this._dpSpeed.tick)this._dpSpeed=void 0;let s=0;const r=[];for(const y of t){try{const b=y.attacker();if(b&&b.isPlayer&&b.isPlayer()){s+=b.numTilesOwned();r.push(b.smallID())}}catch(b){}}const o=r.sort().join(",");const l=this._dpSpeed;if(!l){this._dpSpeed={tick:i,sample:this.dpSubsample(e),attTiles:s,sids:o,ema:null,inst:null,pess:null};return null}const u=i-l.tick;if(u<DP_SPEED_MIN_WINDOW_TICKS){return l.pess!==void 0?l.pess:l.ema}const c=this.dpSubsample(e);const d=[];for(const y of c){let b=Infinity;for(const v of l.sample){const T=a.euclideanDistSquared(y,v);if(T<b)b=T}if(Number.isFinite(b))d.push(Math.sqrt(b))}d.sort((y,b)=>y-b);let f=0;if(d.length>0){const y=Math.min(DP_SPEAR_TOPK,d.length);let b=0;for(let v=d.length-y;v<d.length;v++)b+=d[v];f=b/y}const h=l.sids!==o||s>l.attTiles;const p=h?f/u:0;const g=l.ema===null?p:l.ema*(1-DP_SPEED_EMA)+p*DP_SPEED_EMA;let m=Math.max(p,g);if(l.inst!==null&&l.inst!==void 0&&p>l.inst){m*=DP_ACCEL_MULT}this._dpSpeed={tick:i,sample:c,attTiles:s,sids:o,ema:g,inst:p,pess:m};return m}dpSubsample(e){const t=Math.max(1,Math.floor(e.length/DP_FRONT_SAMPLE_CAP));const a=[];for(let i=0;i<e.length;i+=t)a.push(e[i]);return a}dpTangentSeparation(){const{borderSpacing:e}=this.spacingConstants();let t=e;try{const a=this.game.config();const i=Number(a.defensePostRange?a.defensePostRange():0);if(Number.isFinite(i)&&i>t)t=i}catch(a){}return 2*Math.max(1,t)}countDefensePostsNearFront(e,t,a){if(e.length===0)return 0;const i=this.game;const{borderSpacing:s}=this.spacingConstants();const r=Math.max(s*1.5,(a||0)+2);const o=r**2;const l=Math.ceil(s*.75);const u=s*DP_MAX_DEPTH_SPACINGS+l;let c=null;let d=0;for(const f of this.player.units(UNIT.DefensePost)){const h=f.tile();let p=Infinity;for(const m of e){const y=i.euclideanDistSquared(h,m);if(y<p)p=y;if(p<=o)break}let g=p<=o;if(!g&&Number.isFinite(p)){const m=Math.sqrt(p);if(m<=u){const y=m-l;if(y<=0){g=true}else{if(c===null){try{c=Array.from(this.player.borderTiles())}catch(v){c=[]}}const b=y*y;g=true;for(const v of c){if(i.euclideanDistSquared(h,v)<b){g=false;break}}}}}if(g){d++;if(t!==void 0&&d>=t)return d}}return d}sampleTilesNearFront(e,t,a,i){const s=this.game;const r=this.player;if(e.length===0){return[]}const{borderSpacing:o}=this.spacingConstants();const l=i?i.min:Math.ceil(o*.75);const u=i?i.max:Math.ceil(o*1.5);const c=u;const d=r.borderTiles();const f=r.smallID();const h=i&&e.length>0?e:d;const p=(_,k)=>{let N=Infinity;for(const B of _){const G=s.euclideanDistSquared(B,k);if(G<N)N=G}return Math.sqrt(N)};const g=Math.ceil(o*.75);const m=i?_=>p(h,_):_=>closestTile(s,d,_)[1];const y=i?_=>p(d,_)>=Math.min(g,l):()=>true;const b=this.dpTangentSeparation();const v=r.units(UNIT.DefensePost).map(_=>_.tile());const T=(_,k)=>{if(k<=0)return true;for(const N of v){if(s.euclideanDistSquared(_,N)<k)return false}return true};for(let _=0;_<DP_SPACING_TIERS.length;_++){const k=DP_SPACING_TIERS[_];const N=b*k;const B=N*N;let G=e;if(v.length>0&&B>0){const O=e.filter(C=>T(C,B));if(O.length>0)G=O}const V=[];for(let O=0;O<t*6&&V.length<t;O++){const C=this.random.randElement(G);const F=s.x(C);const J=s.y(C);const ue=this.random.nextInt(F-c,F+c+1);const S=this.random.nextInt(J-c,J+c+1);if(!s.isValidCoord(ue,S))continue;const P=s.ref(ue,S);if(s.ownerID(P)!==f)continue;const q=m(P);if(q<l||q>u)continue;if(!y(P))continue;if(!T(P,B))continue;V.push(P)}if(V.length>0){if(k<1){ofhDebug("[DPost] tangent spacing "+Math.round(b)+" unsatisfiable here — relaxed to "+Math.round(N)+"; a shield inside a neighbour's blast beats no shield")}return V}}const x=[];const I=b*DP_SPACING_TIERS[Math.max(0,DP_SPACING_TIERS.length-2)];const M=I*I;for(let _=0;_<t*4&&x.length<t;_++){const k=this.random.randElement(e);const N=s.x(k);const B=s.y(k);const G=this.random.nextInt(N-c,N+c+1);const V=this.random.nextInt(B-c,B+c+1);if(!s.isValidCoord(G,V))continue;const O=s.ref(G,V);if(s.ownerID(O)!==f)continue;if(M>0&&!T(O,M))continue;x.push(O)}if(x.length===0){for(let _=0;_<t*4&&x.length<t;_++){const k=this.random.randElement(e);const N=s.x(k);const B=s.y(k);const G=this.random.nextInt(N-c,N+c+1);const V=this.random.nextInt(B-c,B+c+1);if(!s.isValidCoord(G,V))continue;const O=s.ref(G,V);if(s.ownerID(O)!==f)continue;x.push(O)}}return x}isOnStructureCooldown(){if(this.lastStructureTick===null||!this.hasHighStartingGold()){return false}const e=HIGH_GOLD_STRUCTURE_COOLDOWN_TICKS[this.placementsCount]??0;if(e===0){return false}return this.game.ticks()-this.lastStructureTick<e}isInPostSaveUpBlockedPhase(){if(state.settings.economyFirst){return false}if(this.game.config().isUnitDisabled(UNIT.MissileSilo)){return false}const e=this.getSaveUpTarget();if(this._postSaveUpStartTick===null){if(this.player.gold()<e){return false}this._postSaveUpStartTick=this.game.ticks()}const t=this.game.ticks()-this._postSaveUpStartTick;return t%(TEAM_POST_SAVE_UP_PHASE_TICKS*2)>=TEAM_POST_SAVE_UP_PHASE_TICKS}async doHandleStructures(){this.reachableStationsCache=null;const e=this.game.config();const t=e.isUnitDisabled(UNIT.City);const a=t?Math.max(1,Math.floor(this.player.numTilesOwned()/TILES_PER_CITY_EQUIVALENT)):this.ownedLevels(UNIT.City);this._sharedWaterComponents=shimSharedWaterComponents(this.game,this.player);const i=this._sharedWaterComponents!==null;this._dominant=false;if(state.settings.winFixes){const u=this.dominanceShare();const c=Number.isFinite(state.settings.factoryRailShare)?state.settings.factoryRailShare:.75;this._dominant=u!==null&&u>c;try{const d=this.game.ticks();if(d-(state._buildDomDiagTick||-999)>=80){state._buildDomDiagTick=d;ofhDebug("[Build] dominance gate",{share:u===null?null:Number(u.toFixed(3)),trigger:c,dominant:this._dominant})}}catch(d){}}state.dominant=this._dominant;const s=!e.isUnitDisabled(UNIT.MissileSilo);const r=currentDifficulty();if(this.placementsCount===0&&(r===Difficulty.Hard||r===Difficulty.Impossible)&&!e.isUnitDisabled(UNIT.AtomBomb)&&s&&!e.isUnitDisabled(UNIT.SAMLauncher)&&this.hasHighStartingGold()&&await this.maybeSpawnStructure(UNIT.SAMLauncher)){return true}if(!t&&this.ownedLevels(UNIT.City)===0&&this.isHighNationDensity()){const u=i&&!e.isUnitDisabled(UNIT.Port)?UNIT.Port:UNIT.Factory;if(!e.isUnitDisabled(u)&&await this.maybeSpawnStructure(u)){return true}}const o=[UNIT.Port,UNIT.Factory,UNIT.SAMLauncher,UNIT.MissileSilo];if(state.settings.samDefense&&!e.isUnitDisabled(UNIT.SAMLauncher)&&this.ownedLevels(UNIT.SAMLauncher)<this.samThreatLevels(a)){o.splice(o.indexOf(UNIT.SAMLauncher),1);o.unshift(UNIT.SAMLauncher)}const l=!e.isUnitDisabled(UNIT.AtomBomb)||!e.isUnitDisabled(UNIT.HydrogenBomb)||!e.isUnitDisabled(UNIT.MIRV);for(const u of o){if(e.isUnitDisabled(u)){continue}if(u===UNIT.Port&&!i){continue}if(!l&&(u===UNIT.MissileSilo||u===UNIT.SAMLauncher)){continue}if(!s&&u===UNIT.SAMLauncher){continue}if(this.shouldBuildStructure(u,a,i)){if(await this.maybeSpawnStructure(u)){return true}}}if(!t&&await this.maybeSpawnStructure(UNIT.City)){return true}return false}hasHighStartingGold(){if(this._hasHighStartingGold===null){const e=this.player.__src??this.player;const t={playerType:this.player.type(),isLobbyCreator:typeof e.isLobbyCreator==="function"?e.isLobbyCreator():false};this._hasHighStartingGold=this.game.config().startingGold(t)>=HIGH_STARTING_GOLD_THRESHOLD}return this._hasHighStartingGold}isHighNationDensity(){const e=this.game.numLandTiles();if(e<=0)return false;return this.game.nations().length/e>HIGH_NATION_DENSITY_THRESHOLD}dominanceShare(){if(this.player===null)return null;let e=false;try{e=String(this.game.config().gameConfig().gameMode)==="Team"}catch(s){return null}const t=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const a=(this.game.numLandTiles()||0)-t;if(a<=0)return null;let i=0;if(e){for(const s of this.game.players()){try{if(s.isPlayer()&&this.player.isOnSameTeam(s)){i+=s.numTilesOwned()}}catch(r){}}}else{i=this.player.numTilesOwned()}return i/a}samTargetParts(e){let t=-1;try{t=Number(this.game.ticks())}catch(i){t=-1}if(this._samPartsTick===t&&this._samParts)return this._samParts;const a=this.computeSamTargetParts(e);this._samPartsTick=t;this._samParts=a;return a}peakHostileCoalitionCapacity(e){if(!e||e.length===0)return 0;const t=e.map((r,o)=>o);const a=r=>{while(t[r]!==r){t[r]=t[t[r]];r=t[r]}return r};for(let r=0;r<e.length;r+=1){for(let o=r+1;o<e.length;o+=1){if(this.sameCoalition(e[r].player,e[o].player)){const l=a(r);const u=a(o);if(l!==u)t[u]=l}}}const i=new Map;for(let r=0;r<e.length;r+=1){const o=a(r);i.set(o,(i.get(o)||0)+e[r].capacity)}let s=0;for(const r of i.values()){if(r>s)s=r}return s}sameCoalition(e,t){try{const a=e.team?e.team():null;const i=t.team?t.team():null;if(a!=null&&i!=null&&a===i)return true}catch(a){}try{return e.isFriendly(t)===true}catch(a){return true}}samThreatLevels(e){const t=this.samTargetParts(e);return Math.max(0,Math.min(t.threat,t.protectables,SAM_MAX_LEVELS))}samTargetLevels(e){const t=this.samTargetParts(e);if(!state.settings.samDefense)return t.stock;const a=Math.max(t.stock,t.threat,t.peerAvg);return Math.max(t.stock,Math.min(a,t.protectables,SAM_MAX_LEVELS))}computeSamTargetParts(e){const t=getStructureRatios(currentDifficulty())[UNIT.SAMLauncher];const a=Math.floor(e*t.ratioPerCity);const i={stock:a,threat:0,peerAvg:0,protectables:a};if(!state.settings.samDefense)return i;const s=this.game;const r=this.player;const o=[];let l=0;let u=0;try{for(const p of s.players()){if(!p.isPlayer()||!p.isAlive())continue;if(p.type()===PlayerType.Bot)continue;u+=1;for(const m of p.units(UNIT.SAMLauncher))l+=m.level();if(p.smallID()===r.smallID()||r.isFriendly(p))continue;let g=0;for(const m of p.units(UNIT.MissileSilo))g+=m.level();if(g>0)o.push({player:p,capacity:g})}}catch(p){return i}const c=this.peakHostileCoalitionCapacity(o);const d=Math.ceil(c*SAM_PER_HOSTILE_SILO_LEVEL);const f=u>0?Math.ceil(l/u):0;let h=0;try{for(const p of r.units(UNIT.City,UNIT.Port,UNIT.Factory,UNIT.MissileSilo)){h+=Math.max(1,p.level())}}catch(p){h=a}return{stock:a,threat:d,peerAvg:f,protectables:h}}shouldBuildStructure(e,t,a){const i=this.game.config();const s=currentDifficulty();const r=getStructureRatios(s);const o=r[e];if(o===void 0){return false}let l=o.ratioPerCity;if(e===UNIT.Factory&&a&&!i.isUnitDisabled(UNIT.Port)&&!this._dominant){l*=FACTORY_COASTAL_RATIO_MULTIPLIER}const u=this.ownedLevels(e);if(e===UNIT.MissileSilo&&u>=MAX_MISSILE_SILOS){return false}if(e===UNIT.MissileSilo&&u===0){l=FIRST_MISSILE_SILO_RATIO}const c=e===UNIT.SAMLauncher?this.samTargetLevels(t):Math.floor(t*l);return u<c}cost(e){switch(e){case UNIT.Port:{const t=this.ownedLevels(UNIT.Port)+this.ownedLevels(UNIT.Factory);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.Factory:{const t=this.ownedLevels(UNIT.Factory)+this.ownedLevels(UNIT.Port);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.City:{const t=this.ownedLevels(UNIT.City);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.SAMLauncher:{const t=this.ownedLevels(UNIT.SAMLauncher);return BigInt(Math.min(3e6,(t+1)*15e5))}case UNIT.MissileSilo:return 1000000n;case UNIT.DefensePost:{const t=this.ownedLevels(UNIT.DefensePost);return BigInt(Math.min(25e4,(t+1)*5e4))}case UNIT.AtomBomb:return 750000n;case UNIT.HydrogenBomb:return 5000000n;case UNIT.MIRV:return 25000000n;case UNIT.Warship:{const t=this.ownedLevels(UNIT.Warship);return BigInt(Math.min(1e6,(t+1)*25e4))}default:return 0n}}async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=mirvReserveHold(a);a=a>i?a-i:0n;if(a<t){return false}const s=this.player.units(e);if(this.getTotalStructureDensity()>UPGRADE_DENSITY_THRESHOLD&&this.game.config().unitInfo(e).upgradable){if(await this.maybeUpgradeStructure(s)){return true}if(s.length>0){return false}}const r=await this.structureSpawnTile(e);if(r===null){return false}const o=getBuildMenu();if(!o||typeof o.sendBuildOrUpgrade!=="function"){return false}o.sendBuildOrUpgrade(r,r.canBuild);state.stats.builds++;setLastAction(tr("🏗️ Build {type}",{type:e}),"build");return true}getPerceivedCost(e){const t=this.cost(e);const a=this.getSaveUpTarget();if(a===0n||this.player.gold()>=a){return t}const i=this.ownedLevels(e);let s;if(e===UNIT.City){s=state.settings.economyFirst?.05:CITY_PERCEIVED_COST_INCREASE_PER_OWNED}else{const o=currentDifficulty();const l=getStructureRatios(o);const u=l[e];s=u&&u.perceivedCostIncreasePerOwned!==void 0?u.perceivedCostIncreasePerOwned:.1}const r=1+s*i;return BigInt(Math.ceil(Number(t)*r))}getSaveUpTarget(){const e=this.game.config();if(state.settings.economyFirst){if(!state.settings.features.nuke)return 0n;return this.cost(UNIT.AtomBomb)*6n}if(e.isUnitDisabled(UNIT.MissileSilo)){return this.cost(UNIT.SAMLauncher)}if(this.game.config().gameConfig().gameMode===GameMode.Team){return this.cost(UNIT.HydrogenBomb)}const t=!e.isUnitDisabled(UNIT.MIRV);const a=!e.isUnitDisabled(UNIT.HydrogenBomb);const i=!e.isUnitDisabled(UNIT.AtomBomb);if(t){return this.cost(UNIT.MIRV)+this.cost(UNIT.HydrogenBomb)}if(a){return this.cost(UNIT.HydrogenBomb)*5n}if(i){return this.cost(UNIT.AtomBomb)*20n}return this.cost(UNIT.SAMLauncher)}async maybeUpgradeStructure(e){if(this.getTotalStructureDensity()<=UPGRADE_DENSITY_THRESHOLD){return false}if(e.length===0){return false}const t=await this.findBestStructureToUpgrade(e);if(t!==null){const a=getBuildMenu();if(!a||typeof a.sendBuildOrUpgrade!=="function"){return false}a.sendBuildOrUpgrade(t.bu);state.stats.builds++;setLastAction(tr("⬆️ Upgrade {type}",{type:t.structure.type()}),"build");return true}return false}getTotalStructureDensity(){const e=this.player.numTilesOwned();return e>0?this.player.units(...STRUCTURES_TYPES).length/e:0}async findBestStructureToUpgrade(e){const t=this.game;if(e.length===0){return null}const a=[];const i=new Map;for(const c of e){const d=await this.buildableFor(c.type(),c.tile());if(d!==null&&d.canUpgrade!==false){a.push(c);i.set(c.id(),d)}}if(a.length===0){return null}const s=c=>({structure:c,bu:i.get(c.id())});if(state.settings.samDefense&&a.length>0&&a[0].type()===UNIT.SAMLauncher){const c=[];for(const h of this.player.units(UNIT.City,UNIT.Port,UNIT.Factory,UNIT.MissileSilo)){c.push({tile:h.tile(),weight:Math.max(1,h.level())*samProtectWeight(h.type())})}let d=null;let f=-1;for(const h of a){const p=t.config().samRange(h.level());const g=p*p;let m=0;for(const y of c){if(t.euclideanDistSquared(h.tile(),y.tile)<=g)m+=y.weight}if(m>f){f=m;d=h}}if(d!==null)return s(d)}const r=currentDifficulty();let o;switch(r){case Difficulty.Easy:o=70;break;case Difficulty.Medium:o=40;break;case Difficulty.Hard:o=25;break;case Difficulty.Impossible:o=0;break;default:o=0}if(this.random.nextInt(0,100)<o){return s(this.random.randElement(a))}const l=this.player.units(UNIT.SAMLauncher);const u=[];for(const c of a){let d=0;for(const f of l){const h=t.config().samRange(f.level());const p=h*h;const g=t.euclideanDistSquared(c.tile(),f.tile());if(g<=p){d+=10;if(f.level()>1){d+=(f.level()-1)*7.5}}}u.push({structure:c,score:d})}if(u.length===0){return null}u.sort((c,d)=>d.score-c.score);return s(u[0].structure)}async structureSpawnTile(e){let t=e===UNIT.Port?this.randCoastalTileArray(25):randTerritoryTileArray(this.random,this.game,this.player,25);if(state.settings.safePlacement&&(e===UNIT.City||e===UNIT.Factory)){try{const o=this.tilesDeepInTerritory(25);if(o.length>0)t=o.concat(t)}catch(o){}}const a=state.settings.safePlacement&&state.settings.samUmbrella&&(e===UNIT.City||e===UNIT.Factory);if(e===UNIT.MissileSilo&&state.settings.winFixes||a){try{const o=this.tilesNearFriendlySams(25);if(o.length>0)t=o.concat(t)}catch(o){}}if(t.length>1)t=Array.from(new Set(t));if(t.length===0)return null;const i=this.structureSpawnTileValue(e);if(i===null)return null;const s=t.map(o=>({t:o,v:i(o)}));s.sort((o,l)=>l.v-o.v);const r=s.length>MAX_SPAWN_PROBES?s.slice(0,MAX_SPAWN_PROBES):s;if(r.length<s.length){ofhDebug("[Build] "+e+": probing the top "+r.length+" of "+s.length+" candidates")}for(const{t:o}of r){const l=await this.buildableFor(e,o);if(l!==null&&l.canBuild!==false){return l}}return null}async buildableFor(e,t){let a;try{a=await withTimeout(this.player.buildables(t,[e]),WORKER_TIMEOUT_MS,null)}catch(i){return null}return Array.isArray(a)?a.find(i=>i.type===e)??null:null}randCoastalTileArray(e){const t=this.game;const a=this._sharedWaterComponents;const i=Array.from(this.player.borderTiles()).filter(s=>{if(!t.isShore(s))return false;if(a===null)return false;for(const r of t.neighbors(s)){if(!t.isWater(r))continue;if(t.isOcean(r))return true;const o=typeof t.getWaterComponent==="function"?t.getWaterComponent(r):null;if(o!==null&&a.has(o))return true}return false});return Array.from(this.arraySampler(i,e))}*arraySampler(e,t){if(e.length<=t){yield*e}else{const a=new Set(e);while(t--){const i=this.random.randFromSet(a);a.delete(i);yield i}}}safePlacementScorer(e){const t=function(){return 0};if(!state.settings.safePlacement)return t;const a=this.game;const i=this.player;const s=this.classifyBorder();if(!s.ok)return t;const{teammateSids:r,threatFront:o,teamFront:l}=s;const u=[];for(const v of BLAST_PAIR_TYPES){if(e===UNIT.MissileSilo&&v===UNIT.SAMLauncher)continue;try{for(const T of i.units(v))u.push(T.tile())}catch(T){}}const c=collectSamMagnets(a);const d=state.settings.samUmbrella?collectFriendlyUmbrellas(a,i,r):[];const{borderSpacing:f}=this.spacingConstants();const h=Math.max(1,f*SAFE_PLACEMENT_RANGE_MULT);const p=Math.max(1,f*2);const g=Math.max(1,f);const m=o.length>0;const y=l.length>0;if(!m&&!y&&d.length===0&&c.length===0&&u.length===0){return t}const b=(v,T)=>{let x=Infinity;for(const I of v){let M;try{M=a.euclideanDistSquared(I,T)}catch(_){continue}if(Number.isFinite(M)&&M<x)x=M}return x===Infinity?Infinity:Math.sqrt(x)};return v=>{let T=0;let x=1;if(m){const k=b(o,v);if(Number.isFinite(k)){x=Math.min(k,h)/h;T+=SAFE_WEIGHT_THREAT*x;T+=SAFE_WEIGHT_DEPTH*(k/(k+h))}}if(y){const k=b(l,v);if(Number.isFinite(k)){T+=SAFE_WEIGHT_TEAM*(1-Math.min(k,h)/h)}}if(c.length>0){const k=samMagnetExposure(a,c,v);if(k>0){T-=SAFE_WEIGHT_SAM_MAGNET*(Math.min(k,SAM_MAGNET_FULL_LEVELS)/SAM_MAGNET_FULL_LEVELS)}}let I=0;if(d.length>0){let k=0;let N=0;for(const B of d){let G;try{G=a.euclideanDistSquared(B.tile,v)}catch(C){continue}if(!Number.isFinite(G)||G>B.range*B.range)continue;const V=Math.min((B.range-Math.sqrt(G))/g,1);if(V<=0)continue;const O=V*B.trust;if(O>k)k=O;if(B.trust>=1)N+=B.level*V}if(k>0){const B=UMBRELLA_FRONT_FLOOR+(1-UMBRELLA_FRONT_FLOOR)*x;T+=SAFE_WEIGHT_SAM_UMBRELLA*k*B}I=Math.min(N/UMBRELLA_RELEASE_SLOTS,1)}const M=UMBRELLA_FRONT_FLOOR+(1-UMBRELLA_FRONT_FLOOR)*x;const _=I*M;if(u.length>0){let k=Infinity;for(const N of u){if(N===v)continue;let B;try{B=a.euclideanDistSquared(N,v)}catch(G){continue}if(Number.isFinite(B)&&B<k)k=B}if(Number.isFinite(k)){const N=Math.sqrt(k);const B=Math.min(N,p)/p;T+=SAFE_WEIGHT_SEPARATION*(_+(1-_)*B)}}return T}}classifyBorder(){const e=this.game;const t=this.player;let a=-1;try{a=Number(e.ticks())}catch(d){a=-1}const i=this._borderClass;if(i&&a>=0&&i.tick===a)return i;let s=null;try{s=t.team?t.team():null}catch(d){s=null}const r=new Set;const o=new Set;try{for(const d of e.players()){if(!d.isPlayer()||!d.isAlive())continue;if(d.smallID()===t.smallID())continue;let f=null;try{f=d.team?d.team():null}catch(h){f=null}if(s!==null&&f!==null&&f===s){r.add(d.smallID())}else{o.add(d.smallID())}}}catch(d){return{ok:false,tick:-1,teammateSids:r,threatFront:[],teamFront:[]}}const l=[];const u=[];try{for(const d of t.borderTiles()){let f=false;let h=false;for(const p of e.neighbors(d)){if(!e.hasOwner(p)||!e.isLand(p))continue;const g=e.ownerID(p);if(o.has(g))f=true;else if(r.has(g))h=true}if(f)l.push(d);if(h)u.push(d)}}catch(d){return{ok:false,tick:-1,teammateSids:r,threatFront:[],teamFront:[]}}const c={ok:true,tick:a,teammateSids:r,threatFront:l,teamFront:u};this._borderClass=c;return c}tilesDeepInTerritory(e){const t=this.game;const a=this.classifyBorder();if(!a.ok||a.threatFront.length===0)return[];const i=a.threatFront;const s=Math.max(1,Math.floor(i.length/DEEP_FRONT_SAMPLE));const r=[];for(let c=0;c<i.length;c+=s)r.push(i[c]);if(r.length===0)return[];let o;try{o=randTerritoryTileArray(this.random,t,this.player,DEEP_PROBE_TILES)}catch(c){return[]}const l=[];for(const c of o){let d=Infinity;for(const f of r){let h;try{h=t.euclideanDistSquared(c,f)}catch(p){continue}if(Number.isFinite(h)&&h<d)d=h}if(Number.isFinite(d))l.push([d,c])}l.sort((c,d)=>d[0]-c[0]);const u=[];for(let c=0;c<l.length&&u.length<e;c++){u.push(l[c][1])}return u}structureSpawnTileValue(e){switch(e){case UNIT.City:return this.cityValue();case UNIT.MissileSilo:return this.missileSiloValue();case UNIT.Factory:return this.factoryValue();case UNIT.Port:return this.portValue();case UNIT.SAMLauncher:return this.samLauncherValue();default:throw new Error(`Value function not implemented for ${e}`)}}missileSiloValue(){const e=this.game;const t=this.player.borderTiles();const a=this.player.units(UNIT.MissileSilo);const{borderSpacing:i,structureSpacing:s}=this.spacingConstants();const r=this.safePlacementScorer(UNIT.MissileSilo);return o=>{let l=0;l+=r(o);l+=e.magnitude(o);const u=closestTile(e,t,o);const c=u[1];l+=Math.min(c,i);const d=new Set(a.map(h=>h.tile()));d.delete(o);const f=closestTwoTiles(e,d,[o]);if(f!==null){const h=e.manhattanDist(f.x,o);l+=Math.min(h,s)}if(state.settings.winFixes){l+=this.samCoverageBonus(o)}return l}}samCoverageBonus(e){const t=this.game;if(typeof t.nearbyUnits!=="function")return 0;let a;try{a=t.config()}catch(u){return 0}const i=a&&a.maxSamRange?Number(a.maxSamRange()):200;let s;try{s=t.nearbyUnits(e,i,UNIT.SAMLauncher)}catch(u){return 0}const r=this.player.smallID();let o=-1;let l=-1;for(const u of s||[]){const c=u.unit||u;const d=c.owner&&c.owner();if(!d)continue;if(c.isUnderConstruction&&c.isUnderConstruction())continue;const f=d.smallID&&d.smallID()===r;const h=!f&&this.player.isFriendly(d)===true;if(!f&&!h)continue;const p=c.level&&Number(c.level())||1;const g=a&&a.samRange?Number(a.samRange(p)):0;if(g<=0)continue;let m=u.distSquared;if(m==null&&t.euclideanDistSquared&&c.tile){m=t.euclideanDistSquared(e,c.tile())}if(m==null||m>g*g)continue;const y=g-Math.sqrt(m);if(f){if(y>o)o=y}else if(y>l){l=y}}if(o>=0)return 1e5+o;if(l>=0)return 5e4+l;return 0}tilesNearFriendlySams(e){const t=this.game;if(typeof t.nearbyUnits!=="function"&&typeof t.units!=="function"){return[]}const a=this.player.smallID();let i=[];try{i=t.units(UNIT.SAMLauncher)||[]}catch(h){return[]}let s=null;try{s=this.player.team?this.player.team():null}catch(h){s=null}const r=[];const o=[];for(const h of i){try{if(h.isUnderConstruction&&h.isUnderConstruction())continue;const p=h.owner&&h.owner();if(!p)continue;let g=null;try{g=p.team?p.team():null}catch(y){g=null}const m=s!==null&&g!==null&&g===s;if(p.smallID&&p.smallID()===a||m)r.push(h);else if(this.player.isFriendly(p)===true)o.push(h)}catch(p){}}const l=r.length>0?r:o;if(l.length===0)return[];let u;try{u=t.config()}catch(h){return[]}const c=[];for(const h of l){const p=h.tile();const g=t.x(p);const m=t.y(p);const y=h.level&&Number(h.level())||1;const b=u&&u.samRange?Number(u.samRange(y)):0;if(b<=0)continue;const v=Math.floor(b);const T=Math.max(2,Math.floor(v/6));const x=[];for(let I=-v;I<=v;I+=T){for(let M=-v;M<=v;M+=T){if(I*I+M*M>b*b)continue;const _=g+I;const k=m+M;if(!t.isValidCoord(_,k))continue;const N=t.ref(_,k);if(!t.isLand(N))continue;if(t.ownerID(N)!==a)continue;x.push(N)}}if(x.length>0)c.push(this.random.shuffleArray(x))}if(c.length===0)return[];const d=[];const f=new Set;for(let h=0;d.length<e;h++){let p=false;for(const g of c){if(h>=g.length)continue;p=true;const m=g[h];if(f.has(m))continue;f.add(m);d.push(m);if(d.length>=e)break}if(!p)break}return d}portValue(){const e=this.game;const t=this.player.units(UNIT.Port);const{structureSpacing:a}=this.spacingConstants();const i=this.safePlacementScorer(UNIT.Port);return s=>{let r=0;r+=i(s);const o=new Set(t.map(c=>c.tile()));o.delete(s);const l=closestTile(e,o,s);const u=l[1];if(Number.isFinite(u)){r+=state.settings.safePlacement?Math.min(u,a):u}return r}}factoryValue(){const e=this.game;const t=this.player;const a=this.player.borderTiles();const i=t.units(UNIT.Factory);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=e.config().trainStationMaxRange();const l=o*o;const u=currentDifficulty();const c=this.shouldUseConnectivityScore(u);const d=c?this.getOrBuildReachableStations():[];const f=e.config().trainStationMinRange()**2;const h=new Set(t.units(UNIT.City).map(g=>g.tile()));const p=this.safePlacementScorer(UNIT.Factory);return g=>{let m=0;m+=p(g);m+=e.magnitude(g);const y=closestTile(e,a,g);const b=y[1];m+=Math.min(b,s);const v=new Set(i.map(I=>I.tile()));v.delete(g);const T=closestTwoTiles(e,v,[g]);if(T!==null){const I=e.manhattanDist(T.x,g);m+=Math.min(I,o)}const x=closestTwoTiles(e,h,[g]);if(x!==null){const I=e.manhattanDist(x.x,g);m+=Math.min(I,r)}if(!c){return m}m+=this.computeConnectivityScore(g,d,f,l)*r;return m}}shouldUseConnectivityScore(e){let t;switch(e){case Difficulty.Easy:t=0;break;case Difficulty.Medium:t=60;break;case Difficulty.Hard:t=75;break;case Difficulty.Impossible:t=100;break;default:t=100}return this.random.nextInt(0,100)<t}getOrBuildReachableStations(){if(this.reachableStationsCache===null){this.reachableStationsCache=this.buildReachableStations()}return this.reachableStationsCache}trainGoldBase(e,t){const a=Math.max(0,(t||0)-9);let i;switch(e){case"ally":i=35e3;break;case"self":i=1e4;break;case"team":case"other":default:i=25e3}return Math.max(5e3,i-a*5e3)}buildReachableStations(){const e=this.game;const t=this.player;const a=Math.max(Number(this.trainGoldBase("ally",0)),1);const i=[];const s=Number(this.trainGoldBase("self",0))/a;for(const d of t.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(!d.hasTrainStation())continue;i.push({tile:d.tile(),weight:s,key:d.id()})}for(const d of t.nearby()){if(!d.isPlayer||!d.isPlayer())continue;if(d.type()===PlayerType.Bot)continue;if(!shimCanTrade(t,d))continue;const f=t.isOnSameTeam(d)?"team":t.isAlliedWith(d)?"ally":"other";const h=Number(this.trainGoldBase(f,0))/a;for(const p of d.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(!p.hasTrainStation())continue;i.push({tile:p.tile(),weight:h,key:p.id()})}}if(i.length===0)return[];let r=null;try{r=typeof e.railroadState==="function"?e.railroadState():null}catch(d){r=null}if(r){const d=this.assignRailClusters(i,r);if(d!==null){const f=[];for(let h=0;h<i.length;h++){f.push({tile:i[h].tile,cluster:d[h],weight:i[h].weight})}return f}}const o=e.config().trainStationMaxRange();const l=o*o;const u=new StationUnionFind;for(const d of i)u.add(d.key);for(let d=0;d<i.length;d++){for(let f=d+1;f<i.length;f++){const h=e.euclideanDistSquared(i[d].tile,i[f].tile);if(h<=l){u.union(i[d].key,i[f].key)}}}const c=[];for(const d of i){c.push({tile:d.tile,cluster:u.find(d.key),weight:d.weight})}return c}assignRailClusters(e,t){try{const a=this.game;const i=a.width();const s=a.height();const r=i*s;const o=new Int32Array(r).fill(-1);let l=0;const u=f=>{const h=l++;const p=[f];o[f]=h;let g=0;while(g<p.length){const m=p[g++];for(const y of a.neighbors(m)){if(y>=0&&y<r&&t[y]!==0&&o[y]===-1){o[y]=h;p.push(y)}}}return h};const c=f=>{if(f<0||f>=r)return null;if(t[f]!==0){if(o[f]===-1)u(f);return o[f]}for(const h of a.neighbors(f)){if(h>=0&&h<r&&t[h]!==0){if(o[h]===-1)u(h);return o[h]}}return null};const d=new Array(e.length);for(let f=0;f<e.length;f++){const h=c(e[f].tile);d[f]=h===null?null:"rail#"+h}return d}catch(a){return null}}computeConnectivityScore(e,t,a,i){const s=new Map;let r=0;for(const{tile:l,cluster:u,weight:c}of t){const d=this.game.euclideanDistSquared(e,l);if(d<a||d>i)continue;if(u!==null){s.set(u,Math.max(s.get(u)??0,c))}else{r+=c}}let o=r;for(const l of s.values())o+=l;return o}cityValue(){const e=this.game;const t=this.player;const a=t.borderTiles();const i=t.units(UNIT.City);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=e.config().trainStationMaxRange();const l=o*o;const u=currentDifficulty();const c=this.shouldUseConnectivityScore(u);const d=c?this.getOrBuildReachableStations():[];const f=e.config().trainStationMinRange()**2;const h=new Set(t.units(UNIT.Factory).map(g=>g.tile()));const p=this.safePlacementScorer(UNIT.City);return g=>{let m=0;m+=p(g);m+=e.magnitude(g);const y=closestTile(e,a,g);const b=y[1];m+=Math.min(b,s);const v=new Set(i.map(I=>I.tile()));v.delete(g);const T=closestTwoTiles(e,v,[g]);if(T!==null){const I=e.manhattanDist(T.x,g);m+=Math.min(I,r)}const x=closestTwoTiles(e,h,[g]);if(x!==null){const I=e.manhattanDist(x.x,g);m+=Math.min(I,r)}if(!c){return m}m+=this.computeConnectivityScore(g,d,f,l)*r;return m}}samLauncherValue(){const e=this.game;const t=this.player;const a=t.borderTiles();const i=t.units(UNIT.SAMLauncher);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=currentDifficulty();const l=o===Difficulty.Hard||o===Difficulty.Impossible;const u=[];for(const m of t.units()){switch(m.type()){case UNIT.City:case UNIT.Factory:case UNIT.MissileSilo:case UNIT.Port:u.push({tile:m.tile(),weight:(l?m.level():1)*samProtectWeight(m.type())})}}let c=0;let d=0;try{const m=Number(e.config().samRange(1))||0;const y=Number(e.config().nukeMagnitudes(UNIT.HydrogenBomb).outer)||0;if(m>0&&y>m){c=m*m;d=y*y}}catch(m){c=0}const f=e.config().defaultSamRange();const h=f*f;const p=state.settings.samDefense?o!==Difficulty.Easy:o!==Difficulty.Easy&&this.random.nextInt(0,100)<25;let g=null;if(p){g=new Map;const m=t.units(UNIT.SAMLauncher);for(const y of u){let b=0;for(const v of m){const T=e.config().samRange(v.level());const x=e.euclideanDistSquared(y.tile,v.tile());if(x<=T*T){b+=v.level()}}g.set(y.tile,b)}}return m=>{let y=0;y+=e.magnitude(m);const b=closestTwoTiles(e,a,[m]);if(b!==null){const x=e.manhattanDist(b.x,m);y+=Math.min(x,s)}const v=new Set(i.map(x=>x.tile()));v.delete(m);const T=closestTwoTiles(e,v,[m]);if(T!==null){const x=e.manhattanDist(T.x,m);y+=Math.min(x,r)}if(d>0){let x=0;for(const I of u){const M=e.euclideanDistSquared(m,I.tile);if(M>c&&M<=d)x+=I.weight}if(x>0){y-=r*(x/(x+SAM_MAGNET_HALF_WEIGHT))}}if(o!==Difficulty.Easy){for(const x of u){const I=e.euclideanDistSquared(m,x.tile);if(I>h)continue;if(p&&g!==null){const M=g.get(x.tile)??0;const _=1/(1+M);y+=r*x.weight*_}else{y+=r*x.weight}}}return y}}spacingConstants(){const e=this.game.config().nukeMagnitudes(UNIT.AtomBomb).outer;return{borderSpacing:e,structureSpacing:e*2}}}"use strict";const AttackStructures=new Set([UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory]);const HumansVsNations="Humans Vs Nations";const BOAT_PROBE_CANDIDATES=4;class AttackBehavior{constructor(e,t,a,i,s,r,o,l){this.random=e;this.game=t;this.player=a;this.triggerRatio=i;this.reserveRatio=s;this.expandRatio=r;this.openingReserve=Math.min(.35,Math.max(.3,.3+(s-.3)/2));this.allianceBehavior=o;this.emojiBehavior=l;this.botAttackTroopsSent=0}async maybeAttack(){if(this.player===null||this.allianceBehavior===void 0){throw new Error("not initialized")}this._openingPassId=(this._openingPassId||0)+1;this._openingSnap=null;const e=Array.from(this.player.borderTiles()).flatMap(p=>this.game.neighbors(p)).filter(p=>this.game.isLand(p)&&this.game.ownerID(p)!==this.player?.smallID());const t=this.player.nearby();const a=new Set(e.map(p=>this.game.playerBySmallID(this.game.ownerID(p))).filter(p=>p!=null&&p.isPlayer()));for(const p of t){if(p.isPlayer())a.add(p)}const i=[...a].sort((p,g)=>p.troops()-g.troops());const s=i.filter(p=>this.player?.isFriendly(p)===true);const r=i.filter(p=>this.player?.isFriendly(p)===false);const o=e.some(p=>!this.game.hasOwner(p)&&!this.game.hasFallout(p));const l=o||t.some(p=>!p.isPlayer());this.noteOpenLand(o);const u=state.settings.features||{};const c=!!u.expand;const d=!!u.boat;const f=!!u.alliance;if(c&&state.settings.winFixes){const p=i.filter(g=>{try{return g.isPlayer()&&g.isDisconnected&&g.isDisconnected()}catch(m){return false}});if(p.length>0){p.sort((g,m)=>g.troops()-m.troops());ofhDebug("[Takeover] disconnected neighbour → grabbing land:",p[0].name?.()??p[0].smallID?.());if(await this.sendAttack(p[0]))return}}if(c&&state.settings.winFixes&&r.some(p=>p.isPlayer()&&p.type()===PlayerType.Bot)){if(await this.attackBots())return}if(state.settings.winFixes){await this.maybeOpportunisticBoat()}let h=false;try{const p=this.openingSnapshot();h=Boolean(p&&p.applies&&!p.over&&!p.built)}catch(p){h=false}if(state.settings.winFixes&&state.settings.features.donate&&!h){const p=performance.now();if(p-(state.lastDonateMs||0)>(state.settings.donateThrottleMs||3e3)){if(this.donateTroops())state.lastDonateMs=p}}if(f&&state.settings.winFixes){this.allianceBehavior.reachOutToFarNations()}if(c&&l){if(await this.sendAttack(this.game.terraNullius()))return}if(r.length===0){if(d&&this.random.chance(5)){await this.attackWithRandomBoat()}}else{if(d&&this.random.chance(10)){if(await this.attackWithRandomBoat(r))return}if(f){this.allianceBehavior.maybeSendAllianceRequests(r)}}if(c){await this.attackBestTarget(s,r)}}async attackWithRandomBoat(e=[]){if(this.player===null)throw new Error("not initialized");if(!(state.settings.features&&state.settings.features.boat)){return false}if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return false}if(state.settings.winFixes){const o=this.game.numLandTiles()||1;if(this.player.numTilesOwned()/o>.25){return false}}if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}const t=Array.from(this.player.borderTiles()).filter(o=>this.game.isShore(o));if(t.length===0){return false}const a=this.random.randElement(t);let i=await this.findRandomBoatTarget(a,e,true);if(i===null){i=await this.findRandomBoatTarget(a,e,false);if(i===null){return false}}const s=discoverCtors(getEventBus());const r=state.settings.winFixes?Math.max(this.player.troops()*(state.settings.boatProbeFrac||.01),state.settings.boatProbeMinTroops||8e3):this.player.troops()/5;if(this.openingVetoesTile(i))return false;if(s.boat&&emitIntent(s.boat,i,r)){state.stats.attacks++;setLastAction(tr("⛵ Random boat"),"naval");return true}return false}async maybeOpportunisticBoat(){if(this.player===null)return false;if(!(state.settings.features&&state.settings.features.boat))return false;if(this.game.config().isUnitDisabled(UNIT.TransportShip))return false;const e=Math.min(this.game.config().boatMaxNumber(),state.settings.maxConcurrentBoats||3);const t=this.player.unitCount(UNIT.TransportShip);const a=performance.now();const i=state.settings.oppBoatThrottleMs||1200;const s=a-(state.lastOppBoatMs||0);const r=t>=e;const o=s<i;const l=this.game.config().maxTroops(this.player);const u=l>0?this.player.troops()/l:1;const c=state.settings.boatSurplusFill||.75;const d=Array.from(this.player.borderTiles()).filter(k=>this.game.isShore(k));try{if(a-(state._boatDiagAt||0)>5e3){state._boatDiagAt=a;ofhDebug("[Boat] diag:",{reason:r?"capped":o?"throttled":d.length===0?"no-shore":"ok",ships:t,boatCap:e,shoreTiles:d.length,fill:Number(u.toFixed(2)),islandFill:state.settings.boatIslandFill||.35,maxShips:this.game.config().boatMaxNumber()})}}catch(k){}if(r)return false;if(o)return false;if(d.length===0)return false;const f=state.beachhead;const h=state.settings.mirvBoatWindowTicks||150;if(f&&f.tile!=null&&!f.surged&&u>=c&&this.game.ticks()-(f.at||0)<h){if(this.landingSucceeded(f.tile)){const k=await withTimeout(this.player.bestTransportShipSpawn(f.tile),WORKER_TIMEOUT_MS,false);if(k!==false){const N=state.settings.boatSurgeFrac||.25;const B=this.player.troops()*N;if(this.emitBoat(f.tile,B,"⚓ Surge landing")){state.lastOppBoatMs=a;f.surged=true;return true}}}}this._inflightBoatTargets=[];for(const k of this.player.units(UNIT.TransportShip)){try{const N=k.targetTile?k.targetTile():null;if(N!=null){this._inflightBoatTargets.push({x:this.game.x(N),y:this.game.y(N)})}}catch(N){}}let p=null;let g=false;let m=false;let y=false;if(p===null){const k=await this.findDisconnectedBoatTarget();if(k!==null&&!this.boatTargetTaken(k)){p=k;m=true;g=true;ofhDebug("[Boat] heading to a DISCONNECTED neighbour's land")}}const b=p===null?this.scanNearbyTargets(d):[];const v=state.settings.islandProbeMax||4;for(let k=0;k<b.length&&k<v;k++){if(this.boatTargetTaken(b[k].tile))continue;const N=await withTimeout(this.player.bestTransportShipSpawn(b[k].tile),WORKER_TIMEOUT_MS,false);if(N!==false){p=b[k].tile;m=b[k].owned;y=b[k].fallout;g=true;break}}if(p===null){const k=this.pickMirvCraterTarget();if(k!==null&&!this.boatTargetTaken(k)){const N=await withTimeout(this.player.bestTransportShipSpawn(k),WORKER_TIMEOUT_MS,false);if(N!==false){p=k;m=true}}}if(p===null){const k=this.random.randElement(d);const N=await this.findRandomBoatTarget(k,[],true);if(N!==null&&!this.boatTargetTaken(N)){p=N;m=this.game.hasOwner(N)}}if(p===null){const k=this.random.randElement(d);const N=await this.findRandomBoatTarget(k,[],false);if(N!==null&&!this.boatTargetTaken(N)){p=N;m=this.game.hasOwner(N)}}if(p===null){const k=await this.findDistantBoatTarget();if(k!==null){p=k;m=true;g=true}}if(p===null){ofhDebug("[Boat] no reachable target",{scanCandidates:b.length,shoreSamples:Math.min(state.settings.islandScanSamples||6,d.length),distant:state._distantDiag||null});return false}const T=g?state.settings.boatIslandFill||.35:c;if(u<T){ofhDebug("[Boat] fill too low to launch",{fill:Number(u.toFixed(2)),need:T,contested:!g});return false}const x=state.settings.boatProbeFrac||.01;const I=state.settings.boatProbeMinTroops||8e3;const M=Math.max(this.player.troops()*x,I);const _=y?"☢️ Nuked-coast grab":g?m?"🏝️ Weak-coast grab":"🏝️ Island grab":"🛟 Probe landing";if(this.emitBoat(p,M,_)){state.lastOppBoatMs=a;state.beachhead={tile:p,at:this.game.ticks(),surged:false};return true}return false}boatTargetTaken(e){if(e==null||!Array.isArray(this._inflightBoatTargets))return false;if(this._inflightBoatTargets.length===0)return false;const t=state.settings.boatSpreadRadius||30;let a;let i;try{a=this.game.x(e);i=this.game.y(e)}catch(s){return false}for(const s of this._inflightBoatTargets){if(Math.abs(s.x-a)+Math.abs(s.y-i)<=t)return true}return false}scanNearbyTargets(e){const t=state.settings.islandScanRadius||40;const a=state.settings.islandScanStep||2;const i=state.settings.islandScanSamples||6;const s=state.settings.boatWeakTroopFrac??.6;const r=this.player.smallID();const o=this.player.troops();const l=new Map;const u=new Set;const c=[];const d=Math.min(i,e.length);for(let f=0;f<d;f++){const h=this.random.randElement(e);const p=this.game.x(h);const g=this.game.y(h);for(let m=-t;m<=t;m+=a){for(let y=-t;y<=t;y+=a){const b=p+m;const v=g+y;if(!this.game.isValidCoord(b,v))continue;const T=this.game.ref(b,v);if(u.has(T))continue;if(!this.game.isLand(T))continue;const x=this.game.hasFallout(T);const I=this.game.ownerID(T);if(I===r)continue;const M=this.game.hasOwner(T);if(M){let _=l.get(I);if(_===void 0){const k=this.game.playerBySmallID(I);_=!!(k&&k.isPlayer()&&this.player.isFriendly(k)===false&&k.troops()<o*s);l.set(I,_)}if(!_)continue}else if(!x){if(this.game.neighbors(T).some(_=>this.game.ownerID(_)===r)){continue}}u.add(T);c.push({tile:T,dist:m*m+y*y,owned:M,fallout:x})}}}c.sort((f,h)=>f.dist-h.dist);return c}async findDisconnectedBoatTarget(){if(this.player===null)return null;const e=this.player.smallID();const t=this.getPlayerCenter(this.player);const a=[];for(const s of this.game.players()){try{if(!s.isPlayer||!s.isPlayer())continue;if(!s.isAlive())continue;if(s.smallID()===e)continue;if(!(s.isDisconnected&&s.isDisconnected()))continue;const r=s.nameLocation?s.nameLocation():null;if(!r||r.x==null)continue;if(!this.game.isValidCoord(r.x,r.y))continue;const o=this.game.ref(r.x,r.y);if(o==null)continue;let l=0;if(t&&t.x!=null){const u=r.x-t.x;const c=r.y-t.y;l=u*u+c*c}a.push({tile:o,dist:l})}catch(r){}}a.sort((s,r)=>s.dist-r.dist);const i=state.settings.distantBoatProbeMax||12;for(let s=0;s<a.length&&s<i;s++){if(this.boatTargetTaken(a[s].tile))continue;const r=await withTimeout(this.player.bestTransportShipSpawn(a[s].tile),WORKER_TIMEOUT_MS,false);if(r!==false)return a[s].tile}return null}async findDistantBoatTarget(){if(this.player===null)return null;const e=this.player.smallID();const t=this.getPlayerCenter(this.player);const a=[];for(const l of this.game.players()){try{if(!l.isPlayer||!l.isPlayer())continue;if(!l.isAlive())continue;if(l.smallID()===e)continue;if(this.player.isFriendly(l)===true)continue;const u=l.nameLocation?l.nameLocation():null;if(!u||u.x==null)continue;if(!this.game.isValidCoord(u.x,u.y))continue;const c=this.game.ref(u.x,u.y);if(c==null)continue;let d=0;if(t&&t.x!=null){const f=u.x-t.x;const h=u.y-t.y;d=f*f+h*h}a.push({tile:c,dist:d})}catch(u){}}a.sort((l,u)=>l.dist-u.dist);const i=state.settings.distantBoatProbeMax||12;const s="__probe_timeout__";let r=0;let o=0;for(let l=0;l<a.length&&l<i;l++){if(this.boatTargetTaken(a[l].tile))continue;r++;const u=await withTimeout(this.player.bestTransportShipSpawn(a[l].tile),WORKER_TIMEOUT_MS,s);if(u===s){o++;continue}if(u!==false){state._distantDiag={enemies:a.length,probed:r,probeCap:i,timedOut:o,found:true};return a[l].tile}}state._distantDiag={enemies:a.length,probed:r,probeCap:i,timedOut:o,found:false};return null}emitBoat(e,t,a){if(!(state.settings.features&&state.settings.features.boat)){return false}try{if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}}catch(s){}if(this.openingVetoesTile(e))return false;const i=discoverCtors(getEventBus());if(i.boat&&emitIntent(i.boat,e,t)){state.stats.attacks++;setLastAction(tr(a),"naval");return true}return false}landingSucceeded(e){const t=this.game.x(e);const a=this.game.y(e);const i=this.player.smallID();const s=6;for(let r=-s;r<=s;r+=2){for(let o=-s;o<=s;o+=2){const l=t+r;const u=a+o;if(!this.game.isValidCoord(l,u))continue;const c=this.game.ref(l,u);if(this.game.isLand(c)&&this.game.ownerID(c)===i)return true}}return false}pickMirvCraterTarget(){const e=Array.isArray(state.recentMirvHits)?state.recentMirvHits:[];const t=state.settings.mirvBoatWindowTicks||150;const a=this.game.ticks();state.recentMirvHits=e.filter(s=>a-(s.at||0)<t);const i=this.player.smallID();for(let s=state.recentMirvHits.length-1;s>=0;s--){const r=state.recentMirvHits[s];if(r.tile==null)continue;if(this.game.ownerID(r.tile)===i)continue;return r.tile}return null}async findRandomBoatTarget(e,t,a=false){if(this.player===null)throw new Error("not initialized");const i=this.game.x(e);const s=this.game.y(e);const r=new Set;const o=[];for(let l=0;l<500;l++){const u=this.random.nextInt(i-150,i+150);const c=this.random.nextInt(s-150,s+150);if(!this.game.isValidCoord(u,c)){continue}const d=this.game.ref(u,c);if(!this.game.isLand(d)){continue}const f=this.game.owner(d);if(f.isPlayer()&&f.smallID()===this.player.smallID()){continue}if(f.isPlayer()&&r.has(f.id())){continue}if(f.isPlayer()&&t.some(p=>p.smallID()===f.smallID())){continue}if(this.isFFA()&&f.isPlayer()&&f.troops()>this.player.troops()){continue}let h;if(a){h=!f.isPlayer()||f.type()===PlayerType.Bot}else{h=!f.isPlayer()||!f.isFriendly(this.player)}if(!h){continue}o.push({tile:d,owner:f});if(o.length>=BOAT_PROBE_CANDIDATES){break}}for(const l of o){if(l.owner.isPlayer()&&r.has(l.owner.id())){continue}const u=await withTimeout(this.player.bestTransportShipSpawn(l.tile),WORKER_TIMEOUT_MS,false);if(u===false){if(l.owner.isPlayer()){r.add(l.owner.id())}continue}return l.tile}return null}async attackBestTarget(e,t){if(this.hasNeighboringBotWithStructures()){if(await this.attackBots())return}if(state.settings.counterAttackFirst){let i=false;try{i=this.player.incomingAttacks().length>0}catch(s){i=false}if(i&&this.counterReady()){const s=this.findIncomingAttackPlayer();if(s&&await this.sendAttack(s,true,true))return}}if(!this.hasReserveRatioTroops())return;if(!this.hasTriggerRatioTroops()&&!this.random.chance(10))return;const a=this.getAttackStrategies(e,t);for(const i of a){if(await i())return}}getAttackStrategies(e,t){const a=currentDifficulty();const i=async()=>{if(!this.counterReady())return false;const v=this.findIncomingAttackPlayer();if(v){return await this.sendAttack(v,true)}return false};const s=async()=>{if(!state.settings.encirclePockets)return false;const v=await this.findSealablePocket();if(!v)return false;return await this.sendAttack(v,true)};const r=async()=>await this.attackBots();const o=async()=>await this.assistAllies();const l=async()=>{const v=this.findTraitor(t);if(v){return await this.sendAttack(v)}return false};const u=async()=>{const v=t.find(T=>T.isDisconnected()&&(!this.isFFA()||T.troops()<this.player.troops()*3));if(v){return await this.sendAttack(v)}return false};const c=async()=>await this.maybeBetrayAndAttack(e,t);const d=async()=>{if(this.isBorderingNukedTerritory()){return await this.sendAttack(this.game.terraNullius())}return false};const f=async()=>{const v=this.findVictim(t);if(v){return await this.sendAttack(v)}return false};const h=async()=>{for(const v of this.player.allRelationsSorted()){if(v.relation!==Relation.Hostile)continue;const T=v.player;if(this.player.isFriendly(T))continue;if(this.isFFA()&&T.troops()>this.player.troops()*3)continue;return await this.sendAttack(T)}return false};const p=async()=>{const v=this.findVeryWeakEnemy(t);if(v){return await this.sendAttack(v)}return false};const g=async()=>{if(t.length>0){const v=t[0];if(!this.isFFA()||v.troops()<this.player.troops()){return await this.sendAttack(v)}}return false};const m=async()=>{if(t.length===0){const v=await this.findNearestIslandEnemy();if(v){return await this.sendAttack(v)}}return false};const y=async()=>await this.donateTroops();let b;switch(a){case Difficulty.Easy:b=[d,r,i,o,c,h,g];break;case Difficulty.Medium:b=[r,d,i,o,c,h,u,l,g,m,y];break;case Difficulty.Hard:b=[r,i,s,o,c,d,l,u,h,p,f,g,m,y];break;case Difficulty.Impossible:b=[i,s,r,p,o,l,u,c,f,d,h,g,m,y];break;default:throw new Error("unreachable difficulty: "+a)}if(state.settings.winFixes){const v=b.indexOf(d);if(v!==-1){b.splice(v,1);const T=b.indexOf(g);if(T!==-1)b.splice(T+1,0,d);else b.push(d)}}return b}hasNeighboringBotWithStructures(){return this.player.nearby().some(e=>e.isPlayer()&&e.type()===PlayerType.Bot&&!this.player.isFriendly(e)&&e.units().some(t=>AttackStructures.has(t.type())))}noteOpenLand(e){let t=false;try{t=this.player.borderTiles().size>0}catch(a){t=false}if(!t)return;this._openLand=Boolean(e)}buildUpReady(){if(this._builtLatched)return true;let e=false;try{const t=!(state.settings.features&&state.settings.features.build)||typeof autoBotBuildAllowed==="function"&&!autoBotBuildAllowed(UNIT.City)||this.game.config().isUnitDisabled(UNIT.City);const a=t?Infinity:this.player.totalUnitLevels(UNIT.City);const i=this.game.config().maxTroops(this.player)||1;const s=this.player.troops()/i;e=a>=(state.settings.openingMinCityLevels||5)&&s>=(state.settings.openingArmyFill||.65)}catch(t){e=true}if(e){this._builtLatched=true;try{setLastAction(tr("⚖️ Opening complete — engaging players"),"combat")}catch(t){}}return e}recentInvaderSids(e){if(!this._recentInvaders)this._recentInvaders=new Map;const t=this._recentInvaders;try{for(const i of this.player.incomingAttacks()){const s=i.attacker();if(s&&s.isPlayer&&s.isPlayer())t.set(s.smallID(),e)}}catch(i){}const a=state.settings.openingInvaderMemoryTicks||600;for(const i of Array.from(t)){if(!Number.isFinite(i[1])||e-i[1]>a)t.delete(i[0])}return new Set(t.keys())}allyInvaderSids(){const e=new Set;try{for(const t of this.player.allies()){for(const a of t.incomingAttacks()){const i=a.attacker();if(i&&i.isPlayer&&i.isPlayer())e.add(i.smallID())}}}catch(t){}return e}phasedOpeningApplies(e){if(!state.settings.phasedOpening)return false;if(this._badSpawnLatched)return true;try{if(state.settings.openingAllModes)return true;if(this.isFFA())return true;if(!e&&this.hostileNeighborCount()>=(state.settings.openingSurroundedNeighbors||2)){this._badSpawnLatched=true;return true}}catch(t){return false}return false}openingSnapshot(){const e=this._openingPassId||0;if(this._openingSnap&&this._openingSnapPass===e){return this._openingSnap}const t={applies:false,over:false,openLand:false,built:true,invaders:null,allyInvaders:null};try{const a=Number(this.game.ticks());const i=state.settings.openingMaxTicks||0;t.over=i>0&&Number.isFinite(a)&&a>=i;t.openLand=Boolean(this._openLand);t.built=this.buildUpReady();t.applies=this.phasedOpeningApplies(t.openLand);t.invaders=this.recentInvaderSids(a);t.allyInvaders=this.allyInvaderSids()}catch(a){t.applies=false}this._openingSnap=t;this._openingSnapPass=e;return t}openingVetoes(e,t){if(!state.settings.phasedOpening)return false;let a;try{a=this.openingSnapshot()}catch(o){return false}if(!a||!a.applies||a.over)return false;let i=false;try{i=Boolean(e&&e.isPlayer&&e.isPlayer())}catch(o){return false}if(!i)return false;if(t===true)return false;let s=false;let r=null;try{s=e.type()===PlayerType.Bot;r=e.smallID()}catch(o){return false}if(r!==null&&a.invaders&&a.invaders.has(r))return false;if(r!==null&&a.allyInvaders&&a.allyInvaders.has(r))return false;try{if(e.isDisconnected&&e.isDisconnected())return false}catch(o){}if(s){try{if(e.units().some(o=>AttackStructures.has(o.type())))return false}catch(o){return false}return a.openLand&&!a.built}return!a.built}openingVetoesTile(e){if(!state.settings.phasedOpening)return false;try{if(!this.game.hasOwner(e))return false;const t=this.game.playerBySmallID(this.game.ownerID(e));if(!t||!t.isPlayer||!t.isPlayer())return false;if(t.smallID&&t.smallID()===this.player.smallID())return false;return this.openingVetoes(t,false)}catch(t){return false}}hasReserveRatioTroops(){const e=this.game.config().maxTroops(this.player);const t=this.player.troops()/e;return t>=this.effectiveReserveRatio()}effectiveReserveRatio(){let e=this.reserveRatio;try{if(state.settings.winFixes){const t=this.game.numLandTiles()||1;const a=this.player.numTilesOwned()/t;const i=state.settings.sizeReserveScale??0;const s=state.settings.sizeReserveCap??.6;e=Math.max(e,Math.min(s,a*i))}}catch(t){}try{if(state.settings.reserveByNeighbors){const t=this.hostileNeighborCount();if(t>1){e=Math.max(e,Math.min(RESERVE_NEIGHBOR_CAP,e+(t-1)*RESERVE_PER_EXTRA_NEIGHBOR))}}}catch(t){}try{if(state.settings.combatReserve&&this.underThreat()){e=Math.max(e,state.settings.combatReserveFloor??.45)}}catch(t){}try{if(state.settings.absorbThenCounter&&this.hostileWaveRemaining()>0){e=Math.max(e,state.settings.absorbReserveFloor??.55)}}catch(t){}return Math.min(e,MAX_DEFENSE_RESERVE)}hostileNeighborCount(){let e=-1;try{e=Number(this.game.ticks())}catch(a){return 0}if(this._hostileNbTick===e)return this._hostileNbCount;let t=0;try{const a=new Set;for(const i of this.game.players()){if(!i.isPlayer()||!i.isAlive())continue;if(i.smallID()===this.player.smallID())continue;if(i.type()===PlayerType.Bot)continue;if(this.player.isFriendly(i))continue;a.add(i.smallID())}if(a.size>0){const i=new Set;for(const s of this.player.borderTiles()){for(const r of this.game.neighbors(s)){if(!this.game.hasOwner(r)||!this.game.isLand(r))continue;const o=this.game.ownerID(r);if(a.has(o))i.add(o)}}t=i.size}}catch(a){t=0}this._hostileNbTick=e;this._hostileNbCount=t;return t}underThreat(){let e;try{e=Number(this.game.ticks())}catch(i){return false}if(!Number.isFinite(e))return false;if(this._threatMemoTick===e)return this._threatMemoVal;if(this._threatAtTick!==void 0&&e<this._threatAtTick){this._threatAtTick=void 0}let t=false;try{t=this.player.incomingAttacks().some(i=>{const s=i.attacker();return s&&s.type()!==PlayerType.Bot&&!this.player.isFriendly(s)})}catch(i){t=false}if(!t){try{t=this.player.outgoingAttacks().some(i=>{if(i.retreating())return false;const s=i.target();return s&&typeof s.isPlayer==="function"&&s.isPlayer()&&s.type()!==PlayerType.Bot&&!this.player.isFriendly(s)})}catch(i){}}if(t)this._threatAtTick=e;const a=this._threatAtTick!==void 0&&e-this._threatAtTick<COMBAT_THREAT_STICKY_TICKS;this._threatMemoTick=e;this._threatMemoVal=a;return a}freeLandShare(){let e=-1;try{e=Number(this.game.ticks())}catch(a){return null}if(this._freeShareTick===e)return this._freeShareVal;let t=null;try{let a=Number(this.game.numLandTiles())||0;try{a-=Number(this.game.numTilesWithFallout())||0}catch(i){}if(a>0){let i=0;for(const s of this.game.players()){if(!s.isPlayer||!s.isPlayer())continue;i+=Number(s.numTilesOwned())||0}t=Math.max(0,Math.min(1,(a-i)/a))}}catch(a){t=null}this._freeShareTick=e;this._freeShareVal=t;return t}borderingBotCount(){try{let e=0;for(const t of this.player.nearby()){if(!t.isPlayer||!t.isPlayer())continue;if(t.type()!==PlayerType.Bot)continue;if(this.player.isFriendly(t))continue;if(t.isAlive&&!t.isAlive())continue;e++}return e}catch(e){return null}}async findSealablePocket(){let e;try{e=Number(this.game.ticks())}catch(c){return null}if(this._pocketTick!==void 0&&e>=this._pocketTick&&e-this._pocketTick<ENCIRCLE_SCAN_TICKS){if(this._pocketSid===null||this._pocketSid===void 0)return null;try{const c=this.game.playerBySmallID(this._pocketSid);if(c&&c.isPlayer&&c.isPlayer()&&c.isAlive())return c}catch(c){}}this._pocketTick=e;this._pocketSid=null;const t=Number(this.game.numLandTiles())||1;const a=state.settings.encircleMaxShare??.1;const i=state.settings.encircleMinSealShare??.6;const s=this.game.width();const r=this.game.height();const o=this.player.smallID();let l=null;let u=0;for(const c of this.player.nearby()){try{if(!c.isPlayer||!c.isPlayer())continue;if(this.player.isFriendly(c))continue;if(c.isAlive&&!c.isAlive())continue;const d=Number(c.numTilesOwned())||0;if(d<=0||d/t>a)continue;await this.game.ensureBorderTiles(c);const f=c.borderTiles();if(!f||f.size===0)continue;const h=c.smallID();let p=0;let g=0;let m=true;for(const v of f){if(this.game.isShore(v)){m=false;break}const T=this.game.x(v);const x=this.game.y(v);if(T<=0||x<=0||T>=s-1||x>=r-1){m=false;break}for(const I of this.game.neighbors(v)){if(!this.game.isLand(I))continue;if(!this.game.hasOwner(I)){g++;continue}const M=this.game.ownerID(I);if(M===h)continue;if(M===o){p++}else{m=false;break}}if(!m)break}if(!m)continue;const y=p+g;if(y===0)continue;const b=p/y;if(b>=i&&b>u){l=c;u=b}}catch(d){}}this._pocketSid=l?l.smallID():null;return l}hostileWaveRemaining(){let e;try{e=Number(this.game.ticks())}catch(a){return 0}if(this._waveTick===e)return this._waveRemaining;let t=0;try{for(const a of this.player.incomingAttacks()){const i=a.attacker();if(!i||!i.isPlayer||!i.isPlayer())continue;if(i.type()===PlayerType.Bot)continue;if(this.player.isFriendly(i))continue;t+=Number(a.troops())||0}}catch(a){t=0}this._waveTick=e;this._waveRemaining=t;return t}shieldThreatened(){let e;try{e=Number(this.game.ticks())}catch(a){return false}if(this._shieldThreatTick===e)return this._shieldThreatVal;let t=false;try{const a=this.player.units(UNIT.DefensePost);if(a&&a.length>0){const i=new Set;for(const s of this.player.incomingAttacks()){const r=s.attacker();if(!r||!r.isPlayer||!r.isPlayer())continue;if(r.type()===PlayerType.Bot)continue;if(this.player.isFriendly(r))continue;i.add(r.smallID())}if(i.size>0){const s=SHIELD_GUARD_DIST*SHIELD_GUARD_DIST;e:for(const r of this.player.borderTiles()){let o=false;for(const l of this.game.neighbors(r)){if(!this.game.hasOwner(l)||!this.game.isLand(l))continue;if(i.has(this.game.ownerID(l))){o=true;break}}if(!o)continue;for(const l of a){if(this.game.euclideanDistSquared(l.tile(),r)<=s){t=true;break e}}}}}}catch(a){t=false}this._shieldThreatTick=e;this._shieldThreatVal=t;return t}counterReady(){if(!state.settings.absorbThenCounter)return true;try{const e=Number(this.game.ticks());if(!Number.isFinite(e))return true;const t=this.hostileWaveRemaining();if(t<=0){this._absorb=void 0;return true}if(!this._absorb||e<this._absorb.startTick){this._absorb={startTick:e,peak:t}}else if(t>this._absorb.peak){this._absorb.peak=t}const a=this._absorb;if(t<=a.peak*(state.settings.counterSpentFrac??.4)){return true}if(this.shieldThreatened())return false;const i=this.findIncomingAttackPlayer();if(i){try{if(Number(i.troops())<Number(this.player.troops())*(state.settings.counterWeakRatio??.5)){return true}}catch(s){}}return e-a.startTick>=(state.settings.absorbMaxTicks??300)}catch(e){return true}}hasTriggerRatioTroops(){const e=this.game.config().maxTroops(this.player);const t=this.player.troops()/e;return t>=this.triggerRatio}findIncomingAttackPlayer(){let e=this.player.incomingAttacks().filter(i=>!this.player.isFriendly(i.attacker()));if(this.player.type()!==PlayerType.Bot){e=e.filter(i=>i.attacker().type()!==PlayerType.Bot)}let t=0;let a;for(const i of e){if(i.troops()<=t)continue;t=i.troops();a=i.attacker()}if(a!==void 0){return a}return null}async attackBots(){const e=this.player.nearby().filter(r=>r.isPlayer()&&this.player.isFriendly(r)===false&&r.type()===PlayerType.Bot);if(e.length===0){return false}this.botAttackTroopsSent=0;const t=r=>r.troops()/r.numTilesOwned();const a=r=>r.units().some(o=>AttackStructures.has(o.type()));const i=e.slice().sort((r,o)=>{const l=a(r);const u=a(o);if(l!==u){return l?-1:1}return t(r)-t(o)});const s=i.slice(0,this.getBotAttackMaxParallelism());for(const r of s){await this.sendAttack(r)}return this.botAttackTroopsSent>0}getBotAttackMaxParallelism(){const e=currentDifficulty();switch(e){case Difficulty.Easy:return 1;case Difficulty.Medium:return this.random.chance(2)?1:2;case Difficulty.Hard:return 3;case Difficulty.Impossible:{return 100}default:throw new Error("unreachable difficulty: "+e)}}async assistAllies(){if(this.emojiBehavior===void 0)throw new Error("not initialized");if(this.game.config().disableAlliances())return false;for(const e of this.player.allies()){if(e.targets().length===0)continue;if(this.player.relation(e)<Relation.Friendly){this.emojiBehavior.sendEmoji(e,EMOJI_ASSIST_RELATION_TOO_LOW);continue}for(const t of e.targets()){if(t.isPlayer()&&t.smallID()===this.player.smallID()){this.emojiBehavior.sendEmoji(e,EMOJI_ASSIST_TARGET_ME);continue}if(this.player.isFriendly(t)){this.emojiBehavior.sendEmoji(e,EMOJI_ASSIST_TARGET_ALLY);continue}if(!await this.sendAttack(t))continue;this.player.updateRelation(e,-20);this.emojiBehavior.sendEmoji(e,EMOJI_ASSIST_ACCEPT);return true}}return false}findTraitor(e){if(this.game.config().disableAlliances())return null;return e.find(t=>t.isTraitor()&&(!this.isFFA()||t.troops()<this.player.troops()*1.2))??null}async maybeBetrayAndAttack(e,t){if(this.allianceBehavior===void 0)throw new Error("not initialized");if(this.game.config().disableAlliances())return false;if(e.length>0){for(const a of e){if(this.allianceBehavior.maybeBetray(a,e.length+t.length)){return await this.sendAttack(a,true)}}}return false}isBorderingNukedTerritory(){if(this.game.config().isUnitDisabled(UNIT.MissileSilo)){return false}for(const e of this.player.borderTiles()){for(const t of this.game.neighbors(e)){if(this.game.isLand(t)&&!this.game.hasOwner(t)&&this.game.hasFallout(t)){return true}}}return false}findVictim(e){return e.find(t=>{if(this.isFFA()&&t.troops()>this.player.troops()*1.2){return false}const a=t.incomingAttacks().reduce((i,s)=>i+s.troops(),0);return a>t.troops()*.5})??null}findVeryWeakEnemy(e){const t=e.filter(a=>{const i=this.game.config().maxTroops(a);return a.troops()<i*.15&&(!this.isFFA()||a.troops()<this.player.troops()*1.2)});return t.length>0?t[0]:null}async findNearestIslandEnemy(){if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return null}if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return null}const e=Array.from(this.player.borderTiles()).some(o=>this.game.isShore(o));if(!e)return null;const t=this.game.players().filter(o=>{if(o.smallID()===this.player.smallID())return false;if(this.player.isFriendly(o))return false;return!this.isFFA()||o.troops()<this.player.troops()});if(t.length===0)return null;const a=this.getPlayerCenter(this.player);const i=t.map(o=>{const l=this.getPlayerCenter(o);if(!a||a.x==null||!l||l.x==null){return{player:o,distance:Infinity}}const u=this.game.ref(a.x,a.y);const c=this.game.ref(l.x,l.y);const d=this.game.manhattanDist(u,c);return{player:o,distance:d}}).sort((o,l)=>o.distance-l.distance);const s=Array.from(this.player.borderTiles()).filter(o=>this.game.isShore(o));const r=[];for(const o of i){await this.game.ensureBorderTiles(o.player);const l=closestTwoTiles(this.game,s,Array.from(o.player.borderTiles()).filter(c=>this.game.isShore(c)));if(l===null)continue;const u=await withTimeout(this.player.bestTransportShipSpawn(l.y),WORKER_TIMEOUT_MS,false);if(u!==false){r.push(o.player);if(r.length>=2)break}}if(r.length===0)return null;return r[0]}isFFA(){return this.game.config().gameConfig().gameMode===GameMode.FFA}getPlayerCenter(e){if(e.largestClusterBoundingBox){return boundingBoxCenter(e.largestClusterBoundingBox)}const t=e.borderTiles();if(t&&t.size>0){return calculateBoundingBoxCenter(this.game,t)}return e.nameLocation()}async attackRandomTarget(){if(!this.hasTriggerRatioTroops())return;const e=this.findIncomingAttackPlayer();if(e){if(await this.sendAttack(e,true))return}const t=this.getNeighborTraitorToAttack();if(t!==null){if(await this.sendAttack(t))return}const a=this.player.nearby();for(const i of this.random.shuffleArray(a)){if(!i.isPlayer())continue;if(this.player.isFriendly(i))continue;if(await this.sendAttack(i))return}}getNeighborTraitorToAttack(){if(this.game.config().disableAlliances())return null;const e=this.player.nearby().filter(t=>t.isPlayer()&&this.player.isFriendly(t)===false&&t.isTraitor());return e.length>0?this.random.randElement(e):null}async forceSendAttack(e){const t=discoverCtors(getEventBus());const a=this.player.troops()/2;const i=e.isPlayer()?e.id():null;if(t.attack&&emitIntent(t.attack,i,a)){state.stats.attacks++;setLastAction(tr("⚔️ Attack"),"combat")}}async sendAttack(e,t=false,a=false){if(this.openingVetoes(e,a))return false;if(!t&&!this.shouldAttack(e))return false;if(e.isPlayer()){if(this.player.sharesBorderWith(e)){return this.sendLandAttack(e,a)}else{return await this.sendBoatAttack(e)}}else{if(this.hasLandBorderWithTerraNullius()){return this.sendLandAttack(e)}else{return await this.sendBoatAttackToNearbyTerraNullius()}}}hasLandBorderWithTerraNullius(){for(const e of this.player.borderTiles()){for(const t of this.game.neighbors(e)){if(this.game.isLand(t)&&!this.game.hasOwner(t)){return true}}}return false}async sendBoatAttackToNearbyTerraNullius(){if(!(state.settings.features&&state.settings.features.boat))return false;if(this.game.config().isUnitDisabled(UNIT.TransportShip))return false;if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber())return false;const e=[[0,-1],[0,1],[-1,0],[1,0]];const t=Array.from(this.player.borderTiles()).filter(i=>this.game.isShore(i));const a=[];e:for(let i=0;i<t.length;i+=10){const s=t[i];const r=this.game.x(s);const o=this.game.y(s);for(const[l,u]of e){const c=r+l;const d=o+u;if(!this.game.isValidCoord(c,d))continue;if(!this.game.isWater(this.game.ref(c,d)))continue;const f=r+l*5;const h=o+u*5;if(!this.game.isValidCoord(f,h))continue;const p=this.game.ref(f,h);if(!this.game.isLand(p))continue;if(this.game.hasOwner(p))continue;if(!state.settings.winFixes&&this.game.hasFallout(p))continue;a.push(p);if(a.length>=BOAT_PROBE_CANDIDATES)break e}}for(const i of a){const s=await withTimeout(this.player.bestTransportShipSpawn(i),WORKER_TIMEOUT_MS,false);if(s===false)continue;const r=state.settings.winFixes?Math.max(this.player.troops()*(state.settings.boatProbeFrac||.01),state.settings.boatProbeMinTroops||8e3):this.player.troops()/5;if(r<1)return false;const o=discoverCtors(getEventBus());const l=Boolean(o.boat)&&emitIntent(o.boat,i,r);if(l){state.stats.attacks++;setLastAction(tr("⛵ Boat (land grab)"),"naval")}return l}return false}shouldAttack(e){if(e.isPlayer()===false||e.type()!==PlayerType.Human||e.isTraitor()||this.player.type()===PlayerType.Bot||this.game.config().gameConfig().playerTeams===HumansVsNations){return true}const t=currentDifficulty();if(t===Difficulty.Easy&&this.random.nextInt(0,4)!==0){return false}if(t===Difficulty.Medium&&this.random.chance(4)){return false}return true}sendLandAttack(e,t=false){const a=this.game.config().maxTroops(this.player);const i=e.isPlayer()&&e.type()===PlayerType.Bot&&e.units().some(f=>AttackStructures.has(f.type()));const s=e.isPlayer()&&!i&&!t;let r=s?this.effectiveReserveRatio():this.expandRatio;if(state.settings.phasedOpening&&!t&&!i){try{const f=this.openingSnapshot();if(f&&f.applies&&!f.over&&!f.built){const h=Boolean(e&&e.isPlayer&&e.isPlayer());const p=!this.underThreat();if(!h){const g=this.freeLandShare();const m=g!==null&&g<=(state.settings.openingFullSendFreeShare??.08);r=m&&p?state.settings.fullSendReserve??.05:Math.max(r,this.openingReserve)}else if(e.type()===PlayerType.Bot){const g=this.borderingBotCount();const m=g!==null&&g<=(state.settings.openingFullSendBotCount??2);r=m&&p?state.settings.fullSendReserve??.05:Math.max(r,this.openingReserve)}}}catch(f){}}if(s&&state.settings.gentleNeighbors){try{if(e.type()!==PlayerType.Bot){r=Math.max(r,state.settings.neighborReserveFloor??.5)}}catch(f){}}if(!s&&!t){try{if(state.settings.combatReserve&&this.underThreat()){r=Math.max(r,this.effectiveReserveRatio())}}catch(f){}}const o=a*r;let l;if(e.isPlayer()&&e.type()===PlayerType.Bot&&this.player.type()!==PlayerType.Bot){l=this.calculateBotAttackTroops(e,this.player.troops()-o-this.botAttackTroopsSent)}else{l=this.player.troops()-o}if(t&&state.settings.combatReserve){const f=state.settings.counterKeepFrac??.45;if(f>0&&f<1){l=Math.min(l,this.player.troops()*(1-f))}}if(state.settings.minAttackForce&&!t&&e.isPlayer()&&e.type()!==PlayerType.Bot){const f=a*(state.settings.minAttackFrac??.12);if(l<f){ofhDebug("[Attack] holding: "+Math.round(l)+" < min force "+Math.round(f)+" — a trickle attack takes max losses for min ground");return false}}if(l<1){return false}if(e.isPlayer()&&this.player.type()===PlayerType.Nation){if(this.emojiBehavior===void 0)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e)}const u=discoverCtors(getEventBus());const c=e.isPlayer()?e.id():null;const d=Boolean(u.attack)&&emitIntent(u.attack,c,l);if(d){state.stats.attacks++;setLastAction(t?tr("⚔️🛡️ Counter-attack"):tr("⚔️ Attack"),"combat")}return d}async sendBoatAttack(e){if(!(state.settings.features&&state.settings.features.boat)){return false}if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return false}await this.game.ensureBorderTiles(e);const t=closestTwoTiles(this.game,Array.from(this.player.borderTiles()).filter(o=>this.game.isShore(o)),Array.from(e.borderTiles()).filter(o=>this.game.isShore(o)));if(t===null){return false}const a=await withTimeout(this.player.bestTransportShipSpawn(t.y),WORKER_TIMEOUT_MS,false);if(a===false){return false}let i;if(state.settings.winFixes){i=Math.max(this.player.troops()*(state.settings.boatProbeFrac||.01),state.settings.boatProbeMinTroops||8e3)}else if(e.type()===PlayerType.Bot){i=this.calculateBotAttackTroops(e,this.player.troops()/5)}else{i=this.player.troops()/5}if(i<1){return false}if(e.isPlayer()&&this.player.type()===PlayerType.Nation){if(this.emojiBehavior===void 0)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e)}try{if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}}catch(o){}const s=discoverCtors(getEventBus());const r=Boolean(s.boat)&&emitIntent(s.boat,t.y,i);if(r){state.stats.attacks++;setLastAction(tr("⛵ Boat attack"),"naval")}return r}calculateBotAttackTroops(e,t){const a=currentDifficulty();if(a===Difficulty.Easy){this.botAttackTroopsSent+=t;return t}let i=e.troops()*4;if(i>t){if(t<e.troops()*2){i=0}else{i=t}}this.botAttackTroopsSent+=i;return i}donateTroops(){try{const g=performance.now();if(g-(state._donDiagAt||0)>5e3){state._donDiagAt=g;const m=this.game.config();const y=this.game.players().filter(b=>this.player.isOnSameTeam(b)&&b.smallID()!==this.player.smallID()&&b.isAlive());ofhDebug("[Donate] diag: "+JSON.stringify({featureOn:!!state.settings.features.donate,winFixes:!!state.settings.winFixes,replicatedDifficulty:String(currentDifficulty()),gameType:String(m.gameConfig().gameType),gameMode:String(m.gameConfig().gameMode),donateAllowedByLobby:m.donateTroops(),aliveTeammates:y.length,myTroops:Math.round(this.player.troops())}))}}catch(g){}if(!state.settings.features.donate)return false;try{const g=Number(this.game.ticks());if(Number.isFinite(g)){if(this._donateUnsafeAtTick!==void 0&&g<this._donateUnsafeAtTick){this._donateUnsafeAtTick=void 0}const m=this.player.incomingAttacks();if(m&&m.length>0)this._donateUnsafeAtTick=g;const y=100;if(this._donateUnsafeAtTick!==void 0&&g-this._donateUnsafeAtTick<y){ofhDebug("[Donate] skip: under attack — defending first");return false}}}catch(g){}if(this.game.config().gameConfig().gameMode!==GameMode.Team){return false}if(this.game.config().donateTroops()===false){return false}if(this.game.getWinner()){ofhDebug("[Donate] skip: game already has a winner");return false}const e=currentDifficulty();if(!state.settings.winFixes){switch(e){case Difficulty.Easy:return false;case Difficulty.Medium:if(!this.random.chance(4)){return false}break;case Difficulty.Hard:if(!this.random.chance(2)){return false}break;case Difficulty.Impossible:break;default:throw new Error("unreachable difficulty: "+e)}}const t=this.game.players().filter(g=>this.player.isOnSameTeam(g)).filter(g=>state.settings.winFixes?true:g.incomingAttacks().length>0||g.outgoingAttacks().length>0);if(t.length===0){ofhDebug("[Donate] skip: no same-team players found");return false}const a=t.map(g=>{const m=this.game.config().maxTroops(g);const y=g.troops()/Math.max(m,1);return{teammate:g,troopPercentage:y}}).sort((g,m)=>g.troopPercentage-m.troopPercentage);const i=state.settings.winFixes?state.settings.donateNeedThreshold??.8:1;const s=a.filter(g=>g.teammate.isAlive()&&g.teammate.smallID()!==this.player.smallID()&&g.troopPercentage<i).map(g=>{let m=false;try{m=g.teammate.incomingAttacks().length>0||g.teammate.outgoingAttacks().length>0}catch(y){}return{entry:g,frontline:m}});s.sort((g,m)=>{if(g.frontline!==m.frontline)return g.frontline?-1:1;return g.entry.troopPercentage-m.entry.troopPercentage});let r=null;if(s.length>0){r=s[0].entry.teammate;ofhDebug("[Donate] picked ally at "+Math.round(s[0].entry.troopPercentage*100)+"% "+(s[0].frontline?"(FRONTLINE — in combat)":"(rear)"))}if(r===null){ofhDebug("[Donate] skip: no teammate below the need threshold (all allies healthy)");return false}const o=this.game.config().maxTroops(this.player);const l=state.settings.winFixes?Math.max(this.effectiveReserveRatio(),state.settings.donateKeepFrac||.45):this.reserveRatio;const u=o*l;const c=this.player.troops()-u;const d=state.settings.winFixes?o*(state.settings.donateMinExcessFrac||.05):1;if(c<d){ofhDebug("[Donate] skip: not enough above the keep line",{troops:Math.round(this.player.troops()),keep:Math.round(u),needExcess:Math.round(d)});return false}const f=state.settings.donateMinDonatePct||.2;const h=this.player.troops()*f;if(c<h){ofhDebug("[Donate] skip: donation too small (minDonatePct)",{available:Math.round(c),minChunk:Math.round(h),pct:Math.round(f*100)+"%"});return false}const p=discoverCtors(getEventBus());if(p.donateTroops&&emitIntent(p.donateTroops,r.__src??r,c)){ofhDebug("[Donate] SENT",Math.round(c),"→",r.name?.()??r.smallID?.());setLastAction(tr("🎁 Donate troops"),"combat")}else{ofhDebug("[Donate] emit failed",{ctor:!!p.donateTroops})}return true}}const SALVO_GAP_MS=140;function salvoPace(n,e){if(n>=e-1)return Promise.resolve();return new Promise(t=>setTimeout(t,SALVO_GAP_MS))}function nukeArcSpeed(n,e){try{const t=n.config();if(typeof t.nukeSpeed==="function"){const a=Number(t.nukeSpeed(e));if(Number.isFinite(a)&&a>0)return a}if(typeof t.defaultNukeSpeed==="function"){const a=Number(t.defaultNukeSpeed());if(Number.isFinite(a)&&a>0)return a}}catch(t){}return 10}"use strict";const MAX_NATION_SILO_UPGRADE_LEVEL=5;const HIGH_DENSITY_NUKE_THRESHOLD=1/75;const MIN_LEVEL_SUM_FOR_HIGH_DENSITY_NUKE=5;const NUKE_STRUCTURES_TYPES=[UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory];function euclDistFN(n,e,t){const a=e*e;if(!t){return(i,s)=>i.euclideanDistSquared(n,s)<=a}else{return(i,s)=>{const r=i.x(n)-.5-i.x(s);const o=i.y(n)-.5-i.y(s);return r*r+o*o<=a}}}class NukeCubicBezierCurve{constructor(e,t,a,i){this.p0=e;this.p1=t;this.p2=a;this.p3=i}getPointAt(e){const t=1-e;const a=t*t;const i=a*t;const s=e*e;const r=s*e;const o=i*this.p0.x+3*a*e*this.p1.x+3*t*s*this.p2.x+r*this.p3.x;const l=i*this.p0.y+3*a*e*this.p1.y+3*t*s*this.p2.y+r*this.p3.y;return{x:o,y:l}}}class NukeDistanceBasedBezierCurve extends NukeCubicBezierCurve{constructor(e,t,a,i,s){super(e,t,a,i);this.totalDistance=0;this.cachedPoints=[];this.currentIndex=0;this.computeAllPoints(s,.002)}getAllPoints(){return this.cachedPoints}increment(e){this.totalDistance+=e;while(this.currentIndex<this.cachedPoints.length-1&&this.getDistanceUpToIndex(this.currentIndex+1)<this.totalDistance){this.currentIndex++}if(this.currentIndex>=this.cachedPoints.length-1){return null}return this.cachedPoints[this.currentIndex]}getCurrentIndex(){return this.currentIndex}computeAllPoints(e,t){this.cachedPoints=[];this.totalDistance=0;this.currentIndex=0;let a=0;let i=this.getPointAt(a);this.cachedPoints.push(i);let s=0;while(a<1){a=Math.min(a+t,1);const o=this.getPointAt(a);const l=o.x-i.x;const u=o.y-i.y;const c=Math.sqrt(l*l+u*u);s+=c;if(s>=e){this.cachedPoints.push(o);s=0}i=o}const r=this.getPointAt(1);if(this.cachedPoints.length===0||r.x!==this.cachedPoints[this.cachedPoints.length-1].x||r.y!==this.cachedPoints[this.cachedPoints.length-1].y){this.cachedPoints.push(r)}}getDistanceUpToIndex(e){let t=0;for(let a=1;a<=e;a++){const i=this.cachedPoints[a-1];const s=this.cachedPoints[a];const r=s.x-i.x;const o=s.y-i.y;t+=Math.sqrt(r*r+o*o)}return t}}const PARABOLA_MIN_HEIGHT=50;class NukeParabolaUniversalPathFinder{constructor(e,t){this.gameMap=e;this.options=t;this.curve=null;this.lastTo=null}createCurve(e,t){const a=this.options?.increment??3;const i=this.options?.distanceBasedHeight??true;const s=this.options?.directionUp??true;const r={x:this.gameMap.x(e),y:this.gameMap.y(e)};const o={x:this.gameMap.x(t),y:this.gameMap.y(t)};const l=o.x-r.x;const u=o.y-r.y;const c=Math.sqrt(l*l+u*u);const d=i?Math.max(c/3,PARABOLA_MIN_HEIGHT):0;const f=s?-1:1;const h=this.gameMap.height();const p={x:r.x+l/4,y:within(r.y+u/4+f*d,0,h-1)};const g={x:r.x+l*3/4,y:within(r.y+u*3/4+f*d,0,h-1)};return new NukeDistanceBasedBezierCurve(r,p,g,o,a)}findPath(e,t){if(Array.isArray(e)){throw new Error("ParabolaUniversalPathFinder does not support multiple start points")}const a=this.createCurve(e,t);return a.getAllPoints().map(i=>this.gameMap.ref(Math.floor(i.x),Math.floor(i.y)))}next(e,t,a){if(this.lastTo!==t){this.curve=this.createCurve(e,t);this.lastTo=t}const i=this.curve.increment(a??1);if(!i){return{status:"Complete",node:t}}const s=this.gameMap.ref(Math.floor(i.x),Math.floor(i.y));return{status:"Next",node:s}}invalidate(){this.curve=null;this.lastTo=null}currentIndex(){return this.curve?.getCurrentIndex()??0}}const UniversalPathFinding={Parabola(n,e){return new NukeParabolaUniversalPathFinder(n,e)}};class NukeBehavior{constructor(e,t,a,i,s){this.random=e;this.game=t;this.player=a;this.attackBehavior=i;this.emojiBehavior=s;this.recentlySentNukes=[];this.atomBombsLaunched=0;this.atomBombPerceivedCost=null;this.hydrogenBombPerceivedCost=null;this.hydrogenBombsLaunched=0;this.isHydroNation=false;this._costCacheTick=-1;this._costCache=new Map}async maybeSendNuke(){const e=this.player.units(UNIT.MissileSilo);const t=this.game.config();if(e.length===0||t.isUnitDisabled(UNIT.MissileSilo)||t.isUnitDisabled(UNIT.AtomBomb)&&t.isUnitDisabled(UNIT.HydrogenBomb)){return}const a=this.findBestNukeTarget();if(a===null){return}if(a.type()===PlayerType.Bot||this.player.isOnSameTeam(a)||this.attackBehavior.shouldAttack(a)===false){return}const i=await this.getPerceivedNukeCost(UNIT.HydrogenBomb);const s=await this.getPerceivedNukeCost(UNIT.AtomBomb);let r;try{const M=BigInt(this.player.gold()||0);r=M-mirvReserveHold(M)}catch(M){r=this.player.gold()}let o;if(!this.game.config().isUnitDisabled(UNIT.HydrogenBomb)&&r>=i&&this.nukeSpendAllowed(await this.cost(UNIT.HydrogenBomb))){o=UNIT.HydrogenBomb}else if(!this.game.config().isUnitDisabled(UNIT.AtomBomb)&&(!this.isHydroNation||this.isUnderHeavyAttack())&&r>=s){o=UNIT.AtomBomb}else{return}const l=this.game.config().nukeMagnitudes(o).outer;const u=a.units(...NUKE_STRUCTURES_TYPES);const c=u.map(M=>M.tile());const d=currentDifficulty();const f=d===Difficulty.Impossible?30:10;await withTimeout(this.game.ensureBorderTiles(a),WORKER_TIMEOUT_MS,null);const h=randTerritoryTileArray(this.random,this.game,a,f);const p=h.concat(c);let g=null;let m=-1;this.removeOldNukeEvents();const y=Boolean(state.settings.nukeDensityFirst);const b=[];e:for(const M of new Set(p)){if(M===null)continue;const _=boundingBoxTiles(this.game,M,l).concat(boundingBoxTiles(this.game,M,Math.floor(l/2)));for(const V of _){if(!this.isValidNukeTile(V,a)){continue e}}const k=this.nukeSpawn(o,M);if(k===false)continue;if(this.game.config().gameConfig().gameMode===GameMode.Team&&d!==Difficulty.Easy&&this.isTeammateAlreadyNukingThisSpot(M,o)){continue}const N=d===Difficulty.Hard||d===Difficulty.Impossible?this.chooseNukeArc(k,M):{intercepted:false,arcUp:true,upgradeSafe:true};const B=N.intercepted;if(B&&!y){continue}let G=this.nukeTileScore(M,e,u,o);if(!B&&N.upgradeSafe===false){G*=.5}b.push({tile:M,value:G,interceptable:B,arcUp:N.arcUp})}b.sort((M,_)=>_.value-M.value);let v=null;let T=null;let x=true;for(const M of b){if(!(M.value>m))break;if(M.interceptable){const k=await this.probeCanBuildNuke(M.tile,UNIT.AtomBomb);if(!k)continue;const N=await this.planSaturationSalvoFor(M.tile);if(N===null)continue;v=M.tile;T=N;m=M.value;break}const _=await this.probeCanBuildNuke(M.tile,o);if(!_)continue;g=M.tile;m=M.value;x=M.arcUp!==false;break}if(T!==null&&v!==null){for(let M=0;M<T.bombsToFire;M++){await this.sendNuke(v,UNIT.AtomBomb,a,T.waitTicksPerBomb[M],true,T.arcUpPerBomb?T.arcUpPerBomb[M]!==false:true);await salvoPace(M,T.bombsToFire)}setLastAction(tr("☢️ Salvo ×{n} → dense target",{n:T.bombsToFire}),"nuke");return}if(!this.nukeSpendAllowed(await this.cost(o)))return;const I=Boolean(state.settings.samCrack);if(g!==null&&(m>0||d!==Difficulty.Impossible&&!I)){await this.sendNuke(g,o,a,0,false,x)}else if(d===Difficulty.Impossible||I){await this.maybeDestroyEnemySam(a)}}findBestNukeTarget(){const e=currentDifficulty();if((e===Difficulty.Hard||e===Difficulty.Impossible)&&this.game.players().length===2){const l=this.game.players().find(u=>u.smallID()!==this.player.smallID());if(l){return l}}const t=this.attackBehavior.findIncomingAttackPlayer();if(t){return t}{const l=this.findHighDensityTarget();if(l!==null){return l}}const a=currentDifficulty();const i=this.game.config().gameConfig().gameMode;if(a===Difficulty.Impossible&&i===GameMode.FFA){const l=this.game.numLandTiles()-this.game.numTilesWithFallout();if(l>0){const u=this.game.players().slice().sort((d,f)=>f.numTilesOwned()-d.numTilesOwned());const c=u[0];if(c&&c.smallID()!==this.player.smallID()&&!this.player.isFriendly(c)){const d=c.numTilesOwned()/l;if(d>.5){return c}}}}for(const l of this.player.allies()){if(l.targets().length===0)continue;if(this.player.relation(l)<Relation.Friendly)continue;for(const u of l.targets()){if(u.smallID()===this.player.smallID())continue;if(this.player.isFriendly(u))continue;return u}}const s=this.game.config().maxTroops(this.player);for(const l of this.player.allRelationsSorted()){if(l.relation!==Relation.Hostile)continue;const u=l.player;if(this.player.isFriendly(u))continue;const c=this.game.config().maxTroops(u);if(s>=c*2)continue;return u}const r=this.findFFACrownTarget();if(r){return r}const o=this.findStrongestTeamTarget();if(o){return o}return null}isRichestNation(){const e=this.player.gold();for(const t of this.game.players()){if(t.smallID()===this.player.smallID())continue;if(t.type()!==PlayerType.Nation)continue;if(t.gold()>e)return false}return true}findHighDensityTarget(){let e=null;let t=HIGH_DENSITY_NUKE_THRESHOLD;for(const a of this.game.players()){if(a.smallID()===this.player.smallID())continue;if(a.type()===PlayerType.Bot)continue;if(this.player.isFriendly(a))continue;const i=a.numTilesOwned();if(i===0)continue;const s=a.units(...NUKE_STRUCTURES_TYPES);let r=0;for(const l of s)r+=l.level();if(r<MIN_LEVEL_SUM_FOR_HIGH_DENSITY_NUKE)continue;const o=r/i;if(o>t){t=o;e=a}}return e}findFFACrownTarget(){const e=currentDifficulty();const t=this.game.config().gameConfig().gameMode;if(t!==GameMode.FFA){return null}if(this.game.players().length<=1){return null}const a=this.game.players().slice().sort((u,c)=>c.numTilesOwned()-u.numTilesOwned());const i=a[0];if(e===Difficulty.Impossible&&i.smallID()===this.player.smallID()&&a.length>=2){const u=a[1];if(!this.player.isFriendly(u)){return u}}if(i.smallID()===this.player.smallID()||this.player.isFriendly(i)){return null}const s=this.game.numLandTiles()-this.game.numTilesWithFallout();if(s<=0){return null}const r=i.numTilesOwned()/s;const o=this.player.numTilesOwned()/s;let l;switch(e){case Difficulty.Easy:l=.4;break;case Difficulty.Medium:l=.3;break;case Difficulty.Hard:l=.2;break;case Difficulty.Impossible:l=.1;break;default:l=.1}if(r-o>l){return i}return null}findStrongestTeamTarget(){if(this.game.config().gameConfig().gameMode!==GameMode.Team){return null}if(this.game.players().length<=1){return null}const e=new Map;const t=new Map;for(const o of this.game.players()){const l=o.team();if(l===null)continue;e.set(l,(e.get(l)??0)+o.numTilesOwned());let u=t.get(l);if(!u){u=[];t.set(l,u)}u.push(o)}const a=Array.from(e.entries()).sort((o,l)=>l[1]-o[1]);if(a.length===0){return null}let i=a[0][0];if(i===this.player.team()){if(a.length>1){i=a[1][0]}else{return null}}const s=t.get(i);const r=s.filter(o=>!this.player.isFriendly(o));if(r.length===0){return null}return r.reduce((o,l)=>this.game.config().maxTroops(o)>this.game.config().maxTroops(l)?o:l)}async getPerceivedNukeCost(e){if(this.game.players().length===2){return await this.cost(e)}if(this.game.config().isUnitDisabled(UNIT.MIRV)){return await this.cost(e)}if(this.game.config().gameConfig().gameMode===GameMode.Team&&this.player.gold()>await this.cost(UNIT.HydrogenBomb)){return await this.cost(e)}if(this.player.gold()>await this.cost(UNIT.MIRV)+await this.cost(UNIT.HydrogenBomb)){return await this.cost(e)}const t=currentDifficulty();if((t===Difficulty.Hard||t===Difficulty.Impossible)&&this.isUnderHeavyAttack()){return await this.cost(e)}if(e===UNIT.AtomBomb){if(this.atomBombPerceivedCost===null){const a=await this.cost(UNIT.AtomBomb);if(!a)return a;this.atomBombPerceivedCost=a}return this.atomBombPerceivedCost}else{if(this.hydrogenBombPerceivedCost===null){const a=await this.cost(UNIT.HydrogenBomb);if(!a)return a;this.hydrogenBombPerceivedCost=a}return this.hydrogenBombPerceivedCost}}isUnderHeavyAttack(){const e=this.player.incomingAttacks();let t=0;for(const i of e){t+=i.troops()}const a=this.player.troops();return t>=a}removeOldNukeEvents(){const e=600;const t=this.game.ticks();while(this.recentlySentNukes.length>0&&this.recentlySentNukes[0][0]+e<t){this.recentlySentNukes.shift()}}isTeammateAlreadyNukingThisSpot(e,t){const a=this.game.config().nukeMagnitudes(t).inner;const i=this.game.units(UNIT.AtomBomb,UNIT.HydrogenBomb);for(const s of i){const r=s.owner();if(r&&r.smallID&&r.smallID()===this.player.smallID()||!this.player.isFriendly(r)){continue}const o=s.targetTile();if(!o)continue;const l=this.game.config().nukeMagnitudes(s.type()).inner;const u=this.game.euclideanDistSquared(e,o);const c=a+l;const d=c*c;if(u<=d){return true}}return false}isTrajectoryInterceptableBySam(e,t,a,i=true,s=0,r=UNIT.AtomBomb){const o=nukeArcSpeed(this.game,r);const l=UniversalPathFinding.Parabola(this.game,{increment:o,distanceBasedHeight:true,directionUp:i!==false});const u=l.findPath(e,t)??[];if(u.length===0){return false}const c=this.game.config().defaultNukeTargetableRange()**2;let d=-1;let f=-1;for(let h=0;h<u.length;h++){const p=u[h];if(d===-1){if(this.game.euclideanDistSquared(p,e)>c){if(this.game.euclideanDistSquared(p,t)<c){break}else{d=h}}}else if(this.game.euclideanDistSquared(p,t)<c){f=h;break}}for(let h=0;h<u.length;h++){if(d!==-1&&f!==-1&&h===d){h=f-1;continue}const p=u[h];const g=this.game.nearbyUnits(p,this.game.config().maxSamRange(),UNIT.SAMLauncher);for(const m of g){const y=m.unit.owner();if(y&&y.smallID&&y.smallID()===this.player.smallID()||this.player.isFriendly(y)){continue}if(a?.has(m.unit.id())){continue}const b=this.game.config().samRange(m.unit.level()+s)**2;if(m.distSquared<=b){return true}}}return false}chooseNukeArc(e,t,a){const i=Boolean(state.settings.nukeArcRotate)&&this.canSetNukeArc();if(state.settings.samUpgradeMargin){if(!this.isTrajectoryInterceptableBySam(e,t,a,true,1)){return{intercepted:false,arcUp:true,upgradeSafe:true}}if(i&&!this.isTrajectoryInterceptableBySam(e,t,a,false,1)){return{intercepted:false,arcUp:false,upgradeSafe:true}}}const s=!state.settings.samUpgradeMargin;const r=this.isTrajectoryInterceptableBySam(e,t,a,true);if(!r){return{intercepted:false,arcUp:true,upgradeSafe:s}}if(!i){return{intercepted:true,arcUp:true,upgradeSafe:false}}const o=this.isTrajectoryInterceptableBySam(e,t,a,false);if(!o){return{intercepted:false,arcUp:false,upgradeSafe:s}}return{intercepted:true,arcUp:true,upgradeSafe:false}}canSetNukeArc(){try{const e=getBuildMenu();return!!(e&&typeof e.sendBuildOrUpgrade==="function"&&e.uiState&&typeof e.uiState==="object")}catch(e){return false}}isValidNukeTile(e,t){const a=currentDifficulty();const i=this.game.owner(e);if(i&&i.isPlayer&&i.isPlayer()&&i.smallID()===t.smallID()){return true}if((a===Difficulty.Hard||a===Difficulty.Impossible)&&(!(i&&i.isPlayer&&i.isPlayer())||this.game.config().gameConfig().gameMode===GameMode.Team&&i.isPlayer()&&!this.player.isFriendly(i))){return true}return false}nukeTileScore(e,t,a,i){const s=this.game.config().nukeMagnitudes(i);const r=euclDistFN(e,s.outer,false);let o=a.filter(m=>r(this.game,m.tile())).map(m=>{const y=m.level();switch(m.type()){case UNIT.City:return 25e3*y;case UNIT.DefensePost:return 5e3*y;case UNIT.MissileSilo:return 5e4*y;case UNIT.Port:return 15e3*y;case UNIT.Factory:return 15e3*y;default:return 0}}).reduce((m,y)=>m+y,0);const l=currentDifficulty();if(l===Difficulty.Medium){const m=euclDistFN(e,50,false);const y=a.some(b=>b.type()===UNIT.SAMLauncher&&m(this.game,b.tile()));if(y)return-1}if(l===Difficulty.Impossible&&i===UNIT.HydrogenBomb){const m=this.game.config().nukeMagnitudes(UNIT.HydrogenBomb);const y=this.game.nearbyUnits(e,m.outer,UNIT.SAMLauncher);for(const b of y){const v=b.unit.level();if(v>=5)continue;const T=this.game.config().samRange(v+(state.settings.samUpgradeMargin?1:0));const x=Math.sqrt(this.game.euclideanDistSquared(e,b.unit.tile()));if(x>T){o+=1e5*v}}}const u=t.map(m=>m.tile());const c=closestTwoTiles(this.game,u,[e]);if(c===null)throw new Error("Missing result");const d=c.x;const f=this.game.euclideanDistSquared(e,d);const h=Math.sqrt(f);const p=h*30;const g=o;o=Math.max(g*.2,o-p);o-=this.recentlySentNukes.filter(([m,y,b])=>{const v=this.game.config().nukeMagnitudes(b).inner;const T=this.game.euclideanDistSquared(e,y);return T<=v*v}).map(m=>1e6).reduce((m,y)=>m+y,0);return o}nukeSpendAllowed(e){if(!state.settings.economyFirst)return true;let t;try{if(typeof incomeWindow!=="function"||incomeWindow()===null){return false}t=typeof estimatedGoldPerMinute==="function"?estimatedGoldPerMinute():0}catch(s){return false}if(!Number.isFinite(t)||t<=0)return false;let a=0;try{a=Number(e)}catch(s){a=0}if(!Number.isFinite(a)||a<=0)return false;const i=state.settings.nukeIncomeMinutes||2;return a<=t*i}async sendNuke(e,t,a,i=0,s=false,r=true){const o=this.game.ticks();let l;try{l=await withTimeout(this.player.buildables(e,[t]),WORKER_TIMEOUT_MS,null)}catch(p){return}const u=Array.isArray(l)?l.find(p=>p.type===t):null;if(u===null||u===void 0)return;if(!(u.canBuild!==false&&this.player.gold()>=u.cost))return;const c=getBuildMenu();if(!c||typeof c.sendBuildOrUpgrade!=="function")return;const d=c.uiState;const f=!!(d&&typeof d==="object");let h;if(f){h=d.rocketDirectionUp;d.rocketDirectionUp=r!==false}try{c.sendBuildOrUpgrade(u,e)}finally{if(f)d.rocketDirectionUp=h}this.recentlySentNukes.push([o,e,t]);if(t===UNIT.AtomBomb){this.atomBombsLaunched++;if(this.atomBombPerceivedCost===null){const p=await this.cost(UNIT.AtomBomb);if(p)this.atomBombPerceivedCost=p}if(!state.settings.economyFirst&&this.atomBombPerceivedCost){this.atomBombPerceivedCost=this.atomBombPerceivedCost*150n/100n}}else if(t===UNIT.HydrogenBomb){this.hydrogenBombsLaunched++;if(this.hydrogenBombPerceivedCost===null){const p=await this.cost(UNIT.HydrogenBomb);if(p)this.hydrogenBombPerceivedCost=p}if(!state.settings.economyFirst&&this.hydrogenBombPerceivedCost){this.hydrogenBombPerceivedCost=this.hydrogenBombPerceivedCost*125n/100n}}state.stats.nukes++;if(!s)setLastAction(tr("☢️ Launch")+" "+t,"nuke");this.emojiBehavior.maybeSendEmoji(a,EMOJI_NUKE)}planSaturationSalvo(e,t,a){const i=this.findEnemySamsCoveringTile(e);const s=new Set(i.map(C=>C.id()));const r=i.reduce((C,F)=>C+F.level(),0);const o=r+1;const l=nukeArcSpeed(this.game,UNIT.AtomBomb);const u=[];for(const C of a){const F=C.level()-C.missileTimerQueue().length;if(F<=0){continue}const J=this.chooseNukeArc(C.tile(),e,s);const ue=J.intercepted;const S=UniversalPathFinding.Parabola(this.game,{increment:l,distanceBasedHeight:true,directionUp:true});const P=S.findPath(C.tile(),e)??[];if(P.length===0)continue;u.push({silo:C,slots:F,flightTicks:P.length,interceptable:ue,arcUp:J.arcUp!==false})}u.sort((C,F)=>this.game.manhattanDist(C.silo.tile(),e)-this.game.manhattanDist(F.silo.tile(),e));const c=[];for(const C of u){for(let F=0;F<C.slots;F++){c.push({flightTicks:C.flightTicks,interceptable:C.interceptable,arcUp:C.arcUp!==false})}}const d=this.game.config().SAMCooldown();const f=Math.floor(d/2);const h=Math.floor(o/5);const p=o+h;const g=[];for(let C=0;C<c.length;C++){if(!c[C].interceptable){g.push({index:C,flightTicks:c[C].flightTicks})}}if(g.length<p){return{ok:false,needsMoreSilos:true,coveringSamIds:s,totalBombs:p}}const m=[...g].sort((C,F)=>C.flightTicks-F.flightTicks);let y=0;let b=0;for(let C=0;C<m.length;C++){let F=C;while(F<m.length&&m[F].flightTicks-m[C].flightTicks<=f){F++}if(F-C>b){b=F-C;y=C}}if(b<p){return{ok:false,needsMoreSilos:true,coveringSamIds:s,totalBombs:p}}const v=m.slice(y,y+b);const T=[...v].sort((C,F)=>C.index-F.index);const x=T.slice(0,p);const I=new Set(x.map(C=>C.index));const M=x[x.length-1].index;const _=M+1;const k=Math.min(...x.map(C=>C.flightTicks));const N=Math.max(1,Math.floor(f/p));let B=0;const G=[];const V=[];for(let C=0;C<_;C++){V.push(c[C].arcUp!==false);if(I.has(C)){const F=k+B*N;G.push(Math.max(0,F-c[C].flightTicks));B++}else{G.push(0)}}const O=t*BigInt(_);if(this.player.gold()<O){return{ok:false,needsMoreSilos:false,coveringSamIds:s,totalBombs:p}}if(!this.nukeSpendAllowed(O)){return{ok:false,needsMoreSilos:false,coveringSamIds:s,totalBombs:p}}return{ok:true,bombsToFire:_,waitTicksPerBomb:G,arcUpPerBomb:V,coveringSamIds:s,totalBombs:p}}async planSaturationSalvoFor(e){if(this.game.config().isUnitDisabled(UNIT.AtomBomb))return null;if(this.player.units(UNIT.AtomBomb).length>0)return null;const t=this.player.units(UNIT.MissileSilo).filter(s=>!s.isUnderConstruction());if(t.length===0)return null;const a=await this.cost(UNIT.AtomBomb);let i;try{i=this.planSaturationSalvo(e,a,t)}catch(s){return null}return i&&i.ok?i:null}async maybeDestroyEnemySam(e){if(this.game.config().isUnitDisabled(UNIT.AtomBomb)){return}const t=this.player.units(UNIT.AtomBomb);if(t.length>0){return}const a=await this.cost(UNIT.AtomBomb);const i=e.units(UNIT.SAMLauncher);if(i.length===0){return}const s=this.player.units(UNIT.MissileSilo).filter(u=>!u.isUnderConstruction());if(s.length===0){return}const r=i.slice().sort((u,c)=>u.level()-c.level());let o=false;let l=null;for(const u of r){const c=u.tile();const d=this.planSaturationSalvo(c,a,s);if(!d.ok){if(d.needsMoreSilos){l??={targetTile:c,coveringSamIds:d.coveringSamIds,totalBombs:d.totalBombs};o=true}continue}for(let f=0;f<d.bombsToFire;f++){await this.sendNuke(c,UNIT.AtomBomb,e,d.waitTicksPerBomb[f],true,d.arcUpPerBomb?d.arcUpPerBomb[f]!==false:true);await salvoPace(f,d.bombsToFire)}setLastAction(tr("☢️ Salvo ×{n} → SAM break",{n:d.bombsToFire}),"nuke");return}if(o&&l!==null){await this.maybeUpgradeHelpfulSilo(l)}}findEnemySamsCoveringTile(e){const t=this.game.nearbyUnits(e,this.game.config().maxSamRange(),UNIT.SAMLauncher);const a=[];for(const i of t){const s=i.unit.owner();if(s&&s.smallID&&s.smallID()===this.player.smallID()||this.player.isFriendly(s)){continue}const r=this.game.config().samRange(i.unit.level());if(i.distSquared<=r*r){a.push(i.unit)}}return a}async maybeUpgradeHelpfulSilo(e){const t=this.player.units(UNIT.MissileSilo);if(t.length===0)return;const a=[];for(const l of t){if(!this.chooseNukeArc(l.tile(),e.targetTile,e.coveringSamIds).intercepted){a.push(l)}}if(a.length===0)return;const i=a.length*MAX_NATION_SILO_UPGRADE_LEVEL;if(i<e.totalBombs)return;const s=this.player.units(UNIT.SAMLauncher);let r=null;let o=-1;for(const l of a){if(l.level()>=MAX_NATION_SILO_UPGRADE_LEVEL)continue;let u=0;for(const c of s){const d=this.game.config().samRange(c.level());const f=this.game.euclideanDistSquared(l.tile(),c.tile());if(f<=d*d){u+=c.level()}}if(u>o){o=u;r=l}}if(r!==null){let l;try{l=await withTimeout(this.player.buildables(r.tile(),[UNIT.MissileSilo]),WORKER_TIMEOUT_MS,null)}catch(c){return}const u=Array.isArray(l)?l.find(c=>c.type===UNIT.MissileSilo):null;if(u===null||u===void 0)return;if(u.canUpgrade!==false){const c=getBuildMenu();if(!c||typeof c.sendBuildOrUpgrade!=="function"){return}c.sendBuildOrUpgrade(u);state.stats.builds++;setLastAction(tr("☢️ Upgrade silo"),"build")}}}async cost(e){const t=this.game.ticks();if(this._costCacheTick!==t){this._costCacheTick=t;this._costCache=new Map}if(this._costCache.has(e))return this._costCache.get(e);const a=this.player.borderTiles();const i=a&&a.size>0?a.values().next().value:null;if(i===null||i===void 0)return 0n;let s;try{s=await withTimeout(this.player.buildables(i,[e]),WORKER_TIMEOUT_MS,null)}catch(l){return 0n}const r=Array.isArray(s)?s.find(l=>l.type===e):null;const o=r&&r.cost!==void 0&&r.cost!==null?r.cost:0n;this._costCache.set(e,o);return o}nukeSpawn(e,t){const a=this.player.units(UNIT.MissileSilo);let i=false;let s=Infinity;for(const r of a){if(r.isActive&&r.isActive()===false)continue;if(r.isUnderConstruction())continue;if(typeof r.ticksLeftInCooldown==="function"&&r.ticksLeftInCooldown()>0){continue}const o=this.game.manhattanDist(r.tile(),t);if(o<s){s=o;i=r.tile()}}return i}async probeCanBuildNuke(e,t){let a;try{a=await withTimeout(this.player.buildables(e,[t]),WORKER_TIMEOUT_MS,null)}catch(s){return false}const i=Array.isArray(a)?a.find(s=>s.type===t):null;return i!==null&&i!==void 0&&i.canBuild!==false}}"use strict";class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=true;this.behaviorsInitialized=false;this.spawnExecAdded=false;this.lastSpawnTile=null;this.lastSpawnTopKey=null;this.lastSpawnPickTick=null;this.status="";this.lastSeenTick=-1;this.embargoMalusApplied=new Set;this.random=new PseudoRandom(simpleHash(String(t&&t.playerId))+simpleHash(String(t&&t.gameId)));this.triggerRatio=this.random.nextInt(50,60)/100;this.reserveRatio=this.random.nextInt(30,40)/100;this.expandRatio=this.random.nextInt(10,20)/100;this.attackRate=this.getAttackRate();this.attackTick=this.random.nextInt(0,this.attackRate)}getAttackRate(){switch(currentDifficulty()){case Difficulty.Easy:return this.random.nextInt(65,100);case Difficulty.Medium:return this.random.nextInt(55,70);case Difficulty.Hard:return this.random.nextInt(45,60);case Difficulty.Impossible:return 30;default:return 30}}feat(e){return!!(state.settings.features&&state.settings.features[e])}async tick(e){this.player=this.mg.myPlayer();const t=this.player;if(t!==null&&typeof sampleBotIncome==="function"){if(typeof maybeResetForNewGame==="function"){try{let c=Number(this.mg.ticks());if(maybeResetForNewGame(c)){pushLog(tr("♻️ New game detected — cleared stale per-game state"),"system")}}catch(c){}}sampleBotIncome(this.mg,t)}if(this.behaviorsInitialized&&t!==null&&t.isAlive()&&this.feat("warship")&&currentDifficulty()!==Difficulty.Easy&&t.unitsConstructed(UNIT.Port)&&!this.mg.config().isUnitDisabled(UNIT.Warship)){try{if(state.settings.warshipAutoSpawn!==false){this.warshipBehavior.trackShipsAndRetaliate()}if(state.settings.winFixes){if(state.settings.warshipNukeDodge!==false){this.warshipBehavior.dodgeNukes()}this.warshipBehavior.smartWarshipPatrol();this.warshipBehavior.smartWarshipCombat()}}catch(c){console.error("[AutoBot] trackShips error:",c)}}if(t===null)return;if(this.mg.inSpawnPhase()){if(this.feat("spawn")){if(this.lastSpawnPickTick==null||e-this.lastSpawnPickTick>=6){this.lastSpawnPickTick=e;const c=this.currentSpawnTopKey();if(!this.spawnExecAdded||c!=null&&c!==this.lastSpawnTopKey){this.lastSpawnTopKey=c;this.doSpawn()}}this.status=tr("Spawn phase…")}else{this.status=tr("Spawn phase…")}return}if(!t.isAlive()){this.active=false;this.status=tr("💀 Eliminated");return}if(!this.behaviorsInitialized){this.initializeBehaviors();if(this.feat("expand")){await this.attackBehavior.forceSendAttack(this.mg.terraNullius())}this.lastSeenTick=e;return}const a=this.lastSeenTick<0?e:this.lastSeenTick+1;this.lastSeenTick=e;let i=this.attackRate;if(state.settings.winFixes){const c=state.settings.combatCadenceScale??1;if(c>0&&c!==1){i=Math.max(1,Math.round(this.attackRate*c))}}const s=this.attackTick%i;const r=(s+Math.floor(i/3))%i;const o=(s+Math.floor(i*2/3))%i;let l=false;let u=false;for(let c=a;c<=e;c++){const d=(c%i+i)%i;if(d===s)l=true;else if(d===r||d===o)u=true}if(!l){if(u&&this.feat("build")){await this.structureBehavior.handleStructures()}return}this.status=tr("Thinking…");try{this.emojiBehavior.maybeSendCasualEmoji();this.updateRelationsFromEmbargos();this.allianceBehavior.handleAllianceRequestsFromBots();if(this.feat("alliance")){this.allianceBehavior.handleAllianceRequests();this.allianceBehavior.handleAllianceExtensionRequests()}if(this.feat("nuke")){await this.mirvBehavior.considerMIRV()}if(this.feat("build")){await this.structureBehavior.handleStructures()}if(this.feat("warship")&&state.settings.warshipAutoSpawn!==false){await this.warshipBehavior.maybeSpawnWarship()}if(this.feat("embargo")){this.handleEmbargoesToHostileNations()}if(this.feat("expand")||this.feat("boat")){await this.attackBehavior.maybeAttack()}if(this.feat("warship")&&state.settings.warshipAutoSpawn!==false){await this.warshipBehavior.counterWarshipInfestation()}if(this.feat("nuke")){await this.nukeBehavior.maybeSendNuke()}}catch(c){console.error("[AutoBot] decision chain error:",c)}}initializeBehaviors(){const e=this.random;const t=this.mg;const a=this.player;this.emojiBehavior=new EmojiBehavior(e,t,a);this.mirvBehavior=new MirvBehavior(e,t,a,this.emojiBehavior);this.allianceBehavior=new AllianceBehavior(e,t,a,this.emojiBehavior);this.warshipBehavior=new WarshipBehavior(e,t,a,this.emojiBehavior);this.attackBehavior=new AttackBehavior(e,t,a,this.triggerRatio,this.reserveRatio,this.expandRatio,this.allianceBehavior,this.emojiBehavior);this.nukeBehavior=new NukeBehavior(e,t,a,this.attackBehavior,this.emojiBehavior);this.structureBehavior=new StructureBehavior(e,t,a);this.behaviorsInitialized=true}currentSpawnTopKey(){if(!state.settings.smartSpawn)return null;let e=null;try{if(typeof getSpawnHeatmapTopSpots==="function")e=getSpawnHeatmapTopSpots();if((!e||e.length===0)&&typeof computeSpawnTopSpotsForBot==="function"){e=computeSpawnTopSpotsForBot(this.mg,this.player)}}catch(t){e=null}return e&&e.length>0?`${e[0].x},${e[0].y}`:null}doSpawn(){const e=this.pickSpawnCenter();if(e==null){this.status=tr("Spawn phase…");return}if(this.spawnExecAdded&&e===this.lastSpawnTile){return}const t=discoverCtors(getEventBus());if(t.spawn){emitIntent(t.spawn,e);const a=this.spawnExecAdded;this.spawnExecAdded=true;this.lastSpawnTile=e;if(!a){state.stats.spawns++}setLastAction(tr("🏁 Spawned"),"spawn")}}pickSpawnCenter(){if(typeof companionSpawnCenter==="function"){const h=companionSpawnCenter(this.mg,this.player);if(h!=null)return h}const e=this.mg;const t=e.width();const a=e.height();let i=30;try{const h=e.config().minDistanceBetweenPlayers();if(Number.isFinite(h))i=h}catch(h){}let s=null;try{const h=this.player.team();if(h!==null&&typeof e.__src?.teamSpawnArea==="function"){s=e.__src.teamSpawnArea(h)??null}}catch(h){}const r=e.players().filter(h=>h.smallID()!==this.player.smallID()&&h.hasSpawned());const o=h=>{const p=e.x(h);const g=e.y(h);for(const m of r){const y=m.nameLocation();if(!y)continue;if(e.manhattanDist(e.ref(y.x,y.y),h)<i)return true}return false};const l=state.settings.smartSpawn;const u=h=>h!=null&&e.isLand(h)&&!e.hasOwner(h)&&!e.isBorder(h)&&!o(h);const c=(h,p)=>{if(e.isValidCoord(h,p)){const g=e.ref(h,p);if(u(g))return g}for(let g=2;g<=24;g+=2){for(let m=-g;m<=g;m+=2){for(let y=-g;y<=g;y+=2){if(Math.abs(y)!==g&&Math.abs(m)!==g)continue;const b=h+y;const v=p+m;if(!e.isValidCoord(b,v))continue;const T=e.ref(b,v);if(u(T))return T}}}return null};if(l){let h=null;try{if(typeof getSpawnHeatmapTopSpots==="function"){h=getSpawnHeatmapTopSpots()}if(!h&&typeof computeSpawnTopSpotsForBot==="function"){h=computeSpawnTopSpotsForBot(e,this.player)}}catch(p){h=null}if(h&&h.length>0){for(let p=0;p<h.length;p++){const g=c(h[p].x,h[p].y);if(g!=null)return g}}}let d=null;let f=-Infinity;for(let h=0;h<1e3;h++){const p=s?this.random.nextInt(s.x,s.x+s.width):this.random.nextInt(0,t);const g=s?this.random.nextInt(s.y,s.y+s.height):this.random.nextInt(0,a);if(!e.isValidCoord(p,g))continue;const m=e.ref(p,g);if(!e.isLand(m)||e.hasOwner(m)||e.isBorder(m))continue;if(o(m))continue;if(!l)return m;const y=this.scoreSpawnTile(m,r,t,a,s);if(y>f){f=y;d=m}}return d}scoreSpawnTile(e,t,a,i,s){const r=this.mg;const o=r.x(e);const l=r.y(e);let u=0;const c=12;let d=0;let f=0;for(let g=-c;g<=c;g++){for(let m=-c;m<=c;m++){const y=o+m;const b=l+g;if(!r.isValidCoord(y,b))continue;f++;if(r.isLand(r.ref(y,b)))d++}}u+=(f>0?d/f:0)*40;let h=Infinity;for(const g of t){const m=g.nameLocation();if(!m)continue;const y=Math.abs(m.x-o)+Math.abs(m.y-l);if(y<h)h=y}u+=Math.min(1,h/200)*30;const p=Math.min(o,l,a-1-o,i-1-l);u+=Math.min(1,p/30)*20;if(s){const g=s.x+s.width/2;const m=s.y+s.height/2;const y=Math.abs(o-g)+Math.abs(l-m);const b=(s.width+s.height)/2;u+=Math.max(0,1-y/Math.max(1,b))*10}return u}updateRelationsFromEmbargos(){const e=this.player;if(e===null)return;const t=this.mg.players().filter(i=>i.id()!==e.id());const a=-20;t.forEach(i=>{if(i.hasEmbargoAgainst(e)&&!this.embargoMalusApplied.has(i.smallID())){e.updateRelation(i,a);this.embargoMalusApplied.add(i.smallID())}else if(!i.hasEmbargoAgainst(e)&&this.embargoMalusApplied.has(i.smallID())){e.updateRelation(i,-a);this.embargoMalusApplied.delete(i.smallID())}})}handleEmbargoesToHostileNations(){const e=this.player;if(e===null)return;const t=this.mg.players().filter(r=>r.id()!==e.id());const a=currentDifficulty();const i=a===Difficulty.Hard||a===Difficulty.Impossible;const s=this.mg.config().gameConfig().gameMode===GameMode.Team;t.forEach(r=>{if(s&&i&&r.type()!==PlayerType.Bot&&!e.isOnSameTeam(r)&&!e.isAlliedWith(r)){if(this.embargoIsWorthIt(r)){if(!e.hasEmbargoAgainst(r))this.addEmbargo(r,false)}else if(e.hasEmbargoAgainst(r)){this.stopEmbargo(r)}return}if(e.relation(r)<=Relation.Hostile&&!e.hasEmbargoAgainst(r)&&!e.isOnSameTeam(r)&&!e.isAlliedWith(r)&&this.embargoIsWorthIt(r)){this.addEmbargo(r,false)}else if(e.hasEmbargoAgainst(r)&&(e.relation(r)>=Relation.Neutral||e.isAlliedWith(r)||!this.embargoIsWorthIt(r))){this.stopEmbargo(r)}})}embargoIsWorthIt(e){try{const t=this.mg.numLandTiles()||1;if(e.numTilesOwned()/t>=EMBARGO_DENIAL_SHARE)return true;return this.tradeStationCount(e)<=this.tradeStationCount(this.player)}catch(t){return false}}tradeStationCount(e){let t=0;for(const a of e.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(typeof a.hasTrainStation==="function"&&a.hasTrainStation()){t+=1}}return t}addEmbargo(e,t){const a=discoverCtors(getEventBus());if(!a.embargo)return;emitIntent(a.embargo,e.__src??e,"start");setLastAction(tr("🚫 Embargo {name}",{name:safeName(e)}),"diplo")}stopEmbargo(e){const t=discoverCtors(getEventBus());if(!t.embargo)return;emitIntent(t.embargo,e.__src??e,"stop");setLastAction(tr("✅ Trade resumed {name}",{name:safeName(e)}),"diplo")}}"use strict";let _api=null;let _apiSrc=null;let _bot=null;let _botSeedKey=null;function ensureGameApi(n){if(_api&&_apiSrc===n)return _api;_api=createGameApi(n);_apiSrc=n;_bot=null;_botSeedKey=null;return _api}function resolveGameId(n){try{if(typeof n.gameID==="function")return String(n.gameID())}catch(e){}try{const e=n.config().gameConfig();if(e&&e.gameID!=null)return String(e.gameID)}catch(e){}return"openfront"}async function botTick(){if(!state.settings.enabled||state.tickInFlight)return;const n=getGame();if(!n){setStatus(tr("Waiting to enter game…"));return}if(isPublicLobby(n)){setStatus(tr("⛔ Blocked in a public lobby"));refreshGateBanner();return}const e=n.myPlayer?.();if(!e||!e.isPlayer?.()){setStatus(tr("Waiting for player…"));return}state.tickInFlight=true;state.tickStartedAt=performance.now();try{updateSpeedFactor(n);const t=ensureGameApi(n);const a=e.id?.();if((!_bot||_botSeedKey!==a)&&typeof NationBot==="function"){_bot=new NationBot(t.game,{gameId:resolveGameId(n),playerId:String(a)});_botSeedKey=a}await t.beginTick(e);const i=t.game.myPlayer();updateLive(t.game,i);if(_bot){await _bot.tick(t.game.ticks());setStatus(_bot.status||tr("Thinking…"))}else{setStatus(tr("Loading bot…"))}}catch(t){console.error("[AutoBot] tick error:",t);setStatus(tr("Error (see console)"))}finally{state.tickInFlight=false;renderStatus()}}function updateLive(n,e){try{const t=toNum(e.troops?.());const a=safeMaxTroops(n,e);state.live={troops:t,gold:toNum(e.gold?.()),tiles:toNum(e.numTilesOwned?.()),fill:a>0?t/a:0}}catch(t){}}function desiredTickInterval(){const n=state.settings.tickMs||200;return clamp(n/Math.max(.25,state.speed.factor||1),100,n)}function startEngine(){if(state.tickTimer!==null)return;state.tickIntervalMs=desiredTickInterval();state.tickTimer=window.setInterval(botTick,state.tickIntervalMs);botTick()}function stopEngine(){if(state.tickTimer!==null){window.clearInterval(state.tickTimer);state.tickTimer=null}state.tickInFlight=false}function retuneEngine(){if(state.tickTimer===null)return;const n=desiredTickInterval();if(Math.abs(n-(state.tickIntervalMs||0))>60){window.clearInterval(state.tickTimer);state.tickIntervalMs=n;state.tickTimer=window.setInterval(botTick,n)}}function setEnabled(n){state.settings.enabled=Boolean(n);saveSettings();if(state.settings.enabled){setStatus(tr("Starting…"));startEngine()}else{stopEngine();setStatus(tr("Disabled"))}renderHeader()}function setStatus(n){state.status=n}function setLastAction(n,e){const t=Date.now();state.lastAction=n+"  ·  T+"+new Date(t).toLocaleTimeString();pushLog(n,e||"combat",t)}function pushLog(n,e,t){state.log.unshift({t:t||Date.now(),cat:e,text:String(n)});if(state.log.length>LOG_CAP)state.log.length=LOG_CAP;if(state.activeTab==="log")renderLog()}"use strict";function ensureStyles(){if(document.getElementById(STYLE_ID))return;const n=document.createElement("style");n.id=STYLE_ID;n.textContent=`
+    `;(document.head||document.documentElement).appendChild(n)}function ensureWarshipRouteContainer(){ensureWarshipRouteStyles();let n=document.getElementById(WARSHIP_ROUTES_CONTAINER_ID);if(!n){n=document.createElement("div");n.id=WARSHIP_ROUTES_CONTAINER_ID;n.setAttribute("aria-hidden","true");(document.body||document.documentElement).appendChild(n)}return n}function ensureWarshipRouteSvg(n){let e=n.querySelector(".openfront-helper-warship-route-svg");if(!e){e=document.createElementNS("http://www.w3.org/2000/svg","svg");e.classList.add("openfront-helper-warship-route-svg");e.setAttribute("aria-hidden","true");n.prepend(e)}return e}function collectWarshipRoutes(n){const e=[];for(const t of n.units("Warship")){if(!t?.isActive?.())continue;const a=getBoatPredictionRelation(n,t);if(!a)continue;if(!warshipFactionEnabled(a))continue;let i=null;try{const u=t.warshipState?.()?.patrolTile;if(u!==void 0&&u!==null)i=asFiniteTileRef(u)}catch(u){}const s=Number(t.id?.());if(i===null&&Number.isFinite(s)){try{const u=n.motionPlans?.()?.get(s);if(u?.path?.length){i=asFiniteTileRef(u.path[u.path.length-1])}}catch(u){}}if(i===null)continue;let r=null;let o=null;try{r=n.x(i);o=n.y(i)}catch(u){continue}try{const u=t.tile?.();if(u!==void 0&&u!==null){const c=Math.abs(n.x(u)-r)+Math.abs(n.y(u)-o);if(c<WARSHIP_ROUTE_MIN_DIST)continue}}catch(u){}let l=warshipRouteColor(a);if(a!=="self"){const u=ofhOwnerOverlayRgb(t.owner?.());if(u)l=ofhOwnerRgba(u,.95)}e.push({id:String(t.id?.()??`dest:${i}`),unit:t,self:a==="self",color:l,motionPlanUnitId:Number.isFinite(s)?s:null,destWorldX:r,destWorldY:o})}return e}function getWarshipRouteEntry(n,e,t){let a=warshipRouteDomCache.get(t.id);if(!a){const s=document.createElementNS("http://www.w3.org/2000/svg","polyline");s.classList.add("openfront-helper-warship-route-line");s.style.display="none";e.appendChild(s);const r=document.createElement("div");r.className="openfront-helper-warship-dest";r.hidden=true;n.appendChild(r);a={routeLine:s,marker:r,signature:"",routePoints:"",markerX:"",markerY:""};warshipRouteDomCache.set(t.id,a)}const i=t.color+(t.self?"|self":"");if(a.signature!==i){a.routeLine.style.stroke=t.color;a.marker.style.setProperty("--ws-color",t.color);a.routeLine.classList.toggle("ofh-ws-self",!!t.self);a.marker.classList.toggle("ofh-ws-self",!!t.self);a.signature=i}return a}function cleanupWarshipRouteDom(n){for(const[e,t]of warshipRouteDomCache){if(!n.has(e)){t.routeLine.remove();t.marker.remove();warshipRouteDomCache.delete(e)}}}function syncWarshipRoutes(){if(!warshipRoutesEnabled){teardownWarshipRoutes();return}_wsFrameCounter=(_wsFrameCounter+1)%3;if(_wsFrameCounter!==0&&_isLowLagMode()){warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes);return}const n=ensureWarshipRouteContainer();const e=getOpenFrontGameContext();if(!e?.game||!e?.transform){n.replaceChildren();warshipRouteDomCache.clear();warshipRouteScan=[];lastWarshipRouteScanAt=0;warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes);return}const t=ensureWarshipRouteSvg(n);const a=Date.now();if(!lastWarshipRouteScanAt||a-lastWarshipRouteScanAt>=WARSHIP_ROUTES_SCAN_MS){warshipRouteScan=collectWarshipRoutes(e.game);const i=new Set;for(const s of warshipRouteScan)i.add(s.id);cleanupWarshipRouteDom(i);lastWarshipRouteScanAt=a}resetScreenPointPool();for(let i=0;i<warshipRouteScan.length;i+=1){const s=warshipRouteScan[i];const r=toScreenPointFromWorld(e.transform,s.destWorldX,s.destWorldY);const o=isNearViewport(r,240);const l=toScreenPoint(e.game,e.transform,asFiniteTileRef(s.unit?.tile?.()));const u=l!=null;const c=u?l.x:0;const d=u?l.y:0;const f=u&&isNearViewport({x:c,y:d},240);const h=getWarshipRouteEntry(n,t,s);if(!o&&!f){h.routeLine.style.display="none";if(!h.marker.hidden)h.marker.hidden=true;continue}const p=r?r.x:0;const g=r?r.y:0;const m=getBoatRouteScreenPoints(e.game,e.transform,s.unit,s.motionPlanUnitId,u?{x:c,y:d}:null,r?{x:p,y:g}:null);if(m.length>=2){let y="";for(let b=0;b<m.length;b+=1){y+=b===0?`${m[b].x},${m[b].y}`:` ${m[b].x},${m[b].y}`}if(h.routePoints!==y){h.routeLine.setAttribute("points",y);h.routePoints=y}h.routeLine.style.display=""}else{h.routeLine.style.display="none"}if(r&&o){const y=`${p}px`;const b=`${g}px`;if(h.markerX!==y){h.marker.style.setProperty("--ws-tx",y);h.markerX=y}if(h.markerY!==b){h.marker.style.setProperty("--ws-ty",b);h.markerY=b}if(h.marker.hidden)h.marker.hidden=false}else if(!h.marker.hidden){h.marker.hidden=true}}warshipRoutesAnimationFrame=requestAnimationFrame(syncWarshipRoutes)}function teardownWarshipRoutes(){if(warshipRoutesAnimationFrame!==null){cancelAnimationFrame(warshipRoutesAnimationFrame)}warshipRoutesAnimationFrame=null;lastWarshipRouteScanAt=0;warshipRouteScan=[];warshipRouteDomCache.clear();document.getElementById(WARSHIP_ROUTES_CONTAINER_ID)?.remove()}function setWarshipRoutesEnabled(n,e){warshipRoutesEnabled=Boolean(n);if(e&&typeof e==="object"){if(e.own!==void 0)warshipShowOwn=Boolean(e.own);if(e.team!==void 0)warshipShowTeam=Boolean(e.team);if(e.ally!==void 0)warshipShowAlly=Boolean(e.ally);if(e.enemy!==void 0)warshipShowEnemy=Boolean(e.enemy)}teardownWarshipRoutes();if(warshipRoutesEnabled){syncWarshipRoutes()}}let autoLeaveOnTeamWin=false;let autoLeaveOnLoss=false;let autoLeaveTimer=null;let autoLeaveFired=false;function checkAutoLeave(){if(autoLeaveFired||!autoLeaveOnTeamWin&&!autoLeaveOnLoss){return}let n=null;try{n=document.querySelector("win-modal")}catch(t){return}if(!n||n.isVisible!==true){return}const e=n.isWin===true;if(e?!autoLeaveOnTeamWin:!autoLeaveOnLoss){return}autoLeaveFired=true;try{window.location.href="/"}catch(t){}}function syncAutoLeaveTimer(){if(autoLeaveOnTeamWin||autoLeaveOnLoss){if(autoLeaveTimer===null){autoLeaveTimer=window.setInterval(checkAutoLeave,1e3)}}else if(autoLeaveTimer!==null){clearInterval(autoLeaveTimer);autoLeaveTimer=null}}function setAutoLeaveOnTeamWinEnabled(n){autoLeaveOnTeamWin=Boolean(n);syncAutoLeaveTimer()}function setAutoLeaveOnLossEnabled(n){autoLeaveOnLoss=Boolean(n);syncAutoLeaveTimer()}"use strict";const UNIT={City:"City",Port:"Port",Factory:"Factory",SAMLauncher:"SAM Launcher",MissileSilo:"Missile Silo",DefensePost:"Defense Post",TransportShip:"Transport",TradeShip:"Trade Ship",Warship:"Warship",AtomBomb:"Atom Bomb",HydrogenBomb:"Hydrogen Bomb",MIRV:"MIRV",MIRVWarhead:"MIRV Warhead"};const PANEL_ID="openfront-helper-auto-bot-panel";const STYLE_ID="openfront-helper-auto-bot-styles";const STORAGE_KEY="openfront-helper-autobot-v1";const DEFAULTS={enabled:true,features:{spawn:true,expand:true,build:true,boat:true,nuke:true,warship:true,alliance:true,embargo:true,donate:true,betray:true},buildStructures:{[UNIT.City]:true,[UNIT.Port]:true,[UNIT.Factory]:true,[UNIT.DefensePost]:true,[UNIT.SAMLauncher]:true,[UNIT.MissileSilo]:true},winFixes:true,economyFirst:true,samCrack:true,safePlacement:true,samUmbrella:true,samDefense:true,defensePosts:true,defensePostTiming:true,defensePostPlayersOnly:true,nukeDensityFirst:true,reserveByNeighbors:true,counterAttackFirst:true,absorbThenCounter:true,counterSpentFrac:.4,counterWeakRatio:.5,absorbMaxTicks:300,absorbReserveFloor:.55,nukeIncomeMinutes:2,nukeArcRotate:true,samUpgradeMargin:true,combatReserve:true,combatReserveFloor:.45,counterKeepFrac:.45,phasedOpening:true,openingArmyFill:.65,openingMinCityLevels:5,openingMaxTicks:9e3,openingFullSendFreeShare:.08,openingFullSendBotCount:2,fullSendReserve:.05,gentleNeighbors:true,neighborReserveFloor:.5,encirclePockets:true,encircleMaxShare:.1,encircleMinSealShare:.6,openingSurroundedNeighbors:2,openingAllModes:true,minAttackForce:true,minAttackFrac:.12,openingInvaderMemoryTicks:600,smartSpawn:true,combatCadenceScale:.6,sizeReserveScale:1.5,sizeReserveCap:.6,mirvLeaderShare:.4,mirvPreemptFrac:.85,mirvTargetMinShare:.35,mirvTargetTopN:3,mirvEarlyGameTicks:6e3,teamWonShare:null,factoryRailShare:.75,boatProbeFrac:.01,boatProbeMinTroops:1e3,boatSurgeFrac:.25,oppBoatThrottleMs:350,maxConcurrentBoats:3,boatSpreadRadius:30,mirvBoatWindowTicks:150,donateThrottleMs:1200,donateNeedThreshold:.65,donateKeepFrac:.45,farAllyThrottleMs:4e3,warshipPatrolThrottleMs:1500,warshipMoveMaxDist:160,warshipMoveCooldownTicks:60,warshipLossMinDist:25,warshipLossWindowTicks:900,warshipRaidWindowTicks:400,warshipLossZoneMin:2,warshipLossZoneRadius:35,warshipRetreatHealthPct:75,warshipHuntTrade:true,warshipCombatThrottleMs:800,warshipAutoSpawn:true,warshipEvade:true,warshipNukeDodge:true,warshipServiceCellSize:40,warshipZoneServiceTicks:90,warshipNukeDodgeMargin:8,warshipNukeDodgeBuffer:20,warshipNukeDodgeSamples:8,warshipNukeDodgeRings:3,donateMinExcessFrac:.05,donateMinDonatePct:.2,boatWeakTroopFrac:.6,distantBoatProbeMax:12,boatSurplusFill:.4,boatIslandFill:.15,islandScanRadius:40,islandScanStep:2,islandScanSamples:6,islandProbeMax:4,tickMs:200,minimized:false,hidden:false,statusOpen:false,featsOpen:true,pos:null};const MAX_DEFENSE_RESERVE=.8;const EMBARGO_DENIAL_SHARE=.4;const RESERVE_PER_EXTRA_NEIGHBOR=.07;const RESERVE_NEIGHBOR_CAP=.65;const COMBAT_THREAT_STICKY_TICKS=150;const SHIELD_GUARD_DIST=20;const EARLY_EXPAND_COMMIT=.6;const BUILD_THROTTLE_MS=1800;const NUKE_THROTTLE_MS=6e3;const MIRV_COOLDOWN_MS=3e4;const MIRV_DOMINANCE_SHARE=.5;const MIRV_STEAMROLL_MIN_CITIES=10;const MIRV_STEAMROLL_GAP=1.25;const WARSHIP_THROTTLE_MS=4e3;const ALLIANCE_THROTTLE_MS=2e3;const BORDER_CACHE_MS=2200;const ENCIRCLE_SCAN_TICKS=100;const UNDER_ATTACK_RATIO=.35;const state={settings:loadSettings(),tickTimer:null,tickIntervalMs:0,tickInFlight:false,tickStartedAt:0,lastCombatMs:0,income:{lastGold:null,earned:0,samples:[]},lastSeenTick:null,lastPlayerAttackMs:0,lastRetaliateMs:0,lastBuildMs:0,lastNukeMs:0,lastWarshipMs:0,lastWarshipMoveMs:0,lastWarshipPatrolMs:0,lastAllianceMs:0,lastEmbargoMs:0,lastDonateMs:0,beachhead:null,recentMirvHits:[],lastOppBoatMs:0,lastNuker:null,recentNukes:[],hostility:new Map,nukeReserveGold:0,nukeWantSlots:null,lastMirv:null,navalThreatAt:0,speed:{lastTick:null,lastMs:0,factor:1},border:{tiles:null,atMs:0},landBorderEnemySids:new Set,status:"",lastAction:"—",stats:{spawns:0,attacks:0,builds:0,nukes:0},live:{troops:0,gold:0,tiles:0,fill:0},log:[],activeTab:"control",logFilter:"all"};const LOG_CATS={spawn:{label:"Spawn",emoji:"🏁"},combat:{label:"Combat",emoji:"⚔️"},naval:{label:"Naval",emoji:"🚢"},build:{label:"Building",emoji:"🏗️"},nuke:{label:"Strikes",emoji:"☢️"},diplo:{label:"Diplomacy",emoji:"🤝"}};const LOG_CAP=200;function maybeResetForNewGame(n){if(typeof n!=="number"||!Number.isFinite(n))return false;const e=state.lastSeenTick;state.lastSeenTick=n;if(typeof e!=="number"||n>=e)return false;state.income={lastGold:null,earned:0,samples:[]};state.nukeReserveGold=0n;state.recentMirvHits=[];state.recentNukes=[];state.nukeWantSlots=null;state.lastNuker=null;state.lastMirv=null;state.beachhead=null;state.hostility=new Map;return true}function loadSettings(){const n=["enabled","nukeIncomeMinutes","openingArmyFill","openingMinCityLevels","openingMaxTicks","openingSurroundedNeighbors","openingInvaderMemoryTicks","minimized","hidden","statusOpen","featsOpen","pos","tickMs","donateKeepFrac","donateNeedThreshold","donateThrottleMs","donateMinDonatePct","warshipRetreatHealthPct","warshipCombatThrottleMs","warshipPatrolThrottleMs"];const e=JSON.parse(JSON.stringify(DEFAULTS));try{const t=window.localStorage.getItem(STORAGE_KEY);if(t){const a=JSON.parse(t);for(const i of n){if(a[i]!==void 0)e[i]=a[i]}e.features={...DEFAULTS.features,...a.features||{}};e.buildStructures={...DEFAULTS.buildStructures,...a.buildStructures||{}}}}catch(t){console.warn("[AutoBot] failed to load settings:",t)}return e}function saveSettings(){try{window.localStorage.setItem(STORAGE_KEY,JSON.stringify(state.settings))}catch(n){console.warn("[AutoBot] failed to save settings:",n)}}"use strict";let autoBotBundle=null;let autoBotLang="en";let autoBotBundleSignature="";function tr(n,e){let t=autoBotBundle&&autoBotBundle[n]||n;if(e){for(const a in e){t=t.split("{"+a+"}").join(String(e[a]))}}return t}function setAutoBotI18n(n,e){const t=n||"en";const a=t!==autoBotLang;const i=e&&typeof e==="object";let s=autoBotBundleSignature;if(i){try{s=JSON.stringify(e)}catch(o){s=autoBotBundleSignature}}const r=i&&s!==autoBotBundleSignature;autoBotLang=t;if(i){autoBotBundle=e;autoBotBundleSignature=s}if(a||r){relocalizeAutoBotPanel()}}function relocalizeAutoBotPanel(){if(!state.settings.enabled){state.status=""}const n=document.getElementById(PANEL_ID);if(n&&typeof buildPanel==="function"){n.remove();buildPanel()}if(typeof renderStatus==="function")renderStatus();if(typeof renderLog==="function")renderLog()}"use strict";function gameType(n){try{return n?.config?.().gameConfig?.().gameType??null}catch(e){return null}}function isPublicLobby(n){return false}function randInt(n,e){return Math.floor(Math.random()*(e-n+1))+n}function clamp(n,e,t){return Math.max(e,Math.min(t,n))}function shuffleInPlace(n){for(let e=n.length-1;e>0;e--){const t=Math.floor(Math.random()*(e+1));[n[e],n[t]]=[n[t],n[e]]}return n}function toNum(n){if(typeof n==="bigint")return Number(n);const e=Number(n);return Number.isFinite(e)?e:0}function withTimeout(n,e,t){return Promise.race([Promise.resolve(n).catch(()=>t),new Promise(a=>window.setTimeout(()=>a(t),e))])}const WORKER_TIMEOUT_MS=2500;function updateSpeedFactor(n){let e=NaN;try{e=Number(n.ticks?.())}catch(r){e=NaN}if(!Number.isFinite(e))return;const t=performance.now();const a=state.speed;if(a.lastTick===null){a.lastTick=e;a.lastMs=t;return}const i=e-a.lastTick;const s=t-a.lastMs;if(s>=1500){if(i>0){const r=i/s*1e3;const o=clamp(r/10,.25,12);a.factor=a.factor*.6+o*.4}a.lastTick=e;a.lastMs=t}}function scaled(n){return n/Math.max(.25,state.speed.factor||1)}function safeMaxTroops(n,e){try{const t=n.config().maxTroops(e);return Number.isFinite(t)&&t>0?t:0}catch(t){return 0}}function safeName(n){try{return String(n.displayName?.()??n.name?.()??"?")}catch(e){return"?"}}"use strict";function findContext(){try{if(typeof getOpenFrontGameContext==="function"){const e=getOpenFrontGameContext();if(e?.game?.myPlayer)return e}}catch(e){}try{if(lastOpenFrontGameContext?.game?.myPlayer){return lastOpenFrontGameContext}}catch(e){}const n=["main-radial-menu","build-menu","control-panel","leader-board","options-menu"];for(const e of n){const t=document.querySelector(e);if(t?.game?.myPlayer){return{game:t.game,transform:t.transformHandler||t.transform||null}}}return null}function getGame(){return findContext()?.game??null}function getRadialMenu(){return document.querySelector("main-radial-menu")}function getBuildMenu(){return document.querySelector("build-menu")||getRadialMenu()?.buildMenu||null}function getEventBus(){const n=getBuildMenu();if(n?.eventBus)return n.eventBus;const e=document.querySelector("control-panel");if(e?.eventBus)return e.eventBus;const t=document.querySelector("leader-board");if(t?.eventBus)return t.eventBus;return getRadialMenu()?.eventBus??null}const _ctors={bus:null,spawn:null,attack:null,boat:null,moveWarship:null,embargo:null,donateTroops:null,emoji:null,target:null,allianceRequest:null};const _alliancesActioned=new WeakSet;function getListenersMap(n){if(n?.listeners instanceof Map)return n.listeners;for(const e of Object.getOwnPropertyNames(n||{})){try{if(n[e]instanceof Map)return n[e]}catch(t){}}return null}function discoverCtors(n){if(_ctors.bus===n&&_ctors.attack&&_ctors.spawn&&_ctors.boat&&_ctors.moveWarship&&_ctors.embargo&&_ctors.donateTroops){return _ctors}const e=getListenersMap(n);if(!e)return _ctors;_ctors.bus=n;for(const t of e.keys()){if(typeof t!=="function")continue;if(!_ctors.moveWarship){try{const a=new t([7,8],99);if(a&&Array.isArray(a.unitIds)&&a.unitIds[0]===7&&a.tile===99){_ctors.moveWarship=t;continue}}catch(a){}}if(!_ctors.embargo){try{const a={__probe:1};const i=new t(a,"start");if(i&&i.target===a&&i.action==="start"){_ctors.embargo=t;continue}}catch(a){}}if(!_ctors.donateTroops){try{const a={__probe:1};const i=new t(a,123);if(i&&i.recipient===a&&i.troops===123){_ctors.donateTroops=t;continue}}catch(a){}}if(!_ctors.emoji){try{const a={__probe:1};const i=new t(a,7);if(i&&i.recipient===a&&i.emoji===7&&i.troops===void 0&&i.action===void 0){_ctors.emoji=t;continue}}catch(a){}}if(!_ctors.target){try{const a=new t("§tp",456);if(a&&a.targetID==="§tp"&&a.troops===void 0&&a.recipient===void 0&&a.dst===void 0&&a.emoji===void 0){_ctors.target=t;continue}}catch(a){}}if(!_ctors.attack){try{const a=new t("§p",123);if(a&&a.targetID==="§p"&&a.troops===123&&a.dst===void 0){_ctors.attack=t;continue}}catch(a){}}if(!_ctors.boat){try{const a=new t(77,123);if(a&&a.dst===77&&a.troops===123){_ctors.boat=t;continue}}catch(a){}}if(!_ctors.spawn){try{const a=new t(55);if(a&&a.tile===55&&a.targetID===void 0&&a.dst===void 0&&a.unit===void 0&&a.troops===void 0){_ctors.spawn=t;continue}}catch(a){}}}return _ctors}function emitIntent(n,...e){const t=getEventBus();if(!t||typeof n!=="function")return false;try{t.emit(new n(...e));return true}catch(a){console.error("[AutoBot] emit failed:",a);return false}}function diagnose(){const n=getGame();const e=getEventBus();const t=e?discoverCtors(e):_ctors;const a=getBuildMenu();const i=n?.myPlayer?.();const s={game:!!n,gameType:n?gameType(n):null,inSpawnPhase:n?.inSpawnPhase?.()??null,myPlayer:!!i,hasSpawned:i?.hasSpawned?.()??null,buildMenu:!!a,sendBuildOrUpgrade:typeof a?.sendBuildOrUpgrade,eventBus:!!e,ctorSpawn:!!t.spawn,ctorAttack:!!t.attack,ctorBoat:!!t.boat,ctorMoveWarship:!!t.moveWarship,ctorEmbargo:!!t.embargo,ctorDonateTroops:!!t.donateTroops,ctorEmoji:!!t.emoji,ctorAllianceRequest:!!t.allianceRequest,speedFactor:Math.round((state.speed?.factor??1)*100)/100,gold:i?Math.round(toNum(i.gold?.())):0,troops:i?Math.round(toNum(i.troops?.())):0,tiles:i?toNum(i.numTilesOwned?.()):0,botStatus:(()=>{try{return typeof _bot!=="undefined"&&_bot?_bot.status:"no-bot"}catch(r){return"n/a"}})(),eventsDisplayEvents:(()=>{try{return document.querySelector("events-display")?.events?.length??null}catch(r){return null}})()};console.log("[AutoBot] DIAG",s);return s}window.__autoBotDiag=diagnose;"use strict";async function getBorderTiles(n,e){const t=performance.now();if(state.border.tiles&&t-state.border.atMs<scaled(BORDER_CACHE_MS)){return state.border.tiles}let a=[];try{const i=await withTimeout(e.borderTiles(),WORKER_TIMEOUT_MS,null);const s=i?.borderTiles??i;a=s?Array.from(s):[]}catch(i){console.warn("[AutoBot] borderTiles failed:",i);a=[]}state.border={tiles:a,atMs:t};return a}function isOceanAdjacent(n,e){try{if(typeof n.isOceanShore==="function")return n.isOceanShore(e)}catch(t){}for(const t of n.neighbors(e)){if(n.isOcean?.(t))return true}return false}function analyzeBorder(n,e,t){const a=e.smallID?.();let i=false;let s=false;let r=false;let o=false;const l=new Map;const u=new Map;for(const c of t){if(!r&&n.isShore?.(c))r=true;if(!o&&isOceanAdjacent(n,c))o=true;for(const d of n.neighbors(c)){if(!n.isLand(d))continue;if(n.ownerID(d)===a)continue;if(!n.hasOwner(d)){if(n.hasFallout?.(d)){s=true}else{i=true}continue}const f=n.owner(d);if(!f?.isPlayer?.())continue;if(f.smallID?.()===a)continue;if(e.isFriendly?.(f)){u.set(f.smallID(),f);continue}l.set(f.smallID(),f)}}return{hasOpenLand:i,hasNukedLand:s,hasShore:r,hasCoastal:o,enemies:Array.from(l.values()),friends:Array.from(u.values())}}function boundingBox(n,e){let t=Infinity;let a=Infinity;let i=-Infinity;let s=-Infinity;for(const r of e){const o=n.x(r);const l=n.y(r);if(o<t)t=o;if(o>i)i=o;if(l<a)a=l;if(l>s)s=l}if(!Number.isFinite(t))return null;return{minX:t,minY:a,maxX:i,maxY:s}}"use strict";const Difficulty={Easy:"Easy",Medium:"Medium",Hard:"Hard",Impossible:"Impossible"};const GameType={Singleplayer:"Singleplayer",Public:"Public",Private:"Private"};const GameMode={FFA:"Free For All",Team:"Team"};const PlayerType={Bot:"BOT",Human:"HUMAN",Nation:"NATION"};const TerrainType={Plains:0,Highland:1,Mountain:2,Lake:3,Ocean:4};function currentDifficulty(){return Difficulty.Impossible}class PseudoRandom{constructor(e){let t=Number(e)>>>0||1;this._next01=function(){t|=0;t=t+1831565813|0;let a=Math.imul(t^t>>>15,1|t);a=a+Math.imul(a^a>>>7,61|a)^a;return((a^a>>>14)>>>0)/4294967296}}next(){return this._next01()}nextInt(e,t){const a=Math.floor(e);const i=Math.floor(t);return Math.floor(this._next01()*(i-a))+a}nextFloat(e,t){return this._next01()*(t-e)+e}randElement(e){if(e.length===0)throw new Error("array must not be empty");return e[this.nextInt(0,e.length)]}randFromSet(e){const t=e.size;if(t===0)throw new Error("set must not be empty");const a=this.nextInt(0,t);let i=0;for(const s of e){if(i===a)return s;i++}throw new Error("Unexpected error selecting element from set")}chance(e){return this.nextInt(0,e)===0}shuffleArray(e){const t=[...e];for(let a=t.length-1;a>0;a--){const i=this.nextInt(0,a+1);[t[a],t[i]]=[t[i],t[a]]}return t}}function simpleHash(n){let e=0;for(let t=0;t<n.length;t++){const a=n.charCodeAt(t);e=(e<<5)-e+a;e=e&e}return Math.abs(e)}function within(n,e,t){return Math.min(Math.max(n,e),t)}function closestTile(n,e,t){let a=Infinity;let i=null;for(const s of e){const r=n.manhattanDist(s,t);if(r<a){a=r;i=s}}return[i,a]}function closestTwoTiles(n,e,t){const a=Array.from(e).sort((u,c)=>n.x(u)-n.x(c));const i=Array.from(t).sort((u,c)=>n.x(u)-n.x(c));if(a.length===0||i.length===0)return null;let s=0;let r=0;let o=Infinity;let l={x:a[0],y:i[0]};while(s<a.length&&r<i.length){const u=a[s];const c=i[r];const d=Math.abs(n.x(u)-n.x(c))+Math.abs(n.y(u)-n.y(c));if(d<o){o=d;l={x:u,y:c}}if(s===a.length-1){r++}else if(r===i.length-1){s++}else if(n.x(u)<n.x(c)){s++}else{r++}}return l}function calculateBoundingBox(n,e){let t=Infinity,a=Infinity,i=-Infinity,s=-Infinity;for(const r of e){const o=n.x(r);const l=n.y(r);t=Math.min(t,o);a=Math.min(a,l);i=Math.max(i,o);s=Math.max(s,l)}return{min:{x:t,y:a},max:{x:i,y:s}}}function boundingBoxCenter(n){return{x:n.min.x+Math.floor((n.max.x-n.min.x)/2),y:n.min.y+Math.floor((n.max.y-n.min.y)/2)}}function calculateBoundingBoxCenter(n,e){return boundingBoxCenter(calculateBoundingBox(n,e))}function boundingBoxTiles(n,e,t){const a=[];const i=n.x(e);const s=n.y(e);const r=i-t;const o=i+t;const l=s-t;const u=s+t;for(let c=r;c<=o;c++){if(n.isValidCoord(c,l))a.push(n.ref(c,l));if(n.isValidCoord(c,u)&&l!==u)a.push(n.ref(c,u))}for(let c=l+1;c<u;c++){if(n.isValidCoord(r,c))a.push(n.ref(r,c));if(n.isValidCoord(o,c)&&r!==o)a.push(n.ref(o,c))}return a}function calculateTerritoryCenter(n,e){const t=e.borderTiles();if(t.size===0)return null;let a=Infinity,i=-Infinity,s=Infinity,r=-Infinity;for(const h of t){const p=n.x(h);const g=n.y(h);if(p<a)a=p;if(p>i)i=p;if(g<s)s=g;if(g>r)r=g}const o=Math.floor((a+i)/2);const l=Math.floor((s+r)/2);const u=n.ref(o,l);const c=n.owner(u);if(c&&c.isPlayer&&c.isPlayer()&&c.smallID()===e.smallID()){return u}let d=null;let f=Infinity;for(const h of t){const p=n.x(h)-o;const g=n.y(h)-l;const m=p*p+g*g;if(m<f){f=m;d=h}}return d}function randTerritoryTileArray(n,e,t,a){const i=calculateBoundingBox(e,t.borderTiles());const s=[];for(let r=0;r<a;r++){const o=randTerritoryTile(n,e,t,i);if(o!==null)s.push(o)}return s}function randTerritoryTile(n,e,t,a){if(a==null){a=calculateBoundingBox(e,t.borderTiles())}for(let s=0;s<100;s++){const r=n.nextInt(a.min.x,a.max.x);const o=n.nextInt(a.min.y,a.max.y);if(!e.isValidCoord(r,o))continue;const l=e.ref(r,o);const u=e.owner(l);if(u&&u.isPlayer&&u.isPlayer()&&u.smallID()===t.smallID()){return l}}const i=t.borderTiles();if(t.numTilesOwned()>0&&t.numTilesOwned()<=100&&i.size>0){return n.randElement(Array.from(i))}return null}"use strict";const Relation={Hostile:0,Distrustful:1,Neutral:2,Friendly:3};function relationFromValue(n){if(n<-50)return Relation.Hostile;if(n<0)return Relation.Distrustful;if(n<50)return Relation.Neutral;return Relation.Friendly}function bucketMidpoint(n){switch(n){case Relation.Hostile:return-75;case Relation.Distrustful:return-25;case Relation.Friendly:return 75;default:return 25}}function createGameApi(n){const e=new Map;const t=new Map;const a=new Map;let i=new Map;let s=[];let r=null;let o=-1;const l=S=>S&&S.__src?S.__src:S;function u(S){try{return!!(S&&typeof S.isPlayer==="function"&&S.isPlayer())}catch(P){return false}}function c(S){if(S==null)return S;const P=(q,L)=>(...W)=>typeof S[q]==="function"?S[q](...W):L;return{__src:S,owner:()=>p(S.owner()),type:P("type",null),tile:P("tile",null),level:P("level",1),id:P("id",null),isActive:P("isActive",false),isUnderConstruction:P("isUnderConstruction",false),isInCombat:P("isInCombat",false),hasTrainStation:P("hasTrainStation",false),missileTimerQueue:P("missileTimerQueue",[]),targetTile:P("targetTile",void 0),patrolTile:P("patrolTile",void 0),warshipState:P("warshipState",void 0),transportShipState:P("transportShipState",void 0),health:P("health",void 0),ticksLeftInCooldown:P("ticksLeftInCooldown",0),lastSetSafeFromPirates:P("lastSetSafeFromPirates",void 0)}}function d(S){const P=q=>typeof q==="function"?q():q;return{__src:S,troops:()=>Number(P(S.troops)??0),attacker:()=>p(typeof S.attacker==="function"?S.attacker():f(S.attackerID)),target:()=>p(typeof S.target==="function"?S.target():f(S.targetID)),retreating:()=>P(S.retreating)??false,id:()=>P(S.id),hasSourceTile:()=>S.sourceTile!==void 0,sourceTile:()=>S.sourceTile!==void 0?P(S.sourceTile):null}}function f(S){if(S==null)return null;try{return n.playerBySmallID(S)}catch(P){return null}}function h(S){const P=i.has(S)?i.get(S):Relation.Neutral;const q=a.get(S)??0;return bucketMidpoint(P)+q}function p(S){if(S==null)return null;if(!u(S)){return S}const P=S.smallID();let q=e.get(P);if(q){q.__src=S;return q}q=g(S);e.set(P,q);return q}function g(S){const P=(L,W)=>(...z)=>typeof S[L]==="function"?S[L](...z.map(ee=>ee&&ee.__src?ee.__src:ee)):W;const q={__src:S,isPlayer:()=>true,isAlive:P("isAlive",false),hasSpawned:P("hasSpawned",false),smallID:()=>S.smallID(),id:()=>S.id(),clientID:P("clientID",null),type:P("type",null),name:P("name","?"),displayName:P("displayName","?"),troops:()=>Number(S.troops?.()??0),gold:()=>S.gold?.()??0n,numTilesOwned:()=>Number(S.numTilesOwned?.()??0),team:P("team",null),maxTroops:()=>F.config().maxTroops(q),isTraitor:P("isTraitor",false),isDisconnected:P("isDisconnected",false),betrayals:P("betrayals",0),getTraitorRemainingTicks:P("getTraitorRemainingTicks",0),units:(...L)=>S.units(...L).map(c),unitCount:L=>S.units(L).length,unitsOwned:L=>S.units(L).filter(W=>!(W.isUnderConstruction?.()??false)).length,unitsConstructed:L=>S.units(L).some(W=>!(W.isUnderConstruction?.()??false)),totalUnitLevels:L=>S.units(L).filter(W=>!(W.isUnderConstruction?.()??false)).reduce((W,z)=>W+(z.level?.()??1),0),incomingAttacks:()=>S.incomingAttacks().map(d),outgoingAttacks:()=>S.outgoingAttacks().map(d),targets:()=>S.targets?S.targets().map(p):[],allies:()=>S.allies?S.allies().map(p):[],transitiveTargets:()=>S.transitiveTargets?S.transitiveTargets().map(p):[],alliances:()=>S.alliances?S.alliances():[],isFriendly:L=>S.isFriendly(l(L)),isAlliedWith:L=>S.isAlliedWith(l(L)),isOnSameTeam:L=>S.isOnSameTeam(l(L)),isRequestingAllianceWith:L=>S.isRequestingAllianceWith?S.isRequestingAllianceWith(l(L)):false,hasEmbargoAgainst:L=>S.hasEmbargoAgainst?S.hasEmbargoAgainst(l(L)):false,nameLocation:()=>S.nameLocation?S.nameLocation():{x:0,y:0},borderTiles:()=>{const L=t.get(S.smallID());return L&&L.set?L.set:new Set},relation:L=>{const W=m(L);return relationFromValue(within(h(W),-100,100))},allRelationsSorted:()=>{const L=new Set;for(const z of i.keys())L.add(z);for(const z of a.keys())L.add(z);const W=[];for(const z of L){if(z===S.smallID())continue;const ee=F.playerBySmallID(z);if(!ee||!ee.isPlayer||!ee.isPlayer()||!ee.isAlive())continue;W.push({player:ee,raw:h(z),sid:z})}W.sort((z,ee)=>z.raw-ee.raw||z.sid-ee.sid);return W.map(z=>({player:z.player,relation:relationFromValue(within(z.raw,-100,100))}))},updateRelation:(L,W)=>{const z=m(L);if(z==null||z===S.smallID())return;a.set(z,within((a.get(z)??0)+W,-100,100))},nearby:()=>y(q),sharesBorderWith:L=>b(q,L),borderTilesAsync:()=>S.borderTiles(),buildables:(L,W)=>S.buildables(L,W),bestTransportShipSpawn:L=>S.bestTransportShipSpawn(L),profile:()=>S.profile(),actions:(L,W)=>S.actions?S.actions(L,W):Promise.resolve(null)};return q}function m(S){if(S==null)return null;if(typeof S==="number")return S;if(typeof S.smallID==="function")return S.smallID();return null}function y(S){const P=new Map;const q=S.smallID();const L=Y=>{if(Y===q)return;if(Y==null){const ne=F.terraNullius();P.set("TN",ne)}else{const ne=F.playerBySmallID(Y);if(ne)P.set(Y,ne)}};const W=S.borderTiles();for(const Y of W){for(const ne of n.neighbors(Y)){if(!n.isLand(ne))continue;const re=n.hasOwner(ne)?n.ownerID(ne):null;if(re!==q)L(re)}}const z=[];for(const Y of W)if(n.isShore(Y))z.push(Y);const ee=[[0,-1],[0,1],[-1,0],[1,0]];for(let Y=0;Y<z.length;Y+=10){const ne=z[Y];const re=n.x(ne);const be=n.y(ne);for(const[oe,de]of ee){const ke=re+oe;const he=be+de;if(!n.isValidCoord(ke,he)||!n.isWater(n.ref(ke,he)))continue;const Le=re+oe*5;const Oe=be+de*5;if(!n.isValidCoord(Le,Oe))continue;const ve=n.ref(Le,Oe);if(!n.isLand(ve))continue;if(!n.hasOwner(ve)&&n.hasFallout(ve))continue;const Fe=n.hasOwner(ve)?n.ownerID(ve):null;if(Fe!==q)L(Fe)}}return Array.from(P.values())}function b(S,P){const q=m(P);if(q==null){for(const L of S.borderTiles()){for(const W of n.neighbors(L)){if(n.isLand(W)&&!n.hasOwner(W))return true}}return false}for(const L of S.borderTiles()){for(const W of n.neighbors(L)){if(n.isLand(W)&&n.hasOwner(W)&&n.ownerID(W)===q)return true}}return false}let v=null;let T=null;function x(){const S=n.config();if(T&&v===S)return T;v=S;T=createGameConfigAdapter(S,l);return T}let I=null;let M=null;let _=null;function k(){const S=n.width();const P=n.height();const q=S*P;const L=new Int32Array(q).fill(-2);const W=[];const z=[];let ee=0;for(let Y=0;Y<q;Y++){if(!n.isWater(Y)||L[Y]!==-2)continue;const ne=ee++;let re=false;const be=new Set;const oe=[Y];L[Y]=ne;let de=0;while(de<oe.length){const ke=oe[de++];if(n.isOcean(ke))re=true;for(const he of n.neighbors(ke)){if(n.isWater(he)){if(L[he]===-2){L[he]=ne;oe.push(he)}}else if(n.isLand(he)){be.add(he)}}}W[ne]=re;z[ne]=re?null:Array.from(be)}I=L;M=W;_=z}function N(){if(I===null)k()}function B(S){N();if(S<0||S>=I.length)return null;const P=I[S];return P>=0?P:null}const G=-1;function V(S){if(S==null)return null;try{if(S.type&&S.type()===PlayerType.Bot)return null}catch(ee){}N();const P=S.borderTiles();const q=S.smallID();let L=false;const W=new Set;for(const ee of P){if(!n.isShore(ee))continue;for(const Y of n.neighbors(ee)){if(!n.isWater(Y))continue;if(n.isOcean(Y)){L=true;continue}const ne=I[Y];if(ne>=0)W.add(ne)}}const z=new Set;if(L)z.add(G);for(const ee of W){const Y=_[ee];if(!Y)continue;let ne=false;const re=new Set;for(const be of Y){if(!n.hasOwner(be))continue;const oe=n.ownerID(be);if(oe==null||oe===q)continue;if(re.has(oe))continue;re.add(oe);const de=p(n.playerBySmallID(oe));if(!de||!de.isPlayer||!de.isPlayer())continue;if(de.type&&de.type()===PlayerType.Bot)continue;if(S.id()!==de.id()&&!S.hasEmbargoAgainst(de)&&!de.hasEmbargoAgainst(S)){ne=true;break}}if(ne)z.add(ee)}return z.size>0?z:null}function O(){try{if(typeof n.frameData!=="function")return null;const S=n.frameData();return S&&S.railroadState?S.railroadState:null}catch(S){return null}}const C=S=>(...P)=>n[S](...P);const F={__src:n,ticks:()=>n.ticks(),inSpawnPhase:()=>n.inSpawnPhase(),isSpawnImmunityActive:(...S)=>typeof n.isSpawnImmunityActive==="function"?n.isSpawnImmunityActive(...S):false,config:()=>x(),myPlayer:()=>r,players:()=>n.players().map(p),playerViews:()=>n.players().map(p),playerBySmallID:S=>p(n.playerBySmallID(S)),nations:()=>(n.nations?n.nations():n.players().filter(S=>S.type?.()==="Nation")).map(p),terraNullius:()=>{if(typeof n.terraNullius==="function")return n.terraNullius();return{isPlayer:()=>false,smallID:()=>0,id:()=>"TerraNullius"}},owner:S=>p(n.owner(S)),ownerID:S=>n.ownerID(S),hasOwner:S=>n.hasOwner(S),numLandTiles:()=>n.numLandTiles(),numTilesWithFallout:()=>typeof n.numTilesWithFallout==="function"?n.numTilesWithFallout():0,getWinner:()=>typeof n.getWinner==="function"?n.getWinner():null,units:(...S)=>n.units(...S).map(c),unitCount:S=>n.units(S).length,ref:C("ref"),x:C("x"),y:C("y"),cell:C("cell"),width:C("width"),height:C("height"),isValidCoord:C("isValidCoord"),isOnMap:S=>typeof n.isOnMap==="function"?n.isOnMap(S):n.isValidCoord(S.x,S.y),isLand:C("isLand"),isWater:C("isWater"),isOcean:C("isOcean"),isShore:C("isShore"),isOceanShore:C("isOceanShore"),isBorder:S=>typeof n.isBorder==="function"?n.isBorder(S):false,magnitude:C("magnitude"),hasFallout:C("hasFallout"),neighbors:C("neighbors"),manhattanDist:C("manhattanDist"),euclideanDistSquared:C("euclideanDistSquared"),terrainType:S=>typeof n.terrainType==="function"?n.terrainType(S):null,nearbyUnits:(...S)=>typeof n.nearbyUnits==="function"?n.nearbyUnits(...S):[],hasUnitNearby:(...S)=>typeof n.hasUnitNearby==="function"?n.hasUnitNearby(...S):false,ensureBorderTiles:S=>J(S),getWaterComponent:S=>B(S),sharedWaterComponents:S=>V(S),railroadState:()=>O(),_wrapPlayer:p,_wrapUnit:c};async function J(S){const P=l(S);const q=P.smallID();const L=n.ticks();const W=t.get(q);const z=typeof performance!=="undefined"&&performance.now?performance.now():Date.now();const ee=1500;if(W&&W.set&&W.set.size>0&&z-(W.at||0)<ee){return W.set}if(W&&W.inFlight){return W.set||new Set}const Y=W||{at:0,set:new Set,inFlight:false};Y.inFlight=true;t.set(q,Y);let ne=null;try{const re=await withTimeout(P.borderTiles(),4e3,null);const be=re&&re.borderTiles?re.borderTiles:re;if(be){const oe=new Set(be);if(oe.size>0)ne=oe}}catch(re){}Y.inFlight=false;if(ne!==null){Y.set=ne;Y.at=typeof performance!=="undefined"&&performance.now?performance.now():Date.now()}t.set(q,Y);return Y.set||new Set}async function ue(S){r=p(S);const P=n.ticks();if(o>=0&&P>o){const q=Math.min(P-o,50);for(const[L,W]of a){let z=W;for(let ee=0;ee<q;ee++){const Y=-1*Math.sign(z);z+=Y*.05;if(Math.abs(z)<.1){z=0;break}}if(z===0)a.delete(L);else a.set(L,z)}}o=P;await J(r);try{const q=await withTimeout(l(r).profile(),WORKER_TIMEOUT_MS,null);if(q&&q.relations){i=new Map(Object.entries(q.relations).map(([L,W])=>[Number(L),Number(W)]));s=(q.alliances||[]).map(Number)}}catch(q){}return r}return{game:F,beginTick:ue,ensureBorderTiles:J,wrapPlayer:p,overlay:a}}"use strict";const emojiTable=[["😀","😊","🥰","😇","😎"],["😞","🥺","😭","😱","😡"],["😈","🤡","🥱","🫡","🖕"],["👋","👏","✋","🙏","💪"],["👍","👎","🫴","🤌","🤦‍♂️"],["🤝","🆘","🕊️","🏳️","⏳"],["🔥","💥","💀","☢️","⚠️"],["↖️","⬆️","↗️","👑","🥇"],["⬅️","🎯","➡️","🥈","🥉"],["↙️","⬇️","↘️","❤️","💔"],["💰","⚓","⛵","🏡","🛡️"],["🏭","🚂","❓","🐔","🐀"]];const flattenedEmojiTable=emojiTable.flat();const emojiId=n=>flattenedEmojiTable.indexOf(n);const EMOJI_ASSIST_ACCEPT=["👍","🤝","🎯"].map(emojiId);const EMOJI_ASSIST_RELATION_TOO_LOW=["🥱","🤦‍♂️"].map(emojiId);const EMOJI_ASSIST_TARGET_ME=["🥺","💀"].map(emojiId);const EMOJI_ASSIST_TARGET_ALLY=["🕊️","👎"].map(emojiId);const EMOJI_AGGRESSIVE_ATTACK=["😈"].map(emojiId);const EMOJI_ATTACK=["😡"].map(emojiId);const EMOJI_WARSHIP_RETALIATION=["⛵"].map(emojiId);const EMOJI_NUKE=["☢️","💥"].map(emojiId);const EMOJI_GOT_INSULTED=["🖕","😡","🤡","😞","😭"].map(emojiId);const EMOJI_LOVE=["❤️","😊","🥰"].map(emojiId);const EMOJI_CONFUSED=["❓","🤡"].map(emojiId);const EMOJI_BRAG=["👑","🥇","💪"].map(emojiId);const EMOJI_CHARM_ALLIES=["🤝","😇","💪"].map(emojiId);const EMOJI_CLOWN=["🤡","🤦‍♂️"].map(emojiId);const EMOJI_RAT=["🐀"].map(emojiId);const EMOJI_OVERWHELMED=["💀","🆘","😱","🥺","😭","😞","🫡","👋"].map(emojiId);const EMOJI_CONGRATULATE=["👏"].map(emojiId);const EMOJI_SCARED_OF_THREAT=["🙏","🥺"].map(emojiId);const EMOJI_BORED=["🥱"].map(emojiId);const EMOJI_HANDSHAKE=["🤝"].map(emojiId);const EMOJI_DONATION_OK=["👍"].map(emojiId);const EMOJI_DONATION_TOO_SMALL=["❓","🥱"].map(emojiId);const EMOJI_GREET=["👋"].map(emojiId);const AllPlayers="AllPlayers";class EmojiBehavior{constructor(e,t,a){this.random=e;this.game=t;this.player=a;this.lastEmojiSent=new Map;this.gameOver=false}maybeSendCasualEmoji(){return ofhBrainRuntime.planSocial(this)}checkOverwhelmedByAttacks(){if(!this.random.chance(16))return;const e=this.player.incomingAttacks();if(e.length===0)return;const t=e.reduce((i,s)=>i+s.troops(),0);const a=this.player.troops();if(t>=a*3){this.sendEmoji(AllPlayers,EMOJI_OVERWHELMED)}}checkVerySmallAttack(){if(!this.random.chance(8))return;const e=this.player.incomingAttacks();if(e.length===0)return;const t=this.player.troops();if(t<=0)return;return ofhBrainRuntime.planSmallAttackEmoji(this,e,t,{human:PlayerType.Human,confused:EMOJI_CONFUSED,bored:EMOJI_BORED})}congratulateWinner(){return ofhBrainRuntime.planSocialWinner(this,()=>this._congratulateWinner())}_congratulateWinner(){const e=this.game.getWinner();if(e===null)return;if(!ofhBrainRuntime.markSocialWinner(this))return;const t=this.game.config().gameConfig().gameMode===GameMode.Team;if(t){if(e===this.player.team())return;this.sendEmoji(AllPlayers,EMOJI_CONGRATULATE)}else{if(typeof e==="string")return;const ofhWinners=this.game.players().filter(i=>i.type()===PlayerType.Nation).sort((i,s)=>s.numTilesOwned()-i.numTilesOwned());const a=ofhBrainRuntime.selectSocialRecipient(this,ofhWinners,"winner");if(!a||a.smallID()!==this.player.smallID())return;ofhBrainRuntime.socialRecipientAction(this,()=>this.sendEmoji(e,EMOJI_CONGRATULATE))}}brag(){if(!this.random.chance(300))return;const e=this.game.players().sort((t,a)=>a.numTilesOwned()-t.numTilesOwned());if(e.length===0||e[0].smallID()!==this.player.smallID())return;this.sendEmoji(AllPlayers,EMOJI_BRAG)}charmAllies(){if(!this.random.chance(250))return;const e=this.player.allies().filter(i=>i.type()===PlayerType.Human);if(e.length===0)return;const t=ofhBrainRuntime.selectSocialRecipient(this,e,"charmAllies");if(t===null)return;const ofhPool=this.random.chance(3)?EMOJI_LOVE:EMOJI_CHARM_ALLIES;const a=ofhBrainRuntime.selectSocialPool(this,[EMOJI_LOVE,EMOJI_CHARM_ALLIES],ofhPool,"charm");if(a===null)return;if(t===null)return;ofhBrainRuntime.socialRecipientAction(this,()=>this.sendEmoji(t,a))}annoyTraitors(){if(!this.random.chance(40))return;const e=this.game.players().filter(a=>a.type()===PlayerType.Human&&!a.isFriendly(this.player)&&a.isTraitor());if(e.length===0)return;const t=ofhBrainRuntime.selectSocialRecipient(this,e,"annoyTraitors");if(t===null)return;ofhBrainRuntime.socialRecipientAction(this,()=>this.sendEmoji(t,EMOJI_CLOWN))}findRat(){if(this.game.ticks()<6e3)return;if(!this.random.chance(1e4))return;const e=this.game.numLandTiles();const t=e*.01;const a=this.game.players().filter(s=>s.type()===PlayerType.Human&&s.numTilesOwned()<t&&s.numTilesOwned()>0);if(a.length===0)return;const i=ofhBrainRuntime.selectSocialRecipient(this,a,"findRat");if(i===null)return;ofhBrainRuntime.socialRecipientAction(this,()=>this.sendEmoji(i,EMOJI_RAT))}greetNearbyPlayers(){if(this.game.ticks()>600)return;if(!this.random.chance(250))return;const e=this.player.nearby().filter(a=>a.isPlayer()&&a.type()===PlayerType.Human);if(e.length===0)return;const t=ofhBrainRuntime.selectSocialRecipient(this,e,"greetNearbyPlayers");if(t===null)return;ofhBrainRuntime.socialRecipientAction(this,()=>this.sendEmoji(t,EMOJI_GREET))}maybeSendEmoji(e,t){return ofhBrainRuntime.planEmojiRequest(this,e,t,false,{})}maybeSendAttackEmoji(e){return ofhBrainRuntime.planEmojiRequest(this,e,undefined,true,{neutral:Relation.Neutral,aggressive:EMOJI_AGGRESSIVE_ATTACK,attack:EMOJI_ATTACK})}sendEmoji(e,t){if(!this.shouldSendEmoji(e,false))return;if(!this.canSendEmoji(e))return;const a=discoverCtors(getEventBus());if(!a.emoji)return;const i=e===AllPlayers?AllPlayers:e.__src??e;ofhBrainRuntime.selectSocialMessage(this,t);return}canSendEmoji(e){const t=this.player.__src;if(t&&typeof t.canSendEmoji==="function"){const a=e===AllPlayers?AllPlayers:e.__src??e;try{return t.canSendEmoji(a)}catch(i){return true}}return true}shouldSendEmoji(e,t=true){return ofhBrainRuntime.emojiPermission(this,e,t,{all:AllPlayers,bot:PlayerType.Bot,human:PlayerType.Human})}}function respondToEmoji(n,e,t,a,i){if(a===AllPlayers||a.type()!==PlayerType.Nation){return}if(!recipientCanSendEmoji(a,t))return;if(i==="🖕"){a.updateRelation(t,-100);e.randElement(EMOJI_GOT_INSULTED)}if(i==="🤡"){a.updateRelation(t,-10);e.randElement(EMOJI_CONFUSED)}if(["🕊️","🏳️","❤️","🥰","👏"].includes(i)){if(currentDifficulty()===Difficulty.Easy){a.updateRelation(t,15)}t.relation(a)>=Relation.Neutral?e.randElement(EMOJI_LOVE):e.randElement(EMOJI_CONFUSED)}}function respondToMIRV(n,e,t,ofhActor){return ofhBrainRuntime.planSocialReaction(ofhActor,()=>{if(!e.chance(8))return;if(!recipientCanSendEmoji(t,AllPlayers))return;ofhBrainRuntime.selectSocialMessage(ofhActor,EMOJI_OVERWHELMED)})}function recipientCanSendEmoji(n,e){const t=n&&n.__src;if(t&&typeof t.canSendEmoji==="function"){const a=e===AllPlayers?AllPlayers:e&&e.__src||e;try{return t.canSendEmoji(a)}catch(i){return true}}return true}"use strict";const ALLIANCE_REQUEST_TYPES=new Set([15,16]);const RENEW_TYPES=new Set([22,24]);const _allianceBehaviorActioned=new WeakSet;function runAndCaptureAllianceCtor(n){const e=getEventBus();if(!e||typeof e.emit!=="function"||_ctors.allianceRequest){n();return}const t=e.emit;e.emit=function(a){try{if(a&&a.requestor!==void 0&&a.recipient!==void 0&&typeof a.constructor==="function"){_ctors.allianceRequest=a.constructor}}catch(i){}return t.call(this,a)};try{n()}finally{e.emit=t}}function getAllianceShapeCtors(n){if(_ctors.allianceShapeBus===n&&_ctors.allianceShape){return _ctors.allianceShape}const e=[];const t=getListenersMap(n);if(t){const a={__probe:1};const i={__probe:2};for(const s of t.keys()){if(typeof s!=="function")continue;try{const r=new s(a,i);if(r&&r.requestor===a&&r.recipient===i){e.push(s)}}catch(r){}}}_ctors.allianceShape=e;_ctors.allianceShapeBus=n;return e}function collectAllianceEvents(){const n=[];for(const e of["events-display","actionable-events"]){try{const t=document.querySelector(e);if(Array.isArray(t?.events))n.push(...t.events)}catch(t){}}try{if(typeof allianceRequestsPanelEvents!=="undefined"&&Array.isArray(allianceRequestsPanelEvents)){n.push(...allianceRequestsPanelEvents)}}catch(e){}return n}function pickAllianceButton(n,e,t){return n.find(a=>a?.className===e&&typeof a.action==="function")||(typeof n[t]?.action==="function"?n[t]:null)}class AllianceBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i}isRegularBot(e){if(!e)return false;try{if(typeof e.type==="function"&&e.type()==="BOT")return true;if(e.data&&e.data.playerType==="BOT")return true}catch(t){}return false}handleAllianceRequests(){return ofhBrainRuntime.planAllianceEvents(this,"requests")}handleAllianceRequestsFromBots(){return ofhBrainRuntime.planAllianceEvents(this,"bots")}_markAllianceEvent(e){_allianceBehaviorActioned.add(e)}handleAllianceExtensionRequests(){return ofhBrainRuntime.planAllianceEvents(this,"renewal")}_renewAllianceEvent(e,s,i){return ofhBrainRuntime.planAllianceEvents(this,"action","renew",()=>{try{ofhBrainRuntime.diplomacyCallback(this,"renewal","AllianceBehavior.renew",s,"action");if(ofhBrainRuntime.allianceEventStopped(this))return false;_allianceBehaviorActioned.add(e);setLastAction(tr("🔁 Renew alliance {name}",{name:safeName(i)}),"diplo")}catch(r){}})}maybeSendAllianceRequests(e){if(this.game.config().disableAlliances())return;return ofhBrainRuntime.planAllianceOutreach(this,e)}_outgoingAllianceCandidate(t){if(this.random.chance(30)&&!(typeof companionAllianceVeto==="function"&&companionAllianceVeto(t))&&!this.isRegularBot(t)&&this.canSendAllianceRequest(t)&&this.getAllianceDecision(t,false,"outgoing")){const a=discoverCtors(getEventBus());if(a.allianceRequest){ofhBrainRuntime.diplomacyIntent(this,"outgoing","AllianceBehavior",a.allianceRequest,this.player.__src??this.player,t.__src??t);if(ofhBrainRuntime.wasDeclined(this))return false;if(ofhBrainRuntime.wasDeclined(this))return;setLastAction(tr("🤝➡️ Send alliance {name}",{name:safeName(t)}),"diplo")}}}isFarNation(e){try{const t=e.smallID();for(const a of this.player.nearby()){if(a&&a.isPlayer&&a.isPlayer()&&a.smallID()===t){return false}}return true}catch(t){return false}}isDominantForDiplomacy(){if(!state.settings.winFixes)return false;if(typeof state.dominant==="boolean")return state.dominant;try{const e=String(this.game.config().gameConfig().gameMode)==="Team";const t=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const a=(this.game.numLandTiles()||0)-t;if(a<=0)return false;let i=0;if(e){for(const r of this.game.players()){try{if(r.isPlayer()&&this.player.isOnSameTeam(r)){i+=r.numTilesOwned()}}catch(o){}}}else{i=this.player.numTilesOwned()}const s=Number.isFinite(state.settings.factoryRailShare)?state.settings.factoryRailShare:.75;return i/a>s}catch(e){return false}}reachOutToFarNations(){const e=performance.now();const t=state.settings.farAllyThrottleMs||4e3;if(e-(state.lastFarAllyMs||0)<t)return;if(this.isDominantForDiplomacy())return;const a=discoverCtors(getEventBus());if(!a.allianceRequest)return;const i=this.player.smallID();const s=[];for(const o of this.game.players()){try{if(!o.isPlayer||!o.isPlayer())continue;if(o.smallID()===i)continue;if(!o.isAlive||!o.isAlive())continue;if(o.type()===PlayerType.Bot)continue;if(this.player.isFriendly(o)===true)continue;if(o.isTraitor&&o.isTraitor())continue;if(!this.isFarNation(o))continue;if(!this.canSendAllianceRequest(o))continue;s.push(o)}catch(l){}}if(s.length===0)return;return ofhBrainRuntime.planFarOutreach(this,s,e,a)}_farOutreachReady(r,e,a){if(typeof companionAllianceVeto==="function"&&companionAllianceVeto(r))return;ofhBrainRuntime.intent(this,"AllianceBehavior",a.allianceRequest,this.player.__src??this.player,r.__src??r);if(ofhBrainRuntime.wasDeclined(this))return false;if(ofhBrainRuntime.wasDeclined(this))return;setLastAction(tr("🤝➡️ Trade-ally {name}",{name:safeName(r)}),"diplo");state.lastFarAllyMs=e;ofhDebug("[Diplo] reach out far →",safeName(r))}getAllianceDecision(e,t,a){return ofhBrainRuntime.decideAlliance(this,e,t,a)}hasTooManyAlliances(e){const t=currentDifficulty();if(t!==Difficulty.Hard&&t!==Difficulty.Impossible){return false}const a=this.game.players().filter(s=>s.type()!==PlayerType.Bot).length;const i=e.alliances().length;if(t===Difficulty.Hard){return i>=a*.5}else{return i>=a*.25}}isConfused(){const e=currentDifficulty();switch(e){case Difficulty.Easy:return this.random.chance(10);case Difficulty.Medium:return this.random.chance(20);case Difficulty.Hard:return this.random.chance(40);case Difficulty.Impossible:return false;default:return assertNever(e)}}isEarlygame(){const e=this.game.config().numSpawnPhaseTurns();const t=currentDifficulty();switch(t){case Difficulty.Easy:return this.game.ticks()<3e3+e&&this.random.nextInt(0,100)>=10;case Difficulty.Medium:return this.game.ticks()<1800+e&&this.random.nextInt(0,100)>=30;case Difficulty.Hard:return this.game.ticks()<1800+e&&this.random.nextInt(0,100)>=50;case Difficulty.Impossible:return this.game.ticks()<600+e&&this.random.nextInt(0,100)>=70;default:return assertNever(t)}}isAlliancePartnerThreat(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:return false;case Difficulty.Medium:return e.troops()>this.player.troops()*2.5;case Difficulty.Hard:return e.troops()>this.player.troops()&&this.game.config().maxTroops(e)>this.game.config().maxTroops(this.player)*2;case Difficulty.Impossible:{const a=e.troops()>this.player.troops()*1.5;const i=e.troops()>this.player.troops()&&this.game.config().maxTroops(e)>this.game.config().maxTroops(this.player)*1.5;const s=e.troops()>this.player.troops()&&e.numTilesOwned()>this.player.numTilesOwned()*1.5;return a||i||s}default:return assertNever(t)}}shouldRejectInTeamGame(){if(this.game.config().gameConfig().gameMode!==GameMode.Team){return false}const e=currentDifficulty();switch(e){case Difficulty.Easy:return this.random.nextInt(0,100)<25;case Difficulty.Medium:return this.random.nextInt(0,100)<50;case Difficulty.Hard:return this.random.nextInt(0,100)<75;case Difficulty.Impossible:return true;default:return assertNever(e)}}checkAlreadyEnoughAlliances(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:return false;case Difficulty.Medium:return this.player.alliances().length>=this.random.nextInt(4,6);case Difficulty.Hard:case Difficulty.Impossible:{const a=this.player.nearby().filter(s=>s.isPlayer()&&s.type()!==PlayerType.Bot);const i=a.filter(s=>this.player?.isFriendly(s)===true);if(a.length>=2&&a.some(s=>s.smallID()===e.smallID())){return a.length<=i.length+1}if(t===Difficulty.Hard){return this.player.alliances().length>=this.random.nextInt(3,5)}return this.player.alliances().length>=this.random.nextInt(2,4)}default:return assertNever(t)}}isAlliancePartnerFriendly(e){const t=currentDifficulty();switch(t){case Difficulty.Easy:case Difficulty.Medium:return this.player.relation(e)===Relation.Friendly;case Difficulty.Hard:return this.player.relation(e)===Relation.Friendly&&this.random.nextInt(0,100)>=17;case Difficulty.Impossible:return this.player.relation(e)===Relation.Friendly&&this.random.nextInt(0,100)>=33;default:return assertNever(t)}}isAlliancePartnerSimilarlyStrong(e){const t=currentDifficulty();const a={[Difficulty.Easy]:[60,70],[Difficulty.Medium]:[70,80],[Difficulty.Hard]:[75,85],[Difficulty.Impossible]:[80,90]};const i={[Difficulty.Easy]:[70,80],[Difficulty.Medium]:[80,90],[Difficulty.Hard]:[85,95],[Difficulty.Impossible]:[90,100]};const s=a[t];const r=i[t];const o=this.player.outgoingAttacks().reduce((g,m)=>g+m.troops(),0);const l=e.outgoingAttacks().reduce((g,m)=>g+m.troops(),0);const u=this.player.troops()+o;const c=e.troops()+l;const d=u*(this.random.nextInt(s[0],s[1])/100);const f=this.player.numTilesOwned()*(this.random.nextInt(r[0],r[1])/100);const h=c>d;const p=e.numTilesOwned()>f&&c>u*.5;return h||p}maybeBetray(e,t){if(state.settings.features&&state.settings.features.betray===false){return false}if(!this.player.isAlliedWith(e))return false;const a=currentDifficulty();if(a!==Difficulty.Easy&&a!==Difficulty.Medium){const i=this.game.config().maxTroops(e);const s=e.outgoingAttacks().reduce((r,o)=>r+o.troops(),0);if(e.troops()+s<i*.2&&e.troops()<this.player.troops()){this.betray(e);return true}}if((a===Difficulty.Easy||a===Difficulty.Medium)&&!(a===Difficulty.Easy&&e.type()===PlayerType.Human)&&this.player.troops()>=e.troops()*10){this.betray(e);return true}if(a!==Difficulty.Easy&&e.isTraitor()&&e.troops()<this.player.troops()*1.2){this.betray(e);return true}if(a!==Difficulty.Easy&&t===1&&e.troops()*3<this.player.troops()){this.betray(e);return true}return false}betray(e){if(!this.player.isAlliedWith(e))return;const t=getEventBus();if(!t)return;if(!_ctors.allianceRequest)return;const a=getAllianceShapeCtors(t);const i=a.find(s=>s!==_ctors.allianceRequest);if(!i)return;ofhBrainRuntime.intent(this,"AllianceBehavior",i,this.player.__src??this.player,e.__src??e);if(ofhBrainRuntime.wasDeclined(this))return false;setLastAction(tr("🗡️ Betray {name}",{name:safeName(e)}),"diplo")}incomingAllianceRequests(){return ofhBrainRuntime.planAllianceEvents(this,"collect")}_makeIncomingAllianceRequest(a,s,r,l,o){const ofhRequest={__ev:a,__createdInSpawnPhase:o,requestor:()=>r,createdAt:()=>l,accept:()=>ofhBrainRuntime.planAllianceEvents(this,"action","accept",()=>{const c=pickAllianceButton(s,"btn",1);if(!c)return;try{runAndCaptureAllianceCtor(()=>ofhBrainRuntime.diplomacyCallback(this,"incoming","AllianceBehavior.accept",c,"action"));if(ofhBrainRuntime.allianceEventStopped(this))return false;_allianceBehaviorActioned.add(a);setLastAction(tr("🤝 Alliance {name}",{name:safeName(r)}),"diplo")}catch(d){console.error("[AutoBot] alliance accept failed:",d)}},ofhRequest),reject:()=>ofhBrainRuntime.planAllianceEvents(this,"action","reject",()=>{const c=pickAllianceButton(s,"btn-info",2);if(!c)return;try{ofhBrainRuntime.diplomacyCallback(this,"incoming","AllianceBehavior.reject",c,"action");if(ofhBrainRuntime.allianceEventStopped(this))return false;_allianceBehaviorActioned.add(a)}catch(d){}},ofhRequest)};return ofhRequest;}canSendAllianceRequest(e){const t=this.player.__src;if(t&&typeof t.canSendAllianceRequest==="function"){try{return t.canSendAllianceRequest(e.__src??e)}catch(a){}}try{if(e.isAlive&&e.isAlive()===false)return false;if(this.player.isAlliedWith(e))return false;if(this.player.isOnSameTeam&&this.player.isOnSameTeam(e)){return false}if(this.player.isRequestingAllianceWith&&this.player.isRequestingAllianceWith(e)){return false}}catch(a){return false}return true}resolveEventPlayer(e){const t=Number(e?.focusID);if(!Number.isFinite(t))return null;let a=null;try{a=this.game.playerBySmallID?this.game.playerBySmallID(t):null}catch(i){a=null}if(a&&a.isPlayer&&a.isPlayer())return a;try{for(const i of this.game.players()){if(i.smallID()===t)return i}}catch(i){}return null}}function assertNever(n){throw new Error("Unexpected difficulty: "+String(n))}"use strict";const MIRV_COOLDOWN_TICKS=300;class MirvBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i;this.recentMirvTargets=new Map}get hesitationOdds(){switch(currentDifficulty()){case Difficulty.Easy:return 2;case Difficulty.Medium:return 4;case Difficulty.Hard:return 8;case Difficulty.Impossible:return 16;default:return 16}}get victoryDenialTeamThreshold(){switch(currentDifficulty()){case Difficulty.Easy:return .9;case Difficulty.Medium:return .8;case Difficulty.Hard:return .7;case Difficulty.Impossible:return .6;default:return .6}}get victoryDenialIndividualThreshold(){switch(currentDifficulty()){case Difficulty.Easy:return .75;case Difficulty.Medium:return .65;case Difficulty.Hard:return .55;case Difficulty.Impossible:return .4;default:return .4}}get steamrollCityGapMultiplier(){switch(currentDifficulty()){case Difficulty.Easy:return 2;case Difficulty.Medium:return 1.5;case Difficulty.Hard:return 1.25;case Difficulty.Impossible:return 1.15;default:return 1.15}}get steamrollMinLeaderCities(){switch(currentDifficulty()){case Difficulty.Easy:return 20;case Difficulty.Medium:case Difficulty.Hard:return 10;case Difficulty.Impossible:return 8;default:return 8}}async considerMIRV(){if(this.player===null)throw new Error("not initialized");if(this.game.config().isUnitDisabled(UNIT.MIRV)){if(state.nukeReserveGold)state.nukeReserveGold=0n;return false}if(this.player.units(UNIT.MissileSilo).length===0){if(state.nukeReserveGold)state.nukeReserveGold=0n;return false}const e=await this.cost(UNIT.MIRV);return ofhBrainRuntime.planMirv(this,e)}selectCounterMirvTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"counter")}selectVictoryDenialTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"denial")}selectSteamrollStopTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"steamroll")}teamHasWon(){if(this.player===null)return false;try{if(String(this.game.config().gameConfig().gameMode)!=="Team"){return false}}catch(s){return false}const e=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const t=(this.game.numLandTiles()||0)-e;if(t<=0)return false;let a=0;for(const s of this.game.players()){try{if(s.isPlayer()&&this.player.isOnSameTeam(s)){a+=s.numTilesOwned()}}catch(r){}}let i=.95;try{const s=Number(this.game.config().percentageTilesOwnedToWin());if(Number.isFinite(s))i=s/100}catch(s){}if(Number.isFinite(state.settings.teamWonShare)){i=state.settings.teamWonShare}return a/t>i}selectWinFixMirvTarget(e){return ofhBrainRuntime.selectStrikePlayer(this,"win-fix")}wasRecentlyMirved(e){const t=this.recentMirvTargets.get(e.id());if(t===void 0)return false;return this.game.ticks()-t<MIRV_COOLDOWN_TICKS}recordMirvHit(e){this.recentMirvTargets.set(e.id(),this.game.ticks())}getValidMirvTargetPlayers(){if(this.player===null)throw new Error("not initialized");return this.game.players().filter(e=>{return e.smallID()!==this.player.smallID()&&e.isPlayer()&&e.type()!==PlayerType.Bot&&!this.player.isOnSameTeam(e)})}isInboundMIRVFrom(e){if(this.player===null)throw new Error("not initialized");const t=e.units(UNIT.MIRV);for(const a of t){const i=a.targetTile();if(!i)continue;if(!this.game.hasOwner(i))continue;const s=this.game.owner(i);if(s&&s.isPlayer&&s.isPlayer()&&s.smallID()===this.player.smallID()){return true}}return false}async maybeSendMIRV(e,ofhDecisionId){if(this.player===null)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e);const t=await this.calculateTerritoryCenter(e);if(!t)return;let a;try{a=await withTimeout(this.player.buildables(t,[UNIT.MIRV]),WORKER_TIMEOUT_MS,null)}catch(s){return}const i=Array.isArray(a)?a.find(s=>s.type===UNIT.MIRV):null;if(i===null||i===void 0)return;if(i.canBuild!==false&&this.player.gold()>=i.cost){const s=getBuildMenu();if(!s||typeof s.sendBuildOrUpgrade!=="function")return;ofhBrainRuntime.strikeBuild(this,ofhDecisionId,"MirvBehavior",s,i,t);if(ofhBrainRuntime.wasDeclined(this))return false;this.recordMirvHit(e);if(state.settings.winFixes){if(!Array.isArray(state.recentMirvHits))state.recentMirvHits=[];state.recentMirvHits.push({sid:e.smallID(),tile:t,at:this.game.ticks()})}state.stats.nukes++;setLastAction(tr("☢️ MIRV"),"nuke");this.emojiBehavior.sendEmoji(AllPlayers,EMOJI_NUKE);respondToMIRV(this.game,this.random,e,this)}}countCities(e){return e.unitCount(UNIT.City)}async calculateTerritoryCenter(e){let t;try{const h=await withTimeout(e.borderTilesAsync(),WORKER_TIMEOUT_MS,null);t=h&&h.borderTiles?h.borderTiles:h}catch(h){return null}if(!t)return null;const a=Array.from(t);if(a.length===0)return null;let i=Infinity,s=-Infinity;let r=Infinity,o=-Infinity;for(const h of a){const p=this.game.x(h);const g=this.game.y(h);if(p<i)i=p;if(p>s)s=p;if(g<r)r=g;if(g>o)o=g}const l=Math.floor((i+s)/2);const u=Math.floor((r+o)/2);const c=this.game.ref(l,u);if(this.game.hasOwner(c)&&this.game.ownerID(c)===e.smallID()){return c}let d=null;let f=Infinity;for(const h of a){const p=this.game.x(h)-l;const g=this.game.y(h)-u;const m=p*p+g*g;if(m<f){f=m;d=h}}return d}async cost(e){if(this.player===null)throw new Error("not initialized");const t=this.player.borderTiles();const a=t&&t.size>0?t.values().next().value:null;if(a===null||a===void 0)return 0n;let i;try{i=await withTimeout(this.player.buildables(a,[e]),WORKER_TIMEOUT_MS,null)}catch(r){return 0n}const s=Array.isArray(i)?i.find(r=>r.type===e):null;return s&&s.cost!==void 0&&s.cost!==null?s.cost:0n}}"use strict";class WarshipBehavior{constructor(e,t,a,i){this.random=e;this.game=t;this.player=a;this.emojiBehavior=i;this.trackedTransportShips=new Set;this.trackedTradeShips=new Set;this.trackedIncomingTransportShips=new Set;this.dealtWithTransportShip=new Set}indexById(e){const t=new Map;for(const a of e)t.set(a.id(),a);return t}async maybeSpawnWarship(){if(this.player===null)throw new Error("not initialized");if(this.game.config().isUnitDisabled(UNIT.Warship)){return false}if(!this.random.chance(50)){return false}return ofhBrainRuntime.planWarshipDeployment(this)}_deployWarshipReady(i,s){const r=getBuildMenu();if(!r||typeof r.sendBuildOrUpgrade!=="function"){return false}ofhBrainRuntime.build(this,"WarshipBehavior",r,s,i);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("🚢 Deploy warship"),"naval");return true}warshipSpawnTile(e,t){return ofhBrainRuntime.selectWarshipSpawn(this,e,t)}trackShipsAndRetaliate(){return ofhBrainRuntime.planWarshipTracking(this)}trackTransportShipsAndRetaliate(){return ofhBrainRuntime.planOutgoingShips(this,"transport")}trackTradeShipsAndRetaliate(){return ofhBrainRuntime.planOutgoingShips(this,"trade")}trackIncomingTransportsAndRetaliate(){return ofhBrainRuntime.planIncomingTransports(this)}maybeRetaliateWithWarship(e,t,a,ofhOnDecline){return ofhBrainRuntime.planWarshipRetaliation(this,e,t,a,ofhOnDecline)}_retaliateBuildReady(e,t,a,i){try{if(i===null||i===void 0||i.canBuild===false){this.maybeMoveWarship(e);return "fallback-unbuildable"}const s=getBuildMenu();if(!s||typeof s.sendBuildOrUpgrade!=="function"){this.maybeMoveWarship(e);return "fallback-menu"}ofhBrainRuntime.build(this,"WarshipBehavior",s,i,e);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("🚢 Retaliate warship"),"naval");this.emojiBehavior.maybeSendEmoji(t,EMOJI_WARSHIP_RETALIATION);this.player.updateRelation(t,a==="trade"?-7.5:-15);return "build-attempted"}catch(i){return "failed"}}maybeMoveWarship(e){ofhBrainRuntime.selectMovingWarship(this,e,{})}async counterWarshipInfestation(){if(!this.shouldCounterWarshipInfestation()){return}const e=this.player.team()!==null;if(!this.isRichPlayer(e)){return}await ofhBrainRuntime.planWarshipInfestation(this,e)}shouldCounterWarshipInfestation(){if(this.game.config().isUnitDisabled(UNIT.Warship)){return false}const e=currentDifficulty();if(e!==Difficulty.Hard&&e!==Difficulty.Impossible){return false}if(this.game.unitCount(UNIT.Warship)<=10){return false}if(this.cost(UNIT.Warship)>this.player.gold()){return false}if(this.player.units(UNIT.Port).length===0){return false}if(this.player.units(UNIT.Warship).length>=10){return false}return true}isRichPlayer(e){const t=this.game.players().filter(i=>{if(i.type()===PlayerType.Human)return false;return e?i.team()===this.player.team():true});const a=t.sort((i,s)=>Number(s.gold()-i.gold())).slice(0,3);return a.some(i=>i.id()===this.player.id())}findWarshipInfestationCounterTarget(e){return e?this.findTeamGameWarshipTarget():this.findFreeForAllWarshipTarget()}findTeamGameWarshipTarget(){return ofhBrainRuntime.selectWarshipInfestation(this,true)}findFreeForAllWarshipTarget(){return ofhBrainRuntime.selectWarshipInfestation(this,false)}async buildCounterWarship(e){const t=e.warship.tile();const a=await this.buildableWarship(t);const r=this._counterWarshipReady(t,a);if(r===false)return false}_counterWarshipReady(t,a){if(a===null||a===void 0||a.canBuild===false){this.maybeMoveWarship(t);return "fallback-unbuildable"}const i=getBuildMenu();if(!i||typeof i.sendBuildOrUpgrade!=="function"){this.maybeMoveWarship(t);return "fallback-menu"}ofhBrainRuntime.build(this,"WarshipBehavior",i,a,t);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("🚢 Counter warship"),"naval");this.emojiBehavior.sendEmoji(AllPlayers,EMOJI_WARSHIP_RETALIATION);return "build-attempted"}async buildableWarship(e){let t;try{t=await withTimeout(this.player.buildables(e,[UNIT.Warship]),WORKER_TIMEOUT_MS,null)}catch(a){return null}return Array.isArray(t)?t.find(a=>a.type===UNIT.Warship)??null:null}cost(e){if(e===UNIT.Warship){const t=this.player.unitsOwned(UNIT.Warship);return BigInt(Math.min(1e6,(t+1)*25e4))}return 0n}ensureSmartState(){return this.smartState=this.smartState||{transportPos:new Map,tradePos:new Map,losses:[],raids:[],cooldown:new Map,serviced:new Map,lastPassMs:0}}smartWarshipPatrol(){return ofhBrainRuntime.planWarshipThreatPass(this,()=>this._smartWarshipPatrol())}_smartWarshipPatrol(){if(this.player===null)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.ensureSmartState();const t=performance.now();const a=state.settings.warshipPatrolThrottleMs||1500;if(t-e.lastPassMs<a)return;e.lastPassMs=t;const i=this.game.ticks();const s=this.player.smallID();const r=this.player.id();const o=this.indexById(this.game.units(UNIT.TransportShip));for(const y of this.player.units(UNIT.TransportShip)){try{const b=y.targetTile?y.targetTile():null;e.transportPos.set(y.id(),{x:this.game.x(y.tile()),y:this.game.y(y.tile()),tx:b!=null?this.game.x(b):null,ty:b!=null?this.game.y(b):null})}catch(b){}}const l=state.settings.warshipLossMinDist||25;for(const[y,b]of Array.from(e.transportPos)){const v=o.get(y);const T=v!==void 0&&v.isActive()&&v.owner().smallID()===s;if(T)continue;if(b.tx!=null&&b.ty!=null){const x=Math.abs(b.x-b.tx)+Math.abs(b.y-b.ty);if(x>l)e.losses.push({x:b.x,y:b.y,at:i})}e.transportPos.delete(y)}const u=this.indexById(this.game.units(UNIT.TradeShip));for(const y of this.player.units(UNIT.TradeShip)){try{e.tradePos.set(y.id(),{x:this.game.x(y.tile()),y:this.game.y(y.tile())})}catch(b){}}for(const[y]of Array.from(e.tradePos)){const b=u.get(y);if(b===void 0||!b.isActive()){e.tradePos.delete(y);continue}if(b.owner().id()!==r){try{e.raids.push({x:this.game.x(b.tile()),y:this.game.y(b.tile()),at:i})}catch(v){}e.tradePos.delete(y)}}const c=state.settings.warshipLossWindowTicks||900;const d=state.settings.warshipRaidWindowTicks||400;e.losses=e.losses.filter(y=>i-y.at<=c);e.raids=e.raids.filter(y=>i-y.at<=d);const f=[];const h=this.findInvasionThreat();if(!ofhBrainRuntime.warshipThreatAllowed(this))return;if(h!==null)f.push(h);const ofhTrade=ofhBrainRuntime.selectWarshipThreat(this,"trade",e.raids);if(!ofhBrainRuntime.warshipThreatAllowed(this))return;if(ofhTrade!==null)f.push({tile:ofhTrade,kind:"trade-lane"});const p=this.findLossZone(e.losses);if(!ofhBrainRuntime.warshipThreatAllowed(this))return;if(p!==null)f.push({tile:p,kind:"loss-zone"});if(f.length===0)return;const g=state.settings.warshipServiceCellSize||40;const m=state.settings.warshipZoneServiceTicks||90;for(const[y,b]of Array.from(e.serviced)){if(i-b>m)e.serviced.delete(y)}return ofhBrainRuntime.planWarshipPatrol(this,f,{smart:e,tick:i,cellSize:g,serviceTicks:m})}findInvasionThreat(){return ofhBrainRuntime.selectWarshipThreat(this,"invasion")}findLossZone(e){return ofhBrainRuntime.selectWarshipThreat(this,"loss",e)}moveBestWarshipTo(e,t,a,i){return ofhBrainRuntime.selectMovingWarship(this,e,{purpose:t,smart:a,tick:i})}_moveSelectedWarship(u,e,t,a,i){if(!a){const c=discoverCtors(getEventBus());if(c.moveWarship){return ofhBrainRuntime.intent(this,"WarshipBehavior",c.moveWarship,[u.id()],e)}return false}const c=discoverCtors(getEventBus());if(!c.moveWarship)return false;if(!ofhBrainRuntime.intent(this,"WarshipBehavior",c.moveWarship,[u.id()],e))return false;a.cooldown.set(u.id(),i);setLastAction(tr("🚢 Patrol → {k}",{k:t}),"naval");ofhDebug("[Warship] patrol →",t,"@",this.game.x(e),this.game.y(e));return true}computeNukeRemainingTicks(e,t){try{if(typeof UniversalPathFinding==="undefined"||!UniversalPathFinding.Parabola||e===void 0||e===null||t===void 0||t===null){return null}const a=this.game.config?.().defaultNukeSpeed?.()??8;const i=UniversalPathFinding.Parabola(this.game,{increment:a,distanceBasedHeight:true,directionUp:true});const s=i.findPath(e,t);if(!Array.isArray(s)||s.length===0)return null;if(s.length===1)return 1;let r=0;for(let o=1;o<s.length;o++){const l=this.game.x(s[o]);const u=this.game.y(s[o]);const c=this.game.x(s[o-1]);const d=this.game.y(s[o-1]);r+=Math.hypot(l-c,u-d)}return Math.floor(r/(a>0?a:8))+1}catch(a){return null}}nukeEtaTicks(e,t){const a=e.type?.();if(a===UNIT.MIRVWarhead)return 0;const i=e.id?.();if(i===void 0)return 0;if(!this.nukeEtaById)this.nukeEtaById=new Map;let s=this.nukeEtaById.get(i);if(s===void 0){let r=this.computeNukeRemainingTicks(e.tile?.(),e.targetTile?.());if(r===null){try{const o=this.game.config?.().defaultNukeSpeed?.()??8;const l=this.game.euclideanDistSquared(e.tile(),e.targetTile());r=Math.floor(Math.sqrt(l)/(o>0?o:8))+1}catch(o){r=1}}s={firstTick:t,remainTicks:r};this.nukeEtaById.set(i,s)}return Math.max(0,s.remainTicks-(t-s.firstTick))}nukeOuterRadius(e){try{const t=this.game.config().nukeMagnitudes(e.type());const a=Number(t?.outer??t?.inner);if(Number.isFinite(a)&&a>0)return a}catch(t){}return e.type&&e.type()===UNIT.HydrogenBomb?160:70}findNukeEscapeTile(e,t,a,i){return ofhBrainRuntime.selectWarshipNukeEscape(this,e,t,a,i)}dodgeNukes(){if(this.player===null)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.player.units(UNIT.Warship);if(e.length===0)return;const t=this.game.ticks();const a=state.settings.warshipNukeDodgeMargin||8;const i=[];const s=new Set;for(const u of this.game.units(UNIT.AtomBomb,UNIT.HydrogenBomb,UNIT.MIRVWarhead)){try{if(!u.isActive())continue;const c=u.targetTile();if(c===void 0||c===null)continue;const d=u.id?.();if(d!==void 0)s.add(d);const f=this.nukeOuterRadius(u)+a;i.push({tx:this.game.x(c),ty:this.game.y(c),radius:f,r2:f*f,owner:u.owner()?.smallID?.(),eta:this.nukeEtaTicks(u,t)})}catch(c){}}if(this.nukeEtaById&&this.nukeEtaById.size>0){for(const u of Array.from(this.nukeEtaById.keys())){if(!s.has(u))this.nukeEtaById.delete(u)}}if(i.length===0)return;const r=(u,c)=>{let d=Infinity;for(const f of i){const h=u-f.tx;const p=c-f.ty;if(h*h+p*p<=f.r2&&f.eta<d)d=f.eta}return d};const o=performance.now();if(o-(this._dodgeLogAtMs||0)>1e3){this._dodgeLogAtMs=o;const u=this.player.smallID();ofhDebug("[Warship] nuke-dodge scan:",i.length,"zone(s)",i.map(c=>({owner:c.owner,mine:c.owner===u,eta:c.eta})))}return ofhBrainRuntime.planWarshipNukeDodge(this,e,{tick:t,zones:i,eta:r,smart:this.ensureSmartState()})}_dodgeWarshipReady(u,p,t,l){const m=discoverCtors(getEventBus());if(!m.moveWarship)return false;ofhBrainRuntime.intent(this,"WarshipBehavior",m.moveWarship,[u.id()],p.tile);if(ofhBrainRuntime.wasDeclined(this))return false;if(ofhBrainRuntime.wasDeclined(this))return false;l.cooldown.set(u.id(),t);setLastAction(tr("🚢 Dodge nuke"),"naval");return true}simulateBattle(e,t,a,i){if(t.length===0)return{win:true,survivalPct:100};if(e.length===0)return{win:false,survivalPct:0};const s=this.game;const r=typeof s.config==="function"&&typeof s.config().warshipTargettingRange==="function"?s.config().warshipTargettingRange():8;const o=typeof s.config==="function"&&typeof s.config().unitInfo==="function"?s.config().unitInfo("Shell"):null;const l=o?o.damage||250:250;const u=typeof s.config==="function"&&typeof s.config().warshipShellAttackRate==="function"?s.config().warshipShellAttackRate():20;const c=(_,k)=>{try{const N=s.config();return typeof N[_]==="function"?N[_]():k}catch(N){return k}};const d=c("warshipVeterancyHealthBonus",20);const f=c("warshipVeterancyShellDamageBonus",20);const h=_=>{try{const k=_.warshipState();const N=k?k.veterancy:0;return typeof N==="number"&&N>0?N:0}catch(k){return 0}};const p=_=>a*(100+d*h(_))/100;const g=_=>l*(100+f*h(_))/100/Math.max(1,u);const m=e.length;const y=new Array(m);for(let _=0;_<m;_++){const k=e[_];const N=i?s.manhattanDist(i,k.tile()):r;y[_]={hp:k.health(),dps:g(k),engageTick:Math.max(0,N-r)}}const b=t.length;const v=new Array(b);for(let _=0;_<b;_++){const k=t[_];const N=i?s.manhattanDist(i,k.tile()):r;v[_]={hp:k.health(),dps:g(k),engageTick:Math.max(0,N-r)}}let T=0;while(T<1e3){let _=0,k=Infinity;for(let O=0;O<m;O++){if(y[O].hp>.01){_++;if(y[O].engageTick<k)k=y[O].engageTick}}let N=0,B=Infinity;for(let O=0;O<b;O++){if(v[O].hp>.01){N++;if(v[O].engageTick<B)B=v[O].engageTick}}if(N===0||_===0)break;const G=y.filter(O=>O.hp>.01&&O.engageTick<=T);const V=v.filter(O=>O.hp>.01&&O.engageTick<=T);if(G.length===0&&V.length===0){const O=Math.min(k,B);if(O>T&&O!==Infinity){T=O;continue}}if(G.length>0&&V.length>0){let O=0,C=0;for(let F=0;F<G.length;F++)O+=G[F].dps;for(let F=0;F<V.length;F++)C+=V[F].dps;V.sort((F,J)=>F.hp-J.hp);G.sort((F,J)=>F.hp-J.hp);for(let F=0;F<V.length&&O>0;F++){const J=Math.min(V[F].hp,O);V[F].hp-=J;O-=J}for(let F=0;F<G.length&&C>0;F++){const J=Math.min(G[F].hp,C);G[F].hp-=J;C-=J}}T++}let x=0,I=0;for(let _=0;_<m;_++){if(y[_].hp>.01){x++;I+=Math.max(0,y[_].hp)}}let M=0;for(let _=0;_<b;_++){if(v[_].hp>.01)M++}if(x>0&&M===0){let _=0;for(let k=0;k<e.length;k++)_+=p(e[k]);return{win:true,survivalPct:I/_*100}}return{win:false,survivalPct:0}}findSafeWaypoint(e,t,a){return ofhBrainRuntime.selectWarshipWaypoint(this,e,t,a)}smartWarshipCombat(){if(this.player===null)return;if(!state.settings.winFixes)return;if(!state.settings.features.warship)return;if(this.game.config().isUnitDisabled(UNIT.Warship))return;const e=this.game;const t=this.player;const a=t.smallID();const i=this.ensureSmartState();const s=performance.now();const r=state.settings.warshipCombatThrottleMs||800;if(s-(i.lastCombatPassMs||0)<r)return;i.lastCombatPassMs=s;const o=[];for(const b of t.units(UNIT.Warship)){try{if(b.isActive()&&!b.isUnderConstruction())o.push(b)}catch(v){}}if(o.length===0)return;const l=typeof e.unitInfo==="function"?e.unitInfo("Warship"):null;const u=l?l.maxHealth||1e3:1e3;let c=(state.settings.warshipRetreatHealthPct||0)/100;if(!c){try{const b=e.config();c=typeof b.warshipRetreatHealthPercent==="function"?b.warshipRetreatHealthPercent()/100:.75}catch(b){c=.75}}const d=e.units(UNIT.Warship)||[];const f=[];for(const b of d){try{const v=b.owner();if(!v||v.smallID()===a)continue;if(b.isActive()&&!b.isUnderConstruction()&&!v.isFriendly(t)){f.push(b)}}catch(v){}}const h=state.settings.warshipHuntTrade!==false;const p=[];if(h){const b=e.units(UNIT.TradeShip)||[];for(const v of b){try{const T=v.owner();if(!T||T.smallID()===a)continue;if(v.isActive()&&!T.isFriendly(t))p.push(v)}catch(T){}}}const ofhHome=ofhBrainRuntime.selectWarshipHome(this,o[0]);if(ofhHome.held)return;const g=ofhHome.tile;for(const b of o){try{const v=b.id();const T=i.cooldown.get(v);if(T!==void 0&&e.ticks()-T<3)continue;const x=b.health();const I=typeof b.maxHealth==="function"?b.maxHealth():u;const M=b.warshipState();const _=M&&(M.state==="retreating"||M.state==="docked");if(_)continue;const k=(()=>{try{const O=e.config();return typeof O.warshipTargettingRange==="function"?O.warshipTargettingRange():130}catch(O){return 130}})();const N=k*k;const B=[];for(const O of f){try{const C=O.warshipState();if(C&&C.state==="docked")continue;if(e.euclideanDistSquared(b.tile(),O.tile())<=N)B.push(O)}catch(C){}}let G=false;if(B.length>0&&state.settings.warshipEvade!==false){const O=o.filter(F=>{try{const J=F.warshipState();if(J&&(J.state==="retreating"||J.state==="docked"))return false;return e.euclideanDistSquared(b.tile(),F.tile())<=N}catch(J){return false}});const C=this.simulateBattle(O,B,I,b.tile());if(!C.win||C.survivalPct<15)G=true}ofhBrainRuntime.planWarshipCombat(this,{ship:b,smart:i,health:x,maxHealth:I,retreatRatio:c,evade:G,enemies:B,trades:p,home:g,homeDecisionId:ofhHome.decisionId,hunt:h,patrol:M})}catch(v){}}}moveWarship(e,t){try{const a=typeof discoverCtors==="function"?discoverCtors(getEventBus()):{};if(a.moveWarship){ofhBrainRuntime.intent(this,"WarshipBehavior",a.moveWarship,[e.id()],t);if(ofhBrainRuntime.wasDeclined(this))return false}}catch(a){}}}"use strict";const SAM_RATIO_BY_DIFFICULTY={[Difficulty.Easy]:.15,[Difficulty.Medium]:.2,[Difficulty.Hard]:.25,[Difficulty.Impossible]:.3};function getStructureRatios(n){const e=Boolean(state.settings.economyFirst);const t=e?2:.75;const a=e?.05:1;return{[UNIT.Port]:{ratioPerCity:t,perceivedCostIncreasePerOwned:a},[UNIT.Factory]:{ratioPerCity:t,perceivedCostIncreasePerOwned:a},[UNIT.SAMLauncher]:{ratioPerCity:SAM_RATIO_BY_DIFFICULTY[n],perceivedCostIncreasePerOwned:.3},[UNIT.MissileSilo]:{ratioPerCity:.2,perceivedCostIncreasePerOwned:1}}}const CITY_PERCEIVED_COST_INCREASE_PER_OWNED=1;const FACTORY_COASTAL_RATIO_MULTIPLIER=.33;const MAX_MISSILE_SILOS=3;const SAM_PER_HOSTILE_SILO_LEVEL=.75;const SAM_MAX_LEVELS=24;const INCOME_WINDOW_TICKS=600;const INCOME_MIN_SPAN_TICKS=300;function sampleBotIncome(n,e){let t;let a;try{t=Number(n.ticks());a=Number(e.gold())}catch(o){return}if(!Number.isFinite(t)||!Number.isFinite(a))return;const i=state.income;const s=i.samples[i.samples.length-1];if(s&&s.tick===t)return;if(i.lastGold!==null&&a>i.lastGold)i.earned+=a-i.lastGold;i.lastGold=a;i.samples.push({tick:t,earned:i.earned,gold:a});const r=t-INCOME_WINDOW_TICKS;while(i.samples.length>1&&i.samples[0].tick<r)i.samples.shift()}function incomeWindow(){const n=state.income;if(!n||n.samples.length<2)return null;const e=n.samples[0];const t=n.samples[n.samples.length-1];const a=t.tick-e.tick;if(a<INCOME_MIN_SPAN_TICKS)return null;return{first:e,last:t,dt:a}}function estimatedGoldPerMinute(){const n=incomeWindow();if(n===null)return 0;return(n.last.earned-n.first.earned)/n.dt*600}function mirvReserveHold(n){if(!state.settings.winFixes)return 0n;if(state.settings.economyFirst)return 0n;let e=0n;let t=0n;try{e=BigInt(state.nukeReserveGold||0);t=BigInt(n||0)}catch(a){return 0n}if(e<=0n||t<=0n)return 0n;return e}const SAFE_PLACEMENT_RANGE_MULT=3;const SAFE_WEIGHT_THREAT=40;const SAFE_WEIGHT_TEAM=25;const SAFE_WEIGHT_SEPARATION=60;const SAFE_WEIGHT_SAM_MAGNET=50;const SAM_MAGNET_MAX_LEVEL=5;const SAM_MAGNET_FULL_LEVELS=4;const SAM_MAGNET_HALF_WEIGHT=5;const SAFE_WEIGHT_SAM_UMBRELLA=90;const UMBRELLA_TRUST_ALLY=.5;const UMBRELLA_FRONT_FLOOR=.35;const UMBRELLA_RELEASE_SLOTS=3;const SAFE_WEIGHT_DEPTH=120;const DEEP_PROBE_TILES=200;const DEEP_FRONT_SAMPLE=32;const MAX_SPAWN_PROBES=40;const SAM_PROTECT_WEIGHT={};SAM_PROTECT_WEIGHT[UNIT.Port]=2.5;SAM_PROTECT_WEIGHT[UNIT.Factory]=2.5;SAM_PROTECT_WEIGHT[UNIT.City]=1;SAM_PROTECT_WEIGHT[UNIT.MissileSilo]=1;function samProtectWeight(n){const e=SAM_PROTECT_WEIGHT[n];return typeof e==="number"&&e>0?e:1}function collectSamMagnets(n){const e=[];let t=0;try{t=Number(n.config().nukeMagnitudes(UNIT.HydrogenBomb).outer)||0}catch(i){return e}if(t<=0)return e;let a=[];try{a=n.units(UNIT.SAMLauncher)||[]}catch(i){return e}for(const i of a){try{if(i.isUnderConstruction&&i.isUnderConstruction())continue;const s=Number(i.level&&i.level())||1;if(s>=SAM_MAGNET_MAX_LEVEL)continue;const r=Number(n.config().samRange(s))||0;if(r<=0||r>=t)continue;e.push({tile:i.tile(),level:s,innerSq:r*r,outerSq:t*t})}catch(s){}}return e}function samMagnetExposure(n,e,t){let a=0;for(const i of e){let s;try{s=n.euclideanDistSquared(t,i.tile)}catch(r){continue}if(!Number.isFinite(s))continue;if(s>i.innerSq&&s<=i.outerSq)a+=i.level}return a}function collectFriendlyUmbrellas(n,e,t){const a=[];let i=[];let s;try{i=n.units(UNIT.SAMLauncher)||[];s=n.config()}catch(o){return a}if(!s||typeof s.samRange!=="function")return a;const r=e.smallID();for(const o of i){try{if(o.isUnderConstruction&&o.isUnderConstruction())continue;const l=o.owner&&o.owner();if(!l)continue;const u=l.smallID?l.smallID():null;let c=0;if(u!==null&&u===r)c=1;else if(u!==null&&t.has(u))c=1;else if(e.isFriendly(l)===true)c=UMBRELLA_TRUST_ALLY;if(c<=0)continue;const d=Number(o.level&&o.level())||1;const f=Number(s.samRange(d))||0;if(f<=0)continue;a.push({tile:o.tile(),level:d,range:f,trust:c})}catch(l){}}return a}const BLAST_PAIR_TYPES=[UNIT.City,UNIT.Factory,UNIT.Port,UNIT.MissileSilo,UNIT.SAMLauncher,UNIT.DefensePost];const DP_SPACING_TIERS=[1,.8,.6,0];const DEFENSE_POST_INCOME_MINUTES=1;const DEFENSE_POST_MAX=12;const FIRST_MISSILE_SILO_RATIO=.4;const UPGRADE_DENSITY_THRESHOLD=1/1500;const TILES_PER_CITY_EQUIVALENT=2e3;const HIGH_NATION_DENSITY_THRESHOLD=1/7500;const HIGH_STARTING_GOLD_THRESHOLD=3000000n;const HIGH_GOLD_STRUCTURE_COOLDOWN_TICKS=[0,0,250,150,100];const TEAM_POST_SAVE_UP_PHASE_TICKS=150;const UNDER_ATTACK_THREAT_RATIO=.35;const DEFENSE_POST_RATIO_PER_POST=.4;const DP_SPEED_MIN_WINDOW_TICKS=20;const DP_SPEED_EMA=.5;const DP_FRONT_SAMPLE_CAP=64;const DP_ETA_SAFETY=1.6;const DP_ETA_MARGIN_TICKS=20;const DP_SPEAR_TOPK=3;const DP_ACCEL_MULT=1.5;const DP_BIG_ATTACK_RATIO=1;const DP_MAX_DEPTH_SPACINGS=4;const STRUCTURES_TYPES=[UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory];function autoBotBuildAllowed(n){const e=state.settings&&state.settings.buildStructures;return!e||e[n]!==false}function shimCanTrade(n,e){if(n==null||e==null)return false;if(n.id()===e.id())return false;return!n.hasEmbargoAgainst(e)&&!e.hasEmbargoAgainst(n)}function shimSharedWaterComponents(n,e){try{if(typeof n.sharedWaterComponents==="function"){return n.sharedWaterComponents(e)}}catch(t){}return null}class StationUnionFind{constructor(){this.parent=new Map}add(e){if(!this.parent.has(e))this.parent.set(e,e)}find(e){let t=e;while(this.parent.get(t)!==t)t=this.parent.get(t);let a=e;while(this.parent.get(a)!==t){const i=this.parent.get(a);this.parent.set(a,t);a=i}return t}union(e,t){const a=this.find(e);const i=this.find(t);if(a!==i)this.parent.set(a,i)}}class StructureBehavior{constructor(e,t,a){this.random=e;this.game=t;this.player=a;this.reachableStationsCache=null;this._sharedWaterComponents=null;this.lastStructureTick=null;this.placementsCount=0;this._hasHighStartingGold=null;this._postSaveUpStartTick=null}ownedLevels(e){let t=0;for(const a of this.player.units(e)){if(a.isUnderConstruction()){t+=1}else{t+=a.level()}}return t}getEnemyFrontTiles(){const e=this.game;const t=this.player;const a=new Set;try{for(const s of e.players()){if(!s.isPlayer()||!s.isAlive())continue;if(s.smallID()===t.smallID())continue;if(t.isFriendly(s))continue;if(state.settings.defensePostPlayersOnly&&s.type()===PlayerType.Bot){continue}a.add(s.smallID())}}catch(s){return[]}if(a.size===0)return[];const i=[];e:for(const s of t.borderTiles()){for(const r of e.neighbors(s)){if(!e.hasOwner(r)||!e.isLand(r))continue;if(a.has(e.ownerID(r))){i.push(s);continue e}}}return i}affordableDefensePosts(){const e=estimatedGoldPerMinute();if(!(e>0))return 0;const t=e*DEFENSE_POST_INCOME_MINUTES;let a=0;let i=0;while(a<DEFENSE_POST_MAX){const s=Math.min(25e4,(a+1)*5e4);if(i+s>t)break;i+=s;a+=1}return a}async handleStructures(){return ofhBrainRuntime.planBuilding(this,"handle")}async tryBuildDefensePost(){if(!autoBotBuildAllowed(UNIT.DefensePost))return false;const e=currentDifficulty();if(e===Difficulty.Easy)return false;if(e===Difficulty.Medium&&!this.random.chance(2)){return false}const t=this.player;const a=this.dpLandAttacks();const i=Boolean(state.settings.defensePosts);if(a.length===0&&!i)return false;const s=t.troops();if(s<=0&&!i)return false;const r=a.reduce((T,x)=>T+x.troops(),0);const o=s>0?r/s:0;let l=0;if(a.length>0&&o>=UNDER_ATTACK_THREAT_RATIO){l=e===Difficulty.Medium?1:Math.ceil(o/DEFENSE_POST_RATIO_PER_POST)}let u=[];let c=0;if(i){u=this.getEnemyFrontTiles();if(u.length>0)c=this.affordableDefensePosts()}const d=Math.max(l,c);if(d<=0)return false;const f=a.length>0?this.getAttackFrontTiles(a):[];const h=f.length>0?f:u;if(h.length===0)return false;let p=null;let g=0;let m=null;if(f.length>0&&state.settings.defensePostTiming){const T=this.measureAttackFrontSpeed(f,a);if(T===null){this.dpDeclinedOnTiming=true;return false}const x=o>=DP_BIG_ATTACK_RATIO;if(T>0||x){const I=typeof getConstructionDuration==="function"?getConstructionDuration(this.game,UNIT.DefensePost):100;const M=I*DP_ETA_SAFETY+DP_ETA_MARGIN_TICKS;const{borderSpacing:_}=this.spacingConstants();let k=T*M;if(x){k=Math.max(k,_)}if(k>_*DP_MAX_DEPTH_SPACINGS){ofhDebug("[DPost] front advancing "+T.toFixed(2)+" tiles/tick — no site can finish a post in time, keeping the gold");this.dpDeclinedOnTiming=true;return false}g=k;m=this.dpSubsample(f);const N=Math.ceil(_*.75);if(k>N){const B=Math.ceil(k);p={min:B,max:B+N};ofhDebug("[DPost] front "+T.toFixed(2)+" tiles/tick, build "+I+"t → placing ≥"+B+" tiles back")}}}if(this.countDefensePostsNearFront(h,d,p?p.max:void 0)>=d){return false}const y=this.cost(UNIT.DefensePost);if(t.gold()<y)return false;const b=this.sampleTilesNearFront(h,25,UNIT.DefensePost,p);let v=b;if(g>0&&m&&m.length>0){const T=this.game;const x=[];for(const I of b){let M=Infinity;for(const k of m){const N=T.euclideanDistSquared(I,k);if(N<M)M=N}const _=Math.sqrt(M);if(_>=g)x.push([_,I])}x.sort((I,M)=>M[0]-I[0]);v=x.map(I=>I[1]);if(v.length===0){ofhDebug("[DPost] no candidate deep enough to finish in time — keeping the gold");this.dpDeclinedOnTiming=true;return false}}const x=await ofhBrainRuntime.planBuilding(this,"defense",v,{threatRatio:o,targetPosts:d,frontTiles:h.length,minDepth:g});if(x===null||!ofhBrainRuntime.buildingAllowed(this))return false;const I=getBuildMenu();if(!I||typeof I.sendBuildOrUpgrade!=="function"){return false}ofhBrainRuntime.build(this,"StructureBehavior",I,x,x.canBuild);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("🛡️ Defense post"),"build");return true}dpLandAttacks(){let e=this.player.incomingAttacks().filter(t=>this.isLandAttack(t));if(state.settings.defensePostPlayersOnly){e=e.filter(t=>{try{const a=t.attacker();if(!a||!a.isPlayer||!a.isPlayer())return true;return a.type()!==PlayerType.Bot}catch(a){return true}})}return e}defensePostNeeded(){const e=currentDifficulty();if(e===Difficulty.Easy)return false;const t=this.dpLandAttacks();if(t.length===0)return false;const a=this.player.troops();if(a<=0)return false;const i=t.reduce((s,r)=>s+r.troops(),0);return i/a>=UNDER_ATTACK_THREAT_RATIO}isLandAttack(e){if(e.hasSourceTile&&e.hasSourceTile()){return e.sourceTile()===null}const t=e.attacker();if(!t||!(t.isPlayer&&t.isPlayer()))return true;return this.player.sharesBorderWith(t)}getAttackFrontTiles(e){const t=this.game;const a=this.player;const i=new Set(e.map(r=>{const o=r.attacker();return o&&o.isPlayer&&o.isPlayer()?o.smallID():null}).filter(r=>r!==null));if(i.size===0)return[];const s=[];e:for(const r of a.borderTiles()){for(const o of t.neighbors(r)){const l=t.hasOwner(o)?t.ownerID(o):null;if(l!==null&&i.has(l)){s.push(r);continue e}}}return s}measureAttackFrontSpeed(e,t){const a=this.game;let i;try{i=Number(a.ticks())}catch(y){return 0}if(!Number.isFinite(i))return 0;if(this._dpSpeed&&i<this._dpSpeed.tick)this._dpSpeed=void 0;let s=0;const r=[];for(const y of t){try{const b=y.attacker();if(b&&b.isPlayer&&b.isPlayer()){s+=b.numTilesOwned();r.push(b.smallID())}}catch(b){}}const o=r.sort().join(",");const l=this._dpSpeed;if(!l){this._dpSpeed={tick:i,sample:this.dpSubsample(e),attTiles:s,sids:o,ema:null,inst:null,pess:null};return null}const u=i-l.tick;if(u<DP_SPEED_MIN_WINDOW_TICKS){return l.pess!==void 0?l.pess:l.ema}const c=this.dpSubsample(e);const d=[];for(const y of c){let b=Infinity;for(const v of l.sample){const T=a.euclideanDistSquared(y,v);if(T<b)b=T}if(Number.isFinite(b))d.push(Math.sqrt(b))}d.sort((y,b)=>y-b);let f=0;if(d.length>0){const y=Math.min(DP_SPEAR_TOPK,d.length);let b=0;for(let v=d.length-y;v<d.length;v++)b+=d[v];f=b/y}const h=l.sids!==o||s>l.attTiles;const p=h?f/u:0;const g=l.ema===null?p:l.ema*(1-DP_SPEED_EMA)+p*DP_SPEED_EMA;let m=Math.max(p,g);if(l.inst!==null&&l.inst!==void 0&&p>l.inst){m*=DP_ACCEL_MULT}this._dpSpeed={tick:i,sample:c,attTiles:s,sids:o,ema:g,inst:p,pess:m};return m}dpSubsample(e){const t=Math.max(1,Math.floor(e.length/DP_FRONT_SAMPLE_CAP));const a=[];for(let i=0;i<e.length;i+=t)a.push(e[i]);return a}dpTangentSeparation(){const{borderSpacing:e}=this.spacingConstants();let t=e;try{const a=this.game.config();const i=Number(a.defensePostRange?a.defensePostRange():0);if(Number.isFinite(i)&&i>t)t=i}catch(a){}return 2*Math.max(1,t)}countDefensePostsNearFront(e,t,a){if(e.length===0)return 0;const i=this.game;const{borderSpacing:s}=this.spacingConstants();const r=Math.max(s*1.5,(a||0)+2);const o=r**2;const l=Math.ceil(s*.75);const u=s*DP_MAX_DEPTH_SPACINGS+l;let c=null;let d=0;for(const f of this.player.units(UNIT.DefensePost)){const h=f.tile();let p=Infinity;for(const m of e){const y=i.euclideanDistSquared(h,m);if(y<p)p=y;if(p<=o)break}let g=p<=o;if(!g&&Number.isFinite(p)){const m=Math.sqrt(p);if(m<=u){const y=m-l;if(y<=0){g=true}else{if(c===null){try{c=Array.from(this.player.borderTiles())}catch(v){c=[]}}const b=y*y;g=true;for(const v of c){if(i.euclideanDistSquared(h,v)<b){g=false;break}}}}}if(g){d++;if(t!==void 0&&d>=t)return d}}return d}sampleTilesNearFront(e,t,a,i){const s=this.game;const r=this.player;if(e.length===0){return[]}const{borderSpacing:o}=this.spacingConstants();const l=i?i.min:Math.ceil(o*.75);const u=i?i.max:Math.ceil(o*1.5);const c=u;const d=r.borderTiles();const f=r.smallID();const h=i&&e.length>0?e:d;const p=(_,k)=>{let N=Infinity;for(const B of _){const G=s.euclideanDistSquared(B,k);if(G<N)N=G}return Math.sqrt(N)};const g=Math.ceil(o*.75);const m=i?_=>p(h,_):_=>closestTile(s,d,_)[1];const y=i?_=>p(d,_)>=Math.min(g,l):()=>true;const b=this.dpTangentSeparation();const v=r.units(UNIT.DefensePost).map(_=>_.tile());const T=(_,k)=>{if(k<=0)return true;for(const N of v){if(s.euclideanDistSquared(_,N)<k)return false}return true};for(let _=0;_<DP_SPACING_TIERS.length;_++){const k=DP_SPACING_TIERS[_];const N=b*k;const B=N*N;let G=e;if(v.length>0&&B>0){const O=e.filter(C=>T(C,B));if(O.length>0)G=O}const V=[];for(let O=0;O<t*6&&V.length<t;O++){const C=this.random.randElement(G);const F=s.x(C);const J=s.y(C);const ue=this.random.nextInt(F-c,F+c+1);const S=this.random.nextInt(J-c,J+c+1);if(!s.isValidCoord(ue,S))continue;const P=s.ref(ue,S);if(s.ownerID(P)!==f)continue;const q=m(P);if(q<l||q>u)continue;if(!y(P))continue;if(!T(P,B))continue;V.push(P)}if(V.length>0){if(k<1){ofhDebug("[DPost] tangent spacing "+Math.round(b)+" unsatisfiable here — relaxed to "+Math.round(N)+"; a shield inside a neighbour's blast beats no shield")}return V}}const x=[];const I=b*DP_SPACING_TIERS[Math.max(0,DP_SPACING_TIERS.length-2)];const M=I*I;for(let _=0;_<t*4&&x.length<t;_++){const k=this.random.randElement(e);const N=s.x(k);const B=s.y(k);const G=this.random.nextInt(N-c,N+c+1);const V=this.random.nextInt(B-c,B+c+1);if(!s.isValidCoord(G,V))continue;const O=s.ref(G,V);if(s.ownerID(O)!==f)continue;if(M>0&&!T(O,M))continue;x.push(O)}if(x.length===0){for(let _=0;_<t*4&&x.length<t;_++){const k=this.random.randElement(e);const N=s.x(k);const B=s.y(k);const G=this.random.nextInt(N-c,N+c+1);const V=this.random.nextInt(B-c,B+c+1);if(!s.isValidCoord(G,V))continue;const O=s.ref(G,V);if(s.ownerID(O)!==f)continue;x.push(O)}}return x}isOnStructureCooldown(){if(this.lastStructureTick===null||!this.hasHighStartingGold()){return false}const e=HIGH_GOLD_STRUCTURE_COOLDOWN_TICKS[this.placementsCount]??0;if(e===0){return false}return this.game.ticks()-this.lastStructureTick<e}isInPostSaveUpBlockedPhase(){if(state.settings.economyFirst){return false}if(this.game.config().isUnitDisabled(UNIT.MissileSilo)){return false}const e=this.getSaveUpTarget();if(this._postSaveUpStartTick===null){if(this.player.gold()<e){return false}this._postSaveUpStartTick=this.game.ticks()}const t=this.game.ticks()-this._postSaveUpStartTick;return t%(TEAM_POST_SAVE_UP_PHASE_TICKS*2)>=TEAM_POST_SAVE_UP_PHASE_TICKS}async doHandleStructures(){this.reachableStationsCache=null;const e=this.game.config();const t=e.isUnitDisabled(UNIT.City);const a=t?Math.max(1,Math.floor(this.player.numTilesOwned()/TILES_PER_CITY_EQUIVALENT)):this.ownedLevels(UNIT.City);this._sharedWaterComponents=shimSharedWaterComponents(this.game,this.player);const i=this._sharedWaterComponents!==null;this._dominant=false;if(state.settings.winFixes){const u=this.dominanceShare();const c=Number.isFinite(state.settings.factoryRailShare)?state.settings.factoryRailShare:.75;this._dominant=u!==null&&u>c;try{const d=this.game.ticks();if(d-(state._buildDomDiagTick||-999)>=80){state._buildDomDiagTick=d;ofhDebug("[Build] dominance gate",{share:u===null?null:Number(u.toFixed(3)),trigger:c,dominant:this._dominant})}}catch(d){}}state.dominant=this._dominant;return ofhBrainRuntime.planStructures(this,{cityLevels:a,cityDisabled:t,sharedWater:i})}hasHighStartingGold(){if(this._hasHighStartingGold===null){const e=this.player.__src??this.player;const t={playerType:this.player.type(),isLobbyCreator:typeof e.isLobbyCreator==="function"?e.isLobbyCreator():false};this._hasHighStartingGold=this.game.config().startingGold(t)>=HIGH_STARTING_GOLD_THRESHOLD}return this._hasHighStartingGold}isHighNationDensity(){const e=this.game.numLandTiles();if(e<=0)return false;return this.game.nations().length/e>HIGH_NATION_DENSITY_THRESHOLD}dominanceShare(){if(this.player===null)return null;let e=false;try{e=String(this.game.config().gameConfig().gameMode)==="Team"}catch(s){return null}const t=typeof this.game.numTilesWithFallout==="function"?this.game.numTilesWithFallout():0;const a=(this.game.numLandTiles()||0)-t;if(a<=0)return null;let i=0;if(e){for(const s of this.game.players()){try{if(s.isPlayer()&&this.player.isOnSameTeam(s)){i+=s.numTilesOwned()}}catch(r){}}}else{i=this.player.numTilesOwned()}return i/a}samTargetParts(e){let t=-1;try{t=Number(this.game.ticks())}catch(i){t=-1}if(this._samPartsTick===t&&this._samParts)return this._samParts;const a=this.computeSamTargetParts(e);this._samPartsTick=t;this._samParts=a;return a}peakHostileCoalitionCapacity(e){if(!e||e.length===0)return 0;const t=e.map((r,o)=>o);const a=r=>{while(t[r]!==r){t[r]=t[t[r]];r=t[r]}return r};for(let r=0;r<e.length;r+=1){for(let o=r+1;o<e.length;o+=1){if(this.sameCoalition(e[r].player,e[o].player)){const l=a(r);const u=a(o);if(l!==u)t[u]=l}}}const i=new Map;for(let r=0;r<e.length;r+=1){const o=a(r);i.set(o,(i.get(o)||0)+e[r].capacity)}let s=0;for(const r of i.values()){if(r>s)s=r}return s}sameCoalition(e,t){try{const a=e.team?e.team():null;const i=t.team?t.team():null;if(a!=null&&i!=null&&a===i)return true}catch(a){}try{return e.isFriendly(t)===true}catch(a){return true}}samThreatLevels(e){const t=this.samTargetParts(e);return Math.max(0,Math.min(t.threat,t.protectables,SAM_MAX_LEVELS))}samTargetLevels(e){const t=this.samTargetParts(e);if(!state.settings.samDefense)return t.stock;const a=Math.max(t.stock,t.threat,t.peerAvg);return Math.max(t.stock,Math.min(a,t.protectables,SAM_MAX_LEVELS))}computeSamTargetParts(e){const t=getStructureRatios(currentDifficulty())[UNIT.SAMLauncher];const a=Math.floor(e*t.ratioPerCity);const i={stock:a,threat:0,peerAvg:0,protectables:a};if(!state.settings.samDefense)return i;const s=this.game;const r=this.player;const o=[];let l=0;let u=0;try{for(const p of s.players()){if(!p.isPlayer()||!p.isAlive())continue;if(p.type()===PlayerType.Bot)continue;u+=1;for(const m of p.units(UNIT.SAMLauncher))l+=m.level();if(p.smallID()===r.smallID()||r.isFriendly(p))continue;let g=0;for(const m of p.units(UNIT.MissileSilo))g+=m.level();if(g>0)o.push({player:p,capacity:g})}}catch(p){return i}const c=this.peakHostileCoalitionCapacity(o);const d=Math.ceil(c*SAM_PER_HOSTILE_SILO_LEVEL);const f=u>0?Math.ceil(l/u):0;let h=0;try{for(const p of r.units(UNIT.City,UNIT.Port,UNIT.Factory,UNIT.MissileSilo)){h+=Math.max(1,p.level())}}catch(p){h=a}return{stock:a,threat:d,peerAvg:f,protectables:h}}shouldBuildStructure(e,t,a){const i=this.game.config();const s=currentDifficulty();const r=getStructureRatios(s);const o=r[e];if(o===void 0){return false}let l=o.ratioPerCity;if(e===UNIT.Factory&&a&&!i.isUnitDisabled(UNIT.Port)&&!this._dominant){l*=FACTORY_COASTAL_RATIO_MULTIPLIER}const u=this.ownedLevels(e);if(e===UNIT.MissileSilo&&u>=MAX_MISSILE_SILOS){return false}if(e===UNIT.MissileSilo&&u===0){l=FIRST_MISSILE_SILO_RATIO}const c=e===UNIT.SAMLauncher?this.samTargetLevels(t):Math.floor(t*l);return u<c}cost(e){switch(e){case UNIT.Port:{const t=this.ownedLevels(UNIT.Port)+this.ownedLevels(UNIT.Factory);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.Factory:{const t=this.ownedLevels(UNIT.Factory)+this.ownedLevels(UNIT.Port);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.City:{const t=this.ownedLevels(UNIT.City);return BigInt(Math.min(1e6,Math.pow(2,t)*125e3))}case UNIT.SAMLauncher:{const t=this.ownedLevels(UNIT.SAMLauncher);return BigInt(Math.min(3e6,(t+1)*15e5))}case UNIT.MissileSilo:return 1000000n;case UNIT.DefensePost:{const t=this.ownedLevels(UNIT.DefensePost);return BigInt(Math.min(25e4,(t+1)*5e4))}case UNIT.AtomBomb:return 750000n;case UNIT.HydrogenBomb:return 5000000n;case UNIT.MIRV:return 25000000n;case UNIT.Warship:{const t=this.ownedLevels(UNIT.Warship);return BigInt(Math.min(1e6,(t+1)*25e4))}default:return 0n}}async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=ofhBrainRuntime.defenseEconomyFacts(this)?0n:mirvReserveHold(a);a=a>i?a-i:0n;if(a<t){return false}const s=this.player.units(e);return ofhBrainRuntime.planBuilding(this,"action",e,s)}async _placeNewStructure(e){const r=await this.structureSpawnTile(e);if(!ofhBrainRuntime.buildingAllowed(this))return false;if(r===null){return false}const o=getBuildMenu();if(!o||typeof o.sendBuildOrUpgrade!=="function"){return false}ofhBrainRuntime.build(this,"StructureBehavior",o,r,r.canBuild);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("🏗️ Build {type}",{type:e}),"build");return true}getPerceivedCost(e){const t=this.cost(e);const a=this.getSaveUpTarget();if(a===0n||this.player.gold()>=a){return t}const i=this.ownedLevels(e);let s;if(e===UNIT.City){s=state.settings.economyFirst?.05:CITY_PERCEIVED_COST_INCREASE_PER_OWNED}else{const o=currentDifficulty();const l=getStructureRatios(o);const u=l[e];s=u&&u.perceivedCostIncreasePerOwned!==void 0?u.perceivedCostIncreasePerOwned:.1}const r=1+s*i;return BigInt(Math.ceil(Number(t)*r))}getSaveUpTarget(){const e=this.game.config();if(state.settings.economyFirst){if(!state.settings.features.nuke)return 0n;return this.cost(UNIT.AtomBomb)*6n}if(e.isUnitDisabled(UNIT.MissileSilo)){return this.cost(UNIT.SAMLauncher)}if(this.game.config().gameConfig().gameMode===GameMode.Team){return this.cost(UNIT.HydrogenBomb)}const t=!e.isUnitDisabled(UNIT.MIRV);const a=!e.isUnitDisabled(UNIT.HydrogenBomb);const i=!e.isUnitDisabled(UNIT.AtomBomb);if(t){return this.cost(UNIT.MIRV)+this.cost(UNIT.HydrogenBomb)}if(a){return this.cost(UNIT.HydrogenBomb)*5n}if(i){return this.cost(UNIT.AtomBomb)*20n}return this.cost(UNIT.SAMLauncher)}async maybeUpgradeStructure(e){if(this.getTotalStructureDensity()<=UPGRADE_DENSITY_THRESHOLD){return false}if(e.length===0){return false}const t=await this.findBestStructureToUpgrade(e);if(!ofhBrainRuntime.buildingAllowed(this))return false;if(t!==null){const a=getBuildMenu();if(!a||typeof a.sendBuildOrUpgrade!=="function"){return false}ofhBrainRuntime.build(this,"StructureBehavior",a,t.bu);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("⬆️ Upgrade {type}",{type:t.structure.type()}),"build");return true}return false}getTotalStructureDensity(){const e=this.player.numTilesOwned();return e>0?this.player.units(...STRUCTURES_TYPES).length/e:0}async findBestStructureToUpgrade(e){return ofhBrainRuntime.planBuilding(this,"upgrade",e)}async structureSpawnTile(e){return ofhBrainRuntime.planStructurePlacement(this,e)}async buildableFor(e,t){let a;try{a=await withTimeout(this.player.buildables(t,[e]),WORKER_TIMEOUT_MS,null)}catch(i){return null}return Array.isArray(a)?a.find(i=>i.type===e)??null:null}randCoastalTileArray(e){const t=this.game;const a=this._sharedWaterComponents;const i=Array.from(this.player.borderTiles()).filter(s=>{if(!t.isShore(s))return false;if(a===null)return false;for(const r of t.neighbors(s)){if(!t.isWater(r))continue;if(t.isOcean(r))return true;const o=typeof t.getWaterComponent==="function"?t.getWaterComponent(r):null;if(o!==null&&a.has(o))return true}return false});return Array.from(this.arraySampler(i,e))}*arraySampler(e,t){if(e.length<=t){yield*e}else{const a=new Set(e);while(t--){const i=this.random.randFromSet(a);a.delete(i);yield i}}}safePlacementScorer(e){const t=function(){return 0};if(!state.settings.safePlacement)return t;const a=this.game;const i=this.player;const s=this.classifyBorder();if(!s.ok)return t;const{teammateSids:r,threatFront:o,teamFront:l}=s;const u=[];for(const v of BLAST_PAIR_TYPES){if(e===UNIT.MissileSilo&&v===UNIT.SAMLauncher)continue;try{for(const T of i.units(v))u.push(T.tile())}catch(T){}}const c=collectSamMagnets(a);const d=state.settings.samUmbrella?collectFriendlyUmbrellas(a,i,r):[];const{borderSpacing:f}=this.spacingConstants();const h=Math.max(1,f*SAFE_PLACEMENT_RANGE_MULT);const p=Math.max(1,f*2);const g=Math.max(1,f);const m=o.length>0;const y=l.length>0;if(!m&&!y&&d.length===0&&c.length===0&&u.length===0){return t}const b=(v,T)=>{let x=Infinity;for(const I of v){let M;try{M=a.euclideanDistSquared(I,T)}catch(_){continue}if(Number.isFinite(M)&&M<x)x=M}return x===Infinity?Infinity:Math.sqrt(x)};return v=>{let T=0;let x=1;if(m){const k=b(o,v);if(Number.isFinite(k)){x=Math.min(k,h)/h;T+=SAFE_WEIGHT_THREAT*x;T+=SAFE_WEIGHT_DEPTH*(k/(k+h))}}if(y){const k=b(l,v);if(Number.isFinite(k)){T+=SAFE_WEIGHT_TEAM*(1-Math.min(k,h)/h)}}if(c.length>0){const k=samMagnetExposure(a,c,v);if(k>0){T-=SAFE_WEIGHT_SAM_MAGNET*(Math.min(k,SAM_MAGNET_FULL_LEVELS)/SAM_MAGNET_FULL_LEVELS)}}let I=0;if(d.length>0){let k=0;let N=0;for(const B of d){let G;try{G=a.euclideanDistSquared(B.tile,v)}catch(C){continue}if(!Number.isFinite(G)||G>B.range*B.range)continue;const V=Math.min((B.range-Math.sqrt(G))/g,1);if(V<=0)continue;const O=V*B.trust;if(O>k)k=O;if(B.trust>=1)N+=B.level*V}if(k>0){const B=UMBRELLA_FRONT_FLOOR+(1-UMBRELLA_FRONT_FLOOR)*x;T+=SAFE_WEIGHT_SAM_UMBRELLA*k*B}I=Math.min(N/UMBRELLA_RELEASE_SLOTS,1)}const M=UMBRELLA_FRONT_FLOOR+(1-UMBRELLA_FRONT_FLOOR)*x;const _=I*M;if(u.length>0){let k=Infinity;for(const N of u){if(N===v)continue;let B;try{B=a.euclideanDistSquared(N,v)}catch(G){continue}if(Number.isFinite(B)&&B<k)k=B}if(Number.isFinite(k)){const N=Math.sqrt(k);const B=Math.min(N,p)/p;T+=SAFE_WEIGHT_SEPARATION*(_+(1-_)*B)}}return T}}classifyBorder(){const e=this.game;const t=this.player;let a=-1;try{a=Number(e.ticks())}catch(d){a=-1}const i=this._borderClass;if(i&&a>=0&&i.tick===a)return i;let s=null;try{s=t.team?t.team():null}catch(d){s=null}const r=new Set;const o=new Set;try{for(const d of e.players()){if(!d.isPlayer()||!d.isAlive())continue;if(d.smallID()===t.smallID())continue;let f=null;try{f=d.team?d.team():null}catch(h){f=null}if(s!==null&&f!==null&&f===s){r.add(d.smallID())}else{o.add(d.smallID())}}}catch(d){return{ok:false,tick:-1,teammateSids:r,threatFront:[],teamFront:[]}}const l=[];const u=[];try{for(const d of t.borderTiles()){let f=false;let h=false;for(const p of e.neighbors(d)){if(!e.hasOwner(p)||!e.isLand(p))continue;const g=e.ownerID(p);if(o.has(g))f=true;else if(r.has(g))h=true}if(f)l.push(d);if(h)u.push(d)}}catch(d){return{ok:false,tick:-1,teammateSids:r,threatFront:[],teamFront:[]}}const c={ok:true,tick:a,teammateSids:r,threatFront:l,teamFront:u};this._borderClass=c;return c}tilesDeepInTerritory(e){const t=this.game;const a=this.classifyBorder();if(!a.ok||a.threatFront.length===0)return[];const i=a.threatFront;const s=Math.max(1,Math.floor(i.length/DEEP_FRONT_SAMPLE));const r=[];for(let c=0;c<i.length;c+=s)r.push(i[c]);if(r.length===0)return[];let o;try{o=randTerritoryTileArray(this.random,t,this.player,DEEP_PROBE_TILES)}catch(c){return[]}const l=[];for(const c of o){let d=Infinity;for(const f of r){let h;try{h=t.euclideanDistSquared(c,f)}catch(p){continue}if(Number.isFinite(h)&&h<d)d=h}if(Number.isFinite(d))l.push([d,c])}l.sort((c,d)=>d[0]-c[0]);const u=[];for(let c=0;c<l.length&&u.length<e;c++){u.push(l[c][1])}return u}structureSpawnTileValue(e){switch(e){case UNIT.City:return this.cityValue();case UNIT.MissileSilo:return this.missileSiloValue();case UNIT.Factory:return this.factoryValue();case UNIT.Port:return this.portValue();case UNIT.SAMLauncher:return this.samLauncherValue();default:throw new Error(`Value function not implemented for ${e}`)}}missileSiloValue(){const e=this.game;const t=this.player.borderTiles();const a=this.player.units(UNIT.MissileSilo);const{borderSpacing:i,structureSpacing:s}=this.spacingConstants();const r=this.safePlacementScorer(UNIT.MissileSilo);return o=>{let l=0;l+=r(o);l+=e.magnitude(o);const u=closestTile(e,t,o);const c=u[1];l+=Math.min(c,i);const d=new Set(a.map(h=>h.tile()));d.delete(o);const f=closestTwoTiles(e,d,[o]);if(f!==null){const h=e.manhattanDist(f.x,o);l+=Math.min(h,s)}if(state.settings.winFixes){l+=this.samCoverageBonus(o)}return l}}samCoverageBonus(e){const t=this.game;if(typeof t.nearbyUnits!=="function")return 0;let a;try{a=t.config()}catch(u){return 0}const i=a&&a.maxSamRange?Number(a.maxSamRange()):200;let s;try{s=t.nearbyUnits(e,i,UNIT.SAMLauncher)}catch(u){return 0}const r=this.player.smallID();let o=-1;let l=-1;for(const u of s||[]){const c=u.unit||u;const d=c.owner&&c.owner();if(!d)continue;if(c.isUnderConstruction&&c.isUnderConstruction())continue;const f=d.smallID&&d.smallID()===r;const h=!f&&this.player.isFriendly(d)===true;if(!f&&!h)continue;const p=c.level&&Number(c.level())||1;const g=a&&a.samRange?Number(a.samRange(p)):0;if(g<=0)continue;let m=u.distSquared;if(m==null&&t.euclideanDistSquared&&c.tile){m=t.euclideanDistSquared(e,c.tile())}if(m==null||m>g*g)continue;const y=g-Math.sqrt(m);if(f){if(y>o)o=y}else if(y>l){l=y}}if(o>=0)return 1e5+o;if(l>=0)return 5e4+l;return 0}tilesNearFriendlySams(e){const t=this.game;if(typeof t.nearbyUnits!=="function"&&typeof t.units!=="function"){return[]}const a=this.player.smallID();let i=[];try{i=t.units(UNIT.SAMLauncher)||[]}catch(h){return[]}let s=null;try{s=this.player.team?this.player.team():null}catch(h){s=null}const r=[];const o=[];for(const h of i){try{if(h.isUnderConstruction&&h.isUnderConstruction())continue;const p=h.owner&&h.owner();if(!p)continue;let g=null;try{g=p.team?p.team():null}catch(y){g=null}const m=s!==null&&g!==null&&g===s;if(p.smallID&&p.smallID()===a||m)r.push(h);else if(this.player.isFriendly(p)===true)o.push(h)}catch(p){}}const l=r.length>0?r:o;if(l.length===0)return[];let u;try{u=t.config()}catch(h){return[]}const c=[];for(const h of l){const p=h.tile();const g=t.x(p);const m=t.y(p);const y=h.level&&Number(h.level())||1;const b=u&&u.samRange?Number(u.samRange(y)):0;if(b<=0)continue;const v=Math.floor(b);const T=Math.max(2,Math.floor(v/6));const x=[];for(let I=-v;I<=v;I+=T){for(let M=-v;M<=v;M+=T){if(I*I+M*M>b*b)continue;const _=g+I;const k=m+M;if(!t.isValidCoord(_,k))continue;const N=t.ref(_,k);if(!t.isLand(N))continue;if(t.ownerID(N)!==a)continue;x.push(N)}}if(x.length>0)c.push(this.random.shuffleArray(x))}if(c.length===0)return[];const d=[];const f=new Set;for(let h=0;d.length<e;h++){let p=false;for(const g of c){if(h>=g.length)continue;p=true;const m=g[h];if(f.has(m))continue;f.add(m);d.push(m);if(d.length>=e)break}if(!p)break}return d}portValue(){const e=this.game;const t=this.player.units(UNIT.Port);const{structureSpacing:a}=this.spacingConstants();const i=this.safePlacementScorer(UNIT.Port);return s=>{let r=0;r+=i(s);const o=new Set(t.map(c=>c.tile()));o.delete(s);const l=closestTile(e,o,s);const u=l[1];if(Number.isFinite(u)){r+=state.settings.safePlacement?Math.min(u,a):u}return r}}factoryValue(){const e=this.game;const t=this.player;const a=this.player.borderTiles();const i=t.units(UNIT.Factory);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=e.config().trainStationMaxRange();const l=o*o;const u=currentDifficulty();const c=this.shouldUseConnectivityScore(u);const d=c?this.getOrBuildReachableStations():[];const f=e.config().trainStationMinRange()**2;const h=new Set(t.units(UNIT.City).map(g=>g.tile()));const p=this.safePlacementScorer(UNIT.Factory);return g=>{let m=0;m+=p(g);m+=e.magnitude(g);const y=closestTile(e,a,g);const b=y[1];m+=Math.min(b,s);const v=new Set(i.map(I=>I.tile()));v.delete(g);const T=closestTwoTiles(e,v,[g]);if(T!==null){const I=e.manhattanDist(T.x,g);m+=Math.min(I,o)}const x=closestTwoTiles(e,h,[g]);if(x!==null){const I=e.manhattanDist(x.x,g);m+=Math.min(I,r)}if(!c){return m}m+=this.computeConnectivityScore(g,d,f,l)*r;return m}}shouldUseConnectivityScore(e){let t;switch(e){case Difficulty.Easy:t=0;break;case Difficulty.Medium:t=60;break;case Difficulty.Hard:t=75;break;case Difficulty.Impossible:t=100;break;default:t=100}return this.random.nextInt(0,100)<t}getOrBuildReachableStations(){if(this.reachableStationsCache===null){this.reachableStationsCache=this.buildReachableStations()}return this.reachableStationsCache}trainGoldBase(e,t){const a=Math.max(0,(t||0)-9);let i;switch(e){case"ally":i=35e3;break;case"self":i=1e4;break;case"team":case"other":default:i=25e3}return Math.max(5e3,i-a*5e3)}buildReachableStations(){const e=this.game;const t=this.player;const a=Math.max(Number(this.trainGoldBase("ally",0)),1);const i=[];const s=Number(this.trainGoldBase("self",0))/a;for(const d of t.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(!d.hasTrainStation())continue;i.push({tile:d.tile(),weight:s,key:d.id()})}for(const d of t.nearby()){if(!d.isPlayer||!d.isPlayer())continue;if(d.type()===PlayerType.Bot)continue;if(!shimCanTrade(t,d))continue;const f=t.isOnSameTeam(d)?"team":t.isAlliedWith(d)?"ally":"other";const h=Number(this.trainGoldBase(f,0))/a;for(const p of d.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(!p.hasTrainStation())continue;i.push({tile:p.tile(),weight:h,key:p.id()})}}if(i.length===0)return[];let r=null;try{r=typeof e.railroadState==="function"?e.railroadState():null}catch(d){r=null}if(r){const d=this.assignRailClusters(i,r);if(d!==null){const f=[];for(let h=0;h<i.length;h++){f.push({tile:i[h].tile,cluster:d[h],weight:i[h].weight})}return f}}const o=e.config().trainStationMaxRange();const l=o*o;const u=new StationUnionFind;for(const d of i)u.add(d.key);for(let d=0;d<i.length;d++){for(let f=d+1;f<i.length;f++){const h=e.euclideanDistSquared(i[d].tile,i[f].tile);if(h<=l){u.union(i[d].key,i[f].key)}}}const c=[];for(const d of i){c.push({tile:d.tile,cluster:u.find(d.key),weight:d.weight})}return c}assignRailClusters(e,t){try{const a=this.game;const i=a.width();const s=a.height();const r=i*s;const o=new Int32Array(r).fill(-1);let l=0;const u=f=>{const h=l++;const p=[f];o[f]=h;let g=0;while(g<p.length){const m=p[g++];for(const y of a.neighbors(m)){if(y>=0&&y<r&&t[y]!==0&&o[y]===-1){o[y]=h;p.push(y)}}}return h};const c=f=>{if(f<0||f>=r)return null;if(t[f]!==0){if(o[f]===-1)u(f);return o[f]}for(const h of a.neighbors(f)){if(h>=0&&h<r&&t[h]!==0){if(o[h]===-1)u(h);return o[h]}}return null};const d=new Array(e.length);for(let f=0;f<e.length;f++){const h=c(e[f].tile);d[f]=h===null?null:"rail#"+h}return d}catch(a){return null}}computeConnectivityScore(e,t,a,i){const s=new Map;let r=0;for(const{tile:l,cluster:u,weight:c}of t){const d=this.game.euclideanDistSquared(e,l);if(d<a||d>i)continue;if(u!==null){s.set(u,Math.max(s.get(u)??0,c))}else{r+=c}}let o=r;for(const l of s.values())o+=l;return o}cityValue(){const e=this.game;const t=this.player;const a=t.borderTiles();const i=t.units(UNIT.City);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=e.config().trainStationMaxRange();const l=o*o;const u=currentDifficulty();const c=this.shouldUseConnectivityScore(u);const d=c?this.getOrBuildReachableStations():[];const f=e.config().trainStationMinRange()**2;const h=new Set(t.units(UNIT.Factory).map(g=>g.tile()));const p=this.safePlacementScorer(UNIT.City);return g=>{let m=0;m+=p(g);m+=e.magnitude(g);const y=closestTile(e,a,g);const b=y[1];m+=Math.min(b,s);const v=new Set(i.map(I=>I.tile()));v.delete(g);const T=closestTwoTiles(e,v,[g]);if(T!==null){const I=e.manhattanDist(T.x,g);m+=Math.min(I,r)}const x=closestTwoTiles(e,h,[g]);if(x!==null){const I=e.manhattanDist(x.x,g);m+=Math.min(I,r)}if(!c){return m}m+=this.computeConnectivityScore(g,d,f,l)*r;return m}}samLauncherValue(){const e=this.game;const t=this.player;const a=t.borderTiles();const i=t.units(UNIT.SAMLauncher);const{borderSpacing:s,structureSpacing:r}=this.spacingConstants();const o=currentDifficulty();const l=o===Difficulty.Hard||o===Difficulty.Impossible;const u=[];for(const m of t.units()){switch(m.type()){case UNIT.City:case UNIT.Factory:case UNIT.MissileSilo:case UNIT.Port:u.push({tile:m.tile(),weight:(l?m.level():1)*samProtectWeight(m.type())})}}let c=0;let d=0;try{const m=Number(e.config().samRange(1))||0;const y=Number(e.config().nukeMagnitudes(UNIT.HydrogenBomb).outer)||0;if(m>0&&y>m){c=m*m;d=y*y}}catch(m){c=0}const f=e.config().defaultSamRange();const h=f*f;const p=state.settings.samDefense?o!==Difficulty.Easy:o!==Difficulty.Easy&&this.random.nextInt(0,100)<25;let g=null;if(p){g=new Map;const m=t.units(UNIT.SAMLauncher);for(const y of u){let b=0;for(const v of m){const T=e.config().samRange(v.level());const x=e.euclideanDistSquared(y.tile,v.tile());if(x<=T*T){b+=v.level()}}g.set(y.tile,b)}}return m=>{let y=0;y+=e.magnitude(m);const b=closestTwoTiles(e,a,[m]);if(b!==null){const x=e.manhattanDist(b.x,m);y+=Math.min(x,s)}const v=new Set(i.map(x=>x.tile()));v.delete(m);const T=closestTwoTiles(e,v,[m]);if(T!==null){const x=e.manhattanDist(T.x,m);y+=Math.min(x,r)}if(d>0){let x=0;for(const I of u){const M=e.euclideanDistSquared(m,I.tile);if(M>c&&M<=d)x+=I.weight}if(x>0){y-=r*(x/(x+SAM_MAGNET_HALF_WEIGHT))}}if(o!==Difficulty.Easy){for(const x of u){const I=e.euclideanDistSquared(m,x.tile);if(I>h)continue;if(p&&g!==null){const M=g.get(x.tile)??0;const _=1/(1+M);y+=r*x.weight*_}else{y+=r*x.weight}}}return y}}spacingConstants(){const e=this.game.config().nukeMagnitudes(UNIT.AtomBomb).outer;return{borderSpacing:e,structureSpacing:e*2}}}"use strict";const AttackStructures=new Set([UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory]);const HumansVsNations="Humans Vs Nations";const BOAT_PROBE_CANDIDATES=4;class AttackBehavior{constructor(e,t,a,i,s,r,o,l){this.random=e;this.game=t;this.player=a;this.triggerRatio=i;this.reserveRatio=s;this.expandRatio=r;this.openingReserve=Math.min(.35,Math.max(.3,.3+(s-.3)/2));this.allianceBehavior=o;this.emojiBehavior=l;this.botAttackTroopsSent=0}async maybeAttack(){if(this.player===null||this.allianceBehavior===void 0){throw new Error("not initialized")}this._openingPassId=(this._openingPassId||0)+1;this._openingSnap=null;const e=Array.from(this.player.borderTiles()).flatMap(p=>this.game.neighbors(p)).filter(p=>this.game.isLand(p)&&this.game.ownerID(p)!==this.player?.smallID());const t=this.player.nearby();const a=new Set(e.map(p=>this.game.playerBySmallID(this.game.ownerID(p))).filter(p=>p!=null&&p.isPlayer()));for(const p of t){if(p.isPlayer())a.add(p)}const i=[...a].sort((p,g)=>p.troops()-g.troops());const s=i.filter(p=>this.player?.isFriendly(p)===true);const r=i.filter(p=>this.player?.isFriendly(p)===false);const o=e.some(p=>!this.game.hasOwner(p)&&!this.game.hasFallout(p));const l=o||t.some(p=>!p.isPlayer());this.noteOpenLand(o);const u=state.settings.features||{};const c=!!u.expand;const d=!!u.boat;const f=!!u.alliance;return ofhBrainRuntime.planAttackSequence(this,{all:i,friends:s,enemies:r,openLand:l,expand:c,boat:d,alliance:f})}async attackWithRandomBoat(e=[]){if(this.player===null)throw new Error("not initialized");if(!(state.settings.features&&state.settings.features.boat)){return false}if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return false}if(state.settings.winFixes){const o=this.game.numLandTiles()||1;if(this.player.numTilesOwned()/o>.25){return false}}if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}const t=Array.from(this.player.borderTiles()).filter(o=>this.game.isShore(o));if(t.length===0){return false}return ofhBrainRuntime.planTacticalBoat(this,t,e)}_launchTacticalBoat(i,r){const s=discoverCtors(getEventBus());if(this.openingVetoesTile(i))return false;if(s.boat&&ofhBrainRuntime.intent(this,"AttackBehavior",s.boat,i,r)){state.stats.attacks++;setLastAction(tr("⛵ Random boat"),"naval");return true}return false}async maybeOpportunisticBoat(){if(this.player===null)return false;if(!(state.settings.features&&state.settings.features.boat))return false;if(this.game.config().isUnitDisabled(UNIT.TransportShip))return false;const e=Math.min(this.game.config().boatMaxNumber(),state.settings.maxConcurrentBoats||3);const t=this.player.unitCount(UNIT.TransportShip);const a=performance.now();const i=state.settings.oppBoatThrottleMs||1200;const s=a-(state.lastOppBoatMs||0);const r=t>=e;const o=s<i;const l=this.game.config().maxTroops(this.player);const u=l>0?this.player.troops()/l:1;const c=state.settings.boatSurplusFill||.75;const d=Array.from(this.player.borderTiles()).filter(k=>this.game.isShore(k));try{if(a-(state._boatDiagAt||0)>5e3){state._boatDiagAt=a;ofhDebug("[Boat] diag:",{reason:r?"capped":o?"throttled":d.length===0?"no-shore":"ok",ships:t,boatCap:e,shoreTiles:d.length,fill:Number(u.toFixed(2)),islandFill:state.settings.boatIslandFill||.35,maxShips:this.game.config().boatMaxNumber()})}}catch(k){}if(r)return false;if(o)return false;if(d.length===0)return false;return ofhBrainRuntime.planNavalActions(this,{now:a,fill:u,surplusFill:c,shore:d})}boatTargetTaken(e){if(e==null||!Array.isArray(this._inflightBoatTargets))return false;if(this._inflightBoatTargets.length===0)return false;const t=state.settings.boatSpreadRadius||30;let a;let i;try{a=this.game.x(e);i=this.game.y(e)}catch(s){return false}for(const s of this._inflightBoatTargets){if(Math.abs(s.x-a)+Math.abs(s.y-i)<=t)return true}return false}scanNearbyTargets(e){const t=state.settings.islandScanRadius||40;const a=state.settings.islandScanStep||2;const i=state.settings.islandScanSamples||6;const s=state.settings.boatWeakTroopFrac??.6;const r=this.player.smallID();const o=this.player.troops();const l=new Map;const u=new Set;const c=[];const d=Math.min(i,e.length);for(let f=0;f<d;f++){const h=this.random.randElement(e);const p=this.game.x(h);const g=this.game.y(h);for(let m=-t;m<=t;m+=a){for(let y=-t;y<=t;y+=a){const b=p+m;const v=g+y;if(!this.game.isValidCoord(b,v))continue;const T=this.game.ref(b,v);if(u.has(T))continue;if(!this.game.isLand(T))continue;const x=this.game.hasFallout(T);const I=this.game.ownerID(T);if(I===r)continue;const M=this.game.hasOwner(T);if(M){let _=l.get(I);if(_===void 0){const k=this.game.playerBySmallID(I);_=!!(k&&k.isPlayer()&&this.player.isFriendly(k)===false&&k.troops()<o*s);l.set(I,_)}if(!_)continue}else if(!x){if(this.game.neighbors(T).some(_=>this.game.ownerID(_)===r)){continue}}u.add(T);c.push({tile:T,dist:m*m+y*y,owned:M,fallout:x})}}}c.sort((f,h)=>f.dist-h.dist);return c}async findDisconnectedBoatTarget(){if(this.player===null)return null;const e=this.player.smallID();const t=this.getPlayerCenter(this.player);const a=[];for(const s of this.game.players()){try{if(!s.isPlayer||!s.isPlayer())continue;if(!s.isAlive())continue;if(s.smallID()===e)continue;if(!(s.isDisconnected&&s.isDisconnected()))continue;const r=s.nameLocation?s.nameLocation():null;if(!r||r.x==null)continue;if(!this.game.isValidCoord(r.x,r.y))continue;const o=this.game.ref(r.x,r.y);if(o==null)continue;let l=0;if(t&&t.x!=null){const u=r.x-t.x;const c=r.y-t.y;l=u*u+c*c}a.push({tile:o,dist:l})}catch(r){}}a.sort((s,r)=>s.dist-r.dist);const i=state.settings.distantBoatProbeMax||12;return ofhBrainRuntime.planNavalLanding(this,a,{mode:"disconnected",probeCap:i})}async findDistantBoatTarget(ofhCoastal=false){if(ofhCoastal)return ofhBrainRuntime.findEnemyProbeTarget(this);if(this.player===null)return null;const e=this.player.smallID();const t=this.getPlayerCenter(this.player);const a=[];for(const l of this.game.players()){try{if(!l.isPlayer||!l.isPlayer())continue;if(!l.isAlive())continue;if(l.smallID()===e)continue;if(this.player.isFriendly(l)===true)continue;const u=l.nameLocation?l.nameLocation():null;if(!u||u.x==null)continue;if(!this.game.isValidCoord(u.x,u.y))continue;const c=this.game.ref(u.x,u.y);if(c==null)continue;let d=0;if(t&&t.x!=null){const f=u.x-t.x;const h=u.y-t.y;d=f*f+h*h}a.push({tile:c,dist:d})}catch(u){}}a.sort((l,u)=>l.dist-u.dist);const i=state.settings.distantBoatProbeMax||12;return ofhBrainRuntime.planNavalLanding(this,a,{mode:"distant",probeCap:i})}emitBoat(e,t,a){if(!(state.settings.features&&state.settings.features.boat)){return false}try{if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}}catch(s){}if(this.openingVetoesTile(e))return false;const i=discoverCtors(getEventBus());if(i.boat&&ofhBrainRuntime.intent(this,"AttackBehavior",i.boat,e,t)){state.stats.attacks++;setLastAction(tr(a),"naval");return true}return false}landingSucceeded(e){const t=this.game.x(e);const a=this.game.y(e);const i=this.player.smallID();const s=6;for(let r=-s;r<=s;r+=2){for(let o=-s;o<=s;o+=2){const l=t+r;const u=a+o;if(!this.game.isValidCoord(l,u))continue;const c=this.game.ref(l,u);if(this.game.isLand(c)&&this.game.ownerID(c)===i)return true}}return false}pickMirvCraterTarget(){const e=Array.isArray(state.recentMirvHits)?state.recentMirvHits:[];const t=state.settings.mirvBoatWindowTicks||150;const a=this.game.ticks();state.recentMirvHits=e.filter(s=>a-(s.at||0)<t);return ofhBrainRuntime.chooseBoatCrater(this,state.recentMirvHits)}async findRandomBoatTarget(e,t,a=false){if(this.player===null)throw new Error("not initialized");const i=this.game.x(e);const s=this.game.y(e);const r=new Set;const o=[];for(let l=0;l<500;l++){const u=this.random.nextInt(i-150,i+150);const c=this.random.nextInt(s-150,s+150);if(!this.game.isValidCoord(u,c)){continue}const d=this.game.ref(u,c);if(!this.game.isLand(d)){continue}const f=this.game.owner(d);if(f.isPlayer()&&f.smallID()===this.player.smallID()){continue}if(f.isPlayer()&&r.has(f.id())){continue}if(f.isPlayer()&&t.some(p=>p.smallID()===f.smallID())){continue}if(this.isFFA()&&f.isPlayer()&&f.troops()>this.player.troops()){continue}let h;if(a){h=!f.isPlayer()||f.type()===PlayerType.Bot}else{h=!f.isPlayer()||!f.isFriendly(this.player)}if(!h){continue}o.push({tile:d,owner:f});if(o.length>=BOAT_PROBE_CANDIDATES){break}}return ofhBrainRuntime.planBoatSites(this,o,{mode:"random",origin:e})}async attackBestTarget(e,t){return ofhBrainRuntime.planAttacks(this,e,t)}hasNeighboringBotWithStructures(){return this.player.nearby().some(e=>e.isPlayer()&&e.type()===PlayerType.Bot&&!this.player.isFriendly(e)&&e.units().some(t=>AttackStructures.has(t.type())))}noteOpenLand(e){let t=false;try{t=this.player.borderTiles().size>0}catch(a){t=false}if(!t)return;this._openLand=Boolean(e)}buildUpReady(){if(this._builtLatched)return true;let e=false;try{const t=!(state.settings.features&&state.settings.features.build)||typeof autoBotBuildAllowed==="function"&&!autoBotBuildAllowed(UNIT.City)||this.game.config().isUnitDisabled(UNIT.City);const a=t?Infinity:this.player.totalUnitLevels(UNIT.City);const i=this.game.config().maxTroops(this.player)||1;const s=this.player.troops()/i;e=a>=(state.settings.openingMinCityLevels||5)&&s>=(state.settings.openingArmyFill||.65)}catch(t){e=true}if(e){this._builtLatched=true;try{setLastAction(tr("⚖️ Opening complete — engaging players"),"combat")}catch(t){}}return e}recentInvaderSids(e){if(!this._recentInvaders)this._recentInvaders=new Map;const t=this._recentInvaders;try{for(const i of this.player.incomingAttacks()){const s=i.attacker();if(s&&s.isPlayer&&s.isPlayer())t.set(s.smallID(),e)}}catch(i){}const a=state.settings.openingInvaderMemoryTicks||600;for(const i of Array.from(t)){if(!Number.isFinite(i[1])||e-i[1]>a)t.delete(i[0])}return new Set(t.keys())}allyInvaderSids(){const e=new Set;try{for(const t of this.player.allies()){for(const a of t.incomingAttacks()){const i=a.attacker();if(i&&i.isPlayer&&i.isPlayer())e.add(i.smallID())}}}catch(t){}return e}phasedOpeningApplies(e){if(!state.settings.phasedOpening)return false;if(this._badSpawnLatched)return true;try{if(state.settings.openingAllModes)return true;if(this.isFFA())return true;if(!e&&this.hostileNeighborCount()>=(state.settings.openingSurroundedNeighbors||2)){this._badSpawnLatched=true;return true}}catch(t){return false}return false}openingSnapshot(){const e=this._openingPassId||0;if(this._openingSnap&&this._openingSnapPass===e){return this._openingSnap}const t={applies:false,over:false,openLand:false,built:true,invaders:null,allyInvaders:null};try{const a=Number(this.game.ticks());const i=state.settings.openingMaxTicks||0;t.over=i>0&&Number.isFinite(a)&&a>=i;t.openLand=Boolean(this._openLand);t.built=this.buildUpReady();t.applies=this.phasedOpeningApplies(t.openLand);t.invaders=this.recentInvaderSids(a);t.allyInvaders=this.allyInvaderSids()}catch(a){t.applies=false}this._openingSnap=t;this._openingSnapPass=e;return t}openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;if(!state.settings.phasedOpening)return false;let a;try{a=this.openingSnapshot()}catch(o){return false}if(!a||!a.applies||a.over)return false;let i=false;try{i=Boolean(e&&e.isPlayer&&e.isPlayer())}catch(o){return false}if(!i)return false;if(t===true)return false;let s=false;let r=null;try{s=e.type()===PlayerType.Bot;r=e.smallID()}catch(o){return false}if(r!==null&&a.invaders&&a.invaders.has(r))return false;if(r!==null&&a.allyInvaders&&a.allyInvaders.has(r))return false;try{if(e.isDisconnected&&e.isDisconnected())return false}catch(o){}if(s){try{if(e.units().some(o=>AttackStructures.has(o.type())))return false}catch(o){return false}return a.openLand&&!a.built}return!a.built}openingVetoesTile(e){const ofhVeto=ofhBrainRuntime.twoTeamOpeningTileVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;if(!state.settings.phasedOpening)return false;try{if(!this.game.hasOwner(e))return false;const t=this.game.playerBySmallID(this.game.ownerID(e));if(!t||!t.isPlayer||!t.isPlayer())return false;if(t.smallID&&t.smallID()===this.player.smallID())return false;return this.openingVetoes(t,false)}catch(t){return false}}hasReserveRatioTroops(){const e=this.game.config().maxTroops(this.player);const t=this.player.troops()/e;return t>=this.effectiveReserveRatio()}effectiveReserveRatio(){let e=this.reserveRatio;try{if(state.settings.winFixes){const t=this.game.numLandTiles()||1;const a=this.player.numTilesOwned()/t;const i=state.settings.sizeReserveScale??0;const s=state.settings.sizeReserveCap??.6;e=Math.max(e,Math.min(s,a*i))}}catch(t){}try{if(state.settings.reserveByNeighbors){const t=this.hostileNeighborCount();if(t>1){e=Math.max(e,Math.min(RESERVE_NEIGHBOR_CAP,e+(t-1)*RESERVE_PER_EXTRA_NEIGHBOR))}}}catch(t){}try{if(state.settings.combatReserve&&this.underThreat()){e=Math.max(e,state.settings.combatReserveFloor??.45)}}catch(t){}try{if(state.settings.absorbThenCounter&&this.hostileWaveRemaining()>0){e=Math.max(e,state.settings.absorbReserveFloor??.55)}}catch(t){}return Math.min(e,MAX_DEFENSE_RESERVE)}hostileNeighborCount(){let e=-1;try{e=Number(this.game.ticks())}catch(a){return 0}if(this._hostileNbTick===e)return this._hostileNbCount;let t=0;try{const a=new Set;for(const i of this.game.players()){if(!i.isPlayer()||!i.isAlive())continue;if(i.smallID()===this.player.smallID())continue;if(i.type()===PlayerType.Bot)continue;if(this.player.isFriendly(i))continue;a.add(i.smallID())}if(a.size>0){const i=new Set;for(const s of this.player.borderTiles()){for(const r of this.game.neighbors(s)){if(!this.game.hasOwner(r)||!this.game.isLand(r))continue;const o=this.game.ownerID(r);if(a.has(o))i.add(o)}}t=i.size}}catch(a){t=0}this._hostileNbTick=e;this._hostileNbCount=t;return t}underThreat(){let e;try{e=Number(this.game.ticks())}catch(i){return false}if(!Number.isFinite(e))return false;if(this._threatMemoTick===e)return this._threatMemoVal;if(this._threatAtTick!==void 0&&e<this._threatAtTick){this._threatAtTick=void 0}let t=false;try{t=this.player.incomingAttacks().some(i=>{const s=i.attacker();return s&&s.type()!==PlayerType.Bot&&!this.player.isFriendly(s)})}catch(i){t=false}if(!t){try{t=this.player.outgoingAttacks().some(i=>{if(i.retreating())return false;const s=i.target();return s&&typeof s.isPlayer==="function"&&s.isPlayer()&&s.type()!==PlayerType.Bot&&!this.player.isFriendly(s)})}catch(i){}}if(t)this._threatAtTick=e;const a=this._threatAtTick!==void 0&&e-this._threatAtTick<COMBAT_THREAT_STICKY_TICKS;this._threatMemoTick=e;this._threatMemoVal=a;return a}freeLandShare(){let e=-1;try{e=Number(this.game.ticks())}catch(a){return null}if(this._freeShareTick===e)return this._freeShareVal;let t=null;try{let a=Number(this.game.numLandTiles())||0;try{a-=Number(this.game.numTilesWithFallout())||0}catch(i){}if(a>0){let i=0;for(const s of this.game.players()){if(!s.isPlayer||!s.isPlayer())continue;i+=Number(s.numTilesOwned())||0}t=Math.max(0,Math.min(1,(a-i)/a))}}catch(a){t=null}this._freeShareTick=e;this._freeShareVal=t;return t}borderingBotCount(){try{let e=0;for(const t of this.player.nearby()){if(!t.isPlayer||!t.isPlayer())continue;if(t.type()!==PlayerType.Bot)continue;if(this.player.isFriendly(t))continue;if(t.isAlive&&!t.isAlive())continue;e++}return e}catch(e){return null}}async findSealablePocket(){return ofhBrainRuntime.selectAttackGeography(this,"pocket")}hostileWaveRemaining(){let e;try{e=Number(this.game.ticks())}catch(a){return 0}if(this._waveTick===e)return this._waveRemaining;let t=0;try{for(const a of this.player.incomingAttacks()){const i=a.attacker();if(!i||!i.isPlayer||!i.isPlayer())continue;if(i.type()===PlayerType.Bot)continue;if(this.player.isFriendly(i))continue;t+=Number(a.troops())||0}}catch(a){t=0}this._waveTick=e;this._waveRemaining=t;return t}shieldThreatened(){let e;try{e=Number(this.game.ticks())}catch(a){return false}if(this._shieldThreatTick===e)return this._shieldThreatVal;let t=false;try{const a=this.player.units(UNIT.DefensePost);if(a&&a.length>0){const i=new Set;for(const s of this.player.incomingAttacks()){const r=s.attacker();if(!r||!r.isPlayer||!r.isPlayer())continue;if(r.type()===PlayerType.Bot)continue;if(this.player.isFriendly(r))continue;i.add(r.smallID())}if(i.size>0){const s=SHIELD_GUARD_DIST*SHIELD_GUARD_DIST;e:for(const r of this.player.borderTiles()){let o=false;for(const l of this.game.neighbors(r)){if(!this.game.hasOwner(l)||!this.game.isLand(l))continue;if(i.has(this.game.ownerID(l))){o=true;break}}if(!o)continue;for(const l of a){if(this.game.euclideanDistSquared(l.tile(),r)<=s){t=true;break e}}}}}}catch(a){t=false}this._shieldThreatTick=e;this._shieldThreatVal=t;return t}counterReady(){if(!state.settings.absorbThenCounter)return true;try{const e=Number(this.game.ticks());if(!Number.isFinite(e))return true;const t=this.hostileWaveRemaining();if(t<=0){this._absorb=void 0;return true}if(!this._absorb||e<this._absorb.startTick){this._absorb={startTick:e,peak:t}}else if(t>this._absorb.peak){this._absorb.peak=t}const a=this._absorb;if(t<=a.peak*(state.settings.counterSpentFrac??.4)){return true}if(this.shieldThreatened())return false;const i=this.findIncomingAttackPlayer();if(i){try{if(Number(i.troops())<Number(this.player.troops())*(state.settings.counterWeakRatio??.5)){return true}}catch(s){}}return e-a.startTick>=(state.settings.absorbMaxTicks??300)}catch(e){return true}}hasTriggerRatioTroops(){const e=this.game.config().maxTroops(this.player);const t=this.player.troops()/e;return t>=this.triggerRatio}findIncomingAttackPlayer(){return ofhBrainRuntime.selectAttackTarget(this,"incoming")}async attackBots(){return ofhBrainRuntime.planBotTargets(this)}getBotAttackMaxParallelism(){const e=currentDifficulty();switch(e){case Difficulty.Easy:return 1;case Difficulty.Medium:return this.random.chance(2)?1:2;case Difficulty.Hard:return 3;case Difficulty.Impossible:{return 100}default:throw new Error("unreachable difficulty: "+e)}}async assistAllies(){if(this.emojiBehavior===void 0)throw new Error("not initialized");return ofhBrainRuntime.planAssist(this)}findTraitor(e){return ofhBrainRuntime.selectAttackTarget(this,"traitor",e)}async maybeBetrayAndAttack(e,t){if(this.allianceBehavior===void 0)throw new Error("not initialized");return ofhBrainRuntime.planBetray(this,e,t)}isBorderingNukedTerritory(){if(this.game.config().isUnitDisabled(UNIT.MissileSilo)){return false}for(const e of this.player.borderTiles()){for(const t of this.game.neighbors(e)){if(this.game.isLand(t)&&!this.game.hasOwner(t)&&this.game.hasFallout(t)){return true}}}return false}findVictim(e){return ofhBrainRuntime.selectAttackTarget(this,"victim",e)}findVeryWeakEnemy(e){return ofhBrainRuntime.selectAttackTarget(this,"weak",e)}async findNearestIslandEnemy(){return ofhBrainRuntime.selectAttackGeography(this,"island")}isFFA(){return this.game.config().gameConfig().gameMode===GameMode.FFA}getPlayerCenter(e){if(e.largestClusterBoundingBox){return boundingBoxCenter(e.largestClusterBoundingBox)}const t=e.borderTiles();if(t&&t.size>0){return calculateBoundingBoxCenter(this.game,t)}return e.nameLocation()}async attackRandomTarget(){if(!this.hasTriggerRatioTroops())return;const e=this.findIncomingAttackPlayer();if(e){if(await this.sendAttack(e,true))return}const t=this.getNeighborTraitorToAttack();if(t!==null){if(await this.sendAttack(t))return}const a=this.player.nearby();for(const i of this.random.shuffleArray(a)){if(!i.isPlayer())continue;if(this.player.isFriendly(i))continue;if(await this.sendAttack(i))return}}getNeighborTraitorToAttack(){if(this.game.config().disableAlliances())return null;const e=this.player.nearby().filter(t=>t.isPlayer()&&this.player.isFriendly(t)===false&&t.isTraitor());return e.length>0?this.random.randElement(e):null}async forceSendAttack(e){ofhBrainRuntime.planAttackAllocation(this,"forced",e)}_forcedAttackReady(e,a){const t=discoverCtors(getEventBus());const i=e.isPlayer()?e.id():null;if(t.attack&&ofhBrainRuntime.intent(this,"AttackBehavior",t.attack,i,a)){state.stats.attacks++;setLastAction(tr("⚔️ Attack"),"combat")}}async sendAttack(e,t=false,a=false){if(this.openingVetoes(e,a))return false;if(!t&&!this.shouldAttack(e))return false;return await ofhBrainRuntime.planAttackRoute(this,e,a)}hasLandBorderWithTerraNullius(){for(const e of this.player.borderTiles()){for(const t of this.game.neighbors(e)){if(this.game.isLand(t)&&!this.game.hasOwner(t)){return true}}}return false}async sendBoatAttackToNearbyTerraNullius(){if(!(state.settings.features&&state.settings.features.boat))return false;if(this.game.config().isUnitDisabled(UNIT.TransportShip))return false;if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber())return false;const e=[[0,-1],[0,1],[-1,0],[1,0]];const t=Array.from(this.player.borderTiles()).filter(i=>this.game.isShore(i));const a=[];e:for(let i=0;i<t.length;i+=10){const s=t[i];const r=this.game.x(s);const o=this.game.y(s);for(const[l,u]of e){const c=r+l;const d=o+u;if(!this.game.isValidCoord(c,d))continue;if(!this.game.isWater(this.game.ref(c,d)))continue;const f=r+l*5;const h=o+u*5;if(!this.game.isValidCoord(f,h))continue;const p=this.game.ref(f,h);if(!this.game.isLand(p))continue;if(this.game.hasOwner(p))continue;if(!state.settings.winFixes&&this.game.hasFallout(p))continue;a.push(p);if(a.length>=BOAT_PROBE_CANDIDATES)break e}}return await ofhBrainRuntime.planFreeBoat(this,a)}_freeBoatReady(i,r){const o=discoverCtors(getEventBus());const l=Boolean(o.boat)&&ofhBrainRuntime.intent(this,"AttackBehavior",o.boat,i,r);if(l){state.stats.attacks++;setLastAction(tr("⛵ Boat (land grab)"),"naval")}return l}shouldAttack(e){if(e.isPlayer()===false||e.type()!==PlayerType.Human||e.isTraitor()||this.player.type()===PlayerType.Bot||this.game.config().gameConfig().playerTeams===HumansVsNations){return true}const t=currentDifficulty();if(t===Difficulty.Easy&&this.random.nextInt(0,4)!==0){return false}if(t===Difficulty.Medium&&this.random.chance(4)){return false}return true}sendLandAttack(e,t=false){return ofhBrainRuntime.planAttackAllocation(this,"land",e,t)}_landReserveFacts(e,t=false){const a=this.game.config().maxTroops(this.player);const i=e.isPlayer()&&e.type()===PlayerType.Bot&&e.units().some(f=>AttackStructures.has(f.type()));const s=e.isPlayer()&&!i&&!t;let r=s?this.effectiveReserveRatio():this.expandRatio;if(state.settings.phasedOpening&&!t&&!i){try{const f=this.openingSnapshot();if(f&&f.applies&&!f.over&&!f.built){const h=Boolean(e&&e.isPlayer&&e.isPlayer());const p=!this.underThreat();if(!h){const g=this.freeLandShare();const m=g!==null&&g<=(state.settings.openingFullSendFreeShare??.08);r=m&&p?state.settings.fullSendReserve??.05:Math.max(r,this.openingReserve)}else if(e.type()===PlayerType.Bot){const g=this.borderingBotCount();const m=g!==null&&g<=(state.settings.openingFullSendBotCount??2);r=m&&p?state.settings.fullSendReserve??.05:Math.max(r,this.openingReserve)}}}catch(f){}}if(s&&state.settings.gentleNeighbors){try{if(e.type()!==PlayerType.Bot){r=Math.max(r,state.settings.neighborReserveFloor??.5)}}catch(f){}}if(!s&&!t){try{if(state.settings.combatReserve&&this.underThreat()){r=Math.max(r,this.effectiveReserveRatio())}}catch(f){}}return {capacity:a,ratio:r}}_landAttackReady(e,t,l){if(e.isPlayer()&&this.player.type()===PlayerType.Nation){if(this.emojiBehavior===void 0)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e)}const u=discoverCtors(getEventBus());const c=e.isPlayer()?e.id():null;const d=Boolean(u.attack)&&ofhBrainRuntime.intent(this,"AttackBehavior",u.attack,c,l);if(d){state.stats.attacks++;setLastAction(t?tr("⚔️🛡️ Counter-attack"):tr("⚔️ Attack"),"combat")}return d}async sendBoatAttack(e){if(!(state.settings.features&&state.settings.features.boat)){return false}if(this.game.config().isUnitDisabled(UNIT.TransportShip)){return false}return await ofhBrainRuntime.planTargetedBoat(this,e)}_targetedBoatReady(e,t,i){if(e.isPlayer()&&this.player.type()===PlayerType.Nation){if(this.emojiBehavior===void 0)throw new Error("not initialized");this.emojiBehavior.maybeSendAttackEmoji(e)}try{if(this.player.unitCount(UNIT.TransportShip)>=this.game.config().boatMaxNumber()){return false}}catch(o){}const s=discoverCtors(getEventBus());const r=Boolean(s.boat)&&ofhBrainRuntime.intent(this,"AttackBehavior",s.boat,t.y,i);if(r){state.stats.attacks++;setLastAction(tr("⛵ Boat attack"),"naval")}return r}calculateBotAttackTroops(e,t){return ofhBrainRuntime.planAttackAllocation(this,"bot",e,t)}donateTroops(){try{const g=performance.now();if(g-(state._donDiagAt||0)>5e3){state._donDiagAt=g;const m=this.game.config();const y=this.game.players().filter(b=>this.player.isOnSameTeam(b)&&b.smallID()!==this.player.smallID()&&b.isAlive());ofhDebug("[Donate] diag: "+JSON.stringify({featureOn:!!state.settings.features.donate,winFixes:!!state.settings.winFixes,replicatedDifficulty:String(currentDifficulty()),gameType:String(m.gameConfig().gameType),gameMode:String(m.gameConfig().gameMode),donateAllowedByLobby:m.donateTroops(),aliveTeammates:y.length,myTroops:Math.round(this.player.troops())}))}}catch(g){}if(!state.settings.features.donate)return false;try{const g=Number(this.game.ticks());if(Number.isFinite(g)){if(this._donateUnsafeAtTick!==void 0&&g<this._donateUnsafeAtTick){this._donateUnsafeAtTick=void 0}const m=this.player.incomingAttacks();if(m&&m.length>0)this._donateUnsafeAtTick=g;const y=100;if(this._donateUnsafeAtTick!==void 0&&g-this._donateUnsafeAtTick<y){ofhDebug("[Donate] skip: under attack — defending first");return false}}}catch(g){}if(this.game.config().gameConfig().gameMode!==GameMode.Team){return false}if(this.game.config().donateTroops()===false){return false}if(this.game.getWinner()){ofhDebug("[Donate] skip: game already has a winner");return false}const e=currentDifficulty();if(!state.settings.winFixes){switch(e){case Difficulty.Easy:return false;case Difficulty.Medium:if(!this.random.chance(4)){return false}break;case Difficulty.Hard:if(!this.random.chance(2)){return false}break;case Difficulty.Impossible:break;default:throw new Error("unreachable difficulty: "+e)}}const t=this.game.players().filter(g=>this.player.isOnSameTeam(g)).filter(g=>state.settings.winFixes?true:g.incomingAttacks().length>0||g.outgoingAttacks().length>0);if(t.length===0){ofhDebug("[Donate] skip: no same-team players found");return false}return ofhBrainRuntime.planDonation(this,t)}_donateReady(r,c){const p=discoverCtors(getEventBus());if(p.donateTroops&&ofhBrainRuntime.intent(this,"AttackBehavior",p.donateTroops,r.__src??r,c)){ofhDebug("[Donate] SENT",Math.round(c),"→",r.name?.()??r.smallID?.());setLastAction(tr("🎁 Donate troops"),"combat");return true}else{ofhDebug("[Donate] emit failed",{ctor:!!p.donateTroops})}return false}}const SALVO_GAP_MS=140;function salvoPace(n,e){if(n>=e-1)return Promise.resolve();return new Promise(t=>setTimeout(t,SALVO_GAP_MS))}function nukeArcSpeed(n,e){try{const t=n.config();if(typeof t.nukeSpeed==="function"){const a=Number(t.nukeSpeed(e));if(Number.isFinite(a)&&a>0)return a}if(typeof t.defaultNukeSpeed==="function"){const a=Number(t.defaultNukeSpeed());if(Number.isFinite(a)&&a>0)return a}}catch(t){}return 10}"use strict";const MAX_NATION_SILO_UPGRADE_LEVEL=5;const HIGH_DENSITY_NUKE_THRESHOLD=1/75;const MIN_LEVEL_SUM_FOR_HIGH_DENSITY_NUKE=5;const NUKE_STRUCTURES_TYPES=[UNIT.City,UNIT.DefensePost,UNIT.SAMLauncher,UNIT.MissileSilo,UNIT.Port,UNIT.Factory];function euclDistFN(n,e,t){const a=e*e;if(!t){return(i,s)=>i.euclideanDistSquared(n,s)<=a}else{return(i,s)=>{const r=i.x(n)-.5-i.x(s);const o=i.y(n)-.5-i.y(s);return r*r+o*o<=a}}}class NukeCubicBezierCurve{constructor(e,t,a,i){this.p0=e;this.p1=t;this.p2=a;this.p3=i}getPointAt(e){const t=1-e;const a=t*t;const i=a*t;const s=e*e;const r=s*e;const o=i*this.p0.x+3*a*e*this.p1.x+3*t*s*this.p2.x+r*this.p3.x;const l=i*this.p0.y+3*a*e*this.p1.y+3*t*s*this.p2.y+r*this.p3.y;return{x:o,y:l}}}class NukeDistanceBasedBezierCurve extends NukeCubicBezierCurve{constructor(e,t,a,i,s){super(e,t,a,i);this.totalDistance=0;this.cachedPoints=[];this.currentIndex=0;this.computeAllPoints(s,.002)}getAllPoints(){return this.cachedPoints}increment(e){this.totalDistance+=e;while(this.currentIndex<this.cachedPoints.length-1&&this.getDistanceUpToIndex(this.currentIndex+1)<this.totalDistance){this.currentIndex++}if(this.currentIndex>=this.cachedPoints.length-1){return null}return this.cachedPoints[this.currentIndex]}getCurrentIndex(){return this.currentIndex}computeAllPoints(e,t){this.cachedPoints=[];this.totalDistance=0;this.currentIndex=0;let a=0;let i=this.getPointAt(a);this.cachedPoints.push(i);let s=0;while(a<1){a=Math.min(a+t,1);const o=this.getPointAt(a);const l=o.x-i.x;const u=o.y-i.y;const c=Math.sqrt(l*l+u*u);s+=c;if(s>=e){this.cachedPoints.push(o);s=0}i=o}const r=this.getPointAt(1);if(this.cachedPoints.length===0||r.x!==this.cachedPoints[this.cachedPoints.length-1].x||r.y!==this.cachedPoints[this.cachedPoints.length-1].y){this.cachedPoints.push(r)}}getDistanceUpToIndex(e){let t=0;for(let a=1;a<=e;a++){const i=this.cachedPoints[a-1];const s=this.cachedPoints[a];const r=s.x-i.x;const o=s.y-i.y;t+=Math.sqrt(r*r+o*o)}return t}}const PARABOLA_MIN_HEIGHT=50;class NukeParabolaUniversalPathFinder{constructor(e,t){this.gameMap=e;this.options=t;this.curve=null;this.lastTo=null}createCurve(e,t){const a=this.options?.increment??3;const i=this.options?.distanceBasedHeight??true;const s=this.options?.directionUp??true;const r={x:this.gameMap.x(e),y:this.gameMap.y(e)};const o={x:this.gameMap.x(t),y:this.gameMap.y(t)};const l=o.x-r.x;const u=o.y-r.y;const c=Math.sqrt(l*l+u*u);const d=i?Math.max(c/3,PARABOLA_MIN_HEIGHT):0;const f=s?-1:1;const h=this.gameMap.height();const p={x:r.x+l/4,y:within(r.y+u/4+f*d,0,h-1)};const g={x:r.x+l*3/4,y:within(r.y+u*3/4+f*d,0,h-1)};return new NukeDistanceBasedBezierCurve(r,p,g,o,a)}findPath(e,t){if(Array.isArray(e)){throw new Error("ParabolaUniversalPathFinder does not support multiple start points")}const a=this.createCurve(e,t);return a.getAllPoints().map(i=>this.gameMap.ref(Math.floor(i.x),Math.floor(i.y)))}next(e,t,a){if(this.lastTo!==t){this.curve=this.createCurve(e,t);this.lastTo=t}const i=this.curve.increment(a??1);if(!i){return{status:"Complete",node:t}}const s=this.gameMap.ref(Math.floor(i.x),Math.floor(i.y));return{status:"Next",node:s}}invalidate(){this.curve=null;this.lastTo=null}currentIndex(){return this.curve?.getCurrentIndex()??0}}const UniversalPathFinding={Parabola(n,e){return new NukeParabolaUniversalPathFinder(n,e)}};class NukeBehavior{constructor(e,t,a,i,s){this.random=e;this.game=t;this.player=a;this.attackBehavior=i;this.emojiBehavior=s;this.recentlySentNukes=[];this.atomBombsLaunched=0;this.atomBombPerceivedCost=null;this.hydrogenBombPerceivedCost=null;this.hydrogenBombsLaunched=0;this.isHydroNation=false;this._costCacheTick=-1;this._costCache=new Map}async maybeSendNuke(){const e=this.player.units(UNIT.MissileSilo);const t=this.game.config();if(e.length===0||t.isUnitDisabled(UNIT.MissileSilo)||t.isUnitDisabled(UNIT.AtomBomb)&&t.isUnitDisabled(UNIT.HydrogenBomb)){return}const ofhTargetSelection={};const a=this.findBestNukeTarget(ofhTargetSelection);if(a===null){return}if(a.type()===PlayerType.Bot||this.player.isOnSameTeam(a)||this.attackBehavior.shouldAttack(a)===false){return}const i=await this.getPerceivedNukeCost(UNIT.HydrogenBomb);const s=await this.getPerceivedNukeCost(UNIT.AtomBomb);let r;try{const M=BigInt(this.player.gold()||0);r=M-mirvReserveHold(M)}catch(M){r=this.player.gold()}const ofhWeaponSelection={};const o=await ofhBrainRuntime.selectNukeWeapon(this,{available:r,hydroCost:i,atomCost:s,parentDecisionId:ofhTargetSelection.decisionId},ofhWeaponSelection);if(o===null)return;const l=this.game.config().nukeMagnitudes(o).outer;const u=a.units(...NUKE_STRUCTURES_TYPES);const c=u.map(M=>M.tile());const d=currentDifficulty();const f=d===Difficulty.Impossible?30:10;await withTimeout(this.game.ensureBorderTiles(a),WORKER_TIMEOUT_MS,null);const h=randTerritoryTileArray(this.random,this.game,a,f);const p=h.concat(c);let g=null;let m=-1;this.removeOldNukeEvents();const y=Boolean(state.settings.nukeDensityFirst);const b=[];e:for(const M of new Set(p)){if(M===null)continue;const _=boundingBoxTiles(this.game,M,l).concat(boundingBoxTiles(this.game,M,Math.floor(l/2)));for(const V of _){if(!this.isValidNukeTile(V,a)){continue e}}const k=this.nukeSpawn(o,M);if(k===false)continue;if(this.game.config().gameConfig().gameMode===GameMode.Team&&d!==Difficulty.Easy&&this.isTeammateAlreadyNukingThisSpot(M,o)){continue}const N=d===Difficulty.Hard||d===Difficulty.Impossible?this.chooseNukeArc(k,M,undefined,ofhWeaponSelection.decisionId):{intercepted:false,arcUp:true,upgradeSafe:true};if(N.stopped)return;const B=N.intercepted;if(B&&!y){continue}let G=this.nukeTileScore(M,e,u,o);if(!B&&N.upgradeSafe===false){G*=.5}b.push({tile:M,value:G,interceptable:B,arcUp:N.arcUp,arcDecisionId:ofhBrainRuntime.strikeDecisionId(N)})}b.sort((M,_)=>_.value-M.value);return ofhBrainRuntime.planNuke(this,b,{target:a,weapon:o,difficulty:d,parentDecisionId:ofhWeaponSelection.decisionId??ofhTargetSelection.decisionId})}findBestNukeTarget(ofhSelection){return ofhBrainRuntime.selectNukeTarget(this,ofhSelection)}isRichestNation(){const e=this.player.gold();for(const t of this.game.players()){if(t.smallID()===this.player.smallID())continue;if(t.type()!==PlayerType.Nation)continue;if(t.gold()>e)return false}return true}findHighDensityTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"density")}findFFACrownTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"crown")}findStrongestTeamTarget(){return ofhBrainRuntime.selectStrikePlayer(this,"team")}async getPerceivedNukeCost(e){if(this.game.players().length===2){return await this.cost(e)}if(this.game.config().isUnitDisabled(UNIT.MIRV)){return await this.cost(e)}if(this.game.config().gameConfig().gameMode===GameMode.Team&&this.player.gold()>await this.cost(UNIT.HydrogenBomb)){return await this.cost(e)}if(this.player.gold()>await this.cost(UNIT.MIRV)+await this.cost(UNIT.HydrogenBomb)){return await this.cost(e)}const t=currentDifficulty();if((t===Difficulty.Hard||t===Difficulty.Impossible)&&this.isUnderHeavyAttack()){return await this.cost(e)}if(e===UNIT.AtomBomb){if(this.atomBombPerceivedCost===null){const a=await this.cost(UNIT.AtomBomb);if(!a)return a;this.atomBombPerceivedCost=a}return this.atomBombPerceivedCost}else{if(this.hydrogenBombPerceivedCost===null){const a=await this.cost(UNIT.HydrogenBomb);if(!a)return a;this.hydrogenBombPerceivedCost=a}return this.hydrogenBombPerceivedCost}}isUnderHeavyAttack(){const e=this.player.incomingAttacks();let t=0;for(const i of e){t+=i.troops()}const a=this.player.troops();return t>=a}removeOldNukeEvents(){const e=600;const t=this.game.ticks();while(this.recentlySentNukes.length>0&&this.recentlySentNukes[0][0]+e<t){this.recentlySentNukes.shift()}}isTeammateAlreadyNukingThisSpot(e,t){const a=this.game.config().nukeMagnitudes(t).inner;const i=this.game.units(UNIT.AtomBomb,UNIT.HydrogenBomb);for(const s of i){const r=s.owner();if(r&&r.smallID&&r.smallID()===this.player.smallID()||!this.player.isFriendly(r)){continue}const o=s.targetTile();if(!o)continue;const l=this.game.config().nukeMagnitudes(s.type()).inner;const u=this.game.euclideanDistSquared(e,o);const c=a+l;const d=c*c;if(u<=d){return true}}return false}isTrajectoryInterceptableBySam(e,t,a,i=true,s=0,r=UNIT.AtomBomb){const o=nukeArcSpeed(this.game,r);const l=UniversalPathFinding.Parabola(this.game,{increment:o,distanceBasedHeight:true,directionUp:i!==false});const u=l.findPath(e,t)??[];if(u.length===0){return false}const c=this.game.config().defaultNukeTargetableRange()**2;let d=-1;let f=-1;for(let h=0;h<u.length;h++){const p=u[h];if(d===-1){if(this.game.euclideanDistSquared(p,e)>c){if(this.game.euclideanDistSquared(p,t)<c){break}else{d=h}}}else if(this.game.euclideanDistSquared(p,t)<c){f=h;break}}for(let h=0;h<u.length;h++){if(d!==-1&&f!==-1&&h===d){h=f-1;continue}const p=u[h];const g=this.game.nearbyUnits(p,this.game.config().maxSamRange(),UNIT.SAMLauncher);for(const m of g){const y=m.unit.owner();if(y&&y.smallID&&y.smallID()===this.player.smallID()||this.player.isFriendly(y)){continue}if(a?.has(m.unit.id())){continue}const b=this.game.config().samRange(m.unit.level()+s)**2;if(m.distSquared<=b){return true}}}return false}chooseNukeArc(e,t,a,ofhDecisionId){return ofhBrainRuntime.selectNukeArc(this,{fromTile:e,targetTile:t,ignoredSamIds:a,parentDecisionId:ofhDecisionId})}canSetNukeArc(){try{const e=getBuildMenu();return!!(e&&typeof e.sendBuildOrUpgrade==="function"&&e.uiState&&typeof e.uiState==="object")}catch(e){return false}}isValidNukeTile(e,t){const a=currentDifficulty();const i=this.game.owner(e);if(i&&i.isPlayer&&i.isPlayer()&&i.smallID()===t.smallID()){return true}if((a===Difficulty.Hard||a===Difficulty.Impossible)&&(!(i&&i.isPlayer&&i.isPlayer())||this.game.config().gameConfig().gameMode===GameMode.Team&&i.isPlayer()&&!this.player.isFriendly(i))){return true}return false}nukeTileScore(e,t,a,i){const s=this.game.config().nukeMagnitudes(i);const r=euclDistFN(e,s.outer,false);let o=a.filter(m=>r(this.game,m.tile())).map(m=>{const y=m.level();switch(m.type()){case UNIT.City:return 25e3*y;case UNIT.DefensePost:return 5e3*y;case UNIT.MissileSilo:return 5e4*y;case UNIT.Port:return 15e3*y;case UNIT.Factory:return 15e3*y;default:return 0}}).reduce((m,y)=>m+y,0);const l=currentDifficulty();if(l===Difficulty.Medium){const m=euclDistFN(e,50,false);const y=a.some(b=>b.type()===UNIT.SAMLauncher&&m(this.game,b.tile()));if(y)return-1}if(l===Difficulty.Impossible&&i===UNIT.HydrogenBomb){const m=this.game.config().nukeMagnitudes(UNIT.HydrogenBomb);const y=this.game.nearbyUnits(e,m.outer,UNIT.SAMLauncher);for(const b of y){const v=b.unit.level();if(v>=5)continue;const T=this.game.config().samRange(v+(state.settings.samUpgradeMargin?1:0));const x=Math.sqrt(this.game.euclideanDistSquared(e,b.unit.tile()));if(x>T){o+=1e5*v}}}const u=t.map(m=>m.tile());const c=closestTwoTiles(this.game,u,[e]);if(c===null)throw new Error("Missing result");const d=c.x;const f=this.game.euclideanDistSquared(e,d);const h=Math.sqrt(f);const p=h*30;const g=o;o=Math.max(g*.2,o-p);o-=this.recentlySentNukes.filter(([m,y,b])=>{const v=this.game.config().nukeMagnitudes(b).inner;const T=this.game.euclideanDistSquared(e,y);return T<=v*v}).map(m=>1e6).reduce((m,y)=>m+y,0);return o}nukeSpendAllowed(e){if(!state.settings.economyFirst)return true;let t;try{if(typeof incomeWindow!=="function"||incomeWindow()===null){return false}t=typeof estimatedGoldPerMinute==="function"?estimatedGoldPerMinute():0}catch(s){return false}if(!Number.isFinite(t)||t<=0)return false;let a=0;try{a=Number(e)}catch(s){a=0}if(!Number.isFinite(a)||a<=0)return false;const i=state.settings.nukeIncomeMinutes||2;return a<=t*i}async sendNuke(e,t,a,i=0,s=false,r=true,ofhDecisionId){const o=this.game.ticks();let l;try{l=await withTimeout(this.player.buildables(e,[t]),WORKER_TIMEOUT_MS,null)}catch(p){return}const u=Array.isArray(l)?l.find(p=>p.type===t):null;if(u===null||u===void 0)return;if(!(u.canBuild!==false&&this.player.gold()>=u.cost))return;const c=getBuildMenu();if(!c||typeof c.sendBuildOrUpgrade!=="function")return;const d=c.uiState;const f=!!(d&&typeof d==="object");let h;if(f){h=d.rocketDirectionUp;d.rocketDirectionUp=r!==false}try{ofhBrainRuntime.strikeBuild(this,ofhDecisionId,"NukeBehavior",c,u,e);if(ofhBrainRuntime.wasDeclined(this))return false}finally{if(f)d.rocketDirectionUp=h}this.recentlySentNukes.push([o,e,t]);if(t===UNIT.AtomBomb){this.atomBombsLaunched++;if(this.atomBombPerceivedCost===null){const p=await this.cost(UNIT.AtomBomb);if(!ofhBrainRuntime.strikeAllowed(this))return;if(p)this.atomBombPerceivedCost=p}if(!state.settings.economyFirst&&this.atomBombPerceivedCost){this.atomBombPerceivedCost=this.atomBombPerceivedCost*150n/100n}}else if(t===UNIT.HydrogenBomb){this.hydrogenBombsLaunched++;if(this.hydrogenBombPerceivedCost===null){const p=await this.cost(UNIT.HydrogenBomb);if(!ofhBrainRuntime.strikeAllowed(this))return;if(p)this.hydrogenBombPerceivedCost=p}if(!state.settings.economyFirst&&this.hydrogenBombPerceivedCost){this.hydrogenBombPerceivedCost=this.hydrogenBombPerceivedCost*125n/100n}}state.stats.nukes++;if(!s)setLastAction(tr("☢️ Launch")+" "+t,"nuke");this.emojiBehavior.maybeSendEmoji(a,EMOJI_NUKE)}planSaturationSalvo(e,t,a,ofhDecisionId){return ofhBrainRuntime.planSaturationSalvo(this,{targetTile:e,cost:t,silos:a,parentDecisionId:ofhDecisionId})}_measureSalvoSilos(e,a,ofhDecisionId){const i=this.findEnemySamsCoveringTile(e);const s=new Set(i.map(C=>C.id()));const r=i.reduce((C,F)=>C+F.level(),0);const o=r+1;const l=nukeArcSpeed(this.game,UNIT.AtomBomb);const u=[];for(const C of a){const F=C.level()-C.missileTimerQueue().length;if(F<=0){continue}const J=this.chooseNukeArc(C.tile(),e,s,ofhDecisionId);if(J.stopped)return{ok:false,stopped:true};const ue=J.intercepted;const S=UniversalPathFinding.Parabola(this.game,{increment:l,distanceBasedHeight:true,directionUp:true});const P=S.findPath(C.tile(),e)??[];if(P.length===0)continue;u.push({silo:C,slots:F,flightTicks:P.length,interceptable:ue,arcUp:J.arcUp!==false})}return{silos:u,coveringSamIds:s,requiredBase:o}}async planSaturationSalvoFor(e,ofhDecisionId){if(this.game.config().isUnitDisabled(UNIT.AtomBomb))return null;if(this.player.units(UNIT.AtomBomb).length>0)return null;const t=this.player.units(UNIT.MissileSilo).filter(s=>!s.isUnderConstruction());if(t.length===0)return null;const a=await this.cost(UNIT.AtomBomb);let i;if(!ofhBrainRuntime.strikeAllowed(this))return{ok:false,stopped:true};try{i=this.planSaturationSalvo(e,a,t,ofhDecisionId)}catch(s){return null}return i&&i.stopped?i:i&&i.ok?i:null}async maybeDestroyEnemySam(e,ofhDecisionId){if(this.game.config().isUnitDisabled(UNIT.AtomBomb)){return}const t=this.player.units(UNIT.AtomBomb);if(t.length>0){return}const a=await this.cost(UNIT.AtomBomb);const i=e.units(UNIT.SAMLauncher);if(i.length===0){return}const s=this.player.units(UNIT.MissileSilo).filter(u=>!u.isUnderConstruction());if(s.length===0){return}const r=i.slice().sort((u,c)=>u.level()-c.level());return ofhBrainRuntime.planSamClear(this,e,r,{cost:a,silos:s,parentDecisionId:ofhDecisionId})}findEnemySamsCoveringTile(e){const t=this.game.nearbyUnits(e,this.game.config().maxSamRange(),UNIT.SAMLauncher);const a=[];for(const i of t){const s=i.unit.owner();if(s&&s.smallID&&s.smallID()===this.player.smallID()||this.player.isFriendly(s)){continue}const r=this.game.config().samRange(i.unit.level());if(i.distSquared<=r*r){a.push(i.unit)}}return a}async maybeUpgradeHelpfulSilo(e,ofhDecisionId){return ofhBrainRuntime.planHelpfulSilo(this,{...e,parentDecisionId:ofhDecisionId})}async _upgradeSiloReady(r,ofhDecisionId){let l;try{l=await withTimeout(this.player.buildables(r.tile(),[UNIT.MissileSilo]),WORKER_TIMEOUT_MS,null)}catch(c){return}const u=Array.isArray(l)?l.find(c=>c.type===UNIT.MissileSilo):null;if(u===null||u===void 0)return;if(u.canUpgrade!==false){const c=getBuildMenu();if(!c||typeof c.sendBuildOrUpgrade!=="function"){return}ofhBrainRuntime.strikeBuild(this,ofhDecisionId,"NukeBehavior",c,u);if(ofhBrainRuntime.wasDeclined(this))return false;state.stats.builds++;setLastAction(tr("☢️ Upgrade silo"),"build")}}async cost(e){const t=this.game.ticks();if(this._costCacheTick!==t){this._costCacheTick=t;this._costCache=new Map}if(this._costCache.has(e))return this._costCache.get(e);const a=this.player.borderTiles();const i=a&&a.size>0?a.values().next().value:null;if(i===null||i===void 0)return 0n;let s;try{s=await withTimeout(this.player.buildables(i,[e]),WORKER_TIMEOUT_MS,null)}catch(l){return 0n}const r=Array.isArray(s)?s.find(l=>l.type===e):null;const o=r&&r.cost!==void 0&&r.cost!==null?r.cost:0n;this._costCache.set(e,o);return o}nukeSpawn(e,t){const a=this.player.units(UNIT.MissileSilo);let i=false;let s=Infinity;for(const r of a){if(r.isActive&&r.isActive()===false)continue;if(r.isUnderConstruction())continue;if(typeof r.ticksLeftInCooldown==="function"&&r.ticksLeftInCooldown()>0){continue}const o=this.game.manhattanDist(r.tile(),t);if(o<s){s=o;i=r.tile()}}return i}async probeCanBuildNuke(e,t){let a;try{a=await withTimeout(this.player.buildables(e,[t]),WORKER_TIMEOUT_MS,null)}catch(s){return false}const i=Array.isArray(a)?a.find(s=>s.type===t):null;return i!==null&&i!==void 0&&i.canBuild!==false}}"use strict";
+// BEGIN CENTRAL BRAIN
+'use strict';
+
+// Priority anchors are economic buildings, not the aggregate structure count.
+function createSamPlacement(deps) {
+  const U = deps.units;
+  const active = unit => !unit.isActive || unit.isActive();
+  function prepare(actor, economyMode) {
+    const game = actor.game, player = actor.player;
+    const ports = economyMode === 'factory' ? [] : player.units(U.Port).filter(active);
+    const anchorKind = ports.length ? 'Port' : 'City';
+    const primary = ports.length ? ports : player.units(U.City).filter(active);
+    if (!primary.length) return { anchorKind:null, tiles:[], metrics:()=>({}) };
+    const sams = player.units(U.SAMLauncher).filter(s => active(s) && !s.isUnderConstruction?.());
+    const anchors = primary.map(unit => ({ tile:unit.tile(), protection:sams.reduce((sum,sam) => {
+      const range = Number(game.config().samRange(Math.max(1,Number(sam.level()) || 1)));
+      return sum + (game.euclideanDistSquared(unit.tile(),sam.tile()) <= range*range ? Math.max(1,Number(sam.level()) || 1) : 0);
+    },0) }));
+    const minimum = Math.min(...anchors.map(a=>a.protection));
+    const targets = anchors.filter(a=>a.protection===minimum);
+    const metrics = tile => {
+      let chosen = targets[0], distance = Infinity;
+      for (const anchor of targets) {
+        const squared = game.euclideanDistSquared(tile,anchor.tile);
+        if (squared < distance) { distance = squared; chosen = anchor; }
+      }
+      return {samAnchorKind:anchorKind,samAnchorTile:chosen.tile,samAnchorProtection:chosen.protection,
+        samAnchorDistance:Math.sqrt(distance)};
+    };
+    const seen = new Set(), tiles = [];
+    for (const radius of [2,6,12,24,40]) {
+      for (const anchor of targets.slice(0,8)) for (let step=0;step<4;step++) {
+        const angle = step*Math.PI/2;
+        const x = Math.round(game.x(anchor.tile)+Math.cos(angle)*radius);
+        const y = Math.round(game.y(anchor.tile)+Math.sin(angle)*radius);
+        if (!game.isValidCoord(x,y)) continue;
+        const tile = game.ref(x,y);
+        if (seen.has(tile) || !game.isLand(tile) || game.ownerID(tile)!==player.smallID() || game.hasFallout(tile)) continue;
+        seen.add(tile); tiles.push(tile);
+        if (tiles.length>=160) return {anchorKind,tiles,metrics};
+      }
+    }
+    return {anchorKind,tiles,metrics};
+  }
+  return {prepare};
+}
+
+
+'use strict';
+
+// Bounded measurements only. The selected central strategy makes the choices.
+function createTeamGeography(deps) {
+  const U = deps.units;
+  const scans = new WeakMap(), fronts = new WeakMap();
+  const active = unit => !unit.isActive || unit.isActive();
+  const ready = unit => active(unit) && !unit.isUnderConstruction?.();
+  const sample = (items, limit) => items.filter((_, index) => index % Math.max(1, Math.ceil(items.length / limit)) === 0).slice(0, limit);
+  function applies(game, self) {
+    if (game.config().gameConfig().gameMode !== deps.teamMode) return false;
+    const teams = new Set(game.players().filter(p => p.type() !== deps.botType).map(p => p.team()).filter(t => t != null));
+    return teams.size === 2 && teams.has(self.team());
+  }
+  function waterAt(game, tile) {
+    return game.neighbors(tile).filter(t => game.isWater(t) && game.getWaterComponent(t) != null);
+  }
+  function usefulWater(game, start) {
+    if (game.isOcean(start)) return true;
+    const seen = new Set([start]), queue = [start];
+    for (let i = 0; i < queue.length && i < 24; i++) {
+      for (const t of game.neighbors(queue[i])) if (game.isWater(t) && !seen.has(t)) { seen.add(t); queue.push(t); }
+    }
+    return seen.size >= 24;
+  }
+  function spawnMetrics(game, self, tile, players) {
+    const seen = new Set([tile]), queue = [tile];
+    let open = 0, waterAccess = false;
+    for (let i = 0; i < queue.length && i < 256; i++) {
+      const current = queue[i];
+      open++;
+      for (const next of game.neighbors(current)) {
+        if (game.isWater(next)) {
+          if (!waterAccess && usefulWater(game, next)) waterAccess = true;
+        } else if (game.isLand(next) && !game.hasOwner(next) && !game.hasFallout(next) && !seen.has(next) &&
+          Math.abs(game.x(tile) - game.x(next)) <= 12 && Math.abs(game.y(tile) - game.y(next)) <= 12) {
+          seen.add(next); queue.push(next);
+        }
+      }
+    }
+    let allyDistance = 100000, enemyDistance = 100000, teammates = 0;
+    for (const other of players) {
+      if (other.smallID() === self.smallID() || other.type() === deps.botType) continue;
+      const location = other.nameLocation();
+      if (!location) continue;
+      const distance = Math.abs(location.x - game.x(tile)) + Math.abs(location.y - game.y(tile));
+      if (other.team() === self.team()) { allyDistance = Math.min(allyDistance, distance); if (distance <= 160) teammates++; }
+      else enemyDistance = Math.min(enemyDistance, distance);
+    }
+    return { openSpace: open / 256, waterAccess, allyDistance, enemyDistance, teammates,
+      edgeDistance: Math.min(game.x(tile), game.y(tile), game.width() - 1 - game.x(tile), game.height() - 1 - game.y(tile)) };
+  }
+  function placementContext(game, self) {
+    if (!applies(game, self)) return null;
+    const tick = game.ticks(), border = self.borderTiles();
+    const cached = fronts.get(self);
+    if (cached && cached.game === game && cached.tick === tick && cached.border === border) return cached;
+    const enemyIds = new Set(game.players().filter(p => p.isAlive() && p.type() !== deps.botType &&
+      p.smallID() !== self.smallID() && !self.isFriendly(p)).map(p => p.smallID()));
+    let front = [];
+    for (const tile of border) if (game.neighbors(tile).some(n => game.isLand(n) && enemyIds.has(game.ownerID(n)))) front.push(tile);
+    const incoming = self.incomingAttacks().some(a => Number(a.troops()) > 0);
+    if (!front.length && incoming) {
+      // No land contact (e.g. a landing): approximate the threatened side from
+      // visible hostile centers until an actual enemy border is established.
+      const centers = game.players().filter(p => enemyIds.has(p.smallID())).map(p => p.nameLocation()).filter(Boolean);
+      const distance = tile => Math.min(...centers.map(c => Math.abs(game.x(tile) - c.x) + Math.abs(game.y(tile) - c.y)));
+      front = sample([...border], 256).sort((a, b) => distance(a) - distance(b)).slice(0, 8);
+    }
+    const value = { game, tick, border, frontline: front.length > 0 || incoming, front: sample(front, 128) };
+    fronts.set(self, value); return value;
+  }
+  function rearMetrics(game, tile, context, unitType) {
+    if (!context?.frontline || !context.front.length) return { frontline: false, rearDistance: 0, rearBand: 0 };
+    const distance = Math.min(...context.front.map(front => game.manhattanDist(tile, front)));
+    return { frontline: true, rearDistance: distance, rearBand: Math.floor(Math.min(180, distance) / (unitType === U.City ? 20 : 30)) };
+  }
+  function rearTiles(game, self, type, context) {
+    if (!context?.frontline) return [];
+    const border = [...context.border];
+    if (!border.length) return [];
+    let tiles;
+    if (type === U.Port) tiles = sample(border.filter(t => game.isShore(t)), 160);
+    else {
+      const xs = border.map(t => game.x(t)), ys = border.map(t => game.y(t));
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const x of xs) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+      for (const y of ys) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+      tiles = [];
+      for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+        const px = Math.round(minX + (maxX - minX) * x / 11), py = Math.round(minY + (maxY - minY) * y / 11);
+        if (game.isValidCoord(px, py)) tiles.push(game.ref(px, py));
+      }
+    }
+    return [...new Set(tiles)].filter(t => game.isLand(t) && game.ownerID(t) === self.smallID() && !game.hasFallout(t))
+      .sort((a, b) => rearMetrics(game, b, context, type).rearDistance - rearMetrics(game, a, context, type).rearDistance).slice(0, 64);
+  }
+  function landRegion(game, self) {
+    const seed = [...self.borderTiles()].find(t => game.isLand(t));
+    if (seed === undefined) return { complete: false, cursor: 0, seen: new Set() };
+    let scan = scans.get(self);
+    if (!scan || scan.game !== game || scan.complete && !scan.seen.has(seed)) {
+      scan = { game, seen: new Set([seed]), queue: [seed], cursor: 0, complete: false, tick: null };
+      scans.set(self, scan);
+    }
+    if (!scan.complete && scan.tick !== game.ticks()) {
+      scan.tick = game.ticks();
+      const end = scan.cursor + (deps.landBudget || 6000);
+      while (scan.cursor < scan.queue.length && scan.cursor < end) {
+        const tile = scan.queue[scan.cursor++];
+        for (const next of game.neighbors(tile)) if (game.isLand(next) && !scan.seen.has(next)) { scan.seen.add(next); scan.queue.push(next); }
+      }
+      scan.complete = scan.cursor === scan.queue.length;
+      if (scan.complete) scan.queue = [];
+    }
+    return scan;
+  }
+  function hostileTransports(game, self) {
+    return game.units(U.TransportShip).filter(ship => {
+      if (!active(ship) || self.isFriendly(ship.owner()) || ship.owner().smallID() === self.smallID()) return false;
+      if (ship.transportShipState?.()?.isRetreating) return false;
+      const target = ship.targetTile();
+      if (target == null || !game.hasOwner(target)) return false;
+      const owner = game.playerBySmallID(game.ownerID(target));
+      return owner && (owner.smallID() === self.smallID() || owner.team() === self.team());
+    });
+  }
+  function navalFacts(game, self) {
+    if (!applies(game, self)) return null;
+    const region = landRegion(game, self);
+    const ports = self.units(U.Port).filter(ready);
+    const defensePorts = ports.filter(p => region.seen.has(p.tile()));
+    const ownComponents = new Set(defensePorts.flatMap(p => waterAt(game, p.tile()).map(t => game.getWaterComponent(t))));
+    const enemies = game.players().filter(p => p.isAlive() && p.type() !== deps.botType &&
+      p.smallID() !== self.smallID() && !self.isFriendly(p));
+    const hostilePorts = enemies.flatMap(p => p.units(U.Port).filter(ready));
+    const sharedComponents = new Set();
+    let sameLand = false;
+    if (region.complete) {
+      for (const enemy of enemies) {
+        const center = enemy.nameLocation();
+        if (center && game.isValidCoord(Math.round(center.x), Math.round(center.y)) &&
+          region.seen.has(game.ref(Math.round(center.x), Math.round(center.y)))) sameLand = true;
+      }
+      for (const port of hostilePorts) {
+        if (region.seen.has(port.tile())) { sameLand = true; continue; }
+        for (const tile of waterAt(game, port.tile())) {
+          const component = game.getWaterComponent(tile);
+          if (ownComponents.has(component)) sharedComponents.add(component);
+        }
+      }
+    }
+    const threats = hostileTransports(game, self).length;
+    const ships = self.units(U.Warship).filter(s => active(s) && sharedComponents.has(game.getWaterComponent(s.tile()))).length;
+    const island = region.complete && !sameLand && sharedComponents.size > 0;
+    const targetShips = threats ? 3 : 2;
+    return { twoTeam: true, island, topologyKnown: region.complete, visitedLand: region.cursor,
+      sharedComponents: [...sharedComponents], defensePortTiles:defensePorts.map(p=>p.tile()), ports: defensePorts.length, ships, threats, targetShips,
+      fleetNeeded: island && defensePorts.length > 0 && ships < targetShips };
+  }
+  function transportTargets(game, self, ship) {
+    if (!applies(game, self)) return [];
+    const component = game.getWaterComponent(ship.tile());
+    if (component == null) return [];
+    const radius = Math.max(80, Math.min(180, Number(game.config().warshipTargettingRange()) || 130));
+    return hostileTransports(game, self).filter(t => game.getWaterComponent(t.tile()) === component &&
+      game.manhattanDist(ship.tile(), t.tile()) <= radius).map(t => ({ tile: t.tile(), targetId: t.id(),
+      targetTile: t.targetTile(), landingDistance: game.manhattanDist(t.tile(), t.targetTile()),
+      interceptDistance: game.manhattanDist(ship.tile(), t.tile()) }))
+      .sort((a, b) => a.landingDistance - b.landingDistance || a.interceptDistance - b.interceptDistance).slice(0, 79);
+  }
+  function coastalPatrols(game, self, naval) {
+    if (!naval?.island) return [];
+    const shipComponents = new Set(self.units(U.Warship).filter(ready).map(s => game.getWaterComponent(s.tile())));
+    const enemies = game.players().filter(p => p.isAlive() && p.type() !== deps.botType && !self.isFriendly(p));
+    const enemyPorts = enemies.flatMap(p => p.units(U.Port).filter(ready));
+    const result = [];
+    for (const player of game.players().filter(p => p.team() === self.team())) {
+      for (const port of player.units(U.Port).filter(ready)) {
+        const starts = waterAt(game, port.tile()).filter(t => shipComponents.has(game.getWaterComponent(t)) && naval.sharedComponents.includes(game.getWaterComponent(t)));
+        if (!starts.length) continue;
+        const seen = new Set(starts), queue = starts.map(tile => ({ tile, depth: 0 }));
+        const candidates = [];
+        for (let i = 0; i < queue.length && i < 160; i++) {
+          const entry = queue[i];
+          if (entry.depth > 0) candidates.push(entry.tile);
+          if (entry.depth >= 20) continue;
+          for (const t of game.neighbors(entry.tile)) if (game.isWater(t) && !seen.has(t) &&
+            game.getWaterComponent(t) === game.getWaterComponent(entry.tile)) { seen.add(t); queue.push({ tile: t, depth: entry.depth + 1 }); }
+        }
+        const enemyDistance = tile => Math.min(...enemyPorts.map(p => game.manhattanDist(tile, p.tile())));
+        candidates.sort((a, b) => enemyDistance(a) - enemyDistance(b));
+        if (candidates.length) result.push({ tile: candidates[0], kind: 'coast-guard', approachDistance: enemyDistance(candidates[0]) });
+        if (result.length >= 8) return result;
+      }
+    }
+    return result;
+  }
+  return { applies, spawnMetrics, placementContext, rearMetrics, rearTiles, navalFacts, transportTargets, coastalPatrols };
+}
+
+
+'use strict';
+
+// Observe the opening; policy choices remain in the selected strategy.
+function createTwoTeamOpening(deps) {
+  const U = deps.units;
+  const geography = new WeakMap();
+  function observe(game, player, context = {}) {
+    const config = game.config();
+    if (config.gameConfig().gameMode !== deps.teamMode) return null;
+    const roster = game.players().filter(p => p.type() !== deps.botType);
+    const teams = new Set(roster.map(p => p.team()).filter(t => t !== null && t !== undefined));
+    if (teams.size !== 2 || !teams.has(player.team())) return null;
+    const enemies = new Set(roster.filter(p => p.isAlive() && !player.isFriendly(p)).map(p => p.smallID()));
+    const border = player.borderTiles();
+    const tick = game.ticks();
+    let land = geography.get(player);
+    // The view's border set can refresh between ticks. Threat ownership also
+    // changes each tick, so retain measurements only within that exact view.
+    if (!land || land.game !== game || land.tick !== tick || land.border !== border) {
+      land = { game, tick, border, wilderness: false, enemyBorder: false, coast: false, borderKnown: border.size > 0 };
+      for (const tile of border) {
+        if (game.isShore(tile)) land.coast = true;
+        for (const neighbor of game.neighbors(tile)) {
+          if (!game.isLand(neighbor)) continue;
+          if (!game.hasOwner(neighbor)) {
+            if (!game.hasFallout(neighbor)) land.wilderness = true;
+          } else if (enemies.has(game.ownerID(neighbor))) land.enemyBorder = true;
+        }
+      }
+      geography.set(player, land);
+    }
+    const enabled = type => !config.isUnitDisabled(type) && (!deps.buildAllowed || deps.buildAllowed(type));
+    const count = type => player.units(type).filter(unit => !unit.isActive || unit.isActive()).length;
+    const ports = count(U.Port), cities = count(U.City), factories = count(U.Factory), sams = count(U.SAMLauncher);
+    const portTarget = enabled(U.Port) && land.coast && context.sharedWater !== false ? 2 : 0;
+    const economyMode = portTarget ? 'coastal' : 'factory';
+    const cityTarget = enabled(U.City) ? (portTarget ? 1 : 2) : 0;
+    const factoryTarget = !portTarget && enabled(U.Factory) ? 1 : 0;
+    const samEnabled = enabled(U.SAMLauncher) && !config.isUnitDisabled(U.MissileSilo) &&
+      [U.AtomBomb, U.HydrogenBomb, U.MIRV].some(type => !config.isUnitDisabled(type));
+    const frontline = land.enemyBorder || player.incomingAttacks().some(a => Number(a.troops()) > 0);
+    const economyReady = ports >= portTarget && cities >= cityTarget && factories >= factoryTarget;
+    return { frontline, wilderness: land.wilderness, borderKnown: land.borderKnown,
+      ports, cities, factories, sams, portTarget, cityTarget, factoryTarget, samEnabled, economyReady, economyMode,
+      stage: frontline ? 'frontline' : !land.borderKnown ? 'survey' : land.wilderness ? 'wilderness' :
+        !economyReady ? 'economy' : samEnabled && !sams ? 'first-sam' : 'development' };
+  }
+  return { observe };
+}
+
+
+
+'use strict';
+
+function createGameConfigAdapter(config, unwrapPlayer) {
+  // EngineConfig methods moved out of the browser Config. These rules match
+  // upstream 420f27a33a0e321a4258062558da38554eea1661 (2026-10-18).
+  const engineRules = {
+    waterNukes: () => config.gameConfig().waterNukes ?? false,
+    goldMultiplier: () => config.gameConfig().goldMultiplier ?? 1,
+    boatMaxNumber: () => config.isUnitDisabled('Transport') ? 0 : 3,
+    trainStationMinRange: () => 15,
+    minDistanceBetweenPlayers: () => 30,
+    defaultSamRange: () => 70,
+    defaultNukeTargetableRange: () => 150,
+    warshipTargettingRange: () => 130,
+    warshipShellAttackRate: () => 20,
+    warshipRetreatHealthPercent: () => 75,
+    warshipVeterancyShellDamageBonus: () => 20,
+    nukeSpeed: type => {
+      switch(type) {
+        case 'Atom Bomb': case 'Hydrogen Bomb': return 10;
+        case 'MIRV': return 15;
+        case 'MIRV Warhead': return 22;
+        default: throw new Error(`Unknown nuke type: ${type}`);
+      }
+    }
+  };
+  function goldInteger(value) {
+    if (typeof value === 'bigint' && value >= 0n) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+    throw new Error('Unsupported starting gold configuration: expected a nonnegative integer');
+  }
+  function configuredStartingGold(playerInfo = {}) {
+    // Browser configs can omit the server-side startingGold(PlayerInfo) method.
+    // Use the configured initial amount, never the player's changing balance.
+    if (playerInfo.playerType === 'BOT') return 0n;
+    const scalar = config.startingGold;
+    const match = config.gameConfig();
+    const base = goldInteger(scalar === undefined ? match.startingGold ?? 0 : scalar);
+    return base + (playerInfo.isLobbyCreator ? goldInteger(match.hostCheats?.startingGold ?? 0) : 0n);
+  }
+  return new Proxy(config, {
+    get(target, key) {
+      if (key === 'maxTroops') return player => config.maxTroops(unwrapPlayer(player));
+      const value = target[key];
+      if (key === 'startingGold' && typeof value !== 'function') return configuredStartingGold;
+      if (value === undefined && Object.prototype.hasOwnProperty.call(engineRules, key)) return engineRules[key];
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+}
+// END GAME CONFIG COMPAT
+
+
+
+'use strict';
+
+function createDecisionEngine(options = {}) {
+  const strategies = new Map();
+  const records = [];
+  const limit = Math.max(1, Math.min(10000, options.maxRecords ?? 1500));
+  const retention = options.retainImportant === true;
+  const recentLimit = retention ? Math.max(1, Math.floor(limit * .3)) : limit;
+  const importantLimit = limit - recentLimit;
+  const important = new Map(), decisions = new Map(), samples = new Map();
+  const counts = Object.create(null);
+  let suppressed = 0, evictedImportant = 0, lastTick = 0;
+  let selected = null, sequence = 0, decisionSequence = 0, dropped = 0;
+
+  // Read data properties only: logging must not invoke arbitrary game getters.
+  function copy(value, depth = 0, seen = new WeakSet()) {
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'string') return value.slice(0, 1500);
+    if (typeof value === 'bigint') return value.toString();
+    if (typeof value === 'number') return Number.isFinite(value) ? value : String(value);
+    if (typeof value === 'undefined') return null;
+    if (typeof value !== 'object') return `[${typeof value}]`;
+    if (seen.has(value)) return '[circular]';
+    if (depth >= 7) return '[depth limit]';
+    seen.add(value);
+    let result;
+    if (Array.isArray(value)) {
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      result = Array.from({ length: Math.min(descriptors.length.value, 80) }, (_, i) =>
+        descriptors[i] && 'value' in descriptors[i] ? copy(descriptors[i].value, depth + 1, seen) : '[accessor or hole]');
+    } else {
+      result = Object.create(null);
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      for (const key of Object.keys(descriptors).slice(0, 60)) {
+        if (key === '__src' || key === '__proto__') continue;
+        const descriptor = descriptors[key];
+        if ('value' in descriptor) result[key] = copy(descriptor.value, depth + 1, seen);
+      }
+    }
+    seen.delete(value);
+    return result;
+  }
+  function freeze(value) {
+    if (value && typeof value === 'object') {
+      for (const item of Object.values(value)) freeze(item);
+      Object.freeze(value);
+    }
+    return value;
+  }
+  function protect(entry, seen = new Set()) {
+    if (!entry || seen.has(entry.seq)) return;
+    seen.add(entry.seq);
+    const parent = entry.snapshot?.parentDecisionId ?? entry.parentDecisionId ??
+      entry.candidates?.find(c => c.id === entry.selectedId)?.parentDecisionId;
+    if (parent !== undefined) protect(decisions.get(parent), seen);
+    if (entry.kind !== 'decision' && entry.decisionId !== undefined) protect(decisions.get(entry.decisionId), seen);
+    important.set(entry.seq, entry);
+    if (important.size > importantLimit) {
+      important.delete(important.keys().next().value); evictedImportant++;
+    }
+  }
+  function retain(entry) {
+    const { kind } = entry, domain = entry.snapshot?.domain;
+    const tick = entry.snapshot?.tick ?? entry.tick ?? lastTick;
+    if (Number.isFinite(tick)) lastTick = tick;
+    counts[kind] = (counts[kind] || 0) + 1;
+    if (kind === 'decision') {
+      decisions.set(entry.decisionId, entry);
+      if (decisions.size > 1024) decisions.delete(decisions.keys().next().value);
+    }
+    const critical = !!entry.error || /error|blocked|dispatch|transport-reservation|transport-manual-request/.test(kind) ||
+      kind === 'structure-placement-result' || kind === 'infrastructure-change' ||
+      kind === 'decision' && !domain;
+    const building = kind === 'decision' && entry.selectedId !== '$wait' && /structure|building|spawn/.test(domain || '') ||
+      kind === 'plan-result' || kind === 'building-result';
+    const noisy = kind === 'rule-call' || kind === 'rule-result' ||
+      kind === 'embargo-result' && entry.status === 'kept' ||
+      kind === 'warship-transport-response-result' && entry.status === 'kept' ||
+      kind === 'decision' && entry.selectedId === 'keep' &&
+        ['embargo-relation-response', 'warship-trade-outgoing-response', 'warship-transport-outgoing-response'].includes(domain);
+    if (!critical && noisy) {
+      // Omit repeated no-op relations and getter chatter, retaining one example
+      // per 100 game ticks and counters for every event. Never alter policy inputs.
+      const selected = entry.candidates?.find(c => c.id === entry.selectedId);
+      const key = [kind, domain || '', entry.module || '', entry.rule || '',
+        selected?.kind || '', selected?.purpose || '', entry.reason || '', entry.status || '',
+        kind === 'decision' ? entry.selectedId?.replace(/:\d+$/, ':*') : ''].join('|');
+      const previous = samples.get(key);
+      if (previous !== undefined && tick >= previous && tick - previous < 100) { suppressed++; return false; }
+      samples.set(key, tick);
+      if (samples.size > 2048) samples.delete(samples.keys().next().value);
+    }
+    if (critical || building) protect(entry);
+    return true;
+  }
+  function append(kind, details) {
+    const entry = freeze({ ...details, seq: ++sequence, kind });
+    if (!retention || retain(entry)) {
+      records.push(entry);
+      if (records.length > recentLimit) { records.shift(); dropped++; }
+    }
+    try { options.onRecord?.(entry); } catch { /* A closed/broken panel cannot stop the bot. */ }
+    return entry.seq;
+  }
+  function record(kind, details = {}) {
+    try { return append(kind, copy(details)); }
+    catch { return append('telemetry-error', { originalKind: kind, reason: 'Unable to serialize record' }); }
+  }
+  function register(strategy) {
+    if (!strategy || typeof strategy.id !== 'string' || !strategy.id || typeof strategy.version !== 'string' ||
+        typeof strategy.decide !== 'function') throw new TypeError('Strategy requires id, version, and decide(snapshot, candidates).');
+    if (strategies.has(strategy.id)) throw new Error(`Strategy already registered: ${strategy.id}`);
+    strategies.set(strategy.id, Object.freeze({ id: strategy.id, version: strategy.version,
+      name: strategy.name || strategy.id, decide: strategy.decide.bind(strategy) }));
+  }
+  function select(id) {
+    if (!strategies.has(id)) throw new Error(`Unknown strategy: ${id}`);
+    selected = id;
+  }
+  function evaluate(strategy, snapshot, candidates) {
+    const state = freeze(copy(snapshot));
+    const proposals = freeze(copy(candidates));
+    if (!Array.isArray(candidates) || candidates.length > 80 || candidates.some(c => !c || typeof c.id !== 'string') ||
+        new Set(candidates.map(c => c.id)).size !== candidates.length) throw new Error('Candidates require unique string IDs; maximum 80.');
+    const choice = strategy.decide(state, proposals);
+    if (choice?.then) {
+      // Decisions are synchronous and replayable; async game I/O belongs to proposal generation.
+      Promise.resolve(choice).catch(() => {});
+      throw new Error('Strategy.decide must return synchronously.');
+    }
+    if (!choice || typeof choice.reason !== 'string' ||
+        choice.selectedId !== null && !proposals.some(c => c.id === choice.selectedId)) {
+      throw new Error('Strategy must select a supplied candidate (or null) and explain the choice.');
+    }
+    return { snapshot: state, candidates: proposals, selectedId: choice.selectedId,
+      reason: choice.reason, evaluations: copy(choice.evaluations ?? []) };
+  }
+  function decide(snapshot, candidates) {
+    const strategy = strategies.get(selected);
+    const decisionId = ++decisionSequence;
+    try {
+      if (!strategy) throw new Error('No strategy selected.');
+      const choice = evaluate(strategy, snapshot, candidates);
+      // These inputs are already sanitized; copying at a different depth breaks replay.
+      append('decision', { decisionId, strategy: { id: strategy.id, version: strategy.version }, ...choice });
+      return { decisionId, selectedId: choice.selectedId, reason: choice.reason };
+    } catch (error) {
+      const reason = String(error?.message || error);
+      record('strategy-error', { decisionId, strategy: selected, reason });
+      return { decisionId, selectedId: null, reason };
+    }
+  }
+  function submit(snapshot, proposal, executor) {
+    const wait = { id: '$wait', kind: 'wait', source: 'DecisionEngine', reason: 'Do not submit this command' };
+    const choice = decide(snapshot, [proposal, wait]);
+    if (choice.selectedId !== proposal.id) return false;
+    const outcome = (status, extra = {}) => record('dispatch', { decisionId: choice.decisionId,
+      proposalId: proposal.id, tick: snapshot.tick, status, ...extra });
+    try {
+      const result = executor();
+      let then;
+      try { then = result?.then; } catch { /* Return introspection cannot change executor behavior. */ }
+      if (typeof then === 'function') {
+        outcome('pending');
+        // Observe settlement, but return exactly the promise the original executor returned.
+        Promise.resolve(result).then(
+          value => outcome(value === false ? 'not-submitted' : 'submitted'),
+          error => outcome('rejected', { error: String(error?.message || error) })
+        ).catch(() => {});
+      } else outcome(result === false ? 'not-submitted' : 'submitted');
+      return result;
+    } catch (error) {
+      outcome('threw', { error: String(error?.message || error) });
+      throw error;
+    }
+  }
+  function exportTrace() {
+    const retained = retention ? [...new Map([...important.values(), ...records].map(e => [e.seq, e])).values()]
+      .sort((a,b) => a.seq-b.seq) : records;
+    return { schemaVersion: 1, strategy: selected, droppedRecords: dropped,
+      ...(retention ? { retention: { recentLimit, importantLimit, suppressedRecords: suppressed,
+        evictedImportantRecords: evictedImportant, counts: { ...counts },
+        samplingTicks: 100, decisionContextLimit: 1024 } } : {}),
+      records: retained.map(entry => JSON.parse(JSON.stringify(entry))) };
+  }
+  function replay(strategyId, trace) {
+    const strategy = strategies.get(strategyId);
+    if (!strategy) throw new Error(`Unknown strategy: ${strategyId}`);
+    return trace.records.filter(entry => entry.kind === 'decision').map(entry => {
+      const result = evaluate(strategy, entry.snapshot, entry.candidates);
+      return { decisionId: entry.decisionId, originalChoice: entry.selectedId,
+        replayChoice: result.selectedId, sameChoice: result.selectedId === entry.selectedId, reason: result.reason };
+    });
+  }
+  return { register, select, decide, submit, record, exportTrace, replay, selectedStrategy:()=>selected,
+    strategies: () => [...strategies.values()].map(({ id, version, name }) => ({ id, version, name })) };
+}
+
+
+
+'use strict';
+/**
+ * One guard per controller/actor. Route every automatic boat path through dispatch
+ * using the same destination key, and every donation using the recipient key.
+ * `emit` is synchronous: only literal false rejects; thrown errors propagate.
+ * A true/void return means emitted, NOT acknowledged by the game. Call acknowledge
+ * only when a ship/accepted command is observed. Supply active own destinations
+ * each dispatch when available. Manual intents bypass automatic operational holds.
+ * Policy holds are explicit caller decisions, reported separately from backpressure.
+ */
+function createCommandGuard(options = {}) {
+  const positive = (name, fallback) => {
+    const value = options[name] === undefined ? fallback : options[name];
+    if (!Number.isSafeInteger(value) || value < 1) throw new TypeError(`${name} must be a positive integer`);
+    return value;
+  };
+  const pendingTicks = positive('pendingTicks', 40);
+  const retryBaseTicks = positive('retryBaseTicks', 40);
+  const retryMaxTicks = positive('retryMaxTicks', 640);
+  const retentionTicks = positive('retentionTicks', 2560);
+  const maxEntries = positive('maxEntries', 512);
+  const boats = new Map(), donations = new Set();
+  let lastTick = null;
+  const result = (emitted, reason, hold = null) => ({emitted, reason, hold});
+  const held = reason => result(false, reason, 'operational');
+  const keyOf = key => {
+    if ((typeof key !== 'string' && typeof key !== 'number') || key === '' ||
+        (typeof key === 'number' && !Number.isFinite(key))) throw new TypeError('key must be a destination or recipient ID');
+    return String(key);
+  };
+  function reset() { boats.clear(); donations.clear(); lastTick = null; }
+  function advance(tick) {
+    if (!Number.isSafeInteger(tick) || tick < 0) throw new TypeError('tick must be a nonnegative integer');
+    if (lastTick !== null && tick < lastTick) reset();
+    if (tick !== lastTick) donations.clear();
+    lastTick = tick;
+    for (const [key, record] of boats) {
+      if (record.pendingUntil !== null && tick >= record.pendingUntil) {
+        record.failures = Math.min(record.failures + 1, 53);
+        record.retryAt = record.pendingUntil + Math.min(retryMaxTicks, retryBaseTicks * 2 ** (record.failures - 1));
+        record.pendingUntil = null;
+      }
+      // Blocked checks never extend retention. Live reservations/cooldowns survive.
+      if (record.pendingUntil === null && tick > Math.max(record.lastAttempt + retentionTicks, record.retryAt)) boats.delete(key);
+    }
+  }
+  function acknowledge(key, tick) {
+    advance(tick);
+    const record = boats.get(keyOf(key));
+    if (!record) return;
+    record.pendingUntil = null;
+    record.retryAt = 0;
+    record.failures = 0;
+  }
+  function dispatch({kind, key, tick, emit, manual = false, policyHold = false, activeBoatDestinations}) {
+    advance(tick);
+    if (kind !== 'boat' && kind !== 'donation') throw new TypeError('kind must be boat or donation');
+    if (typeof emit !== 'function') throw new TypeError('emit must be a synchronous function');
+    key = keyOf(key);
+    if (policyHold) return result(false, 'policy-hold', 'policy');
+    if (manual) return emit() === false ? result(false, 'emit-rejected') : result(true, 'emitted');
+    const previous = boats.get(key);
+    if (kind === 'boat') {
+      if (activeBoatDestinations && Array.from(activeBoatDestinations).some(destination => String(destination) === key)) return held('active-destination');
+      if (previous && previous.pendingUntil !== null) return held('pending');
+      if (previous && previous.lastAttempt === tick) return held('same-tick');
+      if (previous && tick < previous.retryAt) return held('retry-cooldown');
+      if (!previous && boats.size >= maxEntries) return held('capacity');
+      boats.set(key, {pendingUntil:tick + pendingTicks, retryAt:0, failures:previous ? previous.failures : 0, lastAttempt:tick});
+    } else {
+      if (donations.has(key)) return held('same-tick');
+      if (donations.size >= maxEntries) return held('capacity');
+      donations.add(key);
+    }
+    const release = () => {
+      if (kind === 'donation') donations.delete(key);
+      else if (previous) boats.set(key, previous);
+      else boats.delete(key);
+    };
+    try {
+      if (emit() === false) { release(); return result(false, 'emit-rejected'); }
+    } catch (error) { release(); throw error; }
+    return result(true, 'emitted');
+  }
+  return {dispatch, acknowledge, reset};
+}
+
+
+'use strict';
+function createSpendingLedger(){
+  let lastGold=null,lastTick=null;const pending=[];
+  function reconcile(tick,gold){
+    if(lastTick!==null&&tick<lastTick){pending.length=0;lastGold=null;}
+    if(lastGold!==null&&gold<lastGold){
+      let paid=lastGold-gold;
+      for(const row of pending){const amount=paid<row.remaining?paid:row.remaining;row.remaining-=amount;paid-=amount;if(!paid)break;}
+    }
+    for(let i=pending.length-1;i>=0;i--)if(!pending[i].remaining||tick-pending[i].tick>=40)pending.splice(i,1);
+    lastGold=gold;lastTick=tick;
+  }
+  function facts({tick,gold,cost,reserve=0n,key}){
+    const exact=v=>typeof v==='bigint'&&v>=0n;
+    if(!exact(gold)||!exact(cost)||!exact(reserve))return {allowed:false,reason:'Actual nonnegative quote required'};
+    reconcile(tick,gold);
+    const pendingCost=pending.reduce((sum,row)=>sum+row.remaining,0n);
+    const duplicate=pending.some(row=>row.key===key);
+    return {allowed:!duplicate&&gold>=reserve+pendingCost+cost,gold,cost,reserve,pendingCost,
+      reason:duplicate?'Purchase already awaiting confirmation':'Preserve SAM reserve and pending purchase commitments'};
+  }
+  function commit(request,emit){
+    if(!facts(request).allowed)return false;
+    const row={key:request.key,tick:request.tick,remaining:request.cost};pending.push(row);
+    const release=()=>{const index=pending.indexOf(row);if(index>=0)pending.splice(index,1);};
+    try{const result=emit();if(result===false)release();else if(result?.then)Promise.resolve(result).then(value=>{if(value===false)release();},release);return result;}
+    catch(error){release();throw error;}
+  }
+  return {facts,commit};
+}
+
+
+'use strict';
+
+// Require exact, nonnegative quoted amounts. Estimates, missing quotes and
+// already-rounded large numbers cannot authorize spending.
+function defenseEconomyAffordable({ gold, cost, reserve = 0n, pendingCost = 0n } = {}) {
+  const exact = value => typeof value === 'bigint' && value >= 0n ? value :
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
+  const amounts = [gold, cost, reserve, pendingCost].map(exact);
+  return amounts.every(value => value !== null) && amounts[0] >= amounts[1] + amounts[2] + amounts[3];
+}
+
+// Shared observations only: execution and reactive SAM upgrade decisions remain
+// with the runtime. Construction satisfies physical economic goals, while the
+// first SAM must finish before additional development begins.
+function createDefenseEconomy({ units: U, buildAllowed }) {
+  const states = new WeakMap();
+  function observe(game, player, opening) {
+    if (!opening || opening.samEnabled !== true) return null;
+    const config = game.config();
+    const enabled = type => type !== undefined && !config.isUnitDisabled(type) && (!buildAllowed || buildAllowed(type));
+    if (!enabled(U.SAMLauncher)) return null;
+    let state = states.get(player);
+    if (!state || state.game !== game) {
+      state = { game, reserveActivated: false };
+      states.set(player, state);
+    }
+    const safe = opening.borderKnown === true && !opening.frontline;
+    // A newly detected frontline keeps the ordinary policy. Once activated,
+    // however, the reserve cannot disappear merely because geography changes.
+    if (!safe && !state.reserveActivated) return null;
+    const active = type => (player.units(type) || []).filter(unit => !unit.isActive || unit.isActive());
+    const samUnits = active(U.SAMLauncher);
+    const counts = { ports: active(U.Port).length, cities: active(U.City).length,
+      factories: active(U.Factory).length, sams: samUnits.length };
+    const samCompleted = samUnits.some(unit => !unit.isUnderConstruction || !unit.isUnderConstruction());
+    const coastal = opening.portTarget > 0 && enabled(U.Port);
+    const initial = { ports: coastal ? 2 : 0, cities: enabled(U.City) ? (coastal ? 1 : 2) : 0,
+      factories: !coastal && enabled(U.Factory) ? 1 : 0, sams: 1 };
+    const developed = { ports: coastal ? 4 : 0, cities: enabled(U.City) ? (coastal ? 3 : 4) : 0,
+      factories: !coastal && enabled(U.Factory) ? 3 : 0, sams: 1 };
+    const meetsEconomy = targets => ['ports', 'cities', 'factories'].every(key => counts[key] >= targets[key]);
+    const nextType = targets => {
+      const sequence = coastal ? [
+        ['ports', U.Port], ['cities', U.City], ['ports', U.Port],
+        ['ports', U.Port], ['cities', U.City], ['ports', U.Port], ['cities', U.City]
+      ] : [
+        ['cities', U.City], ['cities', U.City], ['factories', U.Factory],
+        ['cities', U.City], ['factories', U.Factory], ['cities', U.City], ['factories', U.Factory]
+      ];
+      const seen = { ports: 0, cities: 0, factories: 0 };
+      for (const [key, type] of sequence) {
+        seen[key]++;
+        if (counts[key] < Math.min(seen[key], targets[key])) return type;
+      }
+      return null;
+    };
+    let stage, requiredType = null, targetCounts;
+    if (state.reserveActivated && samCompleted) {
+      stage = 'reserve'; targetCounts = developed;
+      requiredType = nextType(developed);
+    } else if (!state.reserveActivated && !meetsEconomy(initial)) {
+      stage = 'initial-economy'; targetCounts = initial; requiredType = nextType(initial);
+    } else if (!samCompleted) {
+      stage = 'first-sam'; targetCounts = initial;
+      requiredType = counts.sams ? null : U.SAMLauncher;
+    } else if (!meetsEconomy(developed)) {
+      stage = 'development'; targetCounts = developed; requiredType = nextType(developed);
+    } else {
+      state.reserveActivated = true;
+      stage = 'reserve'; targetCounts = developed;
+    }
+    return { stage, reserve: state.reserveActivated ? 3000000n : 0n,
+      requiredType: safe || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
+      waitingForSam: stage === 'first-sam' && counts.sams > 0,
+      samUpgradeReactiveOnly: true, frontline: !!opening.frontline };
+  }
+  return { observe, affordable: defenseEconomyAffordable };
+}
+
+createDefenseEconomy.affordable = defenseEconomyAffordable;
+
+
+'use strict';
+
+// Pure, conservative prediction over a reconciled client snapshot. The caller
+// supplies hostile strikes only and verifies trajectory progress against live
+// position/motion plans: the engine's nukeState index can be stale on the client.
+function createReactiveSam({range, distance, distanceSquared, cooldown=90,
+  upgradeDuration=45, missileSpeed=12, latencyTicks=2}) {
+  const finite = value => typeof value === 'number' && Number.isFinite(value);
+  const integer = value => Number.isInteger(value) && value >= 0;
+  const operational = sam => sam.active === true && sam.building === false;
+  const validSam = sam => sam && integer(sam.level) && sam.level > 0 &&
+    sam.tile !== undefined && sam.tile !== null && Array.isArray(sam.queue) && sam.queue.every(finite);
+  const ramping = (sam,tick) => finite(sam.upgradeStartTick) &&
+    tick < sam.upgradeStartTick + (sam.upgradeDuration ?? upgradeDuration);
+  function radius(sam,tick) {
+    if (!finite(sam.upgradeStartTick)) return range(sam.level);
+    const duration = sam.upgradeDuration ?? upgradeDuration;
+    if (!finite(sam.upgradeStartRange) || !integer(sam.upgradeTargetLevel) ||
+        sam.upgradeTargetLevel < 1 || !finite(duration) || duration <= 0) return NaN;
+    const progress = Math.max(0,Math.min(1,(tick-sam.upgradeStartTick)/duration));
+    return sam.upgradeStartRange + (range(sam.upgradeTargetLevel)-sam.upgradeStartRange)*progress;
+  }
+  function validThreat(threat) {
+    return !threat.ambiguous && Array.isArray(threat.trajectory) && threat.trajectory.length>=2 &&
+      integer(threat.index) && threat.index < threat.trajectory.length-1 && integer(threat.waitTicks) &&
+      threat.trajectory.every(point => point && point.tile !== undefined && point.tile !== null &&
+        typeof point.targetable === 'boolean');
+  }
+  // A level is a missile slot. Upgrading appends a cooling slot, rather than
+  // increasing ready ammunition. Expired queue entries are ready at launch.
+  function readyAt(sam,tick) {
+    return sam.level > sam.queue.filter(launch => launch+cooldown>tick).length;
+  }
+  function intercept(sam,threat,tick,minLaunch) {
+    if (!operational(sam) || !validSam(sam)) return null;
+    const path=threat.trajectory, last=path.length-1;
+    const check=(flightIndex,coverageTile,coverageTick,kind) => {
+      const point=path[flightIndex];
+      if (!point.targetable) return null;
+      const flightTicks=Math.ceil(distance(sam.tile,point.tile)/missileSpeed);
+      const interceptionTick=tick+flightIndex-threat.index+threat.waitTicks;
+      const launchTick=interceptionTick-flightTicks;
+      const effectiveRange=radius(sam,coverageTick);
+      const squared=distanceSquared(sam.tile,coverageTile);
+      if (!finite(flightTicks) || flightTicks<0 || !finite(squared) || squared<0 ||
+          !finite(effectiveRange) || effectiveRange<0 || launchTick<minLaunch ||
+          squared>effectiveRange*effectiveRange || !readyAt(sam,launchTick)) return null;
+      return {samId:sam.id,launchTick,interceptionTick,flightTicks,effectiveRange,
+        interceptionTile:point.tile,coverageTile,kind};
+    };
+    for (let i=threat.index;i<last;i++) {
+      const arrival=tick+i-threat.index+threat.waitTicks;
+      const result=check(i,path[i].tile,arrival,'flight');
+      if (result) return result;
+    }
+    // Native SAM also allows a preshot at the penultimate flight tile when
+    // the final detonation tile is within the future defensive radius.
+    if (path[last].targetable) {
+      return check(last-1,path[last].tile,tick+last-threat.index+threat.waitTicks,'impact');
+    }
+    return null;
+  }
+  function assess({tick, threats=[], sams=[], candidates=[]}) {
+    const relevant=threats.filter(threat => threat.threatensSelf === true);
+    const unassigned=relevant.filter(threat => !threat.existingInterceptor);
+    const targetIds=relevant.map(threat => threat.id);
+    const complete=sams.filter(operational);
+    const uncertain=unassigned.some(threat => !validThreat(threat));
+    const invalidSam=complete.some(sam => !validSam(sam) || !finite(radius(sam,tick)));
+    const baseline = !uncertain && !invalidSam && finite(tick) ? unassigned.map(threat => ({
+      id:threat.id, interception:complete.map(sam => intercept(sam,threat,tick,tick)).find(Boolean)
+    })) : [];
+    return candidates.map(candidate => {
+      const result={unitId:candidate.unitId,cost:candidate.cost,canDefend:false,
+        reason:'no-relevant-threat',targetIds,threatCount:relevant.length,
+        unassignedThreatCount:unassigned.length};
+      const skip=(reason,facts={}) => Object.assign(result,{reason},facts);
+      if (!relevant.length) return result;
+      if (!unassigned.length) return skip('already-intercepted');
+      if (!finite(tick) || uncertain) return skip('uncertain-trajectory');
+      const sam=sams.find(item => item.id===candidate.unitId);
+      if (!sam || !operational(sam) || !validSam(sam)) return skip('sam-unavailable');
+      if (ramping(sam,tick)) return skip('upgrade-in-progress');
+      if (invalidSam) return skip('uncertain-sam-state');
+      if (baseline.length && baseline.every(entry => entry.interception)) {
+        return skip('already-covered',{baselineSamId:baseline[0].interception.samId});
+      }
+      // Independent per-strike predictions cannot prove native priority and
+      // shared ammo allocation for a salvo. Do not spend on that assumption.
+      if (unassigned.length!==1) return skip('competing-threats');
+      const threat=unassigned[0], upgradeTick=tick+latencyTicks;
+      const startRange=radius(sam,upgradeTick), targetRange=range(sam.level+1);
+      if (!finite(startRange) || !finite(targetRange) || targetRange<=startRange) {
+        return skip('upgrade-cannot-intercept');
+      }
+      // Native targeting includes hostile strikes aimed at other players too.
+      // Such a strike can consume the slot needed by our relevant strike.
+      const competing=threats.some(other => other!==threat && !other.existingInterceptor &&
+        (!validThreat(other) || other.trajectory.slice(other.index).some(point => {
+          if (!point.targetable) return false;
+          const squared=distanceSquared(sam.tile,point.tile);
+          return !finite(squared) || squared<0 || squared<=targetRange*targetRange;
+        })));
+      if (competing) return skip('competing-threats');
+      const upgraded={...sam,level:sam.level+1,queue:[...sam.queue,upgradeTick],
+        upgradeStartTick:upgradeTick,upgradeStartRange:startRange,
+        upgradeTargetLevel:sam.level+1,upgradeDuration};
+      const interception=intercept(upgraded,threat,tick,upgradeTick);
+      if (!interception) return skip('upgrade-cannot-intercept',{
+        upgradeTick,upgradeCompleteTick:upgradeTick+upgradeDuration,startRange,targetRange});
+      return Object.assign(result,{canDefend:true,reason:'upgrade-enables-interception',
+        targetIds:[threat.id],baselineCovered:false,upgradeTick,
+        upgradeCompleteTick:upgradeTick+upgradeDuration,newSlotReadyTick:upgradeTick+cooldown,
+        startRange,targetRange,...interception});
+    });
+  }
+  return {assess};
+}
+
+
+
+'use strict';
+
+// Observe public client state without trusting the engine-only trajectory
+// index: motion-plan movement need not emit an updated nukeState each tick.
+function createSamDefenseObserver({units:U}) {
+  const raw = value => value?.__src || value;
+  const call=(value,key,...args) => {
+    try { return typeof value?.[key] === 'function' ? value[key](...args) : undefined; }
+    catch { return undefined; }
+  };
+  const read=(unit,key) => call(unit,key) ?? call(raw(unit),key);
+  const finite=value => typeof value==='number' && Number.isFinite(value);
+  const nuclear=new Set([U.AtomBomb,U.HydrogenBomb,U.MIRVWarhead].filter(Boolean));
+  const structures=new Set([U.City,U.Port,U.Factory,U.MissileSilo,U.DefensePost,U.SAMLauncher].filter(Boolean));
+  const observedTypes=[...new Set([...nuclear,...structures,U.SAMMissile].filter(Boolean))];
+  function observe(game,player) {
+    const tick=call(game,'ticks'), observation={tick,threats:[],sams:[],ownSams:[]};
+    if (call(raw(game),'isCatchingUp') === true) return {...observation,reason:'catching-up'};
+    let units;
+    try { units=game.units(...observedTypes); }
+    catch { return {...observation,reason:'snapshot-unavailable'}; }
+    if (!Array.isArray(units) || !finite(tick)) return {...observation,reason:'snapshot-unavailable'};
+    const selfId=call(player,'smallID');
+    const ownerOf=unit => call(unit,'owner'); // Keep owner objects in the wrapper's identity domain.
+    const own=unit => selfId!==undefined && call(ownerOf(unit),'smallID')===selfId;
+    const friendly=unit => own(unit) || call(player,'isFriendly',ownerOf(unit))===true;
+    const active=unit => read(unit,'isActive')===true;
+    const ownStructures=units.filter(unit => structures.has(read(unit,'type')) && own(unit) && active(unit));
+    // Native targetedBySAM is global, including third-party interceptors.
+    const interceptors=new Set(units.filter(unit => read(unit,'type')===U.SAMMissile && active(unit))
+      .map(unit => call(raw(unit),'targetUnitId')).filter(id=>id!==undefined && id!==null));
+    for (const unit of units) {
+      const type=read(unit,'type');
+      if (type===U.SAMLauncher && friendly(unit)) {
+        const native=raw(unit), state=native?.state || {};
+        const queue=call(native,'missileTimerQueue');
+        const activeState=read(unit,'isActive'), building=read(unit,'isUnderConstruction');
+        // Unknown operational state stays potentially operational, with an
+        // invalid queue, so the predictor blocks spending instead of silently
+        // dropping a possibly ready friendly launcher from baseline coverage.
+        const known=typeof activeState==='boolean' && typeof building==='boolean';
+        observation.sams.push({id:read(unit,'id'),tile:read(unit,'tile'),level:read(unit,'level'),
+          active:activeState ?? true,building:building ?? false,
+          queue:known && Array.isArray(queue) ? [...queue] : null,
+          ...(state.samUpgradeStartTick!==null && state.samUpgradeStartTick!==undefined ? {
+            upgradeStartTick:state.samUpgradeStartTick,upgradeStartRange:state.samUpgradeStartRange,
+            upgradeTargetLevel:state.samUpgradeTargetLevel,upgradeDuration:state.samUpgradeDuration
+          } : {})});
+        if (own(unit) && activeState===true) observation.ownSams.push(unit);
+      }
+      if (!nuclear.has(type) || !active(unit) || friendly(unit)) continue;
+      // An unknown owner cannot establish a hostile incoming strike.
+      if (call(ownerOf(unit),'smallID')===undefined) continue;
+      const native=raw(unit), state=call(native,'nukeState') || {};
+      const trajectory=Array.isArray(state.trajectory) ? state.trajectory : [];
+      const currentTile=read(unit,'tile'), matches=[];
+      for (let i=0;i<trajectory.length;i++) if (trajectory[i]?.tile===currentTile) matches.push(i);
+      // Positive native waitTicks may also be stale. Without a verified motion
+      // schedule do not turn it into extra time in which an upgrade can work.
+      const waitKnown=Number.isInteger(state.waitTicks) && state.waitTicks===0;
+      const target=call(native,'targetTile') ?? call(unit,'targetTile') ?? trajectory.at(-1)?.tile;
+      let threatensSelf=target!==undefined && selfId!==undefined && call(game,'ownerID',target)===selfId;
+      if (!threatensSelf && target!==undefined) {
+        const config=call(game,'config'), magnitude=call(config,'nukeMagnitudes',type);
+        const outer=magnitude?.outer;
+        if (finite(outer) && outer>0) threatensSelf=ownStructures.some(structure => {
+          const squared=call(game,'euclideanDistSquared',target,read(structure,'tile'));
+          return finite(squared) && squared>=0 && squared<outer*outer;
+        });
+      }
+      observation.threats.push({id:read(unit,'id'),trajectory,index:matches.length===1?matches[0]:null,
+        waitTicks:0,ambiguous:matches.length!==1 || !waitKnown,
+        existingInterceptor:interceptors.has(read(unit,'id')),threatensSelf});
+    }
+    return observation;
+  }
+  return {observe};
+}
+
+
+
+'use strict';
+
+// This receives sanitized engine records. It never supplies policy inputs.
+function createMatchSummary(options={}) {
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  const segment=options.segment||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const metadata=clone(options.metadata||{}),events=[],holds=new Map(),plans=new Map(),errors=new Map(),decisions=new Map();
+  const counts=Object.create(null);let tick=0,firstTick=null,firstState=null,lastState=null,structures=new Map(),restored=false,firstInfrastructure=null;
+  const versions=new Set(metadata.helperVersion?[metadata.helperVersion]:[]);
+  const usefulDomains=new Set(['reactive-sam-upgrade','opening-expansion','structure-plan','attack-plan','naval-action','warship-combat','donation-target','spawn-action','mirv-plan','nuke-action']);
+  const state=s=>s?.self?{tick:s.tick,gold:s.self.gold,troops:s.self.troops,tiles:s.self.tiles,units:s.self.units}:null;
+  function aggregate(map,key,details){
+    let row=map.get(key);
+    if(!row){row={key,...details,count:0,firstTick:tick,lastTick:tick};map.set(key,row);}
+    row.count++;row.lastTick=tick;return row;
+  }
+  function observe(e){
+    const observedTick=e.snapshot?.tick??e.tick;
+    if(Number.isFinite(observedTick)){tick=observedTick;if(firstTick===null)firstTick=tick;}
+    counts[e.kind]=(counts[e.kind]||0)+1;
+    if(e.kind==='observation'||e.kind==='decision'){
+      const s=state(e.snapshot);if(s){lastState=s;if(!firstState)firstState=s;}
+    }
+    const add=details=>events.push({id:`${segment}:${e.seq}`,tick,...details});
+    if(e.kind!=='dispatch'&&(e.error||/error/.test(e.kind))){
+      const reason=String(e.error||e.reason||e.kind).slice(0,400);
+      const key=[e.kind,e.module,e.rule,reason].join('|');
+      let row=errors.get(key);
+      if(!row){row={id:`${segment}:${e.seq}`,key,tick,kind:'error',source:e.module||e.kind,rule:e.rule,reason,count:0,lastTick:tick};errors.set(key,row);events.push(row);}
+      row.count++;row.lastTick=tick;return;
+    }
+    if(e.kind==='decision'){
+      const c=e.candidates?.find(c=>c.id===e.selectedId),domain=e.snapshot?.domain;
+      const choice={action:c?.kind,arguments:c?.arguments,source:c?.source,reason:String(e.reason||'').slice(0,350),domain,
+        purpose:c?.purpose,unitType:c?.unitType,parent:e.snapshot?.parentDecisionId??c?.parentDecisionId};
+      decisions.set(e.decisionId,choice);if(decisions.size>1024)decisions.delete(decisions.keys().next().value);
+      if(!usefulDomains.has(domain))return;
+      const key=[domain,c?.kind,c?.purpose,c?.unitType,e.selectedId==='$wait'?'wait':'act',choice.reason].join('|');
+      const table=e.selectedId==='$wait'||e.selectedId===null?holds:plans;
+      const row=aggregate(table,key,{domain,purpose:c?.purpose,unitType:c?.unitType,reason:choice.reason});
+      if(row.count===1)add({kind:table===holds?'hold':'plan',domain,purpose:c?.purpose,unitType:c?.unitType,reason:choice.reason});
+      return;
+    }
+    if(e.kind==='dispatch'){
+      const c=decisions.get(e.decisionId)||{},parent=decisions.get(c.parent);
+      if(c.action==='moveWarship')return; // Movement spam remains in the detailed trace and totals.
+      add({kind:'command',action:c.action||'unknown',status:e.status,arguments:c.arguments,
+        source:c.source,reason:c.reason,error:e.error,plan:parent?.purpose||parent?.unitType||parent?.reason});return;
+    }
+    if(e.kind==='infrastructure-change'){
+      if(!firstInfrastructure)firstInfrastructure={id:`${segment}:${e.seq}`,tick,structures:e.structures||[],partial:e.totalStructures>80};
+      const next=new Map((e.structures||[]).map(s=>[s.id,s]));
+      const changed=[...next].filter(([id,s])=>JSON.stringify(s)!==JSON.stringify(structures.get(id))).map(([,s])=>s);
+      const removed=e.totalStructures>80?[]:[...structures].filter(([id])=>!next.has(id)).map(([,s])=>s);
+      if(changed.length||removed.length)add({kind:'infrastructure',changed,removed,partial:e.totalStructures>80||undefined});
+      structures=next;return;
+    }
+    if(/^transport-reservation-/.test(e.kind))add({kind:e.kind,tile:e.tile,age:e.age});
+    if(e.kind==='reactive-sam-result'){
+      if(e.status==='selected')add({kind:'sam-defense',assessments:e.assessments,reason:e.reason});
+      else aggregate(holds,['reactive-sam',...(e.assessments||[]).map(a=>a.reason)].join('|'),
+        {domain:'reactive-sam',reason:e.reason});
+    }
+    if(e.kind==='command-operational-hold')aggregate(holds,[e.kind,e.reason,e.destination,e.recipient].join('|'),
+      {domain:e.kind,reason:e.reason,destination:e.destination,recipient:e.recipient});
+    if(['donation-amount-result','naval-action-result','landing-probe','attack-sequence-result'].includes(e.kind)&&
+        ['held','skipped','insufficient-excess','below-minimum-chunk','unreachable','not-submitted'].includes(e.status)){
+      aggregate(holds,[e.kind,e.status,e.purpose,e.reason].join('|'),{domain:e.kind,status:e.status,purpose:e.purpose,reason:e.reason});
+    }
+  }
+  function restore(saved){
+    if(restored||!saved||saved.schemaVersion!==1||saved.type!=='openfront-match-summary')return;
+    restored=true;
+    const prior=clone(saved);
+    let pending=events.splice(0);
+    if(firstInfrastructure){
+      const before=new Map((prior.finalStructures||[]).map(s=>[s.id,s]));
+      const next=new Map(firstInfrastructure.structures.map(s=>[s.id,s]));
+      const changed=[...next].filter(([id,s])=>JSON.stringify(s)!==JSON.stringify(before.get(id))).map(([,s])=>s);
+      const removed=firstInfrastructure.partial?[]:[...before].filter(([id])=>!next.has(id)).map(([,s])=>s);
+      pending=pending.filter(row=>row.id!==firstInfrastructure.id);
+      if(changed.length||removed.length)pending.unshift({id:firstInfrastructure.id,tick:firstInfrastructure.tick,
+        kind:'infrastructure',changed,removed,partial:firstInfrastructure.partial||undefined});
+    }
+    const errorRows=new Map();
+    for(const rows of [prior.events,pending])for(const row of rows){
+      if(row.kind==='error'&&errorRows.has(row.key)){
+        const first=errorRows.get(row.key);first.count+=row.count;first.lastTick=Math.max(first.lastTick,row.lastTick);
+      }else{events.push(row);if(row.kind==='error')errorRows.set(row.key,row);}
+    }
+    for(const [key,value] of Object.entries(prior.counts||{}))counts[key]=(counts[key]||0)+value;
+    for(const [table,rows] of [[holds,prior.holds],[plans,prior.plans]])for(const row of rows||[]){
+      const current=table.get(row.key);
+      table.set(row.key,current?{...row,count:row.count+current.count,lastTick:Math.max(row.lastTick,current.lastTick)}:row);
+    }
+    tick=Math.max(tick,prior.lastTick||0);firstTick=prior.firstTick??firstTick;firstState=prior.firstState||firstState;lastState=lastState||prior.lastState;
+    if(!firstInfrastructure&&prior.finalStructures)structures=new Map(prior.finalStructures.map(s=>[s.id,s]));
+    for(const version of prior.helperVersions||[prior.metadata?.helperVersion])if(version)versions.add(version);
+    // Reconnect repeat-error rows to the restored event objects.
+    errors.clear();for(const row of events)if(row.kind==='error')errors.set(row.key,row);
+  }
+  function exportSummary(){return clone({schemaVersion:1,type:'openfront-match-summary',metadata,helperVersions:[...versions],firstTick,lastTick:tick,
+    firstState,lastState,counts,events,holds:[...holds.values()],plans:[...plans.values()],finalStructures:[...structures.values()],
+    note:'Commands report client submission, not server acceptance. Holds/plans aggregate repeated checks; detailed candidates are in the separate trace.'});}
+  function identify(identity){
+    if(!identity?.gameId||!identity.playerId)throw Error('Match identity is incomplete');
+    if(metadata.gameId&&metadata.gameId!==identity.gameId||metadata.playerId&&metadata.playerId!==identity.playerId)
+      throw Error('Cannot merge different match/player identities');
+    metadata.gameId=identity.gameId;metadata.playerId=identity.playerId;
+  }
+  return {observe,restore,identify,export:exportSummary};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createMatchSummary;
+
+'use strict';
+
+function createIndexedMatchStore(indexedDB) {
+  let database;
+  function open(){
+    if(!database)database=new Promise((resolve,reject)=>{
+      if(!indexedDB){reject(Error('IndexedDB unavailable; history is memory-only'));return;}
+      const request=indexedDB.open('openfront-helper-match-history',1);
+      request.onupgradeneeded=()=>{
+        const store=request.result.createObjectStore('matches',{keyPath:'id'});
+        store.createIndex('updatedAt','updatedAt');
+      };
+      request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||Error('Cannot open match history'));
+      request.onblocked=()=>reject(Error('Match-history database upgrade blocked'));
+    });
+    return database;
+  }
+  async function transaction(mode,run){
+    const db=await open();return new Promise((resolve,reject)=>{
+      const tx=db.transaction('matches',mode);let result;
+      tx.oncomplete=()=>resolve(result);tx.onerror=tx.onabort=()=>reject(tx.error||Error('Match-history transaction failed'));
+      run(tx.objectStore('matches'),value=>{result=value;});
+    });
+  }
+  return {
+    load:id=>transaction('readonly',(store,done)=>{const r=store.get(id);r.onsuccess=()=>done(r.result);}),
+    save:row=>transaction('readwrite',store=>store.put(row)),
+    latest:()=>transaction('readonly',(store,done)=>{const r=store.index('updatedAt').openCursor(null,'prev');r.onsuccess=()=>done(r.result?.value);})
+  };
+}
+
+function createMatchArchive(options) {
+  const store=options.store||createIndexedMatchStore(options.indexedDB);
+  const schedule=options.setInterval||setInterval,cancel=options.clearInterval||clearInterval;
+  let tail=Promise.resolve(),active=null;
+  function serial(run){const next=tail.then(run);tail=next.catch(()=>{});return next;}
+  function start(metadata,resolveIdentity){
+    metadata={...metadata};
+    const previous=active,h=options.createSummary({metadata});
+    let id=metadata.gameId&&metadata.playerId?JSON.stringify([metadata.gameId,metadata.playerId]):null;
+    let dirty=false,revision=0,closed=false,timer,loadFailed=false,identityPromise=null;
+    const status={storage:id?'indexeddb':'memory',restored:false,lastSavedAt:null,error:id?null:'Game/player identity unavailable; memory-only session'};
+    const fail=error=>{
+      const message=String(error?.message||error).slice(0,400);
+      if(status.error!==message)try{options.onError?.(message);}catch{}
+      status.error=message;
+    };
+    async function restoreSaved(){
+      if(id){const row=await serial(()=>store.load(id));if(row){
+          if(row.summary?.schemaVersion!==1||row.summary.type!=='openfront-match-summary'||!Array.isArray(row.summary.events)||
+              row.summary.metadata?.gameId!==metadata.gameId||row.summary.metadata?.playerId!==metadata.playerId)
+            throw Error('Saved match identity or format is invalid; not overwriting it');
+          h.restore(row.summary);status.restored=true;
+      }}
+    }
+    const ready=(async()=>{
+      try{
+        if(previous)await previous.close();
+        await restoreSaved();
+      }catch(error){loadFailed=true;fail(error);}
+    })();
+    async function ensureIdentity(){
+      if(identityPromise)return identityPromise;
+      if(id||!resolveIdentity)return;
+      identityPromise=(async()=>{
+        try{
+          const identity=resolveIdentity();if(!identity?.gameId||!identity.playerId)return;
+          h.identify(identity);metadata={...metadata,gameId:identity.gameId,playerId:identity.playerId};
+          id=JSON.stringify([metadata.gameId,metadata.playerId]);status.storage='indexeddb';
+          await restoreSaved();status.error=null;dirty=true;revision++;
+        }catch(error){if(id)loadFailed=true;fail(error);}
+      })();
+      try{await identityPromise;}finally{identityPromise=null;}
+    }
+    async function flush(){
+      await ready;await ensureIdentity();if(!id||loadFailed||!dirty)return;
+      const version=revision,summary=h.export();
+      try{await serial(()=>store.save({id,updatedAt:Date.now(),summary}));status.lastSavedAt=Date.now();status.error=null;if(revision===version)dirty=false;}
+      catch(error){fail(error);}
+    }
+    const recorder={
+      observe:e=>{if(!closed){try{h.observe(e);dirty=true;revision++;}catch(error){fail(error);}}},
+      flush,
+      close:()=>{if(!closed){closed=true;cancel(timer);}return flush();},
+      export:async()=>{await flush();await ready;return {...h.export(),persistence:{...status,unsavedChanges:dirty}};}
+    };
+    timer=schedule(()=>{flush().catch(fail);},5000);timer?.unref?.();active=recorder;return recorder;
+  }
+  async function exportSummary(){
+    if(active)return active.export();
+    const row=await serial(()=>store.latest());
+    if(!row)throw Error('No saved match history yet. Start the bot in a match first.');
+    return {...row.summary,persistence:{storage:'indexeddb',recoveredSavedMatch:true,lastSavedAt:row.updatedAt}};
+  }
+  return {start,exportSummary,flush:()=>active?active.flush():Promise.resolve()};
+}
+if(typeof module!=='undefined'&&module.exports){module.exports=createMatchArchive;module.exports.createIndexedMatchStore=createIndexedMatchStore;}
+
+'use strict';
+
+function createLegacyStrategy() {
+  return {
+    id: 'legacy-v1',
+    name: 'Original algorithm',
+    version: '1.84.0-plans.38',
+    decide(snapshot, candidates) {
+      if (['team-opening-attack', 'social-reaction', 'alliance-event-action', 'alliance-event-target', 'alliance-event-response', 'social-cooldown', 'social-message', 'social-message-pool', 'social-attack-message', 'social-winner-response', 'social-phase', 'social-recipient', 'social-small-attack-target', 'warship-tracking', 'warship-transport-outgoing-target', 'warship-transport-outgoing-response', 'warship-trade-outgoing-target', 'warship-trade-outgoing-response', 'warship-invasion-source', 'warship-loss-source', 'warship-trade-source', 'warship-transport-target', 'warship-transport-response', 'warship-maintenance', 'salvo-order', 'salvo-window', 'salvo-count', 'salvo-schedule', 'nuke-arc', 'nuke-request-ally', 'nuke-request-player', 'nuke-hostile-player', 'nuke-duel-player', 'nuke-majority-player', 'spawn-action', 'spawn-source', 'spawn-companion', 'spawn-heatmap-spot', 'spawn-neighborhood', 'spawn-random', 'embargo-target', 'embargo-action', 'embargo-relation-target', 'embargo-relation-response', 'free-boat-site', 'free-boat-allocation', 'attack-route', 'targeted-boat-site', 'targeted-boat-allocation', 'land-reserve', 'land-allocation', 'forced-allocation', 'bot-allocation', 'donation-target', 'donation-amount', 'outreach-target', 'far-outreach-target', 'warship-home', 'warship-home-tile', 'warship-nuke-dodge', 'warship-nuke-threat', 'warship-nuke-escape', 'warship-target', 'warship-destination', 'warship-waypoint', 'warship-port', 'warship-placement', 'warship-unit', 'boat-origin', 'boat-destination', 'boat-search', 'boat-allocation', 'attack-sequence', 'takeover-target', 'structure-phase', 'structure-action', 'structure-upgrade', 'defense-placement'].includes(snapshot.domain)) {
+        const chosen = candidates.filter(c => c.kind === snapshot.domain && c.eligible && !c.adaptiveOnly).sort((a,b) => a.priority-b.priority)[0];
+        return { selectedId: chosen?.id ?? '$wait', reason: chosen?.reason ?? 'No eligible building action remains',
+          evaluations: candidates.map(c => ({ id: c.id,
+            verdict: c === chosen || !chosen && c.id === '$wait' ? 'select' : c.eligible === false ? 'ineligible' : 'not-selected', reason: c.reason })) };
+      }
+      if (['turn-plan', 'structure-plan', 'structure-placement', 'bot-target', 'attack-plan', 'attack-target', 'attack-geography', 'naval-landing', 'naval-action', 'warship-patrol', 'warship-combat', 'warship-retaliation', 'warship-deployment', 'warship-infestation', 'mirv-plan', 'nuke-weapon', 'nuke-site', 'nuke-action', 'nuke-target', 'sam-target', 'sam-upgrade', 'strike-silo', 'mirv-target', 'nuke-player', 'alliance-rule', 'assist-ally', 'assist-target', 'betray-target'].includes(snapshot.domain)) {
+        const ranked = candidates.filter(c => c.kind === snapshot.domain && c.eligible &&
+          !c.adaptiveOnly)
+          .sort((a, b) => a.priority - b.priority);
+        const chosen = ranked[0];
+        return { selectedId: chosen?.id ?? '$wait',
+          reason: chosen ? chosen.reason : 'No eligible plan remains; wait',
+          evaluations: candidates.map(c => ({ id: c.id, priority: c.priority ?? null,
+            verdict: c === chosen || !chosen && c.id === '$wait' ? 'select' : c.eligible === false ? 'ineligible' : 'not-selected',
+            reason: c.reason })) };
+      }
+      const proposed = candidates.find(candidate => candidate.kind !== 'wait' && candidate.eligible !== false);
+      return {
+        selectedId: proposed?.id ?? null,
+        reason: proposed ? `Keep the command proposed by ${proposed.source}; preserve the original strategy.` : 'Original behavior proposed no command.',
+        evaluations: candidates.map(candidate => ({ id: candidate.id,
+          verdict: candidate === proposed ? 'select' : 'not-selected',
+          reason: candidate === proposed ? 'Original behavior reached its dispatch point' : 'Original behavior chose to act' }))
+      };
+    }
+  };
+}
+
+
+
+'use strict';
+
+function createAdaptiveStrategy(legacyStrategy) {
+  if (!legacyStrategy || typeof legacyStrategy.decide !== 'function') {
+    throw new TypeError('Adaptive strategy requires a legacy strategy fallback.');
+  }
+  function select(candidate, candidates, reason) {
+    return { selectedId: candidate?.id ?? null, reason,
+      evaluations: candidates.map(item => ({ id: item.id,
+        verdict: item === candidate ? 'select' : item.eligible === false ? 'ineligible' : 'not-selected',
+        reason: item === candidate ? reason : item.reason })) };
+  }
+  function placementChoice(candidates) {
+    const eligible = candidates.filter(candidate => candidate.kind === 'structure-placement' && candidate.eligible);
+    if (!eligible.length) return select(candidates.find(candidate => candidate.id === '$wait'), candidates,
+      'No eligible structure tile remains');
+    const samSearch = eligible.find(c=>c.samSearchPlan);
+    if (samSearch) return select(samSearch,candidates,'Compare a bounded set of actual SAM construction quotes near priority anchors');
+    if (eligible.some(c=>c.samAnchorKind)) {
+      const ranked = [...eligible].sort((a,b) => (a.samAnchorProtection ?? Infinity) - (b.samAnchorProtection ?? Infinity) ||
+        (a.samAnchorDistance ?? Infinity) - (b.samAnchorDistance ?? Infinity) ||
+        (b.originalScore || 0) - (a.originalScore || 0) || (a.priority || 0) - (b.priority || 0));
+      const chosen = ranked[0];
+      const result = select(chosen,candidates,`Place SAM close to least-protected owned ${chosen.samAnchorKind === 'Port' ? 'ports' : 'cities'}; distance=${chosen.samAnchorDistance}`);
+      result.evaluations = candidates.map(c=>({id:c.id,verdict:c===chosen?'select':'not-selected',
+        reason:c.samAnchorKind ? `anchor=${c.samAnchorKind}:${c.samAnchorTile}; protection=${c.samAnchorProtection}; distance=${c.samAnchorDistance}; original=${c.originalScore}` : c.reason}));
+      return result;
+    }
+    const economy = ['City', 'Port', 'Factory'].includes(eligible[0].unitType);
+    if (!economy) return null;
+    const afterSam = eligible.some(candidate => candidate.hasOwnSam);
+    const factoryLines = eligible.some(candidate => candidate.factoryLinePriority);
+    const routeCount = candidate => (candidate.ownedFactoryRoutes || 0) + (candidate.alliedFactoryRoutes || 0);
+    const compare = (left, right) => {
+      if (left.frontline || right.frontline) {
+        const safety = (right.rearBand || 0) - (left.rearBand || 0);
+        if (safety) return safety;
+        const route = Number(routeCount(right) > 0) - Number(routeCount(left) > 0) ||
+          (right.ownSamCoverage || 0) - (left.ownSamCoverage || 0) || (right.alliedSamCoverage || 0) - (left.alliedSamCoverage || 0);
+        if (route) return route;
+      }
+      if (!afterSam && !factoryLines) {
+        return (right.originalScore || 0) - (left.originalScore || 0) ||
+          routeCount(right) - routeCount(left) || (left.priority || 0) - (right.priority || 0);
+      }
+      const leftRoute = routeCount(left) > 0 ? 1 : 0;
+      const rightRoute = routeCount(right) > 0 ? 1 : 0;
+      let result = rightRoute - leftRoute || (right.ownSamCoverage || 0) - (left.ownSamCoverage || 0) ||
+        (right.alliedSamCoverage || 0) - (left.alliedSamCoverage || 0);
+      if (!result && left.unitType === 'Factory') {
+        result = (right.routeClusters || 0) - (left.routeClusters || 0) ||
+          (right.futureRouteCapacity || 0) - (left.futureRouteCapacity || 0);
+      }
+      return result || (right.originalScore || 0) - (left.originalScore || 0) ||
+        (left.priority || 0) - (right.priority || 0);
+    };
+    const chosen = [...eligible].sort(compare)[0];
+    const phase = factoryLines ? 'factory economy: existing factory-line grouping' : afterSam ? 'post-SAM factory-line grouping' : 'pre-SAM spread and safety';
+    return { selectedId: chosen.id,
+      reason: `${chosen.frontline ? 'Rear safety before route bonuses; ' : ''}${phase}: selected tile ${chosen.tile}`,
+      evaluations: candidates.map(candidate => candidate.kind !== 'structure-placement' ?
+        { id: candidate.id, verdict: 'not-selected', reason: candidate.reason } :
+        { id: candidate.id, verdict: candidate === chosen ? 'select' : 'not-selected',
+          reason: `${phase}; rear=${candidate.rearDistance || 0}, band=${candidate.rearBand || 0}, routes=${routeCount(candidate)}, ownSAM=${candidate.ownSamCoverage || 0}, alliedSAM=${candidate.alliedSamCoverage || 0}, clusters=${candidate.routeClusters || 0}, future=${candidate.futureRouteCapacity || 0}, original=${candidate.originalScore || 0}` }) };
+  }
+  return {
+    id: 'adaptive-v1',
+    name: 'Adaptive algorithm',
+    version: '1.7.0-reactive-defense',
+    decide(snapshot, candidates) {
+      if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
+        const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
+          candidates.find(c => c.source === 'team-geography' && c.eligible) || candidates.find(c => c.id === '$wait');
+        return select(chosen, candidates, 'Use companion override or measured two-team group/coastal spawning');
+      }
+      if (snapshot.domain === 'team-spawn-site') {
+        const score = c => (c.openSpace || 0) * 100 + Number(c.waterAccess) * 25 +
+          (c.allyDistance <= 160 ? 20 * Math.max(0, 1 - Math.abs(c.allyDistance - 80) / 100) : 0) +
+          Math.min(1, (c.enemyDistance || 0) / 200) * 30 + Math.min(1, (c.edgeDistance || 0) / 30) * 10 -
+          (c.enemyDistance < 80 ? 100 : 0);
+        const ranked = candidates.filter(c => c.kind === 'team-spawn-site' && c.eligible).sort((a, b) => score(b) - score(a) || a.priority - b.priority);
+        const choice = select(ranked[0] || candidates.find(c => c.id === '$wait'), candidates,
+          'Prefer open safe expansion, useful water and nearby teammates without crowding');
+        choice.evaluations = candidates.map(c => ({ id: c.id, verdict: c === ranked[0] ? 'select' : 'not-selected',
+          reason: c.kind === 'team-spawn-site' ? `score=${score(c).toFixed(2)}; open=${c.openSpace}, coast=${c.waterAccess}, ally=${c.allyDistance}, enemy=${c.enemyDistance}` : c.reason }));
+        return choice;
+      }
+      if (snapshot.domain === 'turn-plan' && snapshot.teamNaval?.island && snapshot.teamNaval.fleetNeeded) {
+        const deploy = candidates.find(c => c.kind === 'turn-plan' && c.phase === 'warship-deployment' && c.eligible);
+        if (deploy) return select(deploy, candidates, 'Island defense fleet before routine spending; deployment preserves economy reserve');
+      }
+      if (snapshot.domain === 'warship-deployment' && snapshot.teamNaval?.island) {
+        const deploy = candidates.find(c => c.id === 'deploy:island' && c.eligible);
+        return select(deploy || candidates.find(c => c.id === '$wait'), candidates,
+          deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
+      }
+      if (snapshot.domain === 'warship-combat' && snapshot.teamNaval?.twoTeam) {
+        const chosen = ['retreat', 'evade', 'engage', 'intercept', 'trade-hunt'].map(p =>
+          candidates.find(c => c.purpose === p && c.eligible)).find(Boolean);
+        return select(chosen || candidates.find(c => c.id === '$wait'), candidates,
+          'Survival and enemy warships first; intercept invading transports before trade hunting');
+      }
+      if (snapshot.domain === 'warship-patrol' && snapshot.teamNaval?.island) {
+        const rank = purpose => ({ invasion: 0, 'coast-guard': 1, 'loss-zone': 2, 'trade-lane': 3 }[purpose] ?? 4);
+        const chosen = candidates.filter(c => c.kind === 'warship-patrol' && c.eligible).sort((a, b) =>
+          rank(a.purpose) - rank(b.purpose) || a.priority - b.priority)[0];
+        return select(chosen || candidates.find(c => c.id === '$wait'), candidates, 'Intercept invasions and cover island approaches before loss/trade patrols');
+      }
+      const opening = snapshot.teamOpening;
+      const safeOpening = opening && !opening.frontline;
+      const wait = () => candidates.find(c => c.id === '$wait');
+      const eligible = id => candidates.find(c => c.id === id && c.eligible !== false);
+      const defense=snapshot.defenseEconomy;
+      if(snapshot.domain==='structure-plan'&&defense){
+        if(defense.stage!=='reserve'){
+          const plan=eligible('structure:defense-economy');
+          return select(plan?.affordable?plan:wait(),candidates,defense.waitingForSam?
+            'First SAM is under construction; do not order another':plan?.affordable?
+            'Complete the physical economy stage before saving the emergency reserve':'Save for the required economy or first SAM');
+        }
+        const chosen=candidates.filter(c=>c.kind==='structure-plan'&&c.eligible&&c.affordable!==false&&
+          c.unitType!=='SAM Launcher'&&c.stage!=='team-opening').sort((a,b)=>a.priority-b.priority)[0];
+        return select(chosen||wait(),candidates,chosen?'Spend only the surplus above the SAM defense reserve':
+          'Preserve the emergency SAM upgrade reserve');
+      }
+      if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam')&&defense.stage!=='reserve')
+        return select(eligible('building:normal')||wait(),candidates,'Prioritize the staged economy and first SAM');
+      if(snapshot.domain==='reactive-sam-upgrade'){
+        const chosen=candidates.filter(c=>c.kind==='reactive-sam-upgrade'&&c.eligible&&c.canDefend)
+          .sort((a,b)=>Number(BigInt(a.cost)-BigInt(b.cost)))[0];
+        return select(chosen||wait(),candidates,chosen?'Incoming strike becomes defendable with this timely SAM upgrade':
+          'No proven useful and affordable SAM upgrade for the incoming strike');
+      }
+      if(snapshot.domain==='opening-expansion'&&snapshot.openingExpansion?.applies){
+        return select(snapshot.openingExpansion.ready?eligible('opening-expansion:wave'):wait(),candidates,
+          snapshot.openingExpansion.ready?`Opening wave: send 20% at ${snapshot.openingExpansion.troops} troops`:
+            `Opening expansion: rebuild to ${Math.ceil(snapshot.openingExpansion.threshold)} troops; ten-tick dispatch spacing`);
+      }
+      if (snapshot.domain==='naval-action' && (!opening ||
+          !opening.frontline && opening.borderKnown && !opening.wilderness)) {
+        const chosen=['surge','enemy-probe','disconnected','nearby','crater','random-free','random-enemy','distant']
+          .map(purpose=>eligible('naval:'+purpose)).find(Boolean);
+        return select(chosen||wait(),candidates,'After the opening, reinforce a landing or try a distant 1% enemy probe before local grabs');
+      }
+      if (snapshot.domain === 'team-opening-attack') {
+        const mode = !safeOpening ? 'legacy' : !opening.borderKnown || opening.wilderness ? 'defer' : 'allow';
+        return select(eligible('team-attack:' + mode) || wait(), candidates,
+          mode === 'defer' ? 'Finish reachable wilderness before attacking countries' :
+            mode === 'allow' ? 'Reachable wilderness exhausted; country expansion may proceed' : 'Retain the existing front-line opening rules');
+      }
+      if (snapshot.domain === 'attack-sequence' && safeOpening && (!opening.borderKnown || opening.wilderness)) {
+        return select(opening.borderKnown ? eligible('sequence:wilderness-only') || wait() : wait(), candidates,
+          'Safe two-team opening: this pass may only expand reachable wilderness');
+      }
+      const incomeOpening = safeOpening && !opening.sams && (opening.samEnabled ||
+        opening.ports < opening.portTarget || opening.cities < opening.cityTarget || opening.factories < opening.factoryTarget);
+      if (!defense && snapshot.domain === 'structure-plan' && snapshot.teamNaval?.island && snapshot.teamNaval.fleetNeeded &&
+        opening?.economyReady && (!opening.samEnabled || opening.sams > 0)) {
+        return select(wait(), candidates, 'Opening economy protected; save for the bounded island defense fleet');
+      }
+      if (snapshot.domain === 'structure-phase' && incomeOpening) {
+        return select(eligible('building:normal') || wait(), candidates,
+          'Save optional defense spending for the opening economy and first SAM');
+      }
+      if (snapshot.domain === 'structure-plan' && incomeOpening) {
+        const plans = candidates.filter(c => c.stage === 'team-opening' && c.eligible);
+        const byRole = role => plans.find(c => c.openingRole === role);
+        const deficits = [];
+        if (opening.ports < Math.min(1, opening.portTarget)) deficits.push('Port');
+        if (opening.cities < opening.cityTarget) deficits.push('City');
+        if (opening.ports < opening.portTarget) deficits.push('Port');
+        if (opening.factories < opening.factoryTarget) deficits.push('Factory');
+        if (deficits.length) {
+          const plan = deficits.map(byRole).find(Boolean);
+          return select(plan?.affordable ? plan : wait(), candidates,
+            plan?.affordable ? 'Build the required physical opening economy' : 'Save for the required opening economy; retry unavailable placements next pass');
+        }
+        const sam = byRole('SAM');
+        const optional = [opening.portTarget && opening.ports < 3 ? byRole('Port') : null,
+          opening.cityTarget && opening.cities < 2 ? byRole('City') : null].find(p => p && sam &&
+            BigInt(p.availableGold) >= BigInt(p.perceivedCost) + BigInt(sam.perceivedCost));
+        return select(optional || (sam?.affordable ? sam : wait()), candidates,
+          optional ? 'Add opening income while preserving the full first-SAM budget' :
+            sam?.affordable ? 'Opening economy ready; construct the first owned SAM' : 'Opening economy ready; save for the first owned SAM');
+      }
+      if (snapshot.domain === 'donation-target') {
+        const configured = snapshot.diplomacy?.threshold;
+        const threshold = Number.isFinite(configured) ? Math.max(0, Math.min(.65, configured)) : .65;
+        const targets = candidates.filter(candidate => candidate.kind === 'donation-target' &&
+          candidate.eligible !== false && Number.isFinite(candidate.fill) && candidate.fill < threshold &&
+          (candidate.frontline === true || candidate.bordersEnemy === true));
+        targets.sort((a,b) => Number(b.frontline === true) - Number(a.frontline === true) || a.fill - b.fill);
+        const chosen = targets[0];
+        return select(chosen || candidates.find(candidate => candidate.skipDonation && candidate.eligible !== false) ||
+          candidates.find(candidate => candidate.id === '$wait'), candidates,
+          chosen ? `Donate to a front-line teammate below ${Math.round(threshold * 100)}% capacity` :
+            `No front-line teammate below ${Math.round(threshold * 100)}% capacity; keep troops`);
+      }
+      if (snapshot.domain === 'structure-plan' && (!safeOpening || opening.samEnabled)) {
+        const reserve = candidates.find(candidate => candidate.kind === 'structure-plan' &&
+          candidate.firstSamReserve && candidate.eligible);
+        if (reserve) {
+          if (reserve.affordable) return select(reserve, candidates,
+            'Build the first owned SAM before spending on other structures');
+          const wait = candidates.find(candidate => candidate.id === '$wait');
+          return select(wait, candidates, 'Save spendable gold for the first owned SAM');
+        }
+        const wait = candidates.find(candidate => candidate.id === '$wait');
+        if (wait?.firstSamReserve) return select(wait, candidates,
+          'Keep the first owned SAM budget after an unsuccessful placement; retry next pass');
+      }
+      if (snapshot.domain === 'structure-placement') {
+        const choice = placementChoice(candidates);
+        if (choice) return choice;
+      }
+      return legacyStrategy.decide(snapshot, candidates);
+    }
+  };
+}
+
+
+
+'use strict';
+
+function createTurnPlanner(deps = {}) {
+  const fullOrder = ['casual-emoji', 'embargo-relations', 'bot-alliance-requests', 'alliance-requests',
+    'mirv', 'structure', 'warship-deployment', 'embargo', 'attack', 'warship-infestation', 'nuke'];
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Stop the remaining phases in this turn pass' };
+  const warshipAutoSpawn = deps.warshipAutoSpawn || (() => true);
+
+  function phaseGate(bot, phase) {
+    switch (phase) {
+      case 'alliance-requests': return { name: 'alliance', enabled: bot.feat('alliance') };
+      case 'mirv': return { name: 'nuke', enabled: bot.feat('nuke') };
+      case 'structure': return { name: 'build', enabled: bot.feat('build') };
+      case 'warship-deployment':
+      case 'warship-infestation': return { name: 'warship', enabled: bot.feat('warship') && warshipAutoSpawn() };
+      case 'embargo': return { name: 'embargo', enabled: bot.feat('embargo') };
+      case 'attack': return { name: 'expand-or-boat', enabled: bot.feat('expand') || bot.feat('boat') };
+      case 'nuke': return { name: 'nuke', enabled: bot.feat('nuke') };
+      default: return { name: 'unconditional', enabled: true };
+    }
+  }
+
+  async function executePhase(bot, phase) {
+    switch (phase) {
+      case 'structure-secondary': return bot.structureBehavior.handleStructures();
+      case 'casual-emoji': return bot.emojiBehavior.maybeSendCasualEmoji();
+      case 'embargo-relations': return bot.updateRelationsFromEmbargos();
+      case 'bot-alliance-requests': return bot.allianceBehavior.handleAllianceRequestsFromBots();
+      case 'alliance-requests':
+        bot.allianceBehavior.handleAllianceRequests();
+        return bot.allianceBehavior.handleAllianceExtensionRequests();
+      case 'mirv': return bot.mirvBehavior.considerMIRV();
+      case 'structure': return bot.structureBehavior.handleStructures();
+      case 'warship-deployment': return bot.warshipBehavior.maybeSpawnWarship();
+      case 'embargo': return bot.handleEmbargoesToHostileNations();
+      case 'attack': return bot.attackBehavior.maybeAttack();
+      case 'warship-infestation': return bot.warshipBehavior.counterWarshipInfestation();
+      case 'nuke': return bot.nukeBehavior.maybeSendNuke();
+      default: throw new Error('Unknown turn phase: ' + phase);
+    }
+  }
+
+  function candidates(context) {
+    const phases = context.path === 'build-only' ? ['structure-secondary'] :
+      context.path === 'full' ? fullOrder : null;
+    if (!phases) throw new Error('Unknown turn path: ' + context.path);
+    return phases.map((phase, priority) => {
+      return { id: `turn:${context.path}:${phase}`, kind: 'turn-plan', phase, priority, eligible: true,
+        readiness: 'unchecked', reason: `Original ${context.path} phase ${priority + 1}: ${phase}` };
+    });
+  }
+
+  const primitiveResult = result => result === null || ['string', 'number', 'boolean'].includes(typeof result) ? result :
+    result === undefined ? 'undefined' : '[non-primitive result]';
+
+  async function run(bot, context, hooks) {
+    const completed = [];
+    const stop = (decisionId, phase, reason) => {
+      hooks.record('turn-plan-result', { decisionId: decisionId ?? null, phase: phase ?? null,
+        status: 'stopped', reason });
+      return { stopped: true, completed, decisionId: decisionId ?? null };
+    };
+    if (!hooks.allowed()) return stop(null, null, 'Bot stopped or ownership changed before turn selection');
+    let remaining = candidates(context), lastDecisionId = null;
+    while (remaining.length) {
+      if (!hooks.allowed()) return stop(lastDecisionId, null, 'Bot stopped or ownership changed before turn selection');
+      const eligible = remaining.filter(candidate => candidate.eligible);
+      if (eligible.length === 0) break;
+      const facts = { path: context.path, tick: context.tick ?? null, attackRate: context.attackRate ?? null,
+        remainingPhases: remaining.length, visiblePhases: remaining.length, eligiblePhases: eligible.length };
+      let choice;
+      try {
+        choice = hooks.choose('turn-plan', [...remaining, wait], facts);
+      } catch (error) {
+        return stop(lastDecisionId, null, `Policy selection threw: ${String(error?.message || error)}`);
+      }
+      lastDecisionId = choice?.decisionId ?? lastDecisionId;
+      const selected = remaining.find(candidate => candidate.id === choice?.selectedId);
+      if (!selected || !selected.eligible) return stop(lastDecisionId, null,
+        choice?.selectedId === '$wait' ? 'Policy selected wait' : 'Policy selected an invalid turn phase');
+      if (!hooks.allowed()) return stop(lastDecisionId, selected.phase,
+        'Bot stopped or ownership changed after turn selection');
+      remaining = remaining.filter(candidate => candidate !== selected);
+      try {
+        const gate = phaseGate(bot, selected.phase);
+        if (!gate.enabled) {
+          hooks.record('turn-plan-result', { decisionId: choice.decisionId, phase: selected.phase,
+            status: 'skipped', gate: gate.name, enabled: false });
+          continue;
+        }
+        const result = await hooks.execute(choice.decisionId, () => executePhase(bot, selected.phase));
+        if (!hooks.allowed()) {
+          hooks.record('turn-plan-result', { decisionId: choice.decisionId, phase: selected.phase,
+            status: 'stopped', reason: 'Bot stopped or ownership changed during the selected phase' });
+          return { stopped: true, completed, decisionId: choice.decisionId };
+        }
+        completed.push(selected.phase);
+        hooks.record('turn-plan-result', { decisionId: choice.decisionId, phase: selected.phase,
+          status: 'completed', executorResult: primitiveResult(result) });
+      } catch (error) {
+        hooks.record('turn-plan-result', { decisionId: choice.decisionId, phase: selected.phase, status: 'threw' });
+        throw error;
+      }
+    }
+    return { stopped: false, completed, decisionId: lastDecisionId };
+  }
+
+  return { run };
+}
+
+
+
+'use strict';
+function createSocialPlanner(){
+  const cooldownTokens=new WeakMap();
+  const phases=['checkOverwhelmedByAttacks','checkVerySmallAttack','congratulateWinner','brag','charmAllies','annoyTraitors','findRat','greetNearbyPlayers'];
+  const wait={id:'$wait',kind:'wait',reason:'Hold social action'};
+  function choose(hooks,domain,candidates,facts={}){
+    const decision=hooks.choose(domain,[...candidates,wait],facts),selected=hooks.allowed()?candidates.find(c=>c.id===decision.selectedId):undefined;
+    if(!selected)hooks.hold();
+    hooks.record('social-result',{domain,decisionId:decision.decisionId,selectedId:selected?.id,status:selected?'selected':'stopped'});
+    return {decision,selected};
+  }
+  function casual(actor,hooks){
+    if(actor.gameOver)return;
+    const remaining=[...phases];
+    while(remaining.length&&hooks.allowed()){
+      const choice=choose(hooks,'social-phase',remaining.map((method,priority)=>({id:method,kind:'social-phase',priority,eligible:true,readiness:'unchecked',reason:'Original casual social order'})));
+      if(!choice.selected||!hooks.allowed())return;
+      const method=choice.selected.id;remaining.splice(remaining.indexOf(method),1);
+      hooks.execute(choice.decision.decisionId,()=>actor[method]());
+    }
+  }
+  function recipient(actor,pool,mode,hooks){
+    if(!hooks.allowed()||!pool.length)return null;
+    const sample=mode==='winner'?pool[0]:actor.random.randElement(pool);
+    const originalIndex=pool.indexOf(sample);
+    const indices=pool.map((_,index)=>index);if(originalIndex>=0){indices.splice(originalIndex,1);indices.unshift(originalIndex);}
+    for(let offset=0;offset<indices.length;offset+=78){
+      const candidates=indices.slice(offset,offset+78).map((index,priority)=>({id:`recipient:${index}`,kind:'social-recipient',priority:offset+priority,inputIndex:index,eligible:true,originalSample:index===originalIndex,reason:'Original sampled or ranked recipient'}));
+      if(offset+78<indices.length)candidates.push({id:'$next',kind:'next-window',priority:indices.length,reason:'Inspect later recipients'});
+      const choice=choose(hooks,'social-recipient',candidates,{mode,total:pool.length,offset});
+      if(!choice.selected||!hooks.allowed())return null;
+      if(choice.selected.id==='$next')continue;
+      hooks.remember(choice.decision.decisionId);return pool[choice.selected.inputIndex];
+    }
+    return null;
+  }
+  function smallAttacks(actor,attacks,troops,deps,hooks){
+    const remaining=attacks.map((attack,index)=>({attack,index}));
+    while(remaining.length&&hooks.allowed()){
+      const choice=choose(hooks,'social-small-attack-target',remaining.slice(0,79).map(entry=>({id:`attack:${entry.index}`,kind:'social-small-attack-target',inputIndex:entry.index,eligible:true,priority:entry.index,readiness:'unchecked',reason:'Original incoming attack order'})));
+      if(!choice.selected||!hooks.allowed())return;
+      const index=remaining.findIndex(e=>e.index===choice.selected.inputIndex),entry=remaining.splice(index,1)[0];
+      const target=entry.attack.attacker();if(target.type()!==deps.human)continue;
+      if(entry.attack.troops()<troops*.1)hooks.execute(choice.decision.decisionId,()=>{
+        const sample=actor.random.chance(2)?deps.confused:deps.bored,selected=pool([deps.confused,deps.bored],sample,'small-attack',hooks);
+        if(selected!==null)actor.maybeSendEmoji(target,selected);
+      });
+    }
+  }
+  function permission(actor,target,mark,deps,hooks){
+    if(!hooks.allowed()){hooks.hold();return false;}
+    let allowed=true,key,previous,had=false;
+    if(target!==deps.all){
+      if(actor.player.type()===deps.bot)allowed=false;
+      else if(target.type()!==deps.human)allowed=false;
+      else if(mark){key=target.smallID();had=actor.lastEmojiSent.has(key);previous=actor.lastEmojiSent.get(key);if(actor.game.ticks()-(previous??-300)<=300)allowed=false;}
+    }
+    const action=allowed?'allow':'reject',choice=choose(hooks,'social-cooldown',[{id:action,kind:'social-cooldown',eligible:true,priority:0,mark:allowed&&mark&&target!==deps.all,reason:'Original emoji eligibility and cooldown'}],{mark,allowed});
+    if(!choice.selected||!hooks.allowed()||!allowed)return false;
+    if(mark&&target!==deps.all){
+      const stamp=actor.game.ticks();actor.lastEmojiSent.set(key,stamp);
+      let tokens=cooldownTokens.get(actor);if(!tokens){tokens=new Map();cooldownTokens.set(actor,tokens);}
+      const token={};tokens.set(key,token);
+      hooks.undo(()=>{if(tokens.get(key)!==token||actor.lastEmojiSent.get(key)!==stamp)return;tokens.delete(key);if(had)actor.lastEmojiSent.set(key,previous);else actor.lastEmojiSent.delete(key);});
+    }
+    return true;
+  }
+  function message(actor,pool,hooks){
+    if(!hooks.allowed()){hooks.hold();return;}
+    const sample=actor.random.randElement(pool),values=Array.from(pool),index=values.indexOf(sample);
+    const entries=values.map((value,inputIndex)=>({value,inputIndex}));
+    if(index>=0)entries.unshift(...entries.splice(index,1));else entries.unshift({value:sample,inputIndex:-1});
+    for(let offset=0;offset<entries.length;offset+=78){
+      const candidates=entries.slice(offset,offset+78).map((entry,priority)=>({id:`message:${entry.inputIndex}`,kind:'social-message',value:entry.value,priority:offset+priority,eligible:true,reason:'Original emoji sample first'}));
+      if(offset+78<entries.length)candidates.push({id:'$next',kind:'next-window',reason:'Inspect later messages'});
+      const choice=choose(hooks,'social-message',candidates,{total:entries.length,offset});
+      if(!choice.selected||!hooks.allowed())return;
+      if(choice.selected.id==='$next')continue;
+      return choice.selected.value;
+    }
+  }
+  function pool(pools,sample,mode,hooks){
+    const index=pools.indexOf(sample),choice=choose(hooks,'social-message-pool',pools.map((_,inputIndex)=>({id:`pool:${inputIndex}`,kind:'social-message-pool',priority:inputIndex===index?0:inputIndex+1,inputIndex,eligible:true,reason:'Original chance-selected message pool'})),{mode});
+    return choice.selected&&hooks.allowed()?pools[choice.selected.inputIndex]:null;
+  }
+  function request(actor,target,emoji,attack,deps,hooks){
+    if(!actor.shouldSendEmoji(target)||!hooks.allowed())return;
+    if(!attack)return actor.sendEmoji(target,emoji);
+    const neutral=actor.player.relation(target)>=deps.neutral,send=actor.random.chance(neutral?2:4);
+    const choice=choose(hooks,'social-attack-message',[
+      {id:'send',kind:'social-attack-message',eligible:send,priority:0,reason:'Original attack emoji chance permits sending'},
+      {id:'skip',kind:'social-attack-message',eligible:true,priority:1,reason:'Original attack emoji chance failed or defer sending'}
+    ].filter(c=>c.eligible),{neutral,send});
+    if(choice.selected?.id==='send'&&hooks.allowed())return hooks.execute(choice.decision.decisionId,()=>actor.sendEmoji(target,neutral?deps.aggressive:deps.attack));
+  }
+  function winnerMark(actor,hooks){
+    const choice=choose(hooks,'social-winner-response',[{id:'mark',kind:'social-winner-response',priority:0,eligible:true,reason:'Winner observed; mark game over'}]);
+    if(!choice.selected||!hooks.allowed())return false;
+    const previous=actor.gameOver;actor.gameOver=true;hooks.undo(()=>{actor.gameOver=previous;});return true;
+  }
+  function reaction(actor,run,hooks){
+    const choice=choose(hooks,'social-reaction',[{id:'observe',kind:'social-reaction',eligible:true,priority:0,reason:'Original MIRV social reaction'}]);
+    if(choice.selected&&hooks.allowed())return hooks.execute(choice.decision.decisionId,run);
+  }
+  return {casual,recipient,smallAttacks,permission,message,pool,request,winnerMark,reaction};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createSocialPlanner;
+
+'use strict';
+function createAllianceEventPlanner(deps){
+  const queuedParents=new WeakMap();
+  function select(hooks,domain,entries,facts){
+    const candidates=entries.map((entry,priority)=>({kind:domain,eligible:true,priority,...entry}));
+    const choice=hooks.choose(domain,[...candidates,{id:'$wait',kind:'wait',reason:'Stop alliance event pass'}],facts);
+    const selected=candidates.find(c=>c.id===choice.selectedId);
+    hooks.record('alliance-event-result',{domain,decisionId:choice.decisionId,selectedId:selected?.id,status:selected?'selected':'stopped'});
+    if(!selected)hooks.hold();return {choice,selected};
+  }
+  function run(actor,mode,hooks){
+    if(!hooks.allowed())return mode==='collect'?[]:undefined;
+    if(mode!=='collect'&&mode!=='bots'&&actor.game.config().disableAlliances())return;
+    let spawning=false;
+    if(mode==='collect')try{spawning=actor.game.inSpawnPhase()===true;}catch(error){}
+    const input=mode==='requests'?actor.incomingAllianceRequests():deps.collect(),output=[];
+    const remaining=input.map((event,index)=>({event,index}));
+    while(remaining.length&&hooks.allowed()){
+      const target=select(hooks,'alliance-event-target',remaining.slice(0,79).map(e=>({id:`event:${e.index}`,inputIndex:e.index,sourceDecisionId:queuedParents.get(e.event),readiness:'unchecked',reason:'Original event order'})),{mode,remaining:remaining.length});
+      if(!target.selected||!hooks.allowed())break;
+      const index=remaining.findIndex(e=>e.index===target.selected.inputIndex),event=remaining.splice(index,1)[0].event;
+      if(mode==='bots'){
+        try{
+          const player=actor.resolveEventPlayer(event),action=player&&actor.isRegularBot(player)?'mark-bot':'ignore';
+          const response=select(hooks,'alliance-event-response',[{id:action,reason:'Original bot-event ignore rule'},...(action==='ignore'?[]:[{id:'defer',reason:'Leave event unmarked'}])],{mode,parentDecisionId:target.choice.decisionId});
+          if(!response.selected||!hooks.allowed())break;
+          if(response.selected.id==='mark-bot')hooks.execute(response.choice.decisionId,()=>actor._markAllianceEvent(event));
+        }catch(error){}
+        continue;
+      }
+      let action='ignore',player,buttons,created,assumedSpawn=false,button,ruleParent;
+      if(mode==='requests'){
+        player=event.requestor();
+        if(player&&actor.isRegularBot(player)||deps.veto(player)||event.createdAt()<=actor.game.config().numSpawnPhaseTurns()+1)action='reject';
+        else{
+          const accepted=hooks.execute(target.choice.decisionId,()=>actor.getAllianceDecision(player,true,'incoming'));
+          if(hooks.allianceStopped()){hooks.hold();break;}action=accepted?'accept':'reject';ruleParent=hooks.ruleParent('incoming');
+        }
+      }else{
+        const type=Number(event?.type),types=mode==='collect'?deps.requestTypes():deps.renewTypes();
+        if(types.has(type)&&!deps.isActioned(event)){
+          buttons=Array.isArray(event.buttons)?event.buttons:[];
+          if(buttons.length){player=actor.resolveEventPlayer(event);
+            if(player&&player.isPlayer&&player.isPlayer()){
+              if(mode==='collect'){
+                const value=Number(event?.createdAt);
+                if(Number.isFinite(value))created=value;
+                else if(spawning){created=0;assumedSpawn=true;}
+                else try{created=actor.game.ticks();}catch(error){created=actor.game.config().numSpawnPhaseTurns()+2;}
+                action='queue';
+              }else if(!deps.veto(player)){
+                const accepted=hooks.execute(target.choice.decisionId,()=>actor.getAllianceDecision(player,true,'renewal'));
+                if(hooks.allianceStopped()){hooks.hold();break;}
+                if(accepted){button=deps.pick(buttons,'btn',1);if(button)action='renew';ruleParent=hooks.ruleParent('renewal');}
+              }
+            }
+          }
+        }
+      }
+      const response=select(hooks,'alliance-event-response',[{id:action,reason:`Original ${mode} event response`},...(action==='ignore'?[]:[{id:'defer',reason:'Leave event unchanged'}])],{mode,parentDecisionId:ruleParent??target.choice.decisionId});
+      if(!response.selected||!hooks.allowed())break;
+      const selected=response.selected.id;
+      if(selected==='queue'){
+        const request=hooks.execute(response.choice.decisionId,()=>actor._makeIncomingAllianceRequest(event,buttons,player,created,assumedSpawn));queuedParents.set(request,response.choice.decisionId);output.push(request);
+      }else if(selected==='accept'||selected==='reject')hooks.execute(response.choice.decisionId,()=>{hooks.link('incoming',response.choice.decisionId);event[selected]();});
+      else if(selected==='renew')hooks.execute(response.choice.decisionId,()=>{hooks.link('renewal',response.choice.decisionId);actor._renewAllianceEvent(event,button,player);});
+      if(hooks.wasDeclined()){hooks.hold();break;}
+    }
+    return mode==='collect'?(hooks.allowed()?output:[]):undefined;
+  }
+  function action(actor,kind,execute,hooks,request){
+    const sourceDecisionId=queuedParents.get(request);
+    const choice=select(hooks,'alliance-event-action',[{id:kind,reason:'Selected event callback'}, {id:'defer',reason:'Leave callback unchanged'}],{action:kind,sourceDecisionId,parentDecisionId:hooks.parent()??sourceDecisionId});
+    if(!choice.selected||!hooks.allowed()||choice.selected.id==='defer')return;
+    return hooks.execute(choice.choice.decisionId,()=>{hooks.link(kind==='renew'?'renewal':'incoming',choice.choice.decisionId);return execute();});
+  }
+  return {run,action};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createAllianceEventPlanner;
+
+'use strict';
+
+function createWarshipMaintenancePlanner(deps) {
+  const phases=['tracking','dodge','patrol','combat'];
+  const methods={tracking:'trackShipsAndRetaliate',dodge:'dodgeNukes',patrol:'smartWarshipPatrol',combat:'smartWarshipCombat'};
+  function run(bot, tick, hooks) {
+    const remaining=[...phases],completed=[];
+    let smartChecked=false,smartEnabled=false;
+    while(remaining.length){
+      if(!hooks.allowed())return {stopped:true,completed};
+      const candidates=remaining.map((id,priority)=>({id,kind:'warship-maintenance',priority,eligible:true,
+        readiness:'unchecked',reason:`Original early maintenance phase: ${id}`}));
+      const decision=hooks.choose([...candidates,{id:'$wait',kind:'wait',reason:'Stop this maintenance pass'}],{tick});
+      const selected=candidates.find(c=>c.id===decision.selectedId);
+      const report=(status,details={})=>hooks.record('warship-maintenance-result',{
+        decisionId:decision.decisionId,phase:selected?.id,status,...details});
+      if(!selected||!hooks.allowed()){report('stopped',{reason:decision.reason});return {stopped:true,completed};}
+      remaining.splice(remaining.indexOf(selected.id),1);
+      let enabled;
+      if(selected.id==='tracking')enabled=deps.settings().warshipAutoSpawn!==false;
+      else{
+        // The original winFixes block is entered once. Preserve that decision
+        // even if a dodge/patrol callback changes settings during the pass.
+        if(!smartChecked){smartChecked=true;smartEnabled=Boolean(deps.settings().winFixes);}
+        enabled=smartEnabled&&(selected.id!=='dodge'||deps.settings().warshipNukeDodge!==false);
+      }
+      if(!enabled){report('skipped');continue;}
+      try{hooks.execute(decision.decisionId,()=>bot.warshipBehavior[methods[selected.id]]());}
+      catch(error){report('threw',{error:String(error?.message||error)});throw error;}
+      if(!hooks.allowed()){report('stopped');return {stopped:true,completed};}
+      completed.push(selected.id);report('completed');
+    }
+    return {stopped:false,completed};
+  }
+  return {run};
+}
+
+if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipMaintenancePlanner;
+
+'use strict';
+
+function createWarshipTransportPlanner(deps) {
+  const tickets=new WeakMap();
+  const outgoingTickets={transport:new WeakMap(),trade:new WeakMap()};
+  const wait={id:'$wait',kind:'wait',reason:'Stop ship responses'};
+  function choose(hooks,domain,entries,facts={}){
+    const candidates=entries.map((entry,priority)=>({kind:domain,priority,eligible:true,...entry}));
+    const decision=hooks.choose(domain,[...candidates,wait],facts);
+    const selected=candidates.find(c=>c.id===decision.selectedId&&c.eligible);
+    const report=(status,details={})=>hooks.record('warship-transport-response-result',{
+      domain,decisionId:decision.decisionId,selectedId:selected?.id,status,...details});
+    if(!selected){report('stopped',{reason:decision.reason});hooks.hold();}
+    return {selected,decision,report};
+  }
+  function incoming(actor,hooks){
+    if(!hooks.allowed())return;
+    actor.game.units(deps.transportType).filter(ship=>{
+      const target=ship.targetTile();
+      return target&&ship.isActive()&&!ship.transportShipState()?.isRetreating&&
+        actor.game.ownerID(target)===actor.player?.smallID()&&ship.owner().smallID()!==actor.player?.smallID();
+    }).forEach(ship=>actor.trackedIncomingTransportShips.add(ship.id()));
+    const indexed=actor.indexById(actor.game.units(deps.transportType));
+    let pending=tickets.get(actor);if(!pending){pending=new Map();tickets.set(actor,pending);}
+    const remaining=Array.from(actor.trackedIncomingTransportShips,(unitId,index)=>({unitId,index}));
+    while(remaining.length&&hooks.allowed()){
+      const target=choose(hooks,'warship-transport-target',remaining.slice(0,79).map(e=>({
+        id:`transport:${e.index}`,inputIndex:e.index,unitId:e.unitId,readiness:'unchecked',reason:'Original tracked transport order'})),
+        {remaining:remaining.length});
+      if(!target.selected||!hooks.allowed())return;
+      const entry=remaining.find(e=>e.index===target.selected.inputIndex);remaining.splice(remaining.indexOf(entry),1);
+      const ship=indexed.get(entry.unitId),tile=ship!==undefined?ship.targetTile():undefined;
+      let action;
+      if(ship===undefined||!ship.isActive()||tile===undefined||ship.transportShipState()?.isRetreating)action='forget';
+      else if(actor.dealtWithTransportShip.has(entry.unitId))action='keep-handled';
+      else if(actor.game.manhattanDist(ship.tile(),tile)<20)action='mark-close';
+      else if(ship.owner().isAlliedWith(actor.player))action='keep-allied';
+      else if(actor.game.hasUnitNearby(tile,90,deps.warshipType,actor.player.id(),true)||
+        actor.player.units(deps.warshipType).filter(warship=>{
+          const patrol=warship.warshipState().patrolTile;
+          return patrol!==undefined&&actor.game.manhattanDist(tile,patrol)<90;
+        }).length>0)action='mark-covered';
+      else action='retaliate';
+      const response=choose(hooks,'warship-transport-response',[
+        {id:action,reason:`Original incoming transport response: ${action}`},
+        ...(action.startsWith('keep')?[]:[{id:'defer',reason:'Leave tracked threat unchanged for a later pass'}])
+      ],{parentDecisionId:target.decision.decisionId,unitId:entry.unitId,targetTile:tile});
+      if(!response.selected||!hooks.allowed())return;
+      if(response.selected.id==='defer'||action.startsWith('keep')){response.report('kept');continue;}
+      if(action==='forget'){
+        actor.trackedIncomingTransportShips.delete(entry.unitId);actor.dealtWithTransportShip.delete(entry.unitId);pending.delete(entry.unitId);
+        response.report('forgotten');continue;
+      }
+      if(action!=='retaliate'){
+        pending.set(entry.unitId,{});actor.dealtWithTransportShip.add(entry.unitId);response.report('handled');continue;
+      }
+      hooks.clearSpawn();
+      const spawn=hooks.execute(response.decision.decisionId,()=>actor.warshipSpawnTile(tile,30));
+      if(!hooks.allowed())return;
+      if(spawn===null){response.report('no-spawn');continue;}
+      const ticket={};pending.set(entry.unitId,ticket);let held=false;
+      const onDecline=()=>{
+        held=true;
+        if(pending.get(entry.unitId)===ticket){
+          pending.delete(entry.unitId);actor.dealtWithTransportShip.delete(entry.unitId);
+          response.report('declined',{unitId:entry.unitId});
+        }
+      };
+      hooks.execute(hooks.spawnParent()??response.decision.decisionId,()=>actor.maybeRetaliateWithWarship(spawn,ship.owner(),'transport',onDecline));
+      if(held){hooks.hold();return;}
+      if(!hooks.allowed())return;
+      actor.dealtWithTransportShip.add(entry.unitId);response.report('retaliation-requested',{unitId:entry.unitId});return;
+    }
+  }
+  function outgoing(actor,mode,hooks){
+    if(!hooks.allowed())return;
+    const type=mode==='trade'?deps.tradeType:deps.transportType;
+    if(mode==='transport'&&actor.game.config().isUnitDisabled(type))return;
+    const tracked=mode==='trade'?actor.trackedTradeShips:actor.trackedTransportShips;
+    let pending=outgoingTickets[mode].get(actor);if(!pending){pending=new Map();outgoingTickets[mode].set(actor,pending);}
+    actor.player.units(type).forEach(ship=>{const unitId=ship.id();tracked.add(unitId);pending.delete(unitId);});
+    const indexed=actor.indexById(actor.game.units(type));
+    const remaining=Array.from(tracked,(unitId,index)=>({unitId,index}));
+    while(remaining.length&&hooks.allowed()){
+      const target=choose(hooks,`warship-${mode}-outgoing-target`,remaining.slice(0,79).map(entry=>({
+        id:`ship:${entry.index}`,inputIndex:entry.index,unitId:entry.unitId,readiness:'unchecked',reason:'Original tracked ship order'
+      })),{remaining:remaining.length});
+      if(!target.selected||!hooks.allowed())return;
+      const entry=remaining.find(e=>e.index===target.selected.inputIndex);remaining.splice(remaining.indexOf(entry),1);
+      const ship=indexed.get(entry.unitId);let action;
+      if(mode==='transport'){
+        const active=ship!==undefined&&ship.isActive();
+        if(active)action='keep';
+        else if(ship!==undefined&&typeof ship.wasDestroyedByEnemy==='function'&&typeof ship.destroyer==='function'&&ship.wasDestroyedByEnemy()&&ship.destroyer()!==undefined)action='retaliate-forget';
+        else action='forget';
+      }else{
+        if(ship===undefined||!ship.isActive())action='forget';
+        else action=ship.owner().id()!==actor.player.id()?'retaliate-forget':'keep';
+      }
+      const response=choose(hooks,`warship-${mode}-outgoing-response`,[
+        {id:action,reason:`Original outgoing ${mode} response: ${action}`},
+        ...(action==='keep'?[]:[{id:'defer',reason:'Leave this tracked ship for a later pass'}])
+      ],{parentDecisionId:target.decision.decisionId,unitId:entry.unitId});
+      if(!response.selected||!hooks.allowed())return;
+      if(response.selected.id==='defer'||action==='keep'){pending.delete(entry.unitId);response.report('kept');continue;}
+      const ticket={};pending.set(entry.unitId,ticket);
+      if(action==='forget'){tracked.delete(entry.unitId);response.report('forgotten');continue;}
+      let held=false;
+      const onDecline=()=>{
+        held=true;
+        if(pending.get(entry.unitId)===ticket){pending.delete(entry.unitId);tracked.add(entry.unitId);response.report('declined',{unitId:entry.unitId});}
+      };
+      hooks.execute(response.decision.decisionId,()=>actor.maybeRetaliateWithWarship(ship.tile(),mode==='trade'?ship.owner():ship.destroyer(),mode,onDecline));
+      if(held){hooks.hold();return;}
+      if(!hooks.allowed())return;
+      tracked.delete(entry.unitId);response.report('retaliation-requested',{unitId:entry.unitId});
+    }
+  }
+  function tracking(actor,hooks){
+    const remaining=['transport','trade','incoming'];
+    while(remaining.length&&hooks.allowed()){
+      const phase=choose(hooks,'warship-tracking',remaining.map(mode=>({id:mode,reason:`Original ${mode} tracking phase`})));
+      if(!phase.selected||!hooks.allowed())return;
+      const mode=phase.selected.id;remaining.splice(remaining.indexOf(mode),1);
+      hooks.execute(phase.decision.decisionId,()=>{
+        if(mode==='transport')actor.trackTransportShipsAndRetaliate();
+        else if(mode==='trade')actor.trackTradeShipsAndRetaliate();
+        else actor.trackIncomingTransportsAndRetaliate();
+      });
+      phase.report(hooks.allowed()?'completed':'stopped');
+    }
+  }
+  return {incoming,outgoing,tracking};
+}
+
+if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipTransportPlanner;
+
+'use strict';
+function createWarshipThreatPlanner(deps) {
+  function select(actor,mode,input,hooks){
+    if(!hooks.allowed())return null;
+    const entries=[];let winner=null;
+    if(mode==='invasion'){
+      const own=actor.player.smallID();let nearest=Infinity;
+      for(const ship of actor.game.units(deps.transportType))try{
+        if(!ship.isActive())continue;
+        const target=ship.targetTile();if(target==null)continue;
+        if(ship.transportShipState&&ship.transportShipState()?.isRetreating)continue;
+        if(actor.game.ownerID(target)!==own||ship.owner().smallID()===own||ship.owner().isAlliedWith(actor.player))continue;
+        const distance=actor.game.manhattanDist(ship.tile(),target);if(distance<20)continue;
+        if(actor.game.hasUnitNearby(target,90,deps.warshipType,actor.player.id(),true))continue;
+        if(distance<Infinity){
+          const entry={ship,distance,score:distance};
+          if(distance<nearest){nearest=distance;entry.tile=ship.tile();winner=entry;}
+          entries.push(entry);
+        }
+      }catch(error){}
+      if(winner===null||winner.tile===null)return null;
+      entries.sort((a,b)=>a===b?0:a===winner?-1:b===winner?1:a.score-b.score);
+    }else if(mode==='loss'){
+      const minimum=deps.settings().warshipLossZoneMin||2,radius=deps.settings().warshipLossZoneRadius||35;
+      if(input.length<minimum)return null;
+      let bestCount=0;
+      for(const center of input){
+        let x=0,y=0,count=0;
+        for(const point of input)if(Math.abs(center.x-point.x)+Math.abs(center.y-point.y)<=radius){x+=point.x;y+=point.y;count++;}
+        if(!(count>=minimum&&count>0))continue;
+        x=Math.round(x/count);y=Math.round(y/count);
+        const entry={x,y,count,score:-count};
+        if(count>bestCount){
+          if(!actor.game.isValidCoord(x,y))continue;
+          const tile=actor.game.ref(x,y);if(!actor.game.isWater(tile))continue;
+          entry.tile=tile;bestCount=count;winner=entry;
+        }
+        entries.push(entry);
+      }
+      if(winner===null||winner.tile===null)return null;
+      entries.sort((a,b)=>a===b?0:a===winner?-1:b===winner?1:a.score-b.score);
+    }else if(mode==='trade'){
+      if(input.length){const point=input[input.length-1];if(actor.game.isValidCoord(point.x,point.y)){
+        const tile=actor.game.ref(point.x,point.y);if(actor.game.isWater(tile))entries.push({tile});
+      }}
+    }else throw new Error(`Unknown warship threat source: ${mode}`);
+    if(!entries.length)return null;
+    let offset=0;
+    while(offset<entries.length){
+      if(!hooks.allowed())return null;
+      const candidates=entries.slice(offset,offset+78).map((entry,index)=>({
+        tile:entry.tile,x:entry.x,y:entry.y,distance:entry.distance,count:entry.count,readiness:Object.hasOwn(entry,'tile')?'measured':'unchecked',id:`source:${offset+index}`,kind:`warship-${mode}-source`,priority:offset+index,
+        eligible:true,reason:`Original ${mode} source ranking`
+      }));
+      if(offset+78<entries.length)candidates.push({id:'$next',kind:'next-window',priority:entries.length,eligible:true,reason:'Examine later source candidates'});
+      const choice=hooks.choose(`warship-${mode}-source`,[...candidates,{id:'$wait',kind:'wait',reason:'Hold threat-source lookup'}],{total:entries.length,offset});
+      const selected=candidates.find(c=>c.id===choice.selectedId);
+      hooks.record('warship-threat-source-result',{domain:`warship-${mode}-source`,decisionId:choice.decisionId,
+        selectedId:selected?.id,tile:selected?.tile,status:selected?.id==='$next'?'next-window':selected?'selected':'stopped'});
+      if(!selected){hooks.hold();return null;}
+      if(!hooks.allowed())return null;
+      if(selected.id==='$next'){offset+=78;continue;}
+      const index=Number(selected.id.slice(7)),entry=entries[index];let tile=entry.tile;
+      if(!Object.hasOwn(entry,'tile')){
+        if(mode==='invasion'){try{tile=entry.ship.tile();}catch(error){entries.splice(index,1);continue;}}
+        else{
+          if(!actor.game.isValidCoord(entry.x,entry.y)){entries.splice(index,1);continue;}
+          tile=actor.game.ref(entry.x,entry.y);if(!actor.game.isWater(tile)){entries.splice(index,1);continue;}
+        }
+      }
+      hooks.remember(mode,tile,choice.decisionId);
+      return mode==='invasion'?{tile,kind:'invasion'}:tile;
+    }
+    return null;
+  }
+  return {select};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipThreatPlanner;
+
+'use strict';
+
+// Plans choose which existing placement routine to try. They are not build quotes.
+function createStructurePlanner(deps) {
+  const U = deps.units;
+  function candidates(actor, context) {
+    const config = actor.game.config();
+    const settings = deps.settings();
+    const enabled = type => !config.isUnitDisabled(type);
+    const siloEnabled = enabled(U.MissileSilo);
+    const nuclearEnabled = enabled(U.AtomBomb) || enabled(U.HydrogenBomb) || enabled(U.MIRV);
+    const plans = [];
+    function add(id, type, priority, stage, reason, exclusion, facts = {}) {
+      plans.push({ id, kind: 'structure-plan', source: 'StructurePlanner', unitType: type,
+        priority, stage, eligible: !exclusion, reason: exclusion || reason,
+        validation: 'Affordability, placement and upgrade checks run only after selection', ...facts });
+    }
+    const hard = ['Hard', 'Impossible'].includes(deps.difficulty());
+    const defense=context.defenseEconomy;
+    if(defense?.requiredType){const type=defense.requiredType,cost=actor.cost(type);
+      add('structure:defense-economy',type,-10,'defense-economy','Required physical economy before emergency reserve',
+        enabled(type)?null:'Unit disabled',{adaptiveOnly:true,forceNew:true,
+          perceivedCost:cost,availableGold:defense.availableGold,
+          affordable:defense.availableGold>=cost+(defense.stage==='first-sam'?0n:defense.reserve)});}
+    const early = actor.placementsCount === 0 && hard && enabled(U.AtomBomb) && siloEnabled &&
+      enabled(U.SAMLauncher) && actor.hasHighStartingGold();
+    add('structure:initial-sam', U.SAMLauncher, 0, 'initial',
+      'Original first-placement protection for high starting gold',
+      early ? null : 'First-placement high-gold protection conditions are not met');
+
+    const denseType = context.sharedWater && enabled(U.Port) ? U.Port : U.Factory;
+    const dense = !context.cityDisabled && actor.ownedLevels(U.City) === 0 && actor.isHighNationDensity();
+    add('structure:dense-economy', denseType, 1, 'dense',
+      'Original economic opening with no cities in a high-density game',
+      !dense ? 'High-density opening conditions are not met' : !enabled(denseType) ? 'Unit disabled in game configuration' : null);
+
+    const urgentSam = settings.samDefense && enabled(U.SAMLauncher) &&
+      actor.ownedLevels(U.SAMLauncher) < actor.samThreatLevels(context.cityLevels);
+    const ownedSamLevels = actor.ownedLevels(U.SAMLauncher);
+    let samTargetLevels = ownedSamLevels;
+    try { samTargetLevels = actor.samTargetLevels(context.cityLevels); } catch {}
+    let samPerceivedCost = 0n;
+    try { samPerceivedCost = actor.getPerceivedCost(U.SAMLauncher); } catch {}
+    let availableGold = actor.player.gold();
+    try { if (deps.spendableGold) availableGold = deps.spendableGold(actor); } catch {}
+    if (context.teamOpening && !context.teamOpening.frontline && !context.teamOpening.sams) {
+      const opening = context.teamOpening;
+      for (const [role, type, target] of [['Port', U.Port, opening.portTarget ? 3 : 0],
+        ['City', U.City, opening.cityTarget ? 2 : 0], ['Factory', U.Factory, opening.factoryTarget],
+        ['SAM', U.SAMLauncher, opening.samEnabled ? 1 : 0]]) {
+        const owned = { Port: opening.ports, City: opening.cities, Factory: opening.factories, SAM: opening.sams }[role];
+        if (!target || owned >= target) continue;
+        const cost = actor.getPerceivedCost(type);
+        add('structure:opening:' + role, type, 100, 'team-opening',
+          'Physical two-team opening construction', enabled(type) ? null : 'Unit disabled',
+          { adaptiveOnly: true, forceNew: true, openingRole: role, perceivedCost: cost,
+            availableGold, affordable: availableGold >= cost });
+      }
+    }
+    const order = urgentSam ? [U.SAMLauncher, U.Port, U.Factory, U.MissileSilo] :
+      [U.Port, U.Factory, U.SAMLauncher, U.MissileSilo];
+    order.forEach((type, index) => {
+      let exclusion = !enabled(type) ? 'Unit disabled in game configuration' :
+        type === U.Port && !context.sharedWater ? 'No shared water component for port trade' :
+        !nuclearEnabled && (type === U.SAMLauncher || type === U.MissileSilo) ? 'All nuclear weapons are disabled' :
+        !siloEnabled && type === U.SAMLauncher ? 'Missile silos are disabled' : null;
+      if (!exclusion && !actor.shouldBuildStructure(type, context.cityLevels, context.sharedWater)) {
+        exclusion = 'Original structure target or ratio is already satisfied';
+      }
+      const firstSamReserve = type === U.SAMLauncher && ownedSamLevels === 0 && !exclusion;
+      if (firstSamReserve && samTargetLevels === 0) samTargetLevels = 1;
+      add(`structure:normal:${type}`, type, index + 2, 'normal',
+        type === U.SAMLauncher && urgentSam ? 'SAM threat shortfall takes priority under the original defense rule' :
+          'Below original structure target; retain original ordering', exclusion,
+        type === U.SAMLauncher ? { ownedLevels: ownedSamLevels, targetLevels: samTargetLevels,
+          perceivedCost: samPerceivedCost, availableGold, affordable: availableGold >= samPerceivedCost,
+          firstSamReserve } : {});
+    });
+    add('structure:city', U.City, 6, 'fallback', 'Original city fallback after targeted structures',
+      context.cityDisabled ? 'Cities disabled in game configuration' : null);
+    plans.push({ id: '$wait', kind: 'wait', eligible: true,
+      firstSamReserve: plans.some(plan => plan.firstSamReserve && plan.eligible),
+      reason: 'Save resources; attempt no structure' });
+    if(defense)for(const plan of plans)if(plan.kind==='structure-plan'&&plan.unitType!==U.SAMLauncher){
+      const cost=actor.cost(plan.unitType);plan.perceivedCost=cost;plan.availableGold=defense.availableGold;
+      plan.affordable=defense.availableGold>=cost+defense.reserve;
+    }
+    return plans;
+  }
+
+  async function run(actor, context, hooks) {
+    if (!hooks.allowed()) return false;
+    let remaining = candidates(actor, context);
+    const exhausted = new Set();
+    let normalPriorities = null;
+    // Each stage is attempted at most once. A failed special opening may still
+    // reach the same unit type in its normal stage, matching the original flow.
+    while (true) {
+      if (!hooks.allowed()) return false;
+      const choice = hooks.choose(remaining);
+      const plan = remaining.find(p => p.id === choice.selectedId);
+      if (!plan || plan.kind === 'wait') return false;
+      if (!plan.eligible) {
+        hooks.record('plan-blocked', { decisionId: choice.decisionId, planId: plan.id, reason: plan.reason });
+        return false;
+      }
+      if (!hooks.allowed()) return false;
+      // Preserve stages already passed by the original ordered walk. Later
+      // ineligible stages can become eligible while a placement query awaits.
+      for (const other of remaining) {
+        if (other.priority < plan.priority && other.eligible === false) exhausted.add(other.id);
+      }
+      if (!normalPriorities && (plan.stage === 'normal' || plan.stage === 'fallback')) {
+        normalPriorities = new Map(remaining.filter(p => p.stage === 'normal').map(p => [p.id, p.priority]));
+      }
+      try {
+        const result = await hooks.execute(plan, choice.decisionId, () => actor.maybeSpawnStructure(plan.unitType));
+        hooks.record('plan-result', { decisionId: choice.decisionId, planId: plan.id,
+          status: result ? 'completed' : 'unfulfilled',
+          reason: result ? 'Original placement routine returned success; consult linked dispatch record' :
+            'Original placement routine did not complete; consult rule results for affordability or placement checks' });
+        if (result) return result;
+      } catch (error) {
+        hooks.record('plan-result', { decisionId: choice.decisionId, planId: plan.id, status: 'threw' });
+        throw error;
+      }
+      exhausted.add(plan.id);
+      if (!hooks.allowed()) return false;
+      remaining = candidates(actor, context).filter(p => !exhausted.has(p.id));
+      if (normalPriorities) {
+        for (const other of remaining) {
+          if (normalPriorities.has(other.id)) other.priority = normalPriorities.get(other.id);
+        }
+      }
+    }
+  }
+  return { candidates, run };
+}
+
+
+
+'use strict';
+
+function createBuildingPlanner(deps) {
+  const U = deps.units;
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Hold this building pass' };
+  const candidate = (domain, id, priority, eligible, facts, reason) => ({
+    id, kind: domain, source: 'BuildingPlanner', priority, eligible, ...facts, reason
+  });
+  async function attempt(domain, actor, options, hooks, execute, facts = {}) {
+    if (!hooks.allowed()) return { stopped: true, result: false };
+    const choice = hooks.choose(domain, [...options, wait], facts);
+    const selected = options.find(item => item.id === choice.selectedId && item.eligible);
+    if (!selected || !hooks.allowed()) {
+      hooks.record('building-result', { domain, decisionId: choice.decisionId, status: 'stopped' });
+      return { stopped: true, result: false };
+    }
+    try {
+      const result = await hooks.execute(choice.decisionId, () => execute(selected));
+      if (!hooks.allowed()) {
+        hooks.record('building-result', { domain, decisionId: choice.decisionId, status: 'stopped' });
+        return { stopped: true, result: false };
+      }
+      hooks.record('building-result', { domain, decisionId: choice.decisionId,
+        selectedId: selected.id, status: result ? 'completed' : 'unfulfilled' });
+      return { stopped: false, result, selected };
+    } catch (error) {
+      hooks.record('building-result', { domain, decisionId: choice.decisionId, status: 'threw',
+        error: String(error?.message || error) });
+      throw error;
+    }
+  }
+  async function handle(actor, hooks) {
+    if (!hooks.allowed()) return false;
+    const domain = 'structure-phase';
+    const defenseEnabled = actor.placementsCount > 0 && !actor.game.config().isUnitDisabled(U.DefensePost);
+    const urgent = defenseEnabled && actor.defensePostNeeded();
+    let normalResult = false;
+    let normalGated = false;
+    let options = [
+      candidate(domain, 'building:emergency', 0, !!urgent, { phase: 'emergency', defenseEnabled, urgent: !!urgent }, 'Emergency defense before ordinary structures'),
+      candidate(domain, 'building:normal', 1, true, { phase: 'normal' }, 'Ordinary structures after original cooldown and saving gates')
+    ];
+    while (options.some(item => item.eligible)) {
+      const outcome = await attempt(domain, actor, options, hooks, async selected => {
+        if (selected.phase === 'emergency') {
+          actor.dpDeclinedOnTiming = false;
+          return actor.tryBuildDefensePost();
+        }
+        if (selected.phase === 'normal') {
+          normalGated = actor.isOnStructureCooldown() || actor.isInPostSaveUpBlockedPhase();
+          if (normalGated) return false;
+          normalResult = await actor.doHandleStructures();
+          if (!hooks.allowed()) return false;
+          if (normalResult) {
+            actor.lastStructureTick = actor.game.ticks();
+            actor.placementsCount++;
+          }
+          return normalResult;
+        }
+        return actor.tryBuildDefensePost();
+      });
+      if (outcome.stopped) return false;
+      if (outcome.result) return outcome.result;
+      if (outcome.selected.phase === 'emergency' && !actor.dpDeclinedOnTiming) return false;
+      if (outcome.selected.phase === 'normal') {
+        // Original cooldown/save-up returns skip even optional defense.
+        // Capture the gates during execution, without evaluating them twice.
+        if (normalGated) return false;
+        options = defenseEnabled && deps.settings().defensePosts ?
+          [candidate(domain, 'building:optional-defense', 2, true, { phase: 'optional-defense' }, 'Optional frontier defense after ordinary structures failed')] : [];
+      } else options = options.filter(item => item !== outcome.selected);
+    }
+    return false;
+  }
+  async function action(actor, unitType, units, hooks) {
+    if (!hooks.allowed()) return false;
+    const domain = 'structure-action';
+    const density = actor.getTotalStructureDensity();
+    const forceNew = hooks.forceNew === true;
+    const preferUpgrade = !forceNew && density > deps.densityThreshold && actor.game.config().unitInfo(unitType).upgradable;
+    let options = [
+      candidate(domain, 'building:upgrade', 0, !!preferUpgrade, { action: 'upgrade', unitType, density, ownedCount: units.length }, 'Original dense-territory upgrade preference'),
+      candidate(domain, 'building:new', 1, !preferUpgrade || units.length === 0, { action: 'new', unitType, density, ownedCount: units.length }, 'New construction allowed by original density rule')
+    ];
+    while (options.some(item => item.eligible)) {
+      const outcome = await attempt(domain, actor, options, hooks, selected => selected.action === 'upgrade' ?
+        actor.maybeUpgradeStructure(units) : actor._placeNewStructure(unitType), { unitType, forceNew });
+      if (outcome.stopped) return false;
+      if (outcome.result) return outcome.result;
+      options = options.filter(item => item !== outcome.selected);
+    }
+    return false;
+  }
+  async function upgrade(actor, units, hooks) {
+    const eligible = [];
+    for (const structure of units) {
+      if (!hooks.allowed()) return null;
+      const bu = await actor.buildableFor(structure.type(), structure.tile());
+      if (!hooks.allowed()) return null;
+      if (bu !== null && bu.canUpgrade !== false) eligible.push({ structure, bu });
+    }
+    if (!eligible.length) return null;
+    let mode = 'sam-coverage';
+    const scores = new Map();
+    let winner;
+    if (deps.settings().samDefense && eligible[0].structure.type() === U.SAMLauncher) {
+      mode = 'protected-value';
+      const protectedUnits = actor.player.units(U.City, U.Port, U.Factory, U.MissileSilo);
+      for (const entry of eligible) {
+        const range = actor.game.config().samRange(entry.structure.level());
+        scores.set(entry, protectedUnits.reduce((sum, unit) => sum +
+          (actor.game.euclideanDistSquared(entry.structure.tile(), unit.tile()) <= range * range ?
+            Math.max(1, unit.level()) * deps.samProtectWeight(unit.type()) : 0), 0));
+      }
+    } else {
+      const chance = { Easy: 70, Medium: 40, Hard: 25, Impossible: 0 }[deps.difficulty()] || 0;
+      if (actor.random.nextInt(0, 100) < chance) {
+        mode = 'random';
+        // Pass units to the original RNG, preserving its input shape and cadence.
+        const chosen = actor.random.randElement(eligible.map(entry => entry.structure));
+        winner = eligible.find(entry => entry.structure === chosen);
+      }
+      if (mode !== 'random') {
+        const sams = actor.player.units(U.SAMLauncher);
+        for (const entry of eligible) scores.set(entry, sams.reduce((score, sam) => {
+          const range = actor.game.config().samRange(sam.level());
+          return score + (actor.game.euclideanDistSquared(entry.structure.tile(), sam.tile()) <= range * range ?
+            10 + Math.max(0, sam.level() - 1) * 7.5 : 0);
+        }, 0));
+      }
+    }
+    const ranked = [...eligible].sort((a, b) => (scores.get(b) || 0) - (scores.get(a) || 0));
+    if (winner) {
+      ranked.splice(ranked.indexOf(winner), 1);
+      ranked.unshift(winner);
+    }
+    const options = ranked.map((entry, priority) => candidate('structure-upgrade', `upgrade:${priority}`, priority, true,
+      { unitId: entry.structure.id(), tile: entry.structure.tile(), unitType: entry.structure.type(),
+        level: entry.structure.level(), score: scores.get(entry) || 0 }, `Original ${mode} upgrade ranking`));
+    if (!hooks.allowed()) return null;
+    const choice = hooks.choose('structure-upgrade', [...options.slice(0, 79), wait], { mode, totalCandidates: options.length });
+    const index = options.slice(0, 79).findIndex(item => item.id === choice.selectedId);
+    if (index < 0 || !hooks.allowed()) return null;
+    const selected = ranked[index];
+    hooks.remember(selected.bu, choice.decisionId);
+    hooks.record('building-result', { domain: 'structure-upgrade', decisionId: choice.decisionId,
+      status: 'selected', unitId: options[index].unitId });
+    return selected;
+  }
+  async function defense(actor, tiles, hooks, facts = {}) {
+    let remaining = tiles.map((tile, priority) => candidate('defense-placement', `defense:${priority}`, priority, true,
+      { tile, unitType: U.DefensePost }, 'Original prepared frontier placement order'));
+    while (remaining.length) {
+      if (!hooks.allowed()) return null;
+      const options = remaining.slice(0, 79);
+      const choice = hooks.choose('defense-placement', [...options, wait], { ...facts, remainingCandidates: remaining.length });
+      const selected = options.find(item => item.id === choice.selectedId);
+      if (!selected || !hooks.allowed()) return null;
+      remaining = remaining.filter(item => item !== selected);
+      try {
+        const quote = await actor.buildableFor(U.DefensePost, selected.tile);
+        if (!hooks.allowed()) {
+          hooks.record('building-result', { domain: 'defense-placement', decisionId: choice.decisionId,
+            status: 'stopped', tile: selected.tile });
+          return null;
+        }
+        if (quote === null || quote.canBuild === false) {
+          hooks.record('building-result', { domain: 'defense-placement', decisionId: choice.decisionId,
+            status: 'unbuildable', tile: selected.tile });
+          continue;
+        }
+        hooks.remember(quote, choice.decisionId);
+        hooks.record('building-result', { domain: 'defense-placement', decisionId: choice.decisionId,
+          status: 'selected', tile: selected.tile });
+        return quote;
+      } catch (error) {
+        hooks.record('building-result', { domain: 'defense-placement', decisionId: choice.decisionId, status: 'threw' });
+        throw error;
+      }
+    }
+    return null;
+  }
+  return { handle, action, upgrade, defense };
+}
+
+
+
+'use strict';
+
+function createStructurePlacementPlanner(deps) {
+  const U = deps.units;
+  const wait = { id: '$wait', kind: 'wait', eligible: true, priority: 999,
+    reason: 'Do not place this structure during the current pass' };
+  const WINDOW_SIZE = 79;
+
+  function sourceTiles(actor, unitType) {
+    const settings = deps.settings();
+    let random = unitType === U.Port ? actor.randCoastalTileArray(25) :
+      deps.randomTerritoryTiles(actor.random, actor.game, actor.player, 25);
+    const sources = [];
+    if (settings.safePlacement && (unitType === U.City || unitType === U.Factory)) {
+      sources.push(...actor.tilesDeepInTerritory(25));
+    }
+    if (unitType === U.MissileSilo && settings.winFixes ||
+        settings.safePlacement && settings.samUmbrella && (unitType === U.City || unitType === U.Factory)) {
+      sources.unshift(...actor.tilesNearFriendlySams(25));
+    }
+    sources.push(...random);
+    return sources;
+  }
+
+  function trainRanges(actor) {
+    const config = actor.game.config();
+    const min = Math.max(0, Number(config.trainStationMinRange()) || 0);
+    const max = Math.max(min, Number(config.trainStationMaxRange()) || min);
+    return { min, max, minSquared: min * min, maxSquared: max * max };
+  }
+
+  function factories(actor) {
+    const result = [];
+    const self = actor.player;
+    const selfId = self.smallID();
+    try {
+      for (const owner of actor.game.players()) {
+        if (!owner?.isPlayer?.() || !owner?.isAlive?.()) continue;
+        const own = owner.smallID() === selfId;
+        if (!own && self.isFriendly(owner) !== true) continue;
+        for (const unit of owner.units(U.Factory)) {
+          if (unit.isUnderConstruction?.()) continue;
+          result.push({ tile: unit.tile(), own });
+        }
+      }
+    } catch {}
+    return result;
+  }
+
+  function sampledRouteTiles(actor, center, unitType, ranges) {
+    const game = actor.game;
+    const ownerId = actor.player.smallID();
+    const radii = [...new Set([ranges.min, Math.round((ranges.min + ranges.max) / 2), ranges.max])];
+    const result = [];
+    const x = game.x(center), y = game.y(center);
+    for (const radius of radii) {
+      if (!(radius > 0)) continue;
+      for (let step = 0; step < 16; step++) {
+        const angle = step * Math.PI / 8;
+        const px = Math.round(x + Math.cos(angle) * radius);
+        const py = Math.round(y + Math.sin(angle) * radius);
+        if (!game.isValidCoord(px, py)) continue;
+        const tile = game.ref(px, py);
+        if (!game.isLand(tile) || game.ownerID(tile) !== ownerId) continue;
+        if (unitType === U.Port && !game.isShore(tile)) continue;
+        result.push(tile);
+      }
+    }
+    return result;
+  }
+
+  function samCoverage(actor, tile) {
+    let own = 0, allied = 0;
+    const selfId = actor.player.smallID();
+    try {
+      for (const unit of actor.game.units(U.SAMLauncher) || []) {
+        if (unit.isUnderConstruction?.()) continue;
+        const owner = unit.owner?.();
+        if (!owner) continue;
+        const level = Math.max(1, Number(unit.level?.()) || 1);
+        const range = Number(actor.game.config().samRange(level)) || 0;
+        if (!(range > 0) || actor.game.euclideanDistSquared(tile, unit.tile()) > range * range) continue;
+        if (owner.smallID?.() === selfId) own += level;
+        else if (actor.player.isFriendly(owner) === true) allied += level;
+      }
+    } catch {}
+    return { own, allied };
+  }
+
+  function futureRouteCapacity(actor, tile, ranges) {
+    return sampledRouteTiles(actor, tile, U.City, ranges).length;
+  }
+
+  function prepare(actor, unitType) {
+    const seen = new Set();
+    const scorer = actor.structureSpawnTileValue(unitType);
+    const safeScorer = actor.safePlacementScorer(unitType);
+    const base = sourceTiles(actor, unitType);
+    const baseSet = new Set(base);
+    const shared = actor._sharedWaterComponents === undefined ? {} : {sharedWater:actor._sharedWaterComponents !== null};
+    const opening = deps.opening?.observe(actor.game,actor.player,shared);
+    const factoryLinePriority = opening?.economyMode === 'factory' && opening.cities >= opening.cityTarget &&
+      opening.factories >= Math.max(1,opening.factoryTarget);
+    const mode = opening?.economyMode || (actor._sharedWaterComponents === undefined ? undefined : actor._sharedWaterComponents === null ? 'factory' : 'coastal');
+    const sam = unitType === U.SAMLauncher ? deps.samPlacement?.prepare(actor,mode) : null;
+    const rear = deps.geography?.placementContext(actor.game, actor.player);
+    const rearTiles = deps.geography && [U.City, U.Port, U.Factory].includes(unitType) ?
+      deps.geography.rearTiles(actor.game, actor.player, unitType, rear) : [];
+    const anchors = factories(actor);
+    const ranges = trainRanges(actor);
+    const routeTiles = [];
+    if (unitType === U.City || unitType === U.Port || unitType === U.Factory) {
+      const routeSeen = new Set();
+      for (const anchor of anchors) {
+        for (const tile of sampledRouteTiles(actor, anchor.tile, unitType, ranges)) {
+          if (routeSeen.has(tile)) continue;
+          routeSeen.add(tile); routeTiles.push(tile);
+          if (routeTiles.length >= 160) break;
+        }
+        if (routeTiles.length >= 160) break;
+      }
+    }
+    const stations = (() => { try { return actor.getOrBuildReachableStations() || []; } catch { return []; } })();
+    const hasOwnSam = (() => { try { return actor.player.units(U.SAMLauncher).length > 0; } catch { return false; } })();
+    const entries = [];
+    for (const tile of [...base, ...routeTiles, ...rearTiles, ...(sam?.tiles || [])]) {
+      if (seen.has(tile)) continue;
+      seen.add(tile);
+      let ownedFactoryRoutes = 0, alliedFactoryRoutes = 0;
+      for (const anchor of anchors) {
+        const distance = actor.game.euclideanDistSquared(tile, anchor.tile);
+        if (distance < ranges.minSquared || distance > ranges.maxSquared) continue;
+        if (anchor.own) ownedFactoryRoutes++;
+        else alliedFactoryRoutes++;
+      }
+      const clusters = new Set();
+      for (const station of stations) {
+        const distance = actor.game.euclideanDistSquared(tile, station.tile);
+        if (distance >= ranges.minSquared && distance <= ranges.maxSquared && station.cluster !== null && station.cluster !== undefined) {
+          clusters.add(String(station.cluster));
+        }
+      }
+      const coverage = samCoverage(actor, tile);
+      entries.push({ tile, ...(sam ? sam.metrics(tile) : {}), factoryLinePriority,
+        economyMode:opening?.economyMode || (sam?.anchorKind === 'Port' ? 'coastal' : sam?.anchorKind === 'City' ? 'factory' : null),
+        ...(deps.geography && [U.City, U.Port, U.Factory].includes(unitType) ?
+        deps.geography.rearMetrics(actor.game, tile, rear, unitType) : {}),
+        originalScore: Number(scorer(tile)) || 0, safeScore: Number(safeScorer(tile)) || 0,
+        ownedFactoryRoutes, alliedFactoryRoutes, routeClusters: clusters.size,
+        futureRouteCapacity: futureRouteCapacity(actor, tile, ranges), ownSamCoverage: coverage.own,
+        alliedSamCoverage: coverage.allied, hasOwnSam, adaptiveOnly: !baseSet.has(tile), inputIndex: entries.length });
+    }
+    entries.sort((a, b) => b.originalScore - a.originalScore || a.inputIndex - b.inputIndex);
+    return entries.map((entry, priority) => ({ ...entry,
+      id: `placement:${String(unitType)}:${entry.inputIndex}`, kind: 'structure-placement',
+      source: 'StructurePlacementPlanner', unitType, eligible: true, priority,
+      reason: 'Buildable candidate ranked by the original placement score' }));
+  }
+
+  function visibleWindow(remaining, unitType) {
+    const economy = unitType === U.City || unitType === U.Port || unitType === U.Factory;
+    const sam = unitType === U.SAMLauncher && remaining.some(c=>c.samAnchorKind);
+    if (!sam && (!economy || !remaining.some(candidate => candidate.hasOwnSam || candidate.frontline || candidate.factoryLinePriority))) return remaining.slice(0, WINDOW_SIZE);
+    const routeCount = candidate => candidate.ownedFactoryRoutes + candidate.alliedFactoryRoutes;
+    const adaptive = [...remaining].sort((left, right) => {
+      if (sam) return (left.samAnchorProtection ?? Infinity) - (right.samAnchorProtection ?? Infinity) ||
+        (left.samAnchorDistance ?? Infinity) - (right.samAnchorDistance ?? Infinity) ||
+        right.originalScore - left.originalScore || left.priority - right.priority;
+      let result = (right.rearBand || 0) - (left.rearBand || 0) ||
+        (routeCount(right) > 0 ? 1 : 0) - (routeCount(left) > 0 ? 1 : 0) ||
+        right.ownSamCoverage - left.ownSamCoverage || right.alliedSamCoverage - left.alliedSamCoverage;
+      if (!result && unitType === U.Factory) {
+        result = right.routeClusters - left.routeClusters || right.futureRouteCapacity - left.futureRouteCapacity;
+      }
+      return result || right.originalScore - left.originalScore || left.priority - right.priority;
+    });
+    const visible = [], included = new Set();
+    const add = candidate => {
+      if (!candidate || included.has(candidate.id) || visible.length >= WINDOW_SIZE) return;
+      included.add(candidate.id); visible.push(candidate);
+    };
+    add(remaining.find(c=>c.samSearchPlan));
+    adaptive.slice(0, 40).forEach(add);
+    remaining.filter(candidate => !candidate.adaptiveOnly).slice(0, 39).forEach(add);
+    adaptive.forEach(add);
+    return visible;
+  }
+
+  async function quoteSam(actor, unitType, requests, hooks, decisionId, maxProbes) {
+    maxProbes = Math.min(79,maxProbes);
+    // Search several distance bands: repeatedly invalid nearest requests must
+    // not consume every pass before a feasible farther band is examined.
+    const bins = Array.from({length:6},()=>[]);
+    const sorted = [...requests].sort((a,b)=>a.samAnchorDistance-b.samAnchorDistance || a.priority-b.priority);
+    for (const candidate of sorted) {
+      const distance = candidate.samAnchorDistance;
+      const band = [3,8,16,32,64].findIndex(limit=>distance<=limit);
+      bins[band<0?5:band].push(candidate);
+    }
+    const samples = [], used = new Set();
+    const add = c => { if (c && !used.has(c.id) && samples.length<maxProbes) { used.add(c.id); samples.push(c); } };
+    for (const bin of bins) bin.slice(0,2).forEach(add);
+    sorted.forEach(add);
+    const quotes = new Map();
+    for (const request of samples) {
+      if (!hooks.allowed()) return null;
+      let quote;
+      try { quote = await actor.buildableFor(unitType,request.tile); }
+      catch (error) {
+        hooks.record('structure-placement-result',{decisionId,unitType,tile:request.tile,status:'threw'}); throw error;
+      }
+      if (!hooks.allowed()) {
+        hooks.record('structure-placement-result',{decisionId,unitType,status:'stopped'}); return null;
+      }
+      if (quote===null || quote.canBuild===false) {
+        hooks.record('structure-placement-result',{decisionId,unitType,tile:request.tile,status:'unbuildable'}); continue;
+      }
+      const tile = typeof quote.canBuild==='number' ? quote.canBuild : request.tile;
+      quotes.set(tile,{quote,request});
+      hooks.record('structure-placement-result',{decisionId,unitType,requestedTile:request.tile,tile,status:'sam-quoted'});
+    }
+    if (!quotes.size) {
+      hooks.record('structure-placement-result',{decisionId,unitType,status:'no-buildable-tile',probed:samples.length}); return null;
+    }
+    const mode = requests.find(c=>c.economyMode)?.economyMode;
+    const fresh = deps.samPlacement.prepare(actor,mode);
+    if (!fresh.anchorKind || !hooks.allowed()) {
+      hooks.record('structure-placement-result',{decisionId,unitType,status:'anchors-changed-or-stopped'}); return null;
+    }
+    const score = actor.structureSpawnTileValue(unitType);
+    const choices = [...quotes].map(([tile,{request}],priority)=>({...request,...fresh.metrics(tile),
+      id:'sam-quote:'+priority,tile,requestedTile:request.tile,priority,originalScore:Number(score(tile)) || 0,quoted:true,
+      reason:'Worker-confirmed actual SAM site; rank actual distance to priority economy anchors'}));
+    const decision = hooks.choose([...choices,wait],{unitType,samQuoteSearch:true,probed:samples.length,actualSites:choices.length});
+    const selected = choices.find(c=>c.id===decision.selectedId);
+    if (!selected || !hooks.allowed()) {
+      hooks.record('structure-placement-result',{decisionId:decision.decisionId,unitType,status:hooks.allowed()?'wait':'stopped',probed:samples.length}); return null;
+    }
+    const result = quotes.get(selected.tile).quote;
+    hooks.remember(result,decision.decisionId);
+    hooks.record('structure-placement-result',{decisionId:decision.decisionId,unitType,tile:selected.tile,
+      requestedTile:selected.requestedTile,samAnchorDistance:selected.samAnchorDistance,status:'selected',probed:samples.length});
+    return result;
+  }
+
+  async function run(actor, unitType, hooks) {
+    if (!hooks.allowed()) return null;
+    let remaining = prepare(actor, unitType);
+    if (unitType===U.SAMLauncher && remaining.some(c=>c.samAnchorKind)) remaining.push({
+      id:'sam:quote-search',kind:'structure-placement',unitType,eligible:true,adaptiveOnly:true,samSearchPlan:true,
+      priority:1000,reason:'Quote candidate sites across distance bands, then choose the closest actual SAM site'});
+    const totalCandidates = remaining.length;
+    const maxProbes = Math.max(1, deps.maxProbes || 12);
+    let probed = 0;
+    if (remaining.length === 0) {
+      hooks.record('structure-placement-result', { decisionId: null, unitType,
+        status: 'no-buildable-tile', totalCandidates, probed });
+      return null;
+    }
+    while (remaining.length && probed < maxProbes) {
+      const visible = visibleWindow(remaining, unitType);
+      const choice = hooks.choose([...visible, wait], { unitType, totalCandidates,
+        remainingCandidates: remaining.length, visibleCandidates: visible.length,
+        hiddenCandidates: remaining.length - visible.length, probed });
+      const selected = visible.find(candidate => candidate.id === choice.selectedId);
+      if (!selected) {
+        hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+          status: 'wait', reason: choice.reason, totalCandidates, probed });
+        return null;
+      }
+      if (!hooks.allowed()) {
+        hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+          tile: selected.tile, status: 'stopped', probed });
+        return null;
+      }
+      if (selected.samSearchPlan) {
+        const execute = () => quoteSam(actor,unitType,remaining.filter(c=>!c.samSearchPlan),hooks,choice.decisionId,maxProbes);
+        return hooks.execute ? hooks.execute(choice.decisionId,execute) : execute();
+      }
+      remaining = remaining.filter(candidate => candidate !== selected);
+      probed++;
+      try {
+        const buildable = await actor.buildableFor(unitType, selected.tile);
+        if (!hooks.allowed()) {
+          hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+            tile: selected.tile, status: 'stopped', probed });
+          return null;
+        }
+        if (buildable === null || buildable.canBuild === false) {
+          hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+            tile: selected.tile, status: 'unbuildable', probed });
+          continue;
+        }
+        hooks.remember(buildable, choice.decisionId);
+        hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+          tile: selected.tile, status: 'selected', probed });
+        return buildable;
+      } catch (error) {
+        hooks.record('structure-placement-result', { decisionId: choice.decisionId, unitType,
+          tile: selected.tile, status: 'threw', probed, error: String(error?.message || error) });
+        throw error;
+      }
+    }
+    hooks.record('structure-placement-result', { decisionId: null, unitType,
+      status: 'no-buildable-tile', totalCandidates, probed });
+    return null;
+  }
+
+  return { prepare, run };
+}
+
+
+
+'use strict';
+
+function createBotTargetPlanner(deps) {
+  const WINDOW_SIZE = 79; // The engine permits 80 candidates, including wait.
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Stop this bot attack wave' };
+  const hostileBot = (actor, target) => target.isPlayer() &&
+    actor.player.isFriendly(target) === false && target.type() === deps.botType;
+
+  async function run(actor, hooks) {
+    if (!hooks.allowed()) return false;
+    const targets = actor.player.nearby().filter(target => hostileBot(actor, target));
+    if (targets.length === 0) {
+      hooks.choose([wait], { remainingTargets: 0, visibleTargets: 0, hiddenTargets: 0, attemptLimit: 0, attempts: 0 });
+      return false; // Preserve the original early return before resetting counters.
+    }
+    actor.botAttackTroopsSent = 0;
+    let remaining = targets.map((target, index) => {
+      const troops = target.troops(), tiles = target.numTilesOwned();
+      return { target, candidate: { id: `bot-target:${index}`, kind: 'bot-target', source: 'BotTargetPlanner',
+        targetId: target.id(), troops, tiles, troopDensity: troops / tiles,
+        hasStructures: target.units().some(unit => deps.attackStructures.has(unit.type())), eligible: true } };
+    }).sort((a, b) => Number(b.candidate.hasStructures) - Number(a.candidate.hasStructures) ||
+      a.candidate.troopDensity - b.candidate.troopDensity);
+    remaining.forEach((entry, priority) => Object.assign(entry.candidate, { priority,
+      reason: entry.candidate.hasStructures ? 'Original priority: bot with structures, then lower troop density' :
+        'Original priority: lower troop density after bots with structures' }));
+    const attemptLimit = actor.getBotAttackMaxParallelism(); // Preserve one difficulty/random sample per wave.
+    let attempts = 0;
+    while (remaining.length && attempts < attemptLimit) {
+      if (!hooks.allowed()) break;
+      const visible = remaining.slice(0, WINDOW_SIZE);
+      const choice = hooks.choose([...visible.map(entry => entry.candidate), wait], {
+        remainingTargets: remaining.length, visibleTargets: visible.length,
+        hiddenTargets: remaining.length - visible.length, attemptLimit, attempts,
+        ranking: 'Initial wave order: structures first, then troop density; not reranked during the wave'
+      });
+      const selected = visible.find(entry => entry.candidate.id === choice.selectedId);
+      if (!selected) break; // Explicit wait or a failed/invalid strategy decision.
+      if (!hooks.allowed()) break;
+      remaining = remaining.filter(entry => entry !== selected);
+      attempts++;
+      const details = { domain: 'bot-target', decisionId: choice.decisionId,
+        planId: selected.candidate.id, targetId: selected.candidate.targetId };
+      try {
+        if (!hostileBot(actor, selected.target) || selected.target.isAlive?.() === false) {
+          hooks.record('plan-result', { ...details, status: 'skipped', reason: 'Target is no longer a live hostile bot' });
+          continue;
+        }
+        const result = await hooks.execute(selected.candidate, choice.decisionId, () => actor.sendAttack(selected.target));
+        hooks.record('plan-result', { ...details, status: 'attempted', executorResult: result,
+          reason: 'Original sendAttack completed; consult linked command and rule records for the outcome' });
+      } catch (error) {
+        hooks.record('plan-result', { ...details, status: 'threw' });
+        throw error;
+      }
+    }
+    hooks.record('plan-wave-result', { domain: 'bot-target', attempts, attemptLimit,
+      remainingTargets: remaining.length, legacyTroopCounter: actor.botAttackTroopsSent,
+      counterMeaning: 'Original allocation bookkeeping; may include failed submissions, not confirmed troops sent',
+      reason: !hooks.allowed() ? 'Bot stopped or ownership changed' :
+        attempts >= attemptLimit ? 'Original difficulty attempt limit reached' :
+          remaining.length === 0 ? 'Target pool exhausted' : 'Strategy stopped the wave' });
+    return actor.botAttackTroopsSent > 0;
+  }
+  return { run };
+}
+
+
+
+'use strict';
+
+function createAttackGeographyPlanner(deps) {
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Stop this geographic target search' };
+  const safe = (fn, fallback = null) => { try { return fn(); } catch { return fallback; } };
+
+  function result(hooks, mode, status, details = {}) {
+    hooks.record('attack-geography-result', { mode, status, ...details });
+  }
+
+  function stopped(hooks, mode, decisionId, reason) {
+    result(hooks, mode, 'stopped', { decisionId: decisionId ?? null, reason });
+    return { target: null, decisionId: decisionId ?? null, stop: true };
+  }
+
+  function choose(entries, mode, hooks, facts = {}) {
+    if (entries.length === 0) {
+      result(hooks, mode, 'empty', { decisionId: null, reason: 'No original search candidate was reachable' });
+      return { target: null, decisionId: null, stop: false };
+    }
+    const visible = entries.slice(0, 79);
+    let choice;
+    try {
+      choice = hooks.choose('attack-geography', [...visible.map(entry => entry.candidate), wait], {
+        mode, totalTargets: entries.length, visibleTargets: visible.length,
+        hiddenTargets: entries.length - visible.length, ...facts
+      });
+    } catch (error) {
+      return stopped(hooks, mode, null, `Policy selection threw: ${String(error?.message || error)}`);
+    }
+    const selected = visible.find(entry => entry.candidate.id === choice?.selectedId);
+    if (!selected) return stopped(hooks, mode, choice?.decisionId,
+      choice?.selectedId === '$wait' ? 'Policy selected wait' : 'Policy selected an invalid geographic target');
+    if (!hooks.allowed()) return stopped(hooks, mode, choice?.decisionId,
+      'Bot stopped or ownership changed after geographic target selection');
+    result(hooks, mode, 'selected', { decisionId: choice.decisionId,
+      targetId: selected.candidate.targetId, reason: selected.candidate.reason });
+    return { target: selected.target, decisionId: choice.decisionId, stop: false };
+  }
+
+  async function pocket(actor, hooks) {
+    let tick;
+    try { tick = Number(actor.game.ticks()); } catch { return { target: null, decisionId: null, stop: false }; }
+    if (actor._pocketTick !== undefined && tick >= actor._pocketTick &&
+        tick - actor._pocketTick < (deps.encircleScanTicks ?? 100)) {
+      if (actor._pocketSid === null || actor._pocketSid === undefined) return { target: null, decisionId: null, stop: false };
+      try {
+        const cached = actor.game.playerBySmallID(actor._pocketSid);
+        if (cached && cached.isPlayer && cached.isPlayer() && cached.isAlive()) {
+          result(hooks, 'pocket', 'cached', { decisionId: null, targetId: safe(() => cached.id()) });
+          return { target: cached, decisionId: null, stop: false };
+        }
+      } catch { /* Original cache lookup falls through to a fresh scan. */ }
+    }
+    if (!hooks.allowed()) return stopped(hooks, 'pocket', null, 'Bot stopped before pocket scan');
+    actor._pocketTick = tick;
+    actor._pocketSid = null;
+    const landTiles = Number(actor.game.numLandTiles()) || 1;
+    const maxLandShare = deps.settings().encircleMaxShare ?? .1;
+    const minSealShare = deps.settings().encircleMinSealShare ?? .6;
+    const width = actor.game.width(), height = actor.game.height(), ownId = actor.player.smallID();
+    const entries = [];
+    let inputIndex = 0;
+    for (const target of actor.player.nearby()) {
+      const index = inputIndex++;
+      try {
+        if (!target.isPlayer || !target.isPlayer()) continue;
+        if (actor.player.isFriendly(target)) continue;
+        if (target.isAlive && !target.isAlive()) continue;
+        const tilesOwned = Number(target.numTilesOwned()) || 0;
+        if (tilesOwned <= 0 || tilesOwned / landTiles > maxLandShare) continue;
+        await actor.game.ensureBorderTiles(target);
+        if (!hooks.allowed()) return stopped(hooks, 'pocket', null, 'Bot stopped during pocket border preparation');
+        const border = target.borderTiles();
+        if (!border || border.size === 0) continue;
+        const targetId = target.smallID();
+        let ownedPerimeter = 0, openPerimeter = 0, sealed = true;
+        for (const tile of border) {
+          if (actor.game.isShore(tile)) { sealed = false; break; }
+          const x = actor.game.x(tile), y = actor.game.y(tile);
+          if (x <= 0 || y <= 0 || x >= width - 1 || y >= height - 1) { sealed = false; break; }
+          for (const neighbor of actor.game.neighbors(tile)) {
+            if (!actor.game.isLand(neighbor)) continue;
+            if (!actor.game.hasOwner(neighbor)) { openPerimeter++; continue; }
+            const owner = actor.game.ownerID(neighbor);
+            if (owner === targetId) continue;
+            if (owner === ownId) ownedPerimeter++;
+            else { sealed = false; break; }
+          }
+          if (!sealed) break;
+        }
+        if (!sealed) continue;
+        const perimeter = ownedPerimeter + openPerimeter;
+        if (perimeter === 0) continue;
+        const sealShare = ownedPerimeter / perimeter;
+        if (sealShare <= 0 || sealShare < minSealShare) continue;
+        entries.push({ target, candidate: {
+          id: `attack-geography:pocket:${targetId}`, kind: 'attack-geography', mode: 'pocket',
+          targetId: safe(() => target.id(), String(targetId)), inputIndex: index, priority: index, eligible: true,
+          facts: { tilesOwned, landShare: tilesOwned / landTiles, maxLandShare, ownedPerimeter,
+            openPerimeter, sealShare, minSealShare },
+          reason: 'Sealable pocket meeting original land-share and perimeter thresholds'
+        } });
+      } catch { /* The original pocket scan ignores one target's failure. */ }
+    }
+    entries.sort((a, b) => b.candidate.facts.sealShare - a.candidate.facts.sealShare ||
+      a.candidate.inputIndex - b.candidate.inputIndex);
+    entries.forEach((entry, priority) => { entry.candidate.priority = priority; });
+    const selected = choose(entries, 'pocket', hooks, { tick, maxLandShare, minSealShare });
+    actor._pocketSid = selected.target ? selected.target.smallID() : null;
+    return selected;
+  }
+
+  async function island(actor, hooks) {
+    if (!hooks.allowed()) return stopped(hooks, 'island', null, 'Bot stopped before island scan');
+    if (actor.game.config().isUnitDisabled(deps.transportType)) return choose([], 'island', hooks);
+    if (actor.player.unitCount(deps.transportType) >= actor.game.config().boatMaxNumber()) return choose([], 'island', hooks);
+    if (!Array.from(actor.player.borderTiles()).some(tile => actor.game.isShore(tile))) return choose([], 'island', hooks);
+    const targets = actor.game.players().filter(target => {
+      if (target.smallID() === actor.player.smallID()) return false;
+      if (actor.player.isFriendly(target)) return false;
+      return !actor.isFFA() || target.troops() < actor.player.troops();
+    });
+    if (targets.length === 0) return choose([], 'island', hooks);
+    const ownCenter = actor.getPlayerCenter(actor.player);
+    const ranked = targets.map((target, inputIndex) => {
+      const center = actor.getPlayerCenter(target);
+      let distance = Infinity;
+      if (ownCenter && ownCenter.x != null && center && center.x != null) {
+        distance = actor.game.manhattanDist(actor.game.ref(ownCenter.x, ownCenter.y), actor.game.ref(center.x, center.y));
+      }
+      return { target, inputIndex, distance };
+    }).sort((a, b) => a.distance - b.distance || a.inputIndex - b.inputIndex);
+    const ownShore = Array.from(actor.player.borderTiles()).filter(tile => actor.game.isShore(tile));
+    const entries = [];
+    for (const entry of ranked) {
+      await actor.game.ensureBorderTiles(entry.target);
+      if (!hooks.allowed()) return stopped(hooks, 'island', null, 'Bot stopped during island border preparation');
+      const pair = deps.closestTwoTiles(actor.game, ownShore,
+        Array.from(entry.target.borderTiles()).filter(tile => actor.game.isShore(tile)));
+      if (pair === null) continue;
+      const reachable = await hooks.probe(pair.y);
+      if (!hooks.allowed()) return stopped(hooks, 'island', null, 'Bot stopped during island reachability probe');
+      if (reachable === false) continue;
+      const smallId = entry.target.smallID();
+      entries.push({ target: entry.target, candidate: {
+        id: `attack-geography:island:${smallId}`, kind: 'attack-geography', mode: 'island',
+        targetId: safe(() => entry.target.id(), String(smallId)), inputIndex: entry.inputIndex,
+        priority: entries.length, eligible: true,
+        facts: { distance: Number.isFinite(entry.distance) ? entry.distance : null, destinationTile: pair.y },
+        reason: 'Reachable island enemy in original center-distance order'
+      } });
+      if (entries.length >= 2) break;
+    }
+    return choose(entries, 'island', hooks, { scannedTargets: ranked.length });
+  }
+
+  async function select(actor, mode, hooks) {
+    if (mode === 'pocket') return pocket(actor, hooks);
+    if (mode === 'island') return island(actor, hooks);
+    throw new Error('Unknown attack geography mode: ' + mode);
+  }
+
+  return { select };
+}
+
+
+
+'use strict';
+
+function createAttackPlanner(deps) {
+  const orders = {
+    Easy: ['crater', 'bots', 'counter', 'assist', 'betray', 'hostile', 'weakest'],
+    Medium: ['bots', 'crater', 'counter', 'assist', 'betray', 'hostile', 'disconnected', 'traitor', 'weakest', 'island', 'donate'],
+    Hard: ['bots', 'counter', 'pocket', 'assist', 'betray', 'crater', 'traitor', 'disconnected', 'hostile', 'weak', 'victim', 'weakest', 'island', 'donate'],
+    Impossible: ['counter', 'pocket', 'bots', 'weak', 'assist', 'traitor', 'disconnected', 'betray', 'victim', 'crater', 'hostile', 'weakest', 'island', 'donate']
+  };
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Do not select an action here' };
+  const WAIT = Symbol('strategy-wait');
+  const safe = (fn, fallback = null) => { try { return fn(); } catch { return fallback; } };
+
+  function select(actor, mode, supplied = [], hooks) {
+    if (!hooks.allowed()) return { target: null, stop: true };
+    let inputs;
+    if (mode === 'incoming') inputs = actor.player.incomingAttacks().map(attack => ({ target: attack.attacker(), attack }));
+    else if (mode === 'hostile') inputs = actor.player.allRelationsSorted().map(r => ({ target: r.player, relation: r.relation }));
+    else inputs = (mode === 'weakest' ? supplied.slice(0, 1) : supplied).map(target => ({ target }));
+    const alliancesDisabled = mode === 'traitor' && actor.game.config().disableAlliances();
+    const entries = inputs.map((input, index) => {
+      const t = input.target;
+      const c = { id: `target:${mode}:${index}`, kind: 'attack-target', mode, inputIndex: index,
+        targetId: safe(() => t.id()), priority: index, eligible: false, facts: {}, reason: '' };
+      try {
+        const reject = reason => { c.reason = reason; };
+        if (alliancesDisabled) reject('Alliances disabled; original traitor rule is inactive');
+        else if (mode === 'incoming') {
+          if (actor.player.isFriendly(t)) reject('Incoming attacker is friendly');
+          else if (actor.player.type() !== deps.botType && t.type() === deps.botType) reject('Original counter rule excludes Bot attackers for non-Bot players');
+          else {
+            c.facts.incomingTroops = input.attack.troops();
+            c.eligible = c.facts.incomingTroops > 0;
+            c.reason = c.eligible ? 'Largest individual incoming attack; preserve first tie' : 'Incoming attack has no positive troops';
+          }
+        } else {
+          // These are exact original predicates; don't call random attack or
+          // opening checks while merely comparing targets.
+          if (mode === 'hostile' && (input.relation !== deps.hostileRelation || actor.player.isFriendly(t))) {
+            reject('Not a hostile, unfriendly relation');
+          } else if (mode === 'traitor' && !t.isTraitor()) reject('Target is not a traitor');
+          else if (mode === 'disconnected' && !t.isDisconnected()) reject('Target is connected');
+          else {
+            const troops = t.troops(), selfTroops = actor.player.troops(), ffa = actor.isFFA();
+            Object.assign(c.facts, { troops, selfTroops, ffa });
+            if (mode === 'weak') {
+              const cap = actor.game.config().maxTroops(t);
+              Object.assign(c.facts, { capacity: cap, capacityThreshold: cap * .15, relativeThreshold: selfTroops * 1.2 });
+              c.eligible = troops < cap * .15 && (!ffa || troops < selfTroops * 1.2);
+              c.reason = c.eligible ? 'Below 15% capacity and within original relative-strength limit' : 'Requires troops <15% capacity and, in FFA, <1.2x own troops';
+            } else if (mode === 'victim') {
+              c.facts.relativeThreshold = selfTroops * 1.2;
+              if (ffa && troops > selfTroops * 1.2) reject('FFA victim exceeds 1.2x own troops');
+              else {
+                c.facts.incomingTroops = t.incomingAttacks().reduce((sum, attack) => sum + attack.troops(), 0);
+                c.facts.pressureThreshold = troops * .5;
+                c.eligible = c.facts.incomingTroops > troops * .5;
+                c.reason = c.eligible ? 'Incoming attack troops exceed half the target army' : 'Requires incoming attack troops >50% of target army';
+              }
+            } else if (['traitor', 'disconnected', 'hostile', 'weakest'].includes(mode)) {
+              const multiplier = mode === 'traitor' ? 1.2 : mode === 'weakest' ? 1 : 3;
+              c.facts.relativeThreshold = selfTroops * multiplier;
+              c.eligible = !ffa || (mode === 'hostile' ? troops <= c.facts.relativeThreshold : troops < c.facts.relativeThreshold);
+              c.reason = c.eligible ? `Original ${mode} target within relative-strength limit; preserve input order` :
+                `FFA strength limit failed (${mode === 'hostile' ? '<=' : '<'} ${multiplier}x own troops required)`;
+            } else throw new Error(`Unknown target mode: ${mode}`);
+          }
+        }
+      } catch {
+        c.eligible = false; c.reason = 'Target rule data unavailable';
+      }
+      return { target: t, candidate: c };
+    });
+    // Put the legacy winner inside the bounded window, even with >79 supplied
+    // targets. Input indices remain visible; ties are stable.
+    entries.sort((a, b) => Number(b.candidate.eligible) - Number(a.candidate.eligible) ||
+      (mode === 'incoming' ? (b.candidate.facts.incomingTroops || 0) - (a.candidate.facts.incomingTroops || 0) : 0) ||
+      a.candidate.inputIndex - b.candidate.inputIndex);
+    if (mode === 'incoming') entries.forEach((entry, rank) => { entry.candidate.priority = rank; });
+    const visible = entries.slice(0, 79);
+    const choice = hooks.choose('attack-target', [...visible.map(e => e.candidate), wait], {
+      mode, totalTargets: entries.length, visibleTargets: visible.length, hiddenTargets: entries.length - visible.length
+    });
+    const selected = visible.find(e => e.candidate.id === choice.selectedId);
+    if (selected && !selected.candidate.eligible) hooks.record('plan-blocked', {
+      domain: 'attack-target', decisionId: choice.decisionId, reason: selected.candidate.reason });
+    return { target: selected?.candidate.eligible ? selected.target : null, decisionId: choice.decisionId,
+      stop: !selected?.candidate.eligible && (choice.selectedId === null || !!selected || entries.some(e => e.candidate.eligible)) };
+  }
+
+  function order() {
+    const difficulty = deps.difficulty();
+    if (!orders[difficulty]) throw new Error('unreachable difficulty: ' + difficulty);
+    const result = [...orders[difficulty]];
+    if (deps.settings().winFixes) {
+      result.splice(result.indexOf('crater'), 1);
+      result.splice(result.indexOf('weakest') + 1, 0, 'crater');
+    }
+    return result;
+  }
+
+  async function run(actor, friends, enemies, hooks) {
+    const sendSelected = async (mode, list, ...flags) => {
+      const choice = select(actor, mode, list, hooks);
+      if (choice.stop) return WAIT;
+      if (!choice.target || !hooks.allowed()) return false;
+      return hooks.execute(choice.decisionId, () => actor.sendAttack(choice.target, ...flags));
+    };
+    const executePurpose = async purpose => {
+      switch (purpose) {
+        case 'structured-bots': return actor.hasNeighboringBotWithStructures() ? actor.attackBots() : false;
+        case 'priority-counter': {
+          if (!deps.settings().counterAttackFirst) return false;
+          let incoming = false;
+          try { incoming = actor.player.incomingAttacks().length > 0; } catch { /* Original fallback. */ }
+          return incoming && actor.counterReady() ? sendSelected('incoming', [], true, true) : false;
+        }
+        case 'counter': return actor.counterReady() ? sendSelected('incoming', [], true) : false;
+        case 'pocket': {
+          if (!deps.settings().encirclePockets) return false;
+          const choice = await hooks.geography('pocket');
+          if (choice.stop) return WAIT;
+          if (!choice.target || !hooks.allowed()) return false;
+          return choice.decisionId === null ? actor.sendAttack(choice.target, true) :
+            hooks.execute(choice.decisionId, () => actor.sendAttack(choice.target, true));
+        }
+        case 'bots': return actor.attackBots();
+        case 'assist': return actor.assistAllies();
+        case 'betray': return actor.maybeBetrayAndAttack(friends, enemies);
+        case 'crater': return actor.isBorderingNukedTerritory() ? actor.sendAttack(actor.game.terraNullius()) : false;
+        case 'traitor': case 'disconnected': case 'victim': case 'weak': case 'weakest':
+          return sendSelected(purpose, enemies);
+        case 'hostile': return sendSelected('hostile', []);
+        case 'island': {
+          if (enemies.length) return false;
+          const choice = await hooks.geography('island');
+          if (choice.stop) return WAIT;
+          if (!choice.target || !hooks.allowed()) return false;
+          return choice.decisionId === null ? actor.sendAttack(choice.target) :
+            hooks.execute(choice.decisionId, () => actor.sendAttack(choice.target));
+        }
+        case 'donate': return actor.donateTroops();
+        default: throw new Error('Unknown attack purpose: ' + purpose);
+      }
+    };
+    const phase = async (names, phaseName) => {
+      let remaining = names.map((purpose, priority) => ({ id: `attack:${phaseName}:${purpose}`, kind: 'attack-plan',
+        purpose, priority, eligible: true, readiness: 'unchecked',
+        reason: `Original ${phaseName} order: ${purpose}; check prerequisites only after selection` }));
+      while (remaining.length) {
+        if (!hooks.allowed()) return 'wait';
+        const choice = hooks.choose('attack-plan', [...remaining, wait], { phase: phaseName, difficulty: deps.difficulty() });
+        const plan = remaining.find(p => p.id === choice.selectedId);
+        if (!plan || !hooks.allowed()) return 'wait';
+        try {
+          const result = await hooks.execute(choice.decisionId, () => executePurpose(plan.purpose));
+          hooks.record('plan-result', { domain: 'attack-plan', decisionId: choice.decisionId, purpose: plan.purpose,
+            status: result === WAIT ? 'wait' : result ? 'completed' : 'unfulfilled',
+            reason: 'Original purpose routine result; consult target, rule and dispatch records' });
+          if (result === WAIT) return 'wait';
+          if (result) return 'success';
+        } catch (error) {
+          hooks.record('plan-result', { domain: 'attack-plan', decisionId: choice.decisionId, purpose: plan.purpose, status: 'threw' });
+          throw error;
+        }
+        remaining = remaining.filter(p => p !== plan);
+      }
+      return 'exhausted';
+    };
+    if (await phase(['structured-bots', 'priority-counter'], 'preflight') !== 'exhausted' || !hooks.allowed()) return;
+    const reserve = actor.hasReserveRatioTroops();
+    hooks.record('attack-gate', { gate: 'reserve', allowed: !!reserve });
+    if (!reserve) return;
+    const trigger = actor.hasTriggerRatioTroops();
+    const randomOverride = !trigger && actor.random.chance(10);
+    hooks.record('attack-gate', { gate: 'trigger', trigger: !!trigger, randomSampled: !trigger, randomOverride: !!randomOverride });
+    if (!trigger && !randomOverride) return;
+    await phase(order(), 'normal');
+    // Preserve attackBestTarget's original undefined return value.
+  }
+  return { select, order, run };
+}
+
+
+
+'use strict';
+function createAttackAllocationPlanner(deps) {
+  function choose(hooks,domain,entries,facts) {
+    const candidates=entries.map((entry,priority)=>({...entry,id:`${domain}:${priority}`,kind:domain,
+      priority,eligible:entry.eligible!==false}));
+    const decision=hooks.choose(domain,[...candidates,{id:'$wait',kind:'wait',reason:'Hold attack allocation'}],facts);
+    const index=candidates.findIndex(c=>c.id===decision.selectedId&&c.eligible);
+    if(index<0||!hooks.allowed()) {hooks.hold();return null;}
+    return {entry:entries[index],decisionId:decision.decisionId};
+  }
+  function bot(actor,target,available,hooks) {
+    if(!hooks.allowed())return 0;
+    const easy=deps.difficulty()===deps.easy,enemy=easy?null:target.troops();
+    let amount=easy?available:enemy*4;
+    if(!easy&&amount>available)amount=available<enemy*2?0:available;
+    const floor=easy?1:enemy*2;
+    const choice=choose(hooks,'bot-allocation',[
+      {amount,reason:'Original difficulty and two-to-four-times defender formula'},
+      {amount:amount*.75,eligible:amount*.75>=floor&&amount*.75>=1,reason:'Smaller viable bot force'},
+      {amount:Math.min(amount,floor),eligible:floor>=1&&floor<=amount,reason:'Two-times defender force'}
+    ],{enemy,available,easy,budget:actor.botAttackTroopsSent});
+    if(!choice)return 0;
+    hooks.setBotMinimum(floor);
+    actor.botAttackTroopsSent+=choice.entry.amount;
+    hooks.record('bot-allocation-result',{decisionId:choice.decisionId,amount:choice.entry.amount});
+    return choice.entry.amount;
+  }
+  function amounts(hooks,domain,amount,minimum,facts,execute,alternativeMinimum=minimum) {
+    if(amount<1||amount<minimum) {
+      hooks.record(`${domain}-result`,{status:'insufficient-force',amount,minimum});return false;
+    }
+    const choice=choose(hooks,domain,[1,.75,.5].map((fraction,index)=>({amount:amount*fraction,
+      eligible:index===0||amount*fraction>=Math.max(1,minimum,alternativeMinimum),
+      reason:index===0?'Original available attack force':'Smaller force within original minimum'})),facts);
+    if(!choice)return false;
+    const result=hooks.execute(choice.decisionId,()=>execute(choice.entry.amount));
+    if(hooks.wasDeclined())hooks.hold();
+    hooks.record(`${domain}-result`,{decisionId:choice.decisionId,amount:choice.entry.amount,
+      status:hooks.wasDeclined()?'declined':'attempt-completed'});
+    return result;
+  }
+  function land(actor,target,counter,hooks) {
+    if(!hooks.allowed())return false;
+    const {capacity,ratio}=actor._landReserveFacts(target,counter);
+    const reserve=choose(hooks,'land-reserve',[
+      {ratio,reason:'Original opening, neighbor, threat and counter reserve'},
+      {ratio:Math.max(ratio,.5),eligible:Number.isFinite(ratio)&&ratio<.5,reason:'Keep at least half capacity'},
+      {ratio:Math.max(ratio,.7),eligible:Number.isFinite(ratio)&&ratio<.7,reason:'Keep at least seventy percent capacity'}
+    ],{capacity,counter,originalRatio:ratio});
+    if(!reserve)return false;
+    return hooks.execute(reserve.decisionId,()=>{
+      const settings=deps.settings();
+      const isBot=target.isPlayer()&&target.type()===deps.botType&&actor.player.type()!==deps.botType;
+      let amount=isBot?actor.calculateBotAttackTroops(target,actor.player.troops()-capacity*reserve.entry.ratio-actor.botAttackTroopsSent):
+        actor.player.troops()-capacity*reserve.entry.ratio;
+      if(!hooks.allowed())return false;
+      if(counter&&settings.combatReserve){const keep=settings.counterKeepFrac??.45;
+        if(keep>0&&keep<1)amount=Math.min(amount,actor.player.troops()*(1-keep));}
+      const minimum=settings.minAttackForce&&!counter&&target.isPlayer()&&target.type()!==deps.botType?
+        capacity*(settings.minAttackFrac??.12):0;
+      return amounts(hooks,'land-allocation',amount,minimum,{capacity,counter,reserve:reserve.entry.ratio,isBot},
+        amount=>actor._landAttackReady(target,counter,amount),isBot?hooks.minimumBotForce():minimum);
+    });
+  }
+  function forced(actor,target,hooks) {
+    if(!hooks.allowed())return;
+    // The original forced path has no minimum-force gate and returns undefined.
+    const amount=actor.player.troops()/2;
+    const choice=choose(hooks,'forced-allocation',[1,.75,.5].map(fraction=>({amount:amount*fraction,
+      reason:fraction===1?'Original half-army forced attack':'Smaller forced attack'})),{troops:amount*2});
+    if(!choice)return;
+    hooks.execute(choice.decisionId,()=>actor._forcedAttackReady(target,choice.entry.amount));
+    if(hooks.wasDeclined())hooks.hold();
+  }
+  return {land,forced,bot};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createAttackAllocationPlanner;
+
+'use strict';
+
+function createOpeningExpansion(deps={}){
+  const states=new WeakMap(),milestones=[4000,5000,6000,8000,10000,10000,10000];
+  function room(actor){
+    const g=actor.game,seen=new Set(),queue=[];
+    const add=t=>{if(seen.size<1024&&!seen.has(t)&&g.isLand(t)&&!g.hasOwner(t)&&!g.hasFallout(t)){
+      seen.add(t);queue.push(t);
+    }};
+    for(const t of actor.player.borderTiles()){
+      for(const n of g.neighbors(t))add(n);
+      if(seen.size>=1024)break;
+    }
+    for(let i=0;i<queue.length&&seen.size<1024;i++)for(const n of g.neighbors(queue[i]))add(n);
+    return seen.size;
+  }
+  function run(actor,target,opening,hooks){
+    let state=states.get(actor);
+    if(!opening||!opening.borderKnown||opening.frontline)return undefined;
+    // Border contact can disappear while combat or its sticky reserve window
+    // remains active. Keep the original defense behavior for that interval.
+    if(deps.settings?.().combatReserve!==false&&actor.underThreat?.())return undefined;
+    if(!opening.wilderness){if(state?.started)state.finished=true;return undefined;}
+    const tick=actor.game.ticks();
+    if(!state||state.game!==actor.game||tick<state.observedTick){
+      state={game:actor.game,started:false,stage:0,lastDispatch:-Infinity,next:10000};states.set(actor,state);
+    }
+    state.observedTick=tick;if(state.finished)return undefined;
+    const troops=actor.player.troops(),capacity=actor.game.config().maxTroops(actor.player);
+    const continuing=state.started&&state.stage>=milestones.length;
+    const freeTiles=continuing?room(actor):null;
+    const targetTroops=!state.started?capacity*.2:continuing?
+      freeTiles>=512?Math.max(13000,state.next):10000:milestones[state.stage];
+    const threshold=!state.started?targetTroops:Math.min(targetTroops,capacity*.8);
+    const amount=Math.floor(troops*.2);
+    const ready=Number.isFinite(capacity)&&capacity>0&&Number.isFinite(troops)&&troops>=threshold&&amount>=1&&tick-state.lastDispatch>=10;
+    const facts={applies:true,stage:state.started?state.stage:'first',troops,capacity,threshold,amount,
+      freeTiles,spaceLimit:1024,spacingTicks:10,lastDispatchTick:Number.isFinite(state.lastDispatch)?state.lastDispatch:null,ready};
+    const candidates=[{id:'opening-expansion:original',kind:'opening-expansion',eligible:true,priority:0,
+      reason:'Retain original reserve-based wilderness allocation'},
+      {id:'opening-expansion:wave',kind:'opening-expansion',eligible:ready,adaptiveOnly:true,priority:1,amount,
+        reason:`Send 20% after rebuilding to ${Math.ceil(threshold)} troops`},
+      {id:'$wait',kind:'wait',eligible:true,reason:'Rebuild troops or wait for dispatch spacing'}];
+    const decision=hooks.choose('opening-expansion',candidates,facts);
+    if(decision.selectedId==='opening-expansion:original')return undefined;
+    const record=(status,extra={})=>hooks.record('opening-expansion-result',{decisionId:decision.decisionId,tick,...facts,status,...extra});
+    if(decision.selectedId!=='opening-expansion:wave'||!ready||!hooks.allowed()){
+      record('held',{reason:decision.reason});hooks.hold();return {result:false};
+    }
+    const result=hooks.execute(decision.decisionId,()=>actor._landAttackReady(target,false,amount));
+    if(result===true&&!hooks.wasDeclined()){
+      if(!state.started){state.started=true;state.stage=0;while(state.stage<5&&milestones[state.stage]<=troops)state.stage++;}
+      else if(state.stage<milestones.length)state.stage++;
+      if(state.stage>=milestones.length){
+        const space=freeTiles??room(actor);
+        state.next=space>=512?Math.ceil(Math.max(10000,threshold)*1.25/1000)*1000:10000;
+      }
+      state.lastDispatch=tick;record('submitted');
+    }else {record('not-submitted');if(hooks.wasDeclined())hooks.hold();}
+    return {result:result===true&&!hooks.wasDeclined()};
+  }
+  function finishIfCleared(actor,opening){
+    if(opening?.borderKnown&&!opening.wilderness){const state=states.get(actor);if(state?.started)state.finished=true;}
+  }
+  return {run,finishIfCleared};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createOpeningExpansion;
+
+'use strict';
+function createAttackRoutingPlanner(deps) {
+  const wait={id:'$wait',kind:'wait',reason:'Hold attack routing'};
+  function choose(hooks,domain,entries,facts,parent) {
+    const candidates=entries.slice(0,79).map((entry,priority)=>({...entry,id:`${domain}:${priority}`,kind:domain,
+      priority,eligible:entry.eligible!==false}));
+    const decision=hooks.choose(domain,[...candidates,wait],facts,parent);
+    const index=candidates.findIndex(c=>c.id===decision.selectedId&&c.eligible);
+    if(index<0||!hooks.allowed()){
+      hooks.hold();hooks.record('attack-routing-result',{domain,decisionId:decision.decisionId,status:'stopped'});return null;
+    }
+    return {...entries[index],decisionId:decision.decisionId};
+  }
+  async function route(actor,target,counter,hooks) {
+    if(!hooks.allowed())return false;
+    const player=target.isPlayer(),border=player?actor.player.sharesBorderWith(target):actor.hasLandBorderWithTerraNullius();
+    const land={route:'land',eligible:!!border,reason:'Land route requires original border predicate'};
+    const boat={route:player?'targeted-boat':'nearby-boat',reason:'Boat route; original feature and reachability gates run after selection'};
+    const selected=choose(hooks,'attack-route',border?[land,boat]:[boat,land],{player,border,counter});
+    if(!selected)return false;
+    const result=await hooks.execute(selected.decisionId,()=>selected.route==='land'?
+      (player?actor.sendLandAttack(target,counter):actor.sendLandAttack(target)):
+      selected.route==='targeted-boat'?actor.sendBoatAttack(target):actor.sendBoatAttackToNearbyTerraNullius());
+    hooks.record('attack-routing-result',{domain:'attack-route',decisionId:selected.decisionId,route:selected.route,
+      status:hooks.stopped()?'stopped':'attempt-completed',result});
+    return result;
+  }
+  async function targeted(actor,target,hooks) {
+    let budget,quoted=false;
+    try {
+      if(!hooks.allowed())return false;
+      await actor.game.ensureBorderTiles(target);
+      if(!hooks.allowed())return false;
+      const own=Array.from(actor.player.borderTiles()).filter(tile=>actor.game.isShore(tile));
+      const shores=Array.from(target.borderTiles()).filter(tile=>actor.game.isShore(tile));
+      const original=deps.closestTwoTiles(actor.game,own,shores);
+      if(original===null){hooks.record('attack-routing-result',{domain:'targeted-boat-site',status:'no-shore'});return false;}
+      const entries=[{tile:original.y,sourceShore:original.x,reason:'Original closestTwoTiles destination'},
+        ...[...new Set(shores)].filter(tile=>tile!==original.y).slice(0,78).map(tile=>({tile,
+          reason:'Alternative supplied target shore; transport service chooses actual spawn'}))];
+      const site=choose(hooks,'targeted-boat-site',entries,{ownShoreCount:own.length,targetShoreCount:shores.length,candidateLimit:79});
+      if(!site)return false;
+      const reachable=await hooks.probe(site.tile);
+      hooks.record('attack-routing-result',{domain:'targeted-boat-site',decisionId:site.decisionId,tile:site.tile,
+        status:!hooks.allowed()?'stopped':reachable===false?'unreachable':'reachable'});
+      if(!hooks.allowed()||reachable===false)return false;
+      return hooks.execute(site.decisionId,()=>{
+        budget=actor.botAttackTroopsSent;quoted=true;
+        const settings=deps.settings();let amount,minimum=1;
+        if(settings.winFixes){minimum=settings.boatProbeMinTroops||8000;
+          amount=Math.max(actor.player.troops()*(settings.boatProbeFrac||.01),minimum);
+        }else if(target.type()===deps.botType){
+          amount=actor.calculateBotAttackTroops(target,actor.player.troops()/5);minimum=hooks.minimumBotForce();
+        }else amount=actor.player.troops()/5;
+        if(!hooks.allowed())return false;
+        if(amount<1){hooks.record('attack-routing-result',{domain:'targeted-boat-allocation',status:'insufficient-force',amount});return false;}
+        const available=actor.player.troops();
+        const allocation=choose(hooks,'targeted-boat-allocation',[1,.75,.5].map((fraction,index)=>({troops:amount*fraction,
+          eligible:index===0||Number.isFinite(amount*fraction)&&amount*fraction>=Math.max(1,minimum)&&amount*fraction<=available,
+          reason:index===0?'Original targeted boat troop formula':'Smaller targeted force within army and viability floor'})),
+          {tile:site.tile,available,minimum,winFixes:!!settings.winFixes},site.decisionId);
+        if(!allocation)return false;
+        const result=hooks.execute(allocation.decisionId,()=>actor._targetedBoatReady(target,{y:site.tile},allocation.troops));
+        if(hooks.wasDeclined())hooks.hold();
+        hooks.record('attack-routing-result',{domain:'targeted-boat-allocation',decisionId:allocation.decisionId,tile:site.tile,
+          troops:allocation.troops,status:hooks.stopped()?'stopped':'attempt-completed',result});
+        return result;
+      });
+    }finally{if(quoted&&hooks.stopped())actor.botAttackTroopsSent=budget;}
+  }
+  async function free(actor,tiles,hooks) {
+    let remaining=tiles.map((tile,index)=>({tile,index,reason:'Original nearby free-land probe order'}));
+    while(remaining.length&&hooks.allowed()) {
+      const site=choose(hooks,'free-boat-site',remaining,{remaining:remaining.length});
+      if(!site)return false;
+      remaining=remaining.filter(entry=>entry.index!==site.index);
+      const reachable=await hooks.probe(site.tile);
+      hooks.record('attack-routing-result',{domain:'free-boat-site',decisionId:site.decisionId,tile:site.tile,
+        status:!hooks.allowed()?'stopped':reachable===false?'unreachable':'reachable'});
+      if(!hooks.allowed())return false;
+      if(reachable===false)continue;
+      const settings=deps.settings(),available=actor.player.troops(),minimum=settings.winFixes?settings.boatProbeMinTroops||8000:1;
+      const amount=settings.winFixes?Math.max(available*(settings.boatProbeFrac||.01),minimum):available/5;
+      if(amount<1)return false;
+      const allocation=choose(hooks,'free-boat-allocation',[1,.75,.5].map((fraction,index)=>({troops:amount*fraction,
+        eligible:index===0||Number.isFinite(amount*fraction)&&amount*fraction>=Math.max(1,minimum)&&amount*fraction<=available,
+        reason:index===0?'Original free-land boat amount':'Smaller viable free-land force'})),{tile:site.tile,available,minimum},site.decisionId);
+      if(!allocation)return false;
+      const result=hooks.execute(allocation.decisionId,()=>actor._freeBoatReady(site.tile,allocation.troops));
+      if(hooks.wasDeclined())hooks.hold();
+      hooks.record('attack-routing-result',{domain:'free-boat-allocation',decisionId:allocation.decisionId,
+        tile:site.tile,troops:allocation.troops,status:hooks.stopped()?'stopped':'attempt-completed',result});
+      return result;
+    }
+    return false;
+  }
+  return {route,targeted,free};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createAttackRoutingPlanner;
+
+'use strict';
+
+function createAttackSequencePlanner(deps) {
+  const phases = ['takeover', 'opening-bots', 'opportunistic-boat', 'donation', 'far-alliance',
+    'open-land', 'random-boat', 'enemy-alliance', 'main'];
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Hold the remaining attack pass' };
+  const result = (status, finish = false) => ({ status, finish });
+  async function takeover(actor, context, hooks) {
+    const targets = context.all.filter(target => {
+      try { return target.isPlayer() && target.isDisconnected && target.isDisconnected(); }
+      catch { return false; }
+    }).sort((a,b) => a.troops()-b.troops());
+    if (!targets.length) return result('skipped');
+    const candidates = targets.slice(0,79).map((target,priority) => ({
+      id: `takeover:${priority}`, kind: 'takeover-target', eligible: true, priority,
+      targetId: target.id(), troops: target.troops(),
+      reason: 'Original disconnected-neighbor takeover; weakest army first, stable ties'
+    }));
+    const choice = hooks.choose('takeover-target', [...candidates, wait], { totalTargets: targets.length });
+    const index = candidates.findIndex(candidate => candidate.id === choice.selectedId);
+    if (index < 0 || !hooks.allowed()) {
+      hooks.record('attack-sequence-result', { domain: 'takeover-target', decisionId: choice.decisionId, status: 'stopped' });
+      return result('stopped',true);
+    }
+    const target = targets[index];
+    deps.debug('[Takeover] disconnected neighbour → grabbing land:', target.name?.() ?? target.smallID?.());
+    try {
+      const sent = await hooks.execute(choice.decisionId, () => actor.sendAttack(target));
+      const status = !hooks.allowed() ? 'stopped' : sent ? 'attempt-completed' : 'unfulfilled';
+      hooks.record('attack-sequence-result', { domain: 'takeover-target', decisionId: choice.decisionId,
+        targetId: candidates[index].targetId, status });
+      return result(status, status === 'stopped' || !!sent);
+    } catch (error) {
+      hooks.record('attack-sequence-result', { domain: 'takeover-target', decisionId: choice.decisionId, status: 'threw' });
+      throw error;
+    }
+  }
+  async function run(actor, context, hooks) {
+    const settings = () => deps.state.settings;
+    const execute = async phase => {
+      switch (phase) {
+        case 'wilderness-only': {
+          const sent = await actor.sendAttack(actor.game.terraNullius());
+          return result(sent ? 'attempt-completed' : 'unfulfilled', true);
+        }
+        case 'takeover': return context.expand && settings().winFixes ? takeover(actor,context,hooks) : result('skipped');
+        case 'opening-bots': {
+          if (!(context.expand && settings().winFixes && context.enemies.some(target => target.isPlayer() && target.type() === deps.botType))) return result('skipped');
+          const sent = await actor.attackBots();
+          return result(sent ? 'attempt-completed' : 'unfulfilled',!!sent);
+        }
+        case 'opportunistic-boat':
+          if (!settings().winFixes) return result('skipped');
+          await actor.maybeOpportunisticBoat(); return result('completed');
+        case 'donation': {
+          let opening = false;
+          // Original observation occurs even when donation is disabled.
+          try { const snap = actor.openingSnapshot(); opening = !!(snap && snap.applies && !snap.over && !snap.built); } catch {}
+          if (!(settings().winFixes && settings().features.donate && !opening)) return {...result('skipped'),
+            reason:!settings().winFixes?'Donation automation requires win fixes':!settings().features.donate?'Troop donation disabled':'Opening economy is still protected'};
+          const now = deps.now();
+          if (now - (deps.state.lastDonateMs || 0) <= (settings().donateThrottleMs || 3000)) return {...result('skipped'),reason:'Donation throttle has not elapsed'};
+          const sent=actor.donateTroops();
+          if (sent) deps.state.lastDonateMs = now;
+          return {...result('completed'),reason:sent?'Donation command submitted; server acceptance unconfirmed':'Donation held or command not submitted'};
+        }
+        case 'far-alliance':
+          if (!(context.alliance && settings().winFixes)) return result('skipped');
+          actor.allianceBehavior.reachOutToFarNations(); return result('completed');
+        case 'open-land': {
+          if (!(context.expand && context.openLand)) return result('skipped');
+          const sent = await actor.sendAttack(actor.game.terraNullius());
+          return result(sent ? 'attempt-completed' : 'unfulfilled',!!sent);
+        }
+        case 'random-boat': {
+          if (!context.boat || !actor.random.chance(context.enemies.length === 0 ? 5 : 10)) return result('skipped');
+          const sent = context.enemies.length ? await actor.attackWithRandomBoat(context.enemies) : await actor.attackWithRandomBoat();
+          return result(sent ? 'attempt-completed' : 'unfulfilled',context.enemies.length > 0 && !!sent);
+        }
+        case 'enemy-alliance':
+          if (!context.enemies.length || !context.alliance) return result('skipped');
+          actor.allianceBehavior.maybeSendAllianceRequests(context.enemies); return result('completed');
+        case 'main':
+          if (!context.expand) return result('skipped');
+          await actor.attackBestTarget(context.friends,context.enemies); return result('completed');
+        default: throw new Error('Unknown attack sequence phase: '+phase);
+      }
+    };
+    let remaining = phases.map((phase,priority) => ({ id: `sequence:${phase}`, kind: 'attack-sequence', phase,
+      eligible: true, priority, readiness: 'unchecked', reason: `Original outer attack order: ${phase}; check gates only after selection` }));
+    if (context.teamOpening) remaining.push({ id: 'sequence:wilderness-only', kind: 'attack-sequence',
+      phase: 'wilderness-only', adaptiveOnly: true, priority: 100,
+      eligible: !!context.expand && context.teamOpening.borderKnown && context.teamOpening.wilderness,
+      reason: 'Expand reachable wilderness and finish this attack pass even if the attempt fails' });
+    while (remaining.length) {
+      if (!hooks.allowed()) return;
+      const choice = hooks.choose('attack-sequence', [...remaining, wait], {
+        expand: context.expand, boat: context.boat, alliance: context.alliance, openLand: context.openLand,
+        friendlyCount: context.friends.length, enemyCount: context.enemies.length });
+      const selected = remaining.find(candidate => candidate.id === choice.selectedId);
+      if (!selected || !hooks.allowed()) {
+        hooks.record('attack-sequence-result', { domain: 'attack-sequence', decisionId: choice.decisionId, status: 'stopped' });
+        return;
+      }
+      try {
+        const outcome = await hooks.execute(choice.decisionId, () => execute(selected.phase));
+        const status = hooks.allowed() ? outcome.status : 'stopped';
+        hooks.record('attack-sequence-result', { domain: 'attack-sequence', decisionId: choice.decisionId, phase: selected.phase, status,
+          ...(outcome.reason?{reason:outcome.reason}:{}) });
+        if (outcome.finish || status === 'stopped') return;
+      } catch (error) {
+        hooks.record('attack-sequence-result', { domain: 'attack-sequence', decisionId: choice.decisionId, phase: selected.phase,
+          status: 'threw', error: String(error?.message || error) });
+        throw error;
+      }
+      remaining = remaining.filter(candidate => candidate !== selected);
+    }
+    // maybeAttack originally returns undefined on every path.
+  }
+  return { run };
+}
+
+
+
+'use strict';
+
+function createDiplomacyPlanner(deps) {
+  const WINDOW_SIZE = 79; // The engine permits 80 candidates, including wait.
+  const rules = [
+    'regular-bot', 'confused', 'traitor', 'far-nation', 'alliance-cap', 'threat',
+    'team-reject', 'hostile-relation', 'friendly-relation', 'enough-alliances',
+    'early-game', 'similar-strength'
+  ];
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Do not decide this alliance request here' };
+  const safe = (read, fallback = null) => { try { return read(); } catch { return fallback; } };
+  const pass = reason => ({ matched: false, reason });
+  const finish = (accepted, reason) => ({ matched: true, accepted: !!accepted, reason });
+
+  function evaluate(actor, target, incoming, rule) {
+    switch (rule) {
+      case 'regular-bot':
+        return actor.isRegularBot(target) ? finish(false, 'Regular Bot requests are rejected') : pass('Target is not a regular Bot');
+      case 'confused':
+        return actor.isConfused() ? finish(actor.random.chance(2), 'Confused behavior made the decision') : pass('Confused behavior did not trigger');
+      case 'traitor':
+        if (!target.isTraitor() || actor.random.nextInt(0, 100) < 10) return pass('Traitor rejection did not trigger');
+        if (incoming && actor.random.chance(3)) actor.emojiBehavior.sendEmoji(target, deps.emojis.confused);
+        return finish(false, 'Traitor rejected after the original mercy roll');
+      case 'far-nation':
+        if (!deps.settings().winFixes || !actor.isFarNation(target)) return pass('Far-nation win-fix does not apply');
+        return finish(!actor.isDominantForDiplomacy(), 'Far nation accepted unless already dominant');
+      case 'alliance-cap':
+        return actor.hasTooManyAlliances(target) ? finish(false, 'Target already has too many alliances') : pass('Alliance cap not reached');
+      case 'threat':
+        if (!actor.isAlliancePartnerThreat(target)) return pass('Target is not an alliance threat');
+        if (!incoming && actor.random.chance(6)) actor.emojiBehavior.sendEmoji(target, deps.emojis.scared);
+        if (incoming && actor.random.chance(6)) actor.emojiBehavior.sendEmoji(target, deps.emojis.love);
+        return finish(true, 'Threatening alliance partner accepted');
+      case 'team-reject':
+        return actor.shouldRejectInTeamGame() ? finish(false, 'Team-game rejection triggered') : pass('Team-game rejection did not trigger');
+      case 'hostile-relation':
+        if (actor.player.relation(target) >= deps.neutralRelation) return pass('Relation is neutral or better');
+        if (incoming && actor.random.chance(3)) actor.emojiBehavior.sendEmoji(target, deps.emojis.confused);
+        return finish(false, 'Negative relation rejected');
+      case 'friendly-relation':
+        if (!actor.isAlliancePartnerFriendly(target)) return pass('Friendly-partner rule did not match');
+        if (actor.random.chance(3)) actor.emojiBehavior.sendEmoji(target, deps.emojis.handshake);
+        return finish(true, 'Friendly alliance partner accepted');
+      case 'enough-alliances':
+        return actor.checkAlreadyEnoughAlliances(target) ? finish(false, 'Existing alliances are sufficient') : pass('More alliances are allowed');
+      case 'early-game':
+        return actor.isEarlygame() ? finish(true, 'Early-game alliance accepted') : pass('Early-game rule did not match');
+      case 'similar-strength':
+        return finish(actor.isAlliancePartnerSimilarlyStrong(target), 'Final similarly-strong comparison');
+      default:
+        throw new Error('Unknown alliance rule: ' + rule);
+    }
+  }
+
+  function decide(actor, target, incoming, hooks) {
+    if (!hooks.allowed()) return { accepted: false, stopped: true, decisionId: null };
+    let remaining = rules.map((rule, priority) => ({
+      id: `alliance:${rule}`, kind: 'alliance-rule', rule, priority, eligible: true, readiness: 'unchecked',
+      reason: `Original alliance rule ${priority + 1}: ${rule}; evaluate only if selected`
+    }));
+    while (remaining.length) {
+      if (!hooks.allowed()) return { accepted: false, stopped: true, decisionId: null };
+      const choice = hooks.choose('alliance-rule', [...remaining, wait], {
+        targetId: safe(() => typeof target?.id === 'function' ? target.id() : target.smallID()), incoming: !!incoming
+      });
+      const selected = remaining.find(candidate => candidate.id === choice?.selectedId);
+      if (!selected) return { accepted: false, stopped: true, decisionId: choice?.decisionId ?? null };
+      const result = hooks.execute(choice.decisionId, () => evaluate(actor, target, incoming, selected.rule));
+      hooks.record('diplomacy-rule-result', {
+        decisionId: choice.decisionId, rule: selected.rule,
+        status: result.matched ? result.accepted ? 'accepted' : 'rejected' : 'unmatched', reason: result.reason
+      });
+      if (!hooks.allowed()) return { accepted: false, stopped: true, decisionId: choice.decisionId };
+      if (result.matched) return { accepted: result.accepted, stopped: false, decisionId: choice.decisionId };
+      remaining = remaining.filter(candidate => candidate !== selected);
+    }
+    return { accepted: false, stopped: true, decisionId: null };
+  }
+
+  const combatResult = (completed, stopped, decisionId) => ({ completed: !!completed, stopped: !!stopped, decisionId: decisionId ?? null });
+  const candidateId = (prefix, index) => `${prefix}:${index}`;
+
+  async function assist(actor, hooks) {
+    if (!hooks.allowed()) return combatResult(false, true, null);
+    if (actor.game.config().disableAlliances()) return combatResult(false, false, null);
+    const allies = actor.player.allies();
+    let remainingAllies = allies.map((ally, index) => ({ ally, candidate: {
+      id: candidateId('assist-ally', index), kind: 'assist-ally', priority: index, eligible: true,
+      reason: 'Inspect this ally at its original position'
+    } }));
+    let lastDecisionId = null;
+    while (remainingAllies.length) {
+      if (!hooks.allowed()) return combatResult(false, true, lastDecisionId);
+      const visible = remainingAllies.slice(0, WINDOW_SIZE);
+      const choice = hooks.choose('assist-ally', [...visible.map(entry => entry.candidate), wait], {
+        remainingAllies: remainingAllies.length, visibleAllies: visible.length,
+        hiddenAllies: remainingAllies.length - visible.length
+      });
+      lastDecisionId = choice?.decisionId ?? lastDecisionId;
+      const selected = visible.find(entry => entry.candidate.id === choice?.selectedId);
+      if (!selected) return combatResult(false, true, lastDecisionId);
+      remainingAllies = remainingAllies.filter(entry => entry !== selected);
+      if (!hooks.allowed()) return combatResult(false, true, lastDecisionId);
+      const allyResult = await hooks.execute(choice.decisionId, async () => {
+        const firstTargets = selected.ally.targets();
+        const allyFacts = { targetCount: firstTargets.length };
+        const allyOutcome = (result, outcome) => ({ ...result, outcome, facts: allyFacts });
+        if (firstTargets.length === 0) return allyOutcome(combatResult(false, false, choice.decisionId), 'no-targets');
+        allyFacts.relation = actor.player.relation(selected.ally);
+        allyFacts.friendlyThreshold = deps.friendlyRelation;
+        if (allyFacts.relation < deps.friendlyRelation) {
+          actor.emojiBehavior.sendEmoji(selected.ally, deps.emojis.assistLow);
+          return allyOutcome(combatResult(false, false, choice.decisionId), 'relation-too-low');
+        }
+        let remainingTargets = selected.ally.targets().map((target, index) => ({ target, candidate: {
+          id: candidateId(`${selected.candidate.id}:target`, index), kind: 'assist-target', priority: index, eligible: true,
+          reason: 'Try this requested target at its original position'
+        } }));
+        let targetDecisionId = choice.decisionId;
+        while (remainingTargets.length) {
+          if (!hooks.allowed()) return allyOutcome(combatResult(false, true, targetDecisionId), 'stopped');
+          const targetVisible = remainingTargets.slice(0, WINDOW_SIZE);
+          const targetChoice = hooks.choose('assist-target', [...targetVisible.map(entry => entry.candidate), wait], {
+            allyIndex: selected.candidate.priority, remainingTargets: remainingTargets.length,
+            visibleTargets: targetVisible.length, hiddenTargets: remainingTargets.length - targetVisible.length
+          });
+          targetDecisionId = targetChoice?.decisionId ?? targetDecisionId;
+          const targetEntry = targetVisible.find(entry => entry.candidate.id === targetChoice?.selectedId);
+          if (!targetEntry) return allyOutcome(combatResult(false, true, targetDecisionId), 'policy-wait');
+          remainingTargets = remainingTargets.filter(entry => entry !== targetEntry);
+          if (!hooks.allowed()) return allyOutcome(combatResult(false, true, targetDecisionId), 'stopped');
+          const targetResult = await hooks.execute(targetChoice.decisionId, async () => {
+            const target = targetEntry.target;
+            if (target.isPlayer() && target.smallID() === actor.player.smallID()) {
+              actor.emojiBehavior.sendEmoji(selected.ally, deps.emojis.assistMe);
+              return { completed: false, outcome: 'target-is-self' };
+            }
+            if (actor.player.isFriendly(target)) {
+              actor.emojiBehavior.sendEmoji(selected.ally, deps.emojis.assistAlly);
+              return { completed: false, outcome: 'target-is-friendly' };
+            }
+            if (!await actor.sendAttack(target)) return { completed: false, outcome: 'attack-failed' };
+            if (!hooks.allowed()) return { completed: false, outcome: 'stale-after-attack' };
+            actor.player.updateRelation(selected.ally, -20);
+            actor.emojiBehavior.sendEmoji(selected.ally, deps.emojis.assistAccept);
+            return { completed: true, outcome: 'attack-accepted', relationDelta: -20 };
+          });
+          hooks.record('diplomacy-combat-result', { domain: 'assist-target', decisionId: targetChoice.decisionId,
+            status: targetResult.completed ? 'completed' : targetResult.outcome === 'stale-after-attack' ? 'stopped' : 'unfulfilled',
+            outcome: targetResult.outcome, ...(targetResult.relationDelta ? { relationDelta: targetResult.relationDelta } : {}),
+            allyIndex: selected.candidate.priority, targetIndex: targetEntry.candidate.priority });
+          if (!hooks.allowed()) return allyOutcome(combatResult(false, true, targetDecisionId), 'stopped');
+          if (targetResult.completed) return allyOutcome(combatResult(true, false, targetDecisionId), 'assistance-completed');
+        }
+        return allyOutcome(combatResult(false, false, targetDecisionId), 'targets-exhausted');
+      });
+      hooks.record('diplomacy-combat-result', { domain: 'assist-ally', decisionId: choice.decisionId,
+        status: allyResult.stopped ? 'wait' : allyResult.completed ? 'completed' : 'unfulfilled',
+        outcome: allyResult.outcome, facts: allyResult.facts, allyIndex: selected.candidate.priority });
+      lastDecisionId = allyResult.decisionId ?? lastDecisionId;
+      if (allyResult.stopped || allyResult.completed) return allyResult;
+    }
+    return combatResult(false, false, lastDecisionId);
+  }
+
+  function shouldBetray(actor, target, totalOpponents) {
+    const facts = { totalOpponents, troopReads: [], selfTroopReads: [] };
+    const targetTroops = () => { const value = target.troops(); facts.troopReads.push(value); return value; };
+    const selfTroops = () => { const value = actor.player.troops(); facts.selfTroopReads.push(value); return value; };
+    const finishBetrayal = (matched, condition) => ({ matched, condition, facts });
+    const settings = deps.settings();
+    facts.featureEnabled = !(settings.features && settings.features.betray === false);
+    if (!facts.featureEnabled) return finishBetrayal(false, 'feature-disabled');
+    facts.allied = actor.player.isAlliedWith(target);
+    if (!facts.allied) return finishBetrayal(false, 'not-allied');
+    const difficulty = deps.difficulty();
+    facts.difficulty = difficulty;
+    const easy = difficulty === deps.difficulties.easy;
+    const medium = difficulty === deps.difficulties.medium;
+    if (!easy && !medium) {
+      const capacity = actor.game.config().maxTroops(target);
+      const outgoing = target.outgoingAttacks().reduce((sum, attack) => sum + attack.troops(), 0);
+      Object.assign(facts, { capacity, outgoingTroops: outgoing, weakCapacityThreshold: capacity * .2 });
+      if (targetTroops() + outgoing < capacity * .2 && targetTroops() < selfTroops()) return finishBetrayal(true, 'weak-capacity');
+    }
+    if (easy || medium) {
+      const easyHuman = easy && (facts.targetType = target.type()) === deps.humanType;
+      if (!easyHuman && selfTroops() >= targetTroops() * 10) {
+        return finishBetrayal(true, 'ten-times-strength');
+      }
+    }
+    if (!easy) {
+      facts.traitor = target.isTraitor();
+      if (facts.traitor && targetTroops() < selfTroops() * 1.2) return finishBetrayal(true, 'traitor');
+    }
+    if (!easy && totalOpponents === 1 && targetTroops() * 3 < selfTroops()) return finishBetrayal(true, 'sole-opponent');
+    return finishBetrayal(false, 'no-condition-matched');
+  }
+
+  async function betray(actor, friends, enemies, hooks) {
+    if (!hooks.allowed()) return combatResult(false, true, null);
+    if (actor.game.config().disableAlliances()) return combatResult(false, false, null);
+    let remaining = friends.map((target, index) => ({ target, candidate: {
+      id: candidateId('betray-target', index), kind: 'betray-target', priority: index, eligible: true,
+      reason: 'Evaluate this ally for betrayal at its original position'
+    } }));
+    let lastDecisionId = null;
+    const totalOpponents = friends.length + enemies.length;
+    while (remaining.length) {
+      if (!hooks.allowed()) return combatResult(false, true, lastDecisionId);
+      const visible = remaining.slice(0, WINDOW_SIZE);
+      const choice = hooks.choose('betray-target', [...visible.map(entry => entry.candidate), wait], {
+        remainingTargets: remaining.length, visibleTargets: visible.length,
+        hiddenTargets: remaining.length - visible.length, totalOpponents
+      });
+      lastDecisionId = choice?.decisionId ?? lastDecisionId;
+      const selected = visible.find(entry => entry.candidate.id === choice?.selectedId);
+      if (!selected) return combatResult(false, true, lastDecisionId);
+      remaining = remaining.filter(entry => entry !== selected);
+      if (!hooks.allowed()) return combatResult(false, true, lastDecisionId);
+      const evaluation = await hooks.execute(choice.decisionId,
+        () => shouldBetray(actor, selected.target, totalOpponents));
+      if (!hooks.allowed()) {
+        hooks.record('diplomacy-combat-result', { domain: 'betray-target', decisionId: choice.decisionId,
+          status: 'stopped', outcome: 'stale-after-evaluation', condition: evaluation.condition,
+          facts: evaluation.facts, targetIndex: selected.candidate.priority });
+        return combatResult(false, true, choice.decisionId);
+      }
+      if (!evaluation.matched) {
+        hooks.record('diplomacy-combat-result', { domain: 'betray-target', decisionId: choice.decisionId,
+          status: 'unfulfilled', condition: evaluation.condition, facts: evaluation.facts,
+          targetIndex: selected.candidate.priority });
+        continue;
+      }
+      const attacked = await hooks.execute(choice.decisionId, async () => {
+        actor.allianceBehavior.betray(selected.target);
+        return actor.sendAttack(selected.target, true);
+      });
+      if (!hooks.allowed()) {
+        hooks.record('diplomacy-combat-result', { domain: 'betray-target', decisionId: choice.decisionId,
+          status: 'stopped', outcome: 'stale-after-attack', condition: evaluation.condition,
+          facts: evaluation.facts, targetIndex: selected.candidate.priority });
+        return combatResult(false, true, choice.decisionId);
+      }
+      hooks.record('diplomacy-combat-result', { domain: 'betray-target', decisionId: choice.decisionId,
+        status: attacked ? 'completed' : 'unfulfilled', condition: evaluation.condition, facts: evaluation.facts,
+        targetIndex: selected.candidate.priority });
+      return combatResult(attacked, false, choice.decisionId);
+    }
+    return combatResult(false, false, lastDecisionId);
+  }
+
+  return { decide, assist, betray };
+}
+
+
+
+'use strict';
+function createDiplomacyDetailsPlanner(deps) {
+  const wait={id:'$wait',kind:'wait',reason:'Hold diplomacy action'};
+  const id=target=>{try{return target.id?.()??target.smallID?.();}catch{return undefined;}};
+  function choose(hooks,domain,entries,facts) {
+    const cs=entries.slice(0,79).map((e,priority)=>({...e,id:`${domain}:${priority}`,kind:domain,priority,
+      eligible:e.eligible!==false}));
+    const decision=hooks.choose(domain,[...cs,wait],facts);
+    const index=cs.findIndex(c=>c.id===decision.selectedId&&c.eligible);
+    if(index<0||!hooks.allowed()) {
+      if(entries.some(e=>e.eligible!==false)||decision.selectedId===null)hooks.hold();
+      hooks.record(`${domain}-result`,{decisionId:decision.decisionId,status:'wait',reason:decision.reason});
+      return {index:-1,decisionId:decision.decisionId};
+    }
+    return {index,decisionId:decision.decisionId};
+  }
+  function donate(actor,targets,hooks) {
+    if(!hooks.allowed())return false;
+    const settings=deps.settings();
+    const ordered=targets.map(teammate=>{
+      const capacity=actor.game.config().maxTroops(teammate);
+      return {teammate,troopPercentage:teammate.troops()/Math.max(capacity,1)};
+    })
+      .sort((a,b)=>a.troopPercentage-b.troopPercentage);
+    const threshold=settings.winFixes?settings.donateNeedThreshold??.8:1;
+    const entries=ordered.filter(e=>e.teammate.isAlive()&&e.teammate.smallID()!==actor.player.smallID()&&e.troopPercentage<threshold)
+      .map(entry=>{let frontline=false;try{frontline=entry.teammate.incomingAttacks().length>0||entry.teammate.outgoingAttacks().length>0;}catch{}
+        let bordersEnemy=false;
+        if(!frontline)try{bordersEnemy=entry.teammate.nearby().some(neighbor=>neighbor.isPlayer()&&neighbor.isAlive()&&
+          !entry.teammate.isFriendly(neighbor)&&entry.teammate.sharesBorderWith(neighbor));}catch{}
+        return {entry,frontline,bordersEnemy};});
+    entries.sort((a,b)=>a.frontline!==b.frontline?(a.frontline?-1:1):a.entry.troopPercentage-b.entry.troopPercentage);
+    // Keep the legacy winner visible, then expose qualified front-line allies
+    // before filling the bounded window with remaining recipients.
+    const cutoff=Math.min(.65,threshold),first=entries[0];
+    const preferred=entries.filter(e=>e!==first&&(e.frontline||e.bordersEnemy)&&e.entry.troopPercentage<cutoff);
+    const preferredSet=new Set(preferred);
+    const visible=[...(first?[first]:[]),...preferred,...entries.filter(e=>e!==first&&!preferredSet.has(e))].slice(0,78);
+    const target=choose(hooks,'donation-target',[...visible.map(e=>({targetId:id(e.entry.teammate),fill:e.entry.troopPercentage,
+      frontline:e.frontline,bordersEnemy:e.bordersEnemy,
+      reason:`Combat=${e.frontline}, enemy border=${e.bordersEnemy}; lowest troop fill within priority`})),
+      {skipDonation:true,reason:'Keep troops and continue the attack pass without donating'}],
+      {threshold,targets:entries.length,visibleTargets:visible.length});
+    if(target.index<0){if(!entries.length)deps.debug('[Donate] skip: no teammate below the need threshold (all allies healthy)');return false;}
+    if(target.index===visible.length){hooks.record('donation-target-result',{decisionId:target.decisionId,status:'skipped',reason:'Policy kept troops'});return false;}
+    const selected=visible[target.index];
+    deps.debug('[Donate] picked ally at '+Math.round(selected.entry.troopPercentage*100)+'% '+(selected.frontline?'(FRONTLINE — in combat)':selected.bordersEnemy?'(FRONTLINE — enemy border)':'(rear)'));
+    return hooks.execute(target.decisionId,()=>{
+      const capacity=actor.game.config().maxTroops(actor.player);
+      const keep=settings.winFixes?Math.max(actor.effectiveReserveRatio(),settings.donateKeepFrac||.45):actor.reserveRatio;
+      const reserve=capacity*keep,excess=actor.player.troops()-reserve;
+      const minimumExcess=settings.winFixes?capacity*(settings.donateMinExcessFrac||.05):1;
+      if(excess<minimumExcess){
+        deps.debug('[Donate] skip: not enough above the keep line',{troops:Math.round(actor.player.troops()),keep:Math.round(reserve),needExcess:Math.round(minimumExcess)});
+        hooks.record('donation-amount-result',{status:'insufficient-excess',excess,minimumExcess});return false;
+      }
+      const fraction=settings.donateMinDonatePct||.2,minimum=actor.player.troops()*fraction;
+      if(excess<minimum){
+        deps.debug('[Donate] skip: donation too small (minDonatePct)',{available:Math.round(excess),minChunk:Math.round(minimum),pct:Math.round(fraction*100)+'%'});
+        hooks.record('donation-amount-result',{status:'below-minimum-chunk',excess,minimum});return false;
+      }
+      const amounts=[{amount:excess,reason:'Original full excess over reserve'},
+        {amount:excess/2,eligible:Number.isFinite(excess/2)&&excess/2>0&&excess/2>=minimum,reason:'Donate half excess within original minimum chunk'},
+        {amount:minimum,eligible:Number.isFinite(minimum)&&minimum>0&&minimum<=excess,reason:'Donate original minimum chunk'}];
+      const choice=choose(hooks,'donation-amount',amounts,{capacity,keep,reserve,minimumExcess,minimum});
+      if(choice.index<0)return false;
+      const result=hooks.execute(choice.decisionId,()=>actor._donateReady(selected.entry.teammate,amounts[choice.index].amount));
+      if(hooks.wasDeclined()){hooks.hold();return false;}
+      hooks.record('donation-amount-result',{decisionId:choice.decisionId,status:result===false?'not-submitted':'attempt-completed',amount:amounts[choice.index].amount});
+      return result;
+    });
+  }
+  function outreach(actor,targets,hooks) {
+    let remaining=targets.map((target,index)=>({target,index}));
+    while(remaining.length&&hooks.allowed()) {
+      const visible=remaining.slice(0,79);
+      const choice=choose(hooks,'outreach-target',visible.map(e=>({targetId:id(e.target),targetIndex:e.index,
+        reason:'Evaluate outgoing request at original loop position'})),{remaining:remaining.length,candidateLimit:79});
+      if(choice.index<0)return;
+      const selected=visible[choice.index];remaining=remaining.filter(e=>e!==selected);
+      hooks.execute(choice.decisionId,()=>actor._outgoingAllianceCandidate(selected.target));
+      if(hooks.wasDeclined()||hooks.allianceStopped()){hooks.hold();return;}
+      hooks.record('outreach-target-result',{decisionId:choice.decisionId,status:'evaluated',targetIndex:selected.index});
+    }
+  }
+  function far(actor,targets,now,ctors,hooks) {
+    if(!hooks.allowed())return;
+    const winner=actor.random.randElement(targets);
+    const entries=[winner,...targets.filter(target=>target!==winner)].slice(0,79);
+    const choice=choose(hooks,'far-outreach-target',entries.map(target=>({targetId:id(target),reason:'Original random eligible far nation, then alternatives'})),
+      {targets:targets.length,candidateLimit:79});
+    if(choice.index<0)return;
+    hooks.execute(choice.decisionId,()=>actor._farOutreachReady(entries[choice.index],now,ctors));
+    if(hooks.wasDeclined())hooks.hold();
+    hooks.record('far-outreach-target-result',{decisionId:choice.decisionId,status:hooks.wasDeclined()?'declined':'evaluated'});
+  }
+  return {donate,outreach,far};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createDiplomacyDetailsPlanner;
+
+'use strict';
+function createEmbargoPlanner() {
+  const wait={id:'$wait',kind:'wait',reason:'Hold remaining embargo responses'};
+  function choose(hooks,domain,entries,facts) {
+    const candidates=entries.slice(0,79).map((entry,priority)=>({...entry,id:`${domain}:${priority}`,kind:domain,
+      priority,eligible:entry.eligible!==false}));
+    const decision=hooks.choose(domain,[...candidates,wait],facts);
+    const index=candidates.findIndex(c=>c.id===decision.selectedId&&c.eligible);
+    if(index<0||!hooks.allowed()) {
+      hooks.hold();hooks.record('embargo-result',{domain,decisionId:decision.decisionId,status:'stopped'});return null;
+    }
+    return {...entries[index],decisionId:decision.decisionId};
+  }
+  function run(actor,targets,context,hooks) {
+    const relations=context.mode==='relations';
+    const targetDomain=relations?'embargo-relation-target':'embargo-target';
+    const actionDomain=relations?'embargo-relation-response':'embargo-action';
+    let remaining=targets.map((target,index)=>({target,index}));
+    while(remaining.length&&hooks.allowed()) {
+      const visible=remaining.slice(0,79);
+      const selected=choose(hooks,targetDomain,visible.map(entry=>({index:entry.index,
+        targetId:(()=>{try{return entry.target.id();}catch{return undefined;}})(),reason:'Original nonself player iteration order'})),
+        {...context,remaining:remaining.length,candidateLimit:79});
+      if(!selected)return;
+      const entry=visible.find(e=>e.index===selected.index);remaining=remaining.filter(e=>e!==entry);
+      hooks.execute(selected.decisionId,()=>{
+        const proposed=(relations?actor._embargoRelationAction(entry.target):
+          actor._embargoAction(entry.target,context.hard,context.team))??'keep';
+        const actions=relations?['penalty','restore','keep']:['start','stop','keep'];
+        const ordered=[proposed,...actions.filter(action=>action!==proposed)];
+        const choice=choose(hooks,actionDomain,ordered.map(action=>({action,
+          eligible:action==='keep'||action===proposed,
+          ...(relations?{delta:action==='penalty'?-20:action==='restore'?20:0}:{}),
+          reason:action===proposed?'Original lazy embargo rule result':action==='keep'?'Leave current state unchanged':'Original rule does not permit this response'})),
+          {...context,targetIndex:entry.index,proposed});
+        if(!choice)return;
+        if(choice.action==='keep'){
+          hooks.record('embargo-result',{domain:actionDomain,decisionId:choice.decisionId,targetIndex:entry.index,status:'kept'});return;
+        }
+        const result=hooks.execute(choice.decisionId,()=>relations?actor._embargoRelationReady(entry.target,choice.action):
+          choice.action==='start'?actor.addEmbargo(entry.target,false):actor.stopEmbargo(entry.target));
+        if(hooks.wasDeclined())hooks.hold();
+        hooks.record('embargo-result',{domain:actionDomain,decisionId:choice.decisionId,targetIndex:entry.index,
+          action:choice.action,status:hooks.stopped()?'stopped':'attempt-completed',result});
+      });
+    }
+  }
+  return {run};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createEmbargoPlanner;
+
+'use strict';
+function createSpawnPlanner(deps) {
+  const wait={id:'$wait',kind:'wait',reason:'Hold spawn selection'};
+  function choose(hooks,domain,entries,facts={}) {
+    const cs=entries.slice(0,79).map((entry,priority)=>({...entry,id:`${domain}:${priority}`,kind:domain,
+      priority,eligible:entry.eligible!==false}));
+    const d=hooks.choose(domain,[...cs,wait],facts),index=cs.findIndex(c=>c.id===d.selectedId&&c.eligible);
+    if(index<0||!hooks.allowed()){hooks.hold();hooks.record('spawn-result',{domain,decisionId:d.decisionId,status:'held'});return null;}
+    return {...entries[index],decisionId:d.decisionId};
+  }
+  function site(hooks,selected) {
+    hooks.remember(selected.tile,selected.decisionId);
+    hooks.record('spawn-result',{decisionId:selected.decisionId,tile:selected.tile,status:'selected'});
+    return selected.tile;
+  }
+  function neighborhood(actor,spot,facts,hooks) {
+    const coords=[{x:spot.x,y:spot.y}];
+    for(let radius=2;radius<=24;radius+=2)for(let dy=-radius;dy<=radius;dy+=2)for(let dx=-radius;dx<=radius;dx+=2){
+      if(Math.abs(dx)!==radius&&Math.abs(dy)!==radius)continue;
+      coords.push({x:spot.x+dx,y:spot.y+dy});
+    }
+    const entries=coords.map((coord,index)=>({...coord,index}));
+    const measured=new Map();let original;
+    const probe=entry=>{
+      if(measured.has(entry.index))return measured.get(entry.index);
+      let tile=null;
+      if(facts.game.isValidCoord(entry.x,entry.y)){
+        const candidate=facts.game.ref(entry.x,entry.y);if(facts.valid(candidate))tile=candidate;
+      }
+      measured.set(entry.index,tile);return tile;
+    };
+    // Invalid geometry is measurement. Stop at the original first valid tile;
+    // expose that winner and untested alternatives without querying past it.
+    for(const entry of entries){if(!hooks.allowed())return null;if(probe(entry)!==null){original=entry;break;}}
+    if(!original){hooks.record('spawn-result',{domain:'spawn-neighborhood',status:'no-valid-neighbor'});return null;}
+    let remaining=[{...original,tile:measured.get(original.index),reason:'Original first valid nearby tile',readiness:'valid'},
+      ...entries.filter(entry=>entry!==original&&!measured.has(entry.index)).map(entry=>({...entry,
+        reason:'Alternative nearby coordinate; validity checked after selection',readiness:'unchecked'}))];
+    while(remaining.length&&hooks.allowed()) {
+      const chosen=choose(hooks,'spawn-neighborhood',remaining,{remaining:remaining.length});if(!chosen)return null;
+      remaining=remaining.filter(c=>c.index!==chosen.index);
+      const tile=probe(chosen);
+      if(tile!==null)return site(hooks,{tile,decisionId:chosen.decisionId});
+    }
+    return null;
+  }
+  function heatmap(actor,facts,hooks) {
+    const spots=actor._spawnHeatmap();
+    let remaining=(spots||[]).map((spot,index)=>({spot,index}));
+    while(remaining.length&&hooks.allowed()) {
+      const chosen=choose(hooks,'spawn-heatmap-spot',remaining.map(e=>({index:e.index,x:e.spot.x,y:e.spot.y,
+        readiness:'unchecked',reason:'Original heatmap spot order; search nearby valid tile after selection'})),{remaining:remaining.length});
+      if(!chosen)return null;
+      const entry=remaining.find(e=>e.index===chosen.index);remaining=remaining.filter(e=>e!==entry);
+      const tile=hooks.execute(chosen.decisionId,()=>neighborhood(actor,entry.spot,facts,hooks));
+      if(tile!==null||!hooks.allowed())return tile;
+    }
+    return null;
+  }
+  function random(actor,facts,hooks) {
+    const {game,width,height,team,players,smart}=facts;let pool=[];
+    for(let trial=0;trial<1000&&hooks.allowed();trial++) {
+      const x=team?actor.random.nextInt(team.x,team.x+team.width):actor.random.nextInt(0,width);
+      const y=team?actor.random.nextInt(team.y,team.y+team.height):actor.random.nextInt(0,height);
+      if(!game.isValidCoord(x,y))continue;
+      const tile=game.ref(x,y);
+      if(!game.isLand(tile)||game.hasOwner(tile)||game.isBorder(tile)||facts.tooClose(tile))continue;
+      if(!smart) {
+        const chosen=choose(hooks,'spawn-random',[{tile,mode:'use',reason:'Original first valid random trial'},
+          {mode:'resample',reason:'Request another random trial within the original limit'}],{trial,smart});
+        if(!chosen)return null;
+        if(chosen.mode==='use')return site(hooks,chosen);
+        continue;
+      }
+      const score=actor.scoreSpawnTile(tile,players,width,height,team);
+      if(score>-Infinity){
+        const prior=pool.find(entry=>entry.tile===tile);
+        if(prior&&prior.score>=score)continue;
+        if(prior)pool=pool.filter(entry=>entry!==prior);
+        pool.push({tile,score,trial,reason:'Original highest score, preserving first ties'});
+        pool.sort((a,b)=>b.score-a.score||a.trial-b.trial);if(pool.length>79)pool.pop();}
+    }
+    if(!hooks.allowed()||!pool.length)return null;
+    const chosen=choose(hooks,'spawn-random',pool,{smart,trials:1000,candidateLimit:79});
+    return chosen?site(hooks,chosen):null;
+  }
+  function pick(actor,hooks) {
+    if(!hooks.allowed())return null;
+    const game = actor.mg;
+    const teamSpawn = !!deps.geography && deps.settings().smartSpawn !== false && deps.geography.applies(game, actor.player);
+    let remaining=[{source:'companion',reason:'Original companion override first',readiness:'unchecked'},
+      {source:'heatmap',eligible:!!deps.settings().smartSpawn,reason:'Original smart heatmap second',readiness:'unchecked'},
+      {source:'random',reason:'Original random search after unavailable earlier sources'}];
+    if (teamSpawn) remaining.push({ source:'team-geography', adaptiveOnly:true, reason:'Measured group/coastal spawn pool' });
+    let facts;
+    while(remaining.some(e=>e.eligible!==false)&&hooks.allowed()) {
+      const chosen=choose(hooks,'spawn-source',remaining,{teamSpawn});if(!chosen)return null;
+      remaining=remaining.filter(e=>e.source!==chosen.source);
+      const tile=hooks.execute(chosen.decisionId,()=>{
+        if(chosen.source==='companion'){
+          const tile=actor._spawnCompanion();if(tile==null)return null;
+          const selected=choose(hooks,'spawn-companion',[{tile,reason:'Original authoritative companion tile'}]);
+          return selected?site(hooks,selected):null;
+        }
+        facts??=actor._spawnFacts();
+        if (chosen.source === 'team-geography') return teamSites(actor, facts, hooks);
+        return chosen.source==='heatmap'?heatmap(actor,facts,hooks):random(actor,facts,hooks);
+      });
+      if(tile!==null||!hooks.allowed())return tile;
+      hooks.record('spawn-result',{decisionId:chosen.decisionId,source:chosen.source,status:'unavailable'});
+    }
+    return null;
+  }
+  function teamSites(actor, facts, hooks) {
+    const {game,width,height,team} = facts;
+    const pool = [], seen = new Set();
+    const add = (x,y) => {
+      if (!hooks.allowed() || !game.isValidCoord(x,y) || team && (x < team.x || y < team.y || x >= team.x + team.width || y >= team.y + team.height)) return;
+      const tile = game.ref(x,y);
+      if (seen.has(tile) || !facts.valid(tile) || game.hasFallout(tile)) return;
+      seen.add(tile);
+      pool.push({tile, ...deps.geography.spawnMetrics(game, actor.player, tile, facts.players), reason:'Measured valid group/coastal spawn candidate'});
+    };
+    const spots = actor._spawnHeatmap() || [];
+    for (const spot of spots.slice(0, 12)) {
+      for (const [dx,dy] of [[0,0],[8,0],[-8,0],[0,8],[0,-8]]) {
+        if (pool.length >= 24) break;
+        add(spot.x+dx,spot.y+dy);
+      }
+    }
+    for (let i=0; i<500 && pool.length<72 && hooks.allowed(); i++) {
+      add(actor.random.nextInt(team?.x || 0,team ? team.x+team.width : width),
+        actor.random.nextInt(team?.y || 0,team ? team.y+team.height : height));
+    }
+    if (!pool.length || !hooks.allowed()) return null;
+    const chosen = choose(hooks,'team-spawn-site',pool,{candidates:pool.length,teamArea:!!team});
+    return chosen ? site(hooks,chosen) : null;
+  }
+  function dispatch(actor,hooks) {
+    if(!hooks.allowed())return;
+    hooks.clearSite();const tile=actor.pickSpawnCenter();
+    if(!hooks.allowed())return;
+    hooks.execute(hooks.siteParent(),()=>actor._spawnReady(tile));
+    if(hooks.wasDeclined())hooks.hold();
+  }
+  function tick(actor,tick,hooks) {
+    if(!actor.feat('spawn')||!hooks.allowed())return;
+    const due=actor.lastSpawnPickTick==null||tick-actor.lastSpawnPickTick>=6;
+    const key=due?actor.currentSpawnTopKey():null;
+    const repick=due&&(!actor.spawnExecAdded||key!=null&&key!==actor.lastSpawnTopKey);
+    const selected=choose(hooks,'spawn-action',[{action:'repick',eligible:!!repick,reason:'Original due spawn or changed top key'},
+      {action:'check',eligible:due&&!repick,reason:'Original due check; existing spawn key unchanged'},
+      {action:'keep',reason:'Keep current spawn and check metadata'}],{tick,due,key,repick});
+    if(!selected||selected.action==='keep')return;
+    const fields=['lastSpawnPickTick','lastSpawnTopKey'];
+    const before=fields.map(key=>({key,had:Object.hasOwn(actor,key),value:actor[key]}));
+    try {
+      actor.lastSpawnPickTick=tick;
+      if(selected.action==='repick'){
+        actor.lastSpawnTopKey=key;hooks.execute(selected.decisionId,()=>actor.doSpawn());
+      }
+    }finally{if(hooks.stopped())for(const entry of before){if(entry.had)actor[entry.key]=entry.value;else delete actor[entry.key];}}
+  }
+  return {pick,dispatch,tick};
+}
+
+
+'use strict';
+
+function createNavalLandingPlanner() {
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Stop this landing-site lookup' };
+  async function run(actor, sites, context, hooks) {
+    const distant = context.mode === 'distant';
+    const timeout = distant ? '__probe_timeout__' : false;
+    // The caller supplies the original distance-sorted pool. Compare indices
+    // with the cap rather than slice(cap), preserving fractional cap semantics.
+    let remaining = sites.map((site, priority) => ({ id: `landing:${context.mode}:${priority}`,
+      kind: 'naval-landing', source: 'NavalLandingPlanner', mode: context.mode, tile: site.tile,
+      distanceSquared: site.dist, priority, eligible: true, readiness: 'unchecked',
+      reason: 'Original nearest-first order; check boat assignment and reachability after selection'
+    })).filter(candidate => candidate.priority < context.probeCap);
+    const poolSize = remaining.length;
+    let probed = 0, timedOut = 0;
+    const finish = tile => {
+      if (distant && hooks.allowed()) hooks.diagnostics({ enemies: sites.length, probed,
+        probeCap: context.probeCap, timedOut, found: tile !== null });
+      return tile;
+    };
+    while (hooks.allowed()) {
+      const visible = remaining.slice(0, 79);
+      const choice = hooks.choose([...visible, wait], {
+        mode: context.mode, totalTargets: sites.length, searchPool: poolSize,
+        outsideCap: sites.length - poolSize, remainingTargets: remaining.length,
+        windowHidden: remaining.length - visible.length, probeCap: context.probeCap, probed, timedOut
+      });
+      const selected = visible.find(c => c.id === choice.selectedId);
+      if (!selected) {
+        if (visible.length > 0 || choice.selectedId === null) hooks.stop?.(choice);
+        return finish(null);
+      }
+      if (!hooks.allowed()) return finish(null);
+      remaining = remaining.filter(c => c !== selected);
+      const details = { decisionId: choice.decisionId, candidateId: selected.id,
+        mode: context.mode, tile: selected.tile };
+      const report = (status, extra = {}) => hooks.record('landing-probe', {
+        ...details, status, probed, timedOut, ...extra
+      });
+      try {
+        if (actor.boatTargetTaken(selected.tile)) {
+          report('already-targeted', { reason: 'Original boat target spacing check rejected this destination' });
+          continue;
+        }
+        probed++;
+        const result = await hooks.probe(choice.decisionId, selected.tile, timeout);
+        if (!hooks.allowed()) {
+          report('stale', { reason: 'Bot disabled or game ownership changed while probing' });
+          return null;
+        }
+        if (distant && result === timeout) {
+          timedOut++;
+          report('timeout');
+          continue;
+        }
+        if (result === false) {
+          report('unreachable', {
+            reason: distant ? 'Reachability probe returned false' : 'Reachability failed or timed out (original false fallback)' });
+          continue;
+        }
+        report('reachable', {
+          reason: 'Transport spawn probe succeeded; no boat has been dispatched by this lookup' });
+        return finish(selected.tile);
+      } catch (error) {
+        report('threw');
+        throw error;
+      }
+    }
+    return null;
+  }
+  return { run };
+}
+
+
+
+'use strict';
+
+function createNavalActionPlanner(deps) {
+  const state = deps.state;
+  const purposes = ['surge', 'disconnected', 'nearby', 'crater', 'random-free', 'random-enemy', 'distant'];
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Stop this opportunistic naval pass' };
+  async function run(actor, context, hooks) {
+    let inflightReady = false, scanned = 0;
+    function prepareInflight() {
+      if (inflightReady) return;
+      inflightReady = true;
+      actor._inflightBoatTargets = [];
+      for (const ship of actor.player.units(deps.transportType)) {
+        try {
+          const tile = ship.targetTile ? ship.targetTile() : null;
+          if (tile != null) actor._inflightBoatTargets.push({ x: actor.game.x(tile), y: actor.game.y(tile) });
+        } catch { /* Original ship metadata fallback. */ }
+      }
+    }
+    async function findTarget(purpose) {
+      switch (purpose) {
+        case 'disconnected': {
+          const tile = await actor.findDisconnectedBoatTarget();
+          if (tile !== null && hooks.allowed() && !actor.boatTargetTaken(tile)) return { tile, owned: true, island: true };
+          return null;
+        }
+        case 'nearby': {
+          const sites = actor.scanNearbyTargets(context.shore);
+          scanned = sites.length;
+          const cap = state.settings.islandProbeMax || 4;
+          const tile=await hooks.nearby(sites,cap);
+          const site=sites.find(site=>site.tile===tile);
+          return tile!==null && site && hooks.allowed()?{tile,owned:site.owned,fallout:site.fallout,island:true}:null;
+        }
+        case 'crater': {
+          const tile = actor.pickMirvCraterTarget();
+          if (tile === null || actor.boatTargetTaken(tile)) return null;
+          const spawn = await hooks.probe(tile);
+          return spawn !== false && hooks.allowed() ? { tile, owned: true, island: false } : null;
+        }
+        case 'random-free': case 'random-enemy': {
+          const shore = hooks.origin(context.shore);
+          if(shore===null||!hooks.allowed())return null;
+          const tile = await actor.findRandomBoatTarget(shore, [], purpose === 'random-free');
+          return tile !== null && hooks.allowed() && !actor.boatTargetTaken(tile) ?
+            { tile, owned: actor.game.hasOwner(tile), island: false } : null;
+        }
+        case 'enemy-probe': case 'distant': {
+          const tile = await actor.findDistantBoatTarget(purpose==='enemy-probe');
+          return tile !== null && hooks.allowed() ? { tile, owned: true, island: true } : null;
+        }
+        default: throw new Error('Unknown naval target purpose: ' + purpose);
+      }
+    }
+    let remaining = purposes.map((purpose, priority) => ({ id: `naval:${purpose}`, kind: 'naval-action',
+      purpose, priority, eligible: true, readiness: 'unchecked',
+      reason: `Original naval order: ${purpose}; run search and launch checks only after selection` }));
+    remaining.push({id:'naval:enemy-probe',kind:'naval-action',purpose:'enemy-probe',priority:7,
+      eligible:true,adaptiveOnly:true,readiness:'unchecked',
+      reason:'After the opening, send a 1% probe to a reachable distant enemy before local grabs'});
+    while (remaining.length && hooks.allowed()) {
+      // A policy that kept the original order must finish naturally rather
+      // than turning the unused adaptive-only alternative into a policy hold.
+      if(remaining.every(plan=>plan.adaptiveOnly))break;
+      const choice = hooks.choose([...remaining, wait], {
+        fill: context.fill, surplusFill: context.surplusFill, shoreTiles: context.shore.length,
+        beachhead: state.beachhead ? { tile: state.beachhead.tile, at: state.beachhead.at, surged: state.beachhead.surged } : null
+      });
+      const plan = remaining.find(p => p.id === choice.selectedId);
+      const report = (status, data = {}) => hooks.record('naval-action-result', {
+        decisionId: choice.decisionId, purpose: plan?.purpose ?? null, status, ...data
+      });
+      if (!plan) { report('wait', { reason: choice.reason }); return false; }
+      const stopped = () => {
+        report('stopped', { reason: 'Bot ownership/enabled state changed or a nested policy stopped this pass' });
+        return { done: true, result: false };
+      };
+      if (!hooks.allowed()) { stopped(); return false; }
+      try {
+        const outcome = await hooks.execute(choice.decisionId, async () => {
+          if (plan.purpose === 'surge') {
+            const head = state.beachhead;
+            const window = state.settings.mirvBoatWindowTicks || 150;
+            if (!(head && head.tile != null && !head.surged && context.fill >= context.surplusFill &&
+                actor.game.ticks() - (head.at || 0) < window && actor.landingSucceeded(head.tile))) {
+              report('unfulfilled', { reason: 'Original reinforcement preconditions are not met' });
+              return { done: false };
+            }
+            const spawn = await hooks.probe(head.tile);
+            if (!hooks.allowed()) return stopped();
+            if (spawn === false) { report('unfulfilled', { reason: 'Reinforcement spawn probe failed' }); return { done: false }; }
+            const sent = hooks.launch(head.tile, 'surge', '⚓ Surge landing');
+            if(!hooks.allowed())return stopped();
+            if (sent) { state.lastOppBoatMs = context.now; head.surged = true; }
+            report('launch-result', { tile: head.tile, submitted: !!sent });
+            // The original surge falls through on failed emit, unlike a found
+            // ordinary target whose failed launch ends the entire pass.
+            return { done: !!sent, result: !!sent };
+          }
+          prepareInflight();
+          const target = await findTarget(plan.purpose);
+          if (!hooks.allowed()) return stopped();
+          if (!target) { report('unfulfilled', { reason: 'Selected search found no usable target' }); return { done: false }; }
+          const threshold = plan.purpose==='enemy-probe' ? 0 : target.island ? state.settings.boatIslandFill || .35 : context.surplusFill;
+          if (context.fill < threshold) {
+            report('held', { tile: target.tile, fill: context.fill, requiredFill: threshold });
+            return { done: true, result: false };
+          }
+          const label = plan.purpose==='enemy-probe' ? '🛟 Distant enemy probe (1%)' : target.fallout ? '☢️ Nuked-coast grab' : target.island ?
+            target.owned ? '🏝️ Weak-coast grab' : '🏝️ Island grab' : '🛟 Probe landing';
+          const sent = hooks.launch(target.tile, plan.purpose==='enemy-probe'?'probe-1pct':'probe', label);
+          if(!hooks.allowed())return stopped();
+          if (sent) {
+            state.lastOppBoatMs = context.now;
+            state.beachhead = { tile: target.tile, at: actor.game.ticks(), surged: false };
+          }
+          report('launch-result', { tile: target.tile, submitted: !!sent, label });
+          return { done: true, result: !!sent };
+        });
+        if (outcome.done) return outcome.result;
+      } catch (error) {
+        report('threw'); throw error;
+      }
+      remaining = remaining.filter(p => p !== plan && !(plan.purpose==='enemy-probe'&&p.purpose==='distant'));
+    }
+    if (hooks.allowed()) deps.debug?.('[Boat] no reachable target', {
+      scanCandidates: scanned, shoreSamples: Math.min(state.settings.islandScanSamples || 6, context.shore.length), distant: state._distantDiag || null
+    });
+    return false;
+  }
+  return { run };
+}
+
+
+
+'use strict';
+
+function createBoatPlanner(deps) {
+  const wait = { id: '$wait', kind: 'wait', eligible: true, reason: 'Hold this boat action' };
+  function enemyProbeSites(actor) {
+    const game=actor.game,player=actor.player,components=new Set();
+    const waterComponents=tile=>game.neighbors(tile).filter(t=>game.isWater(t))
+      .map(t=>game.getWaterComponent(t)).filter(component=>component!==null&&component!==undefined);
+    let origin=null;
+    for(const tile of player.borderTiles())if(game.isLand(tile)&&game.isShore(tile)){
+      for(const component of waterComponents(tile)){
+        components.add(component);if(origin===null)origin=tile;
+      }
+    }
+    if(origin===null)return [];
+    const center=actor.getPlayerCenter(player)||{x:game.x(origin),y:game.y(origin)};
+    const groups=[];
+    for(const enemy of game.players()){
+      if(!enemy.isPlayer()||!enemy.isAlive()||enemy.smallID()===player.smallID()||player.isFriendly(enemy))continue;
+      const best=[];
+      // Border tiles already delimit ownership. Keep only a small set of
+      // coastal alternatives per enemy, instead of sending its inland label.
+      for(const tile of enemy.borderTiles()){
+        if(!game.isLand(tile)||!game.isShore(tile)||game.ownerID(tile)!==enemy.smallID()||
+            !waterComponents(tile).some(component=>components.has(component)))continue;
+        const dx=game.x(tile)-center.x,dy=game.y(tile)-center.y;
+        best.push({tile,dist:dx*dx+dy*dy,ownerId:enemy.id()});
+        best.sort((a,b)=>a.dist-b.dist||a.tile-b.tile);
+        if(best.length>4)best.pop();
+      }
+      if(best.length)groups.push(best);
+    }
+    groups.sort((a,b)=>a[0].dist-b[0].dist);
+    const sites=[];
+    // Try each enemy's nearest usable coast before second alternatives.
+    for(let index=0;index<4;index++)for(const group of groups)if(group[index])sites.push(group[index]);
+    return sites;
+  }
+  function origin(actor, shore, hooks) {
+    if (!hooks.allowed() || !shore.length) return null;
+    const original = actor.random.randElement(shore);
+    const ordered = [original, ...shore.filter(tile => tile !== original)];
+    const candidates = ordered.slice(0,79).map((tile,priority) => ({ id:`origin:${priority}`, kind:'boat-origin',
+      tile, priority, eligible:true, reason: priority===0 ? 'Original randomly sampled shore' : 'Alternate supplied shore' }));
+    const choice=hooks.choose('boat-origin',[...candidates,wait],{shoreTiles:shore.length});
+    const selected=candidates.find(c=>c.id===choice.selectedId);
+    hooks.record('boat-detail-result',{domain:'boat-origin',decisionId:choice.decisionId,
+      status:selected && hooks.allowed()?'selected':'stopped',tile:selected?.tile??null});
+    if(!selected || !hooks.allowed())return null;
+    hooks.remember(selected.tile,choice.decisionId,'origin');
+    return selected.tile;
+  }
+  async function destination(actor,sites,context,hooks) {
+    let remaining=sites.map((site,priority)=>({id:`boat-site:${priority}`,kind:'boat-destination',priority,
+      eligible:true,tile:site.tile,ownerId:site.ownerId??null,owned:!!site.owned,fallout:!!site.fallout,
+      distanceSquared:site.dist??null,reason:`Original ${context.mode} site order; probe after selection`}))
+      .filter(c=>context.mode!=='nearby'||c.priority<context.cap);
+    const failedOwners=new Set();
+    while(remaining.length && hooks.allowed()) {
+      const visible=remaining.slice(0,79);
+      const choice=hooks.choose('boat-destination',[...visible,wait],{...context,remainingSites:remaining.length});
+      const selected=visible.find(c=>c.id===choice.selectedId);
+      const report=status=>hooks.record('boat-detail-result',{domain:'boat-destination',decisionId:choice.decisionId,
+        mode:context.mode,tile:selected?.tile??null,status});
+      if(!selected||!hooks.allowed()){report('stopped');return null;}
+      remaining=remaining.filter(c=>c!==selected);
+      if(context.mode==='nearby'&&actor.boatTargetTaken(selected.tile)){report('already-targeted');continue;}
+      if(selected.ownerId!==null&&failedOwners.has(selected.ownerId)){report('owner-unreachable');continue;}
+      try {
+        const reachable=await hooks.probe(choice.decisionId,selected.tile);
+        if(!hooks.allowed()){report('stopped');return null;}
+        if(reachable===false){
+          if(selected.ownerId!==null)failedOwners.add(selected.ownerId);
+          report('unreachable');continue;
+        }
+        hooks.remember(selected.tile,choice.decisionId,'destination');report('reachable');return selected.tile;
+      } catch(error){report('threw');throw error;}
+    }
+    return null;
+  }
+  function allocation(actor,context,hooks) {
+    if(!hooks.allowed())return null;
+    const available=actor.player.troops(),settings=deps.state.settings;
+    const exactProbe=context.mode==='probe-1pct';
+    const fraction=exactProbe ? .01 : context.mode==='surge' ? settings.boatSurgeFrac||.25 :
+      context.mode==='tactical'&&!settings.winFixes ? .2 : settings.boatProbeFrac||.01;
+    const minimum=exactProbe||context.mode==='surge'||context.mode==='tactical'&&!settings.winFixes?0:settings.boatProbeMinTroops||8000;
+    const original=exactProbe ? Math.floor(available*fraction) : context.mode==='surge' ? available*fraction :
+      context.mode==='tactical'&&!settings.winFixes ? available/5 : Math.max(available*fraction,minimum);
+    const candidates=[['original',original],['half',Math.min(available,original/2)],['double',Math.min(available,original*2)]]
+      .map(([mode,troops],priority)=>({id:`boat:${mode}`,kind:'boat-allocation',priority,
+        eligible:priority===0&&!exactProbe || Number.isFinite(troops)&&(exactProbe?troops>=1:troops>0)&&troops<=available,
+        mode,launchMode:context.mode,tile:context.tile,troops,availableTroops:available,fraction,minimum,
+        reason:priority===0?'Original boat troop formula':`Alternate ${mode} allocation within available troops`}));
+    const choice=hooks.choose('boat-allocation',[...candidates,wait],{...context,availableTroops:available});
+    const selected=candidates.find(c=>c.id===choice.selectedId&&c.eligible);
+    if(!selected||!hooks.allowed()){
+      hooks.record('boat-detail-result',{domain:'boat-allocation',decisionId:choice.decisionId,status:'stopped'});return null;
+    }
+    hooks.record('boat-detail-result',{domain:'boat-allocation',decisionId:choice.decisionId,status:'selected',
+      tile:context.tile,troops:selected.troops});
+    return {troops:selected.troops,decisionId:choice.decisionId};
+  }
+  function crater(actor,hits,hooks){
+    let remaining=[...hits].reverse().filter(hit=>hit.tile!=null).map((hit,priority)=>({
+      id:`crater:${priority}`,kind:'boat-destination',priority,eligible:true,readiness:'unchecked',
+      tile:hit.tile,hitAt:hit.at??0,reason:'Original newest-first recent MIRV landing target; ownership checked after selection'
+    }));
+    while(remaining.length&&hooks.allowed()){
+      const visible=remaining.slice(0,79),choice=hooks.choose('boat-destination',[...visible,wait],{mode:'crater',remainingSites:remaining.length});
+      const selected=visible.find(c=>c.id===choice.selectedId);
+      if(!selected||!hooks.allowed())return null;
+      remaining=remaining.filter(c=>c!==selected);
+      if(actor.game.ownerID(selected.tile)===actor.player.smallID())continue;
+      hooks.remember(selected.tile,choice.decisionId,'destination');
+      hooks.record('boat-detail-result',{domain:'boat-destination',decisionId:choice.decisionId,mode:'crater',tile:selected.tile,status:'selected'});
+      return selected.tile;
+    }
+    return null;
+  }
+  async function tactical(actor,shore,enemies,hooks) {
+    const start=origin(actor,shore,hooks);
+    if(start===null||!hooks.allowed())return false;
+    let remaining=['free','enemy'].map((mode,priority)=>({id:`boat-search:${mode}`,kind:'boat-search',mode,
+      priority,eligible:true,reason:'Original free-before-enemy random boat search'}));
+    while(remaining.length&&hooks.allowed()) {
+      const choice=hooks.choose('boat-search',[...remaining,wait],{origin:start,enemyCount:enemies.length});
+      const selected=remaining.find(c=>c.id===choice.selectedId);
+      if(!selected||!hooks.allowed()){
+        hooks.record('boat-detail-result',{domain:'boat-search',decisionId:choice.decisionId,status:'stopped'});return false;
+      }
+      let tile;
+      try {tile=await hooks.execute(choice.decisionId,()=>actor.findRandomBoatTarget(start,enemies,selected.mode==='free'));}
+      catch(error){hooks.record('boat-detail-result',{domain:'boat-search',decisionId:choice.decisionId,status:'threw'});throw error;}
+      if(!hooks.allowed()){
+        hooks.record('boat-detail-result',{domain:'boat-search',decisionId:choice.decisionId,status:'stopped',tile});return false;
+      }
+      hooks.record('boat-detail-result',{domain:'boat-search',decisionId:choice.decisionId,status:tile===null?'no-site':'found',tile});
+      if(tile!==null){
+        const amount=allocation(actor,{tile,mode:'tactical'},hooks);
+        if(!amount||!hooks.allowed())return false;
+        const sent=hooks.launch(amount.decisionId,tile,amount.troops);
+        hooks.record('boat-detail-result',{domain:'boat-allocation',decisionId:amount.decisionId,
+          status:'launch-result',tile,troops:amount.troops,submitted:!!sent});
+        return sent;
+      }
+      remaining=remaining.filter(c=>c!==selected);
+    }
+    return false;
+  }
+  return {enemyProbeSites,origin,destination,crater,allocation,tactical};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createBoatPlanner;
+
+'use strict';
+
+function createWarshipDetailsPlanner(deps) {
+  const wait = { id: '$wait', kind: 'wait', reason: 'Hold warship action' };
+  function spawn(actor, center, radius, hooks) {
+    if (!hooks.allowed()) return null;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      if (!hooks.allowed()) return null;
+      const x = actor.random.nextInt(actor.game.x(center)-radius, actor.game.x(center)+radius);
+      const y = actor.random.nextInt(actor.game.y(center)-radius, actor.game.y(center)+radius);
+      if (!actor.game.isValidCoord(x,y)) continue;
+      const tile = actor.game.ref(x,y);
+      if (!actor.game.isWater(tile)) continue;
+      const candidates = [{ id: 'site:use', kind: 'warship-placement', priority: 0, eligible: true,
+        tile, reason: 'Use first valid water sample' },
+      { id: 'site:resample', kind: 'warship-placement', priority: 1, eligible: attempt < 49,
+        resample: true, reason: 'Search another coordinate pair within fifty attempts' }, wait];
+      const choice = hooks.choose('warship-placement', candidates, { center, radius, attempt });
+      const selected = candidates.find(c=>c.id===choice.selectedId && c.eligible);
+      const status = !hooks.allowed() ? 'stopped' : selected?.resample ? 'resample' : selected ? 'selected' : 'wait';
+      hooks.record('warship-placement-result', { decisionId: choice.decisionId, tile, attempt, status });
+      if (status === 'selected') { hooks.remember(choice.decisionId); return tile; }
+      if (status !== 'resample') { hooks.hold(); return null; }
+    }
+    hooks.record('warship-placement-result', { status: 'exhausted', attempts: 50 });
+    return null;
+  }
+  function move(actor, tile, context, hooks) {
+    if (!hooks.allowed() || !actor.game.isWater(tile)) return false;
+    const { smart, tick, purpose } = context;
+    const settings = deps.settings();
+    const maxDistance = settings.warshipMoveMaxDist || 160;
+    const cooldownTicks = settings.warshipMoveCooldownTicks || 60;
+    const component = smart ? actor.game.getWaterComponent(tile) : undefined;
+    const ships = actor.player.units(deps.warshipType).filter(ship => {
+      if (!smart) {
+        const patrol = ship.warshipState().patrolTile;
+        return patrol !== undefined && actor.game.manhattanDist(ship.tile(),patrol) < 130;
+      }
+      try {
+        const state = ship.warshipState(), patrol = state ? state.patrolTile : undefined;
+        if (patrol === undefined || state.state !== undefined && state.state !== 'patrolling') return false;
+        if (actor.game.manhattanDist(ship.tile(),patrol) >= 130) return false;
+        if (actor.game.getWaterComponent(ship.tile()) !== component) return false;
+        const last = smart.cooldown.get(ship.id());
+        return last === undefined || tick-last >= cooldownTicks;
+      } catch { return false; }
+    }).sort((a,b)=>actor.game.manhattanDist(a.tile(),tile)-actor.game.manhattanDist(b.tile(),tile));
+    const entries = ships.slice(0,79);
+    const candidates = entries.map((ship,priority)=>({id:`ship:${priority}`,kind:'warship-unit',priority,
+      eligible: !smart || actor.game.manhattanDist(ship.tile(),tile) <= maxDistance,
+      unitId: ship.id(), tile: ship.tile(), distance: actor.game.manhattanDist(ship.tile(),tile),
+      reason:'Closest eligible patrolling ship, preserving first ties'}));
+    const choice = hooks.choose('warship-unit',[...candidates,wait],{ tile,purpose,tick,smart:Boolean(smart),maxDistance,cooldownTicks });
+    const index = candidates.findIndex(c=>c.id===choice.selectedId && c.eligible);
+    if (index < 0 || !hooks.allowed()) {
+      if (candidates.some(c=>c.eligible) || choice.selectedId === null) hooks.hold();
+      hooks.record('warship-unit-result',{decisionId:choice.decisionId,status:hooks.allowed()?'wait':'stopped'});
+      return false;
+    }
+    const result = hooks.execute(choice.decisionId,()=>actor._moveSelectedWarship(entries[index],tile,purpose,smart,tick));
+    hooks.record('warship-unit-result',{decisionId:choice.decisionId,status:'move-result',moved:Boolean(result),unitId:candidates[index].unitId,tile});
+    return result;
+  }
+  return { spawn, move };
+}
+
+
+'use strict';
+
+function createWarshipPatrolPlanner() {
+  function run(actor, sites, context, hooks) {
+    const { smart, tick, cellSize, serviceTicks } = context;
+    const remaining = sites.map((site, priority) => ({ ...site, priority, id: `patrol:${priority}` }));
+    while (remaining.length) {
+      if (!hooks.allowed()) return;
+      const candidates = remaining.map(site => {
+        const cell = Math.floor(actor.game.x(site.tile) / cellSize) + ',' + Math.floor(actor.game.y(site.tile) / cellSize);
+        const lastServiceTick = smart.serviced.get(cell);
+        const eligible = lastServiceTick === undefined || tick - lastServiceTick >= serviceTicks;
+        return { id: site.id, kind: 'warship-patrol', purpose: site.kind, tile: site.tile, sourceDecisionId:site.sourceDecisionId,
+          ...(site.adaptiveOnly ? {adaptiveOnly:true} : {}),
+          priority: site.priority, cell, lastServiceTick, eligible,
+          reason: eligible ? `Patrol ${site.kind} in original priority order` : 'Zone was recently serviced' };
+      });
+      const choice = hooks.choose([...candidates, { id: '$wait', kind: 'wait', reason: 'Hold patrol position' }]);
+      const selected = candidates.find(c => c.id === choice.selectedId && c.eligible);
+      const report = (status, extra = {}) => hooks.record('warship-patrol-result', {
+        decisionId: choice.decisionId, purpose: selected?.purpose, tile: selected?.tile, status, ...extra
+      });
+      if (!selected) { report('wait', { reason: choice.reason }); return; }
+      if (!hooks.allowed()) { report('stopped'); return; }
+      remaining.splice(remaining.findIndex(s => s.id === selected.id), 1);
+      const moved = hooks.execute(choice.decisionId, () => actor.moveBestWarshipTo(selected.tile, selected.purpose, smart, tick));
+      report('move-result', { moved: Boolean(moved) });
+      if (moved) { smart.serviced.set(selected.cell, tick); return; }
+    }
+  }
+  return { run };
+}
+
+
+
+'use strict';
+
+function createWarshipCombatPlanner(deps) {
+  const wait = { id: '$wait', kind: 'wait', reason: 'Hold destination' };
+  function destination(hooks, domain, entries, facts) {
+    const candidates = entries.slice(0,79).map((entry,priority)=>({ ...entry,
+      id:`${domain}:${priority}`,kind:domain,priority,eligible:true }));
+    const decision = hooks.choose(domain,[...candidates,wait],facts);
+    const selected = candidates.find(c=>c.id===decision.selectedId);
+    const allowed = hooks.allowed();
+    hooks.record(`${domain}-result`,{decisionId:decision.decisionId,
+      status: !allowed ? 'stopped' : selected ? 'selected' : 'wait',tile:selected?.tile,reason:decision.reason});
+    return { tile: allowed && selected ? selected.tile : null, decisionId:decision.decisionId };
+  }
+  function target(actor, context, purpose, hooks) {
+    const entries = [];
+    if (purpose === 'intercept') return destination(hooks, 'warship-target',
+      context.transports.map(t => ({ ...t, reason:'Hostile transport approaching same-team land; shortest remaining landing distance first' })),
+      {purpose,unitId:context.ship.id(),targets:context.transports.length});
+    if (purpose === 'retreat') {
+      if (context.home !== null) entries.push({tile:context.home,reason:'Return to original home destination'});
+      return destination(hooks,'warship-destination',entries,{purpose,unitId:context.ship.id()});
+    }
+    const units = purpose === 'engage' ? context.enemies : context.trades;
+    const component = purpose === 'trade-hunt' ? actor.game.getWaterComponent(context.ship.tile()) : null;
+    let winner = purpose === 'engage' ? -1 : 0, best = Infinity;
+    for (const [index,unit] of units.entries()) {
+      if (purpose === 'trade-hunt' && actor.game.getWaterComponent(unit.tile()) !== component) continue;
+      const value = purpose === 'engage' ? unit.health() : actor.game.manhattanDist(context.ship.tile(),unit.tile());
+      if (value < best) { best=value;winner=index; }
+      entries.push({index,value,unit});
+    }
+    const ranked = entries.filter(e=>purpose!=='engage'||e.value<Infinity)
+      .sort((a,b)=>(a.index===winner?-1:b.index===winner?1:0)||a.value-b.value||a.index-b.index);
+    const proposals=[];
+    for(const entry of ranked.slice(0,79)) {
+      let tile,targetId;
+      // Only the original winner's tile was mandatory in the baseline. Extra
+      // alternative/telemetry getters must not abort that original action.
+      if(entry.index===winner)tile=entry.unit.tile();
+      else { try { tile=entry.unit.tile(); } catch { continue; } }
+      try { targetId=entry.unit.id?.(); } catch {}
+      proposals.push({tile,targetId,metric:entry.value,
+        reason:purpose==='engage'?'Lowest enemy health, preserving first ties':'Nearest hostile trade, preserving first ties'});
+    }
+    return destination(hooks,'warship-target',proposals,
+      {purpose,unitId:context.ship.id(),targets:units.length,candidateLimit:79});
+  }
+  function waypoint(actor, start, home, enemies, hooks) {
+    if (!hooks.allowed()) return null;
+    const game=actor.game,component=game.getWaterComponent(start);
+    const queue=[{tile:start,depth:0}],seen=new Set([start]),entries=[];
+    let best=-Infinity,winner=0;
+    for(let cursor=0;cursor<queue.length;cursor++) {
+      if (!hooks.allowed()) return null;
+      const {tile,depth}=queue[cursor];let nearest=Infinity;
+      for(const enemy of enemies) {
+        const distance=game.manhattanDist(tile,enemy.tile());
+        if(distance<nearest)nearest=distance;
+      }
+      const homeDistance=home?game.manhattanDist(tile,home):0;
+      const neighbors=game.neighbors(tile);let waterNeighbors=0;
+      for(const neighbor of neighbors)if(game.isWater(neighbor))waterNeighbors++;
+      const score=Math.min(nearest,15)*50-homeDistance-(4-waterNeighbors)*15;
+      if(score>best){best=score;winner=cursor;}
+      entries.push({tile,depth,nearestEnemy:nearest,homeDistance,waterNeighbors,score,order:cursor,
+        reason:'Original enemy-distance, home-distance and water-neighbor score'});
+      if(depth>=30)continue;
+      for(const neighbor of neighbors)if(game.isWater(neighbor)&&game.getWaterComponent(neighbor)===component&&!seen.has(neighbor)) {
+        seen.add(neighbor);queue.push({tile:neighbor,depth:depth+1});
+      }
+    }
+    entries.sort((a,b)=>(a.order===winner?-1:b.order===winner?1:0)||b.score-a.score||a.order-b.order);
+    const result=destination(hooks,'warship-waypoint',entries,{start,home,depthLimit:30,
+      visited:entries.length,candidateLimit:79,enemies:enemies.length});
+    if(result.tile!==null)hooks.remember?.(result.decisionId);
+    return result.tile;
+  }
+  function choose(hooks, domain, purposes, facts) {
+    const candidates = purposes.map(([purpose, eligible, reason, adaptiveOnly], priority) => ({
+      id: `${domain}:${purpose}`, kind: domain, purpose, eligible, priority, reason, ...(adaptiveOnly ? {adaptiveOnly:true} : {})
+    }));
+    const decision = hooks.choose(domain, [...candidates, { id: '$wait', kind: 'wait', reason: 'Hold position' }], facts);
+    const selected = candidates.find(c => c.id === decision.selectedId && c.eligible);
+    const report = (status, details = {}) => hooks.record(`${domain}-result`, {
+      decisionId: decision.decisionId, purpose: selected?.purpose, status, ...details
+    });
+    if (!selected) report('wait', { reason: decision.reason });
+    return { selected, decision, report };
+  }
+
+  function combat(actor, context, hooks) {
+    if (!hooks.allowed()) return;
+    const { ship, smart, health, maxHealth, retreatRatio, evade, enemies, trades, home, hunt, patrol } = context;
+    const low = health < maxHealth * retreatRatio;
+    const danger = evade && enemies.length > 0;
+    const { selected, decision, report } = choose(hooks, 'warship-combat', [
+      ['retreat', low, 'Health below retreat threshold'],
+      ['evade', !low && danger, 'Battle prediction requires evasion'],
+      ['engage', !low && !evade && enemies.length > 0, 'Engage weakest nearby enemy'],
+      ['trade-hunt', !low && !danger && enemies.length === 0 && hunt && trades.length > 0, 'Hunt nearest hostile trade ship'],
+      ...(context.transports?.length ? [['intercept', !low && !danger && enemies.length === 0,
+        'Intercept hostile transports approaching same-team land', true]] : [])
+    ], { unitId: ship.id(), tile: ship.tile(), health, maxHealth, retreatRatio, evade,
+      nearbyEnemies: enemies.length, tradeTargets: trades.length, home });
+    if (!selected) return;
+    if (!hooks.allowed()) { report('stopped'); return; }
+    return hooks.execute(decision.decisionId, () => {
+      const escape = selected.purpose === 'evade' || selected.purpose === 'retreat' && danger;
+      const result = escape ? (hooks.waypoint ? hooks.waypoint(ship.tile(),home,enemies) :
+        { tile:actor.findSafeWaypoint(ship.tile(),home,enemies),decisionId:decision.decisionId }) :
+        target(actor,context,selected.purpose,hooks);
+      const { tile } = result;
+      if (tile === null) { report('held', { reason: 'No destination' }); return; }
+      const previous = patrol ? patrol.patrolTile : undefined;
+      const distant = previous === undefined || actor.game.manhattanDist(previous, tile) > 20;
+      let sameWater = true;
+      try { sameWater = actor.game.getWaterComponent(tile) === actor.game.getWaterComponent(ship.tile()); } catch {}
+      if (!distant || !sameWater) { report('held', { tile, distant, sameWater }); return; }
+      if (!hooks.allowed()) { report('stopped'); return; }
+      let commandDeclined=false;
+      hooks.execute(result.decisionId,()=>{
+        actor.moveWarship(ship, tile);
+        commandDeclined=hooks.wasDeclined?.() === true;
+        if(!commandDeclined)smart.cooldown.set(ship.id(), actor.game.ticks());
+      });
+      report(commandDeclined?'declined':'move-attempted', { tile });
+    });
+  }
+
+  function retaliate(actor, tile, target, cause, hooks) {
+    if (!hooks.allowed()) return;
+    if (target.smallID() === actor.player.smallID()) return;
+    const capped = actor.player.units(deps.warshipType).length >= 10;
+    let build = false;
+    if (!capped) {
+      const difficulty = deps.difficulty();
+      if (difficulty === 'Medium') build = actor.random.nextInt(0, 100) < 15;
+      else if (difficulty === 'Hard') build = actor.random.nextInt(0, 100) < 50;
+      else if (difficulty === 'Impossible') build = actor.random.nextInt(0, 100) < 100;
+    }
+    const { selected, decision, report } = choose(hooks, 'warship-retaliation', [
+      ['reposition', capped, 'Fleet cap reached; reposition existing warship'],
+      ['build', build, 'Original difficulty roll permits retaliation build']
+    ], { tile, targetId: target.smallID(), cause, capped, build });
+    if (!selected) { if(capped||build||decision.selectedId===null)hooks.hold(); return; }
+    if (!hooks.allowed()) { report('stopped'); return; }
+    if (selected.purpose === 'reposition') {
+      hooks.execute(decision.decisionId, () => actor.maybeMoveWarship(tile));
+      report('move-attempted', { tile }); return;
+    }
+    // Do not hold the actor's parent scope while waiting: concurrent responses can finish out of order.
+    void (async () => {
+      try {
+        const buildable = await actor.buildableWarship(tile);
+        if (!hooks.allowed()) { hooks.hold(); report('stopped'); return; }
+        const outcome = hooks.execute(decision.decisionId, () => actor._retaliateBuildReady(tile, target, cause, buildable));
+        report('response-completed', { tile, outcome: outcome === false ? 'declined' : outcome,
+          buildable: buildable != null && buildable.canBuild !== false });
+      } catch (error) { report('threw', { error: String(error?.message || error) }); }
+    })();
+  }
+  return { combat, retaliate, waypoint };
+}
+
+
+
+'use strict';
+
+function createWarshipSafetyPlanner(deps) {
+  const wait={id:'$wait',kind:'wait',reason:'Hold safety action'};
+  const safeId=unit=>{try{return unit.id?.();}catch{return undefined;}};
+  function choose(hooks,domain,entries,facts) {
+    const candidates=entries.slice(0,79).map((e,priority)=>({...e,id:`${domain}:${priority}`,kind:domain,priority,eligible:true}));
+    const decision=hooks.choose(domain,[...candidates,wait],facts);
+    const index=candidates.findIndex(c=>c.id===decision.selectedId);
+    const selected=index<0||!hooks.allowed()?null:entries[index];
+    hooks.record(`${domain}-result`,{decisionId:decision.decisionId,status:!hooks.allowed()?'stopped':selected?'selected':'wait',
+      tile:selected?.tile,reason:decision.reason});
+    return {selected,decisionId:decision.decisionId,error:decision.selectedId===null};
+  }
+  function home(actor,ship,hooks) {
+    if(!hooks.allowed())return {tile:null,held:true};
+    const entries=[],self=actor.player.smallID();
+    for(const port of actor.game.units(deps.portType)||[]) {
+      try {
+        const owner=port.owner();
+        if(!port.isActive()||port.isUnderConstruction()||!owner)continue;
+        const own=owner.smallID()===self;
+        const team=!own&&typeof owner.isOnSameTeam==='function'&&owner.isOnSameTeam(actor.player);
+        if(own||team)entries.push({port,own,team});
+      }catch{}
+    }
+    let winner=0,best=Infinity;
+    for(const [index,entry] of entries.entries()) {
+      entry.tile=entry.port.tile();entry.distance=actor.game.manhattanDist(ship.tile(),entry.tile);entry.index=index;
+      if(entry.distance<best){best=entry.distance;winner=index;}
+    }
+    entries.sort((a,b)=>(a.index===winner?-1:b.index===winner?1:0)||a.distance-b.distance||a.index-b.index);
+    const selection=choose(hooks,'warship-home',entries.map(e=>({tile:e.tile,distance:e.distance,
+      portIndex:e.index,unitId:safeId(e.port),own:e.own,team:e.team,reason:'Nearest active own or same-team port, preserving first ties'})),
+      {shipId:safeId(ship),ports:entries.length});
+    if(!selection.selected)return {tile:null,held:entries.length>0||selection.error||!hooks.allowed(),decisionId:selection.decisionId};
+    const entry=entries.find(e=>e.index===selection.selected.portIndex);
+    return hooks.execute(selection.decisionId,()=>{
+      const portTile=entry.port.tile(),tiles=[];
+      for(const tile of actor.game.neighbors(portTile)) {
+        let water;
+        if(!tiles.length)water=actor.game.isWater(tile);
+        else {try{water=actor.game.isWater(tile);}catch{continue;}}
+        if(water)tiles.push({tile,reason:'Water next to chosen home port, in original neighbor order'});
+      }
+      if(!tiles.length)tiles.push({tile:portTile,reason:'Original dry-port fallback'});
+      const result=choose(hooks,'warship-home-tile',tiles,{portTile});
+      return {tile:result.selected?.tile??null,held:!result.selected,decisionId:result.decisionId};
+    });
+  }
+  function escape(actor,x,y,zones,eta,hooks) {
+    if(!hooks.allowed())return null;
+    const threats=zones.map((zone,index)=>({zone,index,distance:(x-zone.tx)**2+(y-zone.ty)**2}));
+    threats.sort((a,b)=>a.distance-b.distance||a.index-b.index);
+    const entries=threats.filter(e=>e.distance<Infinity);
+    const threat=choose(hooks,'warship-nuke-threat',entries.map(e=>({tx:e.zone.tx,ty:e.zone.ty,radius:e.zone.radius,
+      distance:e.distance,index:e.index,reason:'Nearest blast center, preserving first ties'})),{x,y,zones:zones.length});
+    if(!threat.selected)return null;
+    return hooks.execute(threat.decisionId,()=>{
+      const zone=zones[threat.selected.index],settings=deps.settings();
+      const buffer=settings.warshipNukeDodgeBuffer||20;
+      const samples=Math.max(1,settings.warshipNukeDodgeSamples||8),rings=Math.max(1,settings.warshipNukeDodgeRings||3);
+      let angle=Math.atan2(y-zone.ty,x-zone.tx);if(!Number.isFinite(angle))angle=0;
+      const sites=[];let bestEta=-Infinity,bestDistance=Infinity,winner=-1;
+      for(let ring=1;ring<=rings;ring++) {
+        const radius=zone.radius+buffer*ring;
+        for(let sample=0;sample<samples;sample++) {
+          const offset=Math.ceil(sample/2),sign=sample%2===0?1:-1;
+          const direction=angle+sign*offset*(Math.PI/4);
+          const tx=Math.round(zone.tx+Math.cos(direction)*radius),ty=Math.round(zone.ty+Math.sin(direction)*radius);
+          if(!actor.game.isValidCoord(tx,ty))continue;
+          const tile=actor.game.ref(tx,ty);if(!actor.game.isWater(tile))continue;
+          const safety=eta(tx,ty),distance=Math.abs(tx-x)+Math.abs(ty-y),index=sites.length;
+          if(safety>bestEta||safety===bestEta&&distance<bestDistance){bestEta=safety;bestDistance=distance;winner=index;}
+          sites.push({tile,eta:safety,distance,ring,sample,index,reason:'Highest blast ETA then shortest travel, preserving sample ties'});
+        }
+      }
+      const ranked=sites.filter(e=>winner>=0&&(e.eta>-Infinity||e.eta===-Infinity&&e.distance<Infinity));
+      ranked.sort((a,b)=>(a.index===winner?-1:b.index===winner?1:0)||b.eta-a.eta||a.distance-b.distance||a.index-b.index);
+      const result=choose(hooks,'warship-nuke-escape',ranked,{x,y,samples,rings,probes:sites.length,candidateLimit:79});
+      if(!result.selected)return null;
+      hooks.remember?.(result.decisionId);
+      return {tile:result.selected.tile,eta:result.selected.eta};
+    });
+  }
+  function dodge(actor,ships,context,hooks) {
+    const {tick,zones,eta,smart}=context;
+    for(const ship of ships) {
+      if(!hooks.allowed())return;
+      try {
+        const tile=ship.tile(),x=actor.game.x(tile),y=actor.game.y(tile),currentEta=eta(x,y);
+        if(currentEta===Infinity)continue;
+        const choice=choose(hooks,'warship-nuke-dodge',[{tile,unitId:safeId(ship),currentEta,
+          reason:'Ship is inside a blast zone; search for safer water'}],{tick});
+        if(!choice.selected)continue;
+        hooks.execute(choice.decisionId,()=>{
+          const result=hooks.escape(x,y,zones,eta);
+          const escape=result.selection;
+          if(escape===null)return;
+          if(escape.eta<=currentEta){hooks.record('warship-nuke-dodge-result',{decisionId:choice.decisionId,status:'not-safer'});return;}
+          const patrol=ship.warshipState().patrolTile;
+          if(patrol!==undefined&&eta(actor.game.x(patrol),actor.game.y(patrol))>=escape.eta)return;
+          if(!hooks.allowed())return;
+          const moved=hooks.execute(result.decisionId,()=>actor._dodgeWarshipReady(ship,escape,tick,smart));
+          hooks.record('warship-nuke-dodge-result',{decisionId:choice.decisionId,status:hooks.wasDeclined?.()?'declined':moved?'move-attempted':'not-moved',tile:escape.tile});
+        });
+      }catch(error){hooks.record('warship-nuke-dodge-result',{status:'threw',error:String(error?.message||error)});}
+    }
+  }
+  return {home,escape,dodge};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipSafetyPlanner;
+
+'use strict';
+
+function createWarshipDeploymentPlanner(deps) {
+  const inFlight = new WeakSet(), pending = new WeakMap();
+  const wait = { id: '$wait', kind: 'wait', reason: 'Wait for another opportunity' };
+  function randomUnit(actor, units, domain, parentDecisionId, hooks) {
+    const winner = actor.random.randElement(units);
+    const entries = [winner, ...units.filter(unit => unit !== winner)].slice(0,79);
+    const candidates = entries.map((unit, priority) => ({ id: `unit:${priority}`, kind: domain,
+      priority, eligible: true, unitId: unit.id?.(), tile: unit.tile(),
+      reason: priority === 0 ? 'Original random draw' : 'Alternative unit from the same pool' }));
+    const decision = hooks.choose(domain, [...candidates,wait], { candidateLimit: 79 }, parentDecisionId);
+    const index = candidates.findIndex(c => c.id === decision.selectedId);
+    hooks.record(`${domain}-result`, { decisionId: decision.decisionId, status: index < 0 ? 'wait' : 'selected', unitId: candidates[index]?.unitId });
+    return { unit: index < 0 || !hooks.allowed() ? null : entries[index], decision };
+  }
+  async function deploy(actor, hooks) {
+    if (!hooks.allowed()) return false;
+    const ports = actor.player.units(deps.portType);
+    const ships = actor.player.units(deps.warshipType);
+    const eligible = ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType);
+    const candidate = { id: 'deploy:first', kind: 'warship-deployment', priority: 0, eligible,
+      reason: eligible ? 'Build first warship from an existing port' : 'Requires a port, no warships and gold above cost' };
+    const naval = hooks.naval?.();
+    const ticket = pending.get(actor);
+    if (ticket && (ships.length > ticket.count || actor.game.ticks() - ticket.tick >= 40)) pending.delete(actor);
+    const strategicEligible = naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
+      ports.some(p => (!p.isActive || p.isActive()) && !p.isUnderConstruction?.()) &&
+      BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + BigInt(naval.reserve);
+    const choices = [candidate];
+    if (naval?.island) choices.push({ id:'deploy:island', kind:'warship-deployment', priority:100, adaptiveOnly:true,
+      eligible:!!strategicEligible, reason:'Bounded island fleet; keep the next economy/SAM purchase in reserve',
+      reserve:naval.reserve, targetShips:naval.targetShips, ships:naval.ships });
+    const decision = hooks.choose('warship-deployment', [...choices, wait], { ports: ports.length, warships: ships.length });
+    const report = (status, details = {}) => hooks.record('warship-deployment-result', { decisionId: decision.decisionId, status, ...details });
+    const selected = choices.find(c => c.id === decision.selectedId && c.eligible);
+    if (!selected) { report('wait', { reason: decision.reason }); return false; }
+    const strategic = selected.id === 'deploy:island';
+    if (!hooks.allowed()) { report('stopped'); return false; }
+    try {
+      if (strategic) inFlight.add(actor);
+      const rejected = new Set();
+      for (let attempt=0; attempt<(strategic ? 8 : 1); attempt++) {
+        if (!hooks.allowed()) { report('stopped'); return false; }
+        let site;
+        if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
+        else {
+          const { unit: port, decision: portDecision } = randomUnit(actor, ports, 'warship-port', decision.decisionId, hooks);
+          if (!port) { report('wait'); return false; }
+          site = hooks.spawn ? hooks.spawn(port.tile(), 250, portDecision.decisionId) :
+            { tile: actor.warshipSpawnTile(port.tile(), 250), decisionId: portDecision.decisionId };
+        }
+        const { tile } = site;
+        if (tile === null) { report('no-site'); return false; }
+        const buildable = await actor.buildableWarship(tile);
+        if (!hooks.allowed()) { report('stopped'); return false; }
+        if (buildable == null || buildable.canBuild === false) {
+          report('unbuildable', { tile });
+          if (strategic) { rejected.add(tile); continue; }
+          return false;
+        }
+        if (strategic) {
+          const fresh = hooks.naval();
+          const cost = BigInt(buildable.cost ?? actor.cost(deps.warshipType));
+          if (!fresh?.island || !fresh.fleetNeeded || BigInt(actor.player.gold()) < cost + BigInt(fresh.reserve)) {
+            report('reserve-or-fleet-changed', {tile}); return false;
+          }
+        }
+        const result = hooks.execute(site.decisionId, () => actor._deployWarshipReady(tile, buildable));
+        if (strategic && result) pending.set(actor, {tick:actor.game.ticks(),count:ships.length});
+        report(result ? 'build-attempted' : 'not-built', { tile });
+        return result;
+      }
+      report('sites-exhausted'); return false;
+    } catch (error) { report('threw', { error: String(error?.message || error) }); throw error; }
+    finally { if (strategic) inFlight.delete(actor); }
+  }
+
+  function select(actor, teamGame, hooks) {
+    if (!hooks.allowed()) return { target: null };
+    const entries = [];
+    if (teamGame) {
+      const teams = new Map();
+      for (const player of actor.game.players()) {
+        if (actor.player.isFriendly(player) || player.id() === actor.player.id()) continue;
+        const team = player.team();
+        if (team === null) continue;
+        const key = team.toString();
+        if (!teams.has(key)) teams.set(key, { count: 0, players: [] });
+        const group = teams.get(key);
+        group.count += player.units(deps.warshipType).length;
+        group.players.push(player);
+      }
+      for (const [team, group] of teams) {
+        if (group.count <= 15) continue;
+        const player = group.players.reduce((best, next) => next.units(deps.warshipType).length > (best ? best.units(deps.warshipType).length : 0) ? next : best, null);
+        if (!player) continue;
+        const fleet = player.units(deps.warshipType);
+        if (fleet.length > 3) entries.push({ player, fleet, team, teamShips: group.count });
+        if (entries.length === 79) break;
+      }
+    } else {
+      const enemies = actor.game.players().filter(player => !actor.player.isFriendly(player) && player.id() !== actor.player.id());
+      for (const player of enemies) {
+        const fleet = player.units(deps.warshipType);
+        if (fleet.length > 10) entries.push({ player, fleet });
+        if (entries.length === 79) break;
+      }
+    }
+    const candidates = entries.map((entry, priority) => ({ id: `infestation:${priority}`, kind: 'warship-infestation',
+      priority, eligible: true, targetId: entry.player.id(), warships: entry.fleet.length,
+      team: entry.team, teamWarships: entry.teamShips,
+      reason: teamGame ? 'Strongest fleet on qualifying hostile team, in original team order' : 'Hostile fleet above ten warships, in original player order' }));
+    const decision = hooks.choose('warship-infestation', [...candidates, wait], { teamGame, candidateLimit: 79 });
+    const index = candidates.findIndex(c => c.id === decision.selectedId);
+    if (index < 0) {
+      hooks.record('warship-infestation-result', { decisionId: decision.decisionId, status: 'wait', reason: decision.reason });
+      return { target: null, decision };
+    }
+    if (!hooks.allowed()) {
+      hooks.record('warship-infestation-result', { decisionId: decision.decisionId, status: 'stopped' });
+      return { target: null, decision };
+    }
+    const entry = entries[index];
+    const selection = randomUnit(actor, entry.fleet, 'warship-unit', decision.decisionId, hooks);
+    const target = selection.unit ? { player: entry.player, warship: selection.unit } : null;
+    return { target, decision, unitDecision: selection.decision };
+  }
+
+  async function counter(actor, teamGame, hooks) {
+    const { target, decision, unitDecision } = select(actor, teamGame, hooks);
+    if (target === null) return;
+    const report = (status, details = {}) => hooks.record('warship-infestation-result', { decisionId: decision.decisionId, status, ...details });
+    try {
+      const tile = target.warship.tile();
+      const buildable = await actor.buildableWarship(tile);
+      if (!hooks.allowed()) { report('stopped'); return; }
+      const outcome = hooks.execute(unitDecision.decisionId, () => actor._counterWarshipReady(tile, buildable));
+      report('response-completed', { tile, outcome: outcome === false ? 'declined' : outcome });
+    } catch (error) { report('threw', { error: String(error?.message || error) }); throw error; }
+  }
+  return { deploy, select, counter };
+}
+
+
+
+'use strict';
+
+function createStrikePlanner(deps) {
+  const { state, units } = deps;
+  const wait = { id: '$wait', kind: 'wait', reason: 'Hold strike' };
+  function choose(hooks, domain, plans, facts = {}) {
+    const candidates = plans.map((plan, priority) => ({ kind: domain, priority, eligible: true, ...plan }));
+    const decision = hooks.choose(domain, [...candidates, wait], facts);
+    const plan = candidates.find(c => c.id === decision.selectedId && c.eligible);
+    const report = (status, details = {}) => hooks.record('strike-result', {
+      domain, decisionId: decision.decisionId, planId: plan?.id, status, ...details
+    });
+    if (!plan) report('wait', { reason: decision.reason });
+    return { plan, decision, report };
+  }
+  async function mirv(actor, cost, hooks) {
+    if (!hooks.allowed()) return false;
+    if (state.settings.winFixes && actor.teamHasWon()) {
+      if (state.nukeReserveGold) state.nukeReserveGold = 0n;
+      hooks.record('strike-result', { domain: 'mirv-plan', status: 'team-won' }); return false;
+    }
+    const remaining = state.settings.winFixes ? ['win-fix', 'counter', 'denial', 'steamroll'] : ['counter', 'denial', 'steamroll'];
+    let affordabilityChecked = false;
+    while (remaining.length) {
+      if (!hooks.allowed()) return false;
+      if (remaining[0] !== 'win-fix' && !affordabilityChecked) {
+        affordabilityChecked = true;
+        if (actor.player.gold() < cost) {
+          hooks.record('strike-result', { domain: 'mirv-plan', status: 'unaffordable', cost }); return false;
+        }
+      }
+      const { plan, decision, report } = choose(hooks, 'mirv-plan', remaining.map(purpose => ({
+        id: purpose, readiness: 'unchecked', reason: `Original MIRV purpose: ${purpose}`
+      })), { cost, reserve: state.nukeReserveGold });
+      if (!plan) return false;
+      if (plan.id !== 'win-fix' && !affordabilityChecked) {
+        affordabilityChecked = true;
+        if (actor.player.gold() < cost) { report('unaffordable', { cost }); return false; }
+      }
+      remaining.splice(remaining.indexOf(plan.id), 1);
+      const read = () => {
+        if (plan.id === 'win-fix') return actor.selectWinFixMirvTarget(cost);
+        if (plan.id === 'counter') return actor.selectCounterMirvTarget();
+        if (plan.id === 'denial') return actor.selectVictoryDenialTarget();
+        return actor.selectSteamrollStopTarget();
+      };
+      const lookup = hooks.lookup ? hooks.lookup(decision.decisionId,read) : { target: read(), stopped: false };
+      if (lookup.stopped) { report('stopped', { reason: 'Target ranking policy stopped purpose pass' }); return false; }
+      const target = lookup.target;
+      if (!hooks.allowed()) { report('stopped'); return false; }
+      if (target && !actor.wasRecentlyMirved(target)) {
+        if (plan.id === 'win-fix') {
+          if (actor.player.gold() >= cost) state.nukeReserveGold = 0n;
+          else {
+            if (actor.game.ticks() >= (state.settings.mirvEarlyGameTicks ?? 6000)) state.nukeReserveGold = cost;
+            else if (state.nukeReserveGold) state.nukeReserveGold = 0n;
+            report('reserve', { reserve: state.nukeReserveGold, cost }); return false;
+          }
+        }
+        await actor.maybeSendMIRV(target, lookup.decisionId ?? decision.decisionId);
+        report('attempt-completed'); return true;
+      }
+      if (plan.id === 'win-fix' && state.nukeReserveGold) state.nukeReserveGold = 0n;
+      report('unfulfilled', { reason: target ? 'Target was recently MIRVed' : 'No target' });
+    }
+    return false;
+  }
+
+  async function weapon(actor, context, hooks) {
+    const remaining = [units.HydrogenBomb, units.AtomBomb];
+    while (remaining.length) {
+      if (!hooks.allowed()) return null;
+      const { plan, decision, report } = choose(hooks, 'nuke-weapon', remaining.map(type => ({
+        id: type, readiness: 'unchecked', reason: `Original weapon preference: ${type}`
+      })), context);
+      if (!plan) return null;
+      remaining.splice(remaining.indexOf(plan.id), 1);
+      let eligible = false;
+      if (plan.id === units.HydrogenBomb) {
+        eligible = !actor.game.config().isUnitDisabled(units.HydrogenBomb) && context.available >= context.hydroCost && actor.nukeSpendAllowed(await actor.cost(units.HydrogenBomb));
+      } else {
+        eligible = !actor.game.config().isUnitDisabled(units.AtomBomb) && (!actor.isHydroNation || actor.isUnderHeavyAttack()) && context.available >= context.atomCost;
+      }
+      if (!hooks.allowed()) { report('stopped'); return null; }
+      report(eligible ? 'weapon-selected' : 'unfulfilled');
+      if (eligible) { hooks.selected?.(decision.decisionId); return plan.id; }
+    }
+    return null;
+  }
+
+  async function nuke(actor, sites, context, hooks) {
+    const difficulty = context.difficulty ?? deps.difficulty();
+    const remaining = [];
+    // Original sorted loop stops at the first score that does not exceed -1.
+    for (const site of sites) { if (!(site.value > -1)) break; remaining.push({ ...site, id: `site:${remaining.length}` }); }
+    let selected = null, salvo = null, siteDecisionId;
+    while (remaining.length) {
+      if (!hooks.allowed()) return;
+      const { plan, decision, report } = choose(hooks, 'nuke-site', remaining.slice(0, 79).map(site => ({
+        ...site, reason: 'Original descending strike score; reachability unchecked'
+      })), { parentDecisionId: context.parentDecisionId, weapon: context.weapon });
+      if (!plan) return;
+      if (plan.arcDecisionId !== undefined) hooks.record('strike-link', {
+        decisionId: decision.decisionId, sourceDecisionId: plan.arcDecisionId, relation: 'selected-site-arc' });
+      remaining.splice(remaining.findIndex(s => s.id === plan.id), 1);
+      const reachable = await actor.probeCanBuildNuke(plan.tile, plan.interceptable ? units.AtomBomb : context.weapon);
+      if (!hooks.allowed()) { report('stopped'); return; }
+      if (!reachable) { report('unreachable', { tile: plan.tile }); continue; }
+      if (plan.interceptable) {
+        salvo = await actor.planSaturationSalvoFor(plan.tile, decision.decisionId);
+        if (!hooks.allowed()) { report('stopped'); return; }
+        if (salvo?.stopped) { report('stopped'); return; }
+        if (salvo === null) { report('no-salvo', { tile: plan.tile }); continue; }
+      }
+      selected = plan; siteDecisionId = decision.decisionId; report('site-selected', { tile: plan.tile }); break;
+    }
+    if (!hooks.allowed()) return;
+    let purpose;
+    if (salvo !== null) purpose = 'salvo';
+    else {
+      const permitted = actor.nukeSpendAllowed(await actor.cost(context.weapon));
+      if (!hooks.allowed()) return;
+      if (!permitted) { hooks.record('strike-result', { domain: 'nuke-action', status: 'spend-blocked' }); return; }
+      const samCrack = Boolean(state.settings.samCrack);
+      if (selected !== null && (selected.value > 0 || difficulty !== 'Impossible' && !samCrack)) purpose = 'direct';
+      else if (difficulty === 'Impossible' || samCrack) purpose = 'sam-clear';
+    }
+    const { plan, decision, report } = choose(hooks, 'nuke-action', purpose ? [{
+      id: purpose, reason: `Original strike action: ${purpose}`, tile: selected?.tile
+    }] : [], { parentDecisionId: hooks.parent?.(salvo) ?? siteDecisionId ?? context.parentDecisionId, weapon: context.weapon });
+    if (!plan) return;
+    if (!hooks.allowed()) { report('stopped'); return; }
+    try {
+      if (purpose === 'salvo') {
+        for (let i = 0; i < salvo.bombsToFire; i++) {
+          if (!hooks.allowed()) { report('stopped', { attempts: i }); return; }
+          await actor.sendNuke(selected.tile, units.AtomBomb, context.target, salvo.waitTicksPerBomb[i], true, salvo.arcUpPerBomb ? salvo.arcUpPerBomb[i] !== false : true, decision.decisionId);
+          if (!hooks.allowed()) { report('stopped', { attempts: i + 1 }); return; }
+          await deps.salvoPace(i, salvo.bombsToFire);
+        }
+        if (!hooks.allowed()) { report('stopped'); return; }
+        deps.salvoMessage(salvo.bombsToFire);
+      } else if (purpose === 'direct') await actor.sendNuke(selected.tile, context.weapon, context.target, 0, false, selected.arcUp !== false, decision.decisionId);
+      else await actor.maybeDestroyEnemySam(context.target, decision.decisionId);
+      report('attempt-completed');
+    } catch (error) { report('threw', { error: String(error?.message || error) }); throw error; }
+  }
+  return { mirv, weapon, nuke };
+}
+
+
+
+'use strict';
+
+function createStrikeTargetPlanner(deps) {
+  const wait = { id: '$wait', kind: 'wait', reason: 'Hold strike' };
+  function choose(hooks, domain, entries, facts = {}) {
+    const candidates = entries.map((entry, priority) => ({ kind: domain, priority, eligible: true, ...entry }));
+    const decision = hooks.choose(domain, [...candidates, wait], facts);
+    const selected = candidates.find(c => c.id === decision.selectedId && c.eligible);
+    const report = (status, details = {}) => hooks.record('strike-target-result', { domain,
+      decisionId: decision.decisionId, selectedId: selected?.id, status, ...details });
+    if (!selected) report('wait', { reason: decision.reason });
+    return { selected, decision, report };
+  }
+  const playerId = player => { try { return player?.id?.() ?? null; } catch { return null; } };
+  const linked = (hooks,result,decisionId) => hooks.link ? hooks.link(result,decisionId) : result;
+  function salvo(actor, context, hooks) {
+    const stopped = () => ({ ok: false, stopped: true });
+    if (!hooks.allowed()) return stopped();
+    const measured = actor._measureSalvoSilos(context.targetTile, context.silos, context.parentDecisionId);
+    if (measured.stopped || !hooks.allowed()) return stopped();
+    const { silos, coveringSamIds, requiredBase } = measured;
+    silos.sort((a,b) => actor.game.manhattanDist(a.silo.tile(),context.targetTile)-actor.game.manhattanDist(b.silo.tile(),context.targetTile));
+    const order = choose(hooks,'salvo-order',[{id:'game-queue',
+      siloCount:silos.length,slots:silos.map(s=>s.slots),
+      reason:'Nearest-silo launch queue with original first ties; game controls launch origin'}],
+      {parentDecisionId:context.parentDecisionId,targetTile:context.targetTile});
+    if (!order.selected || !hooks.allowed()) return stopped();
+    order.report('order-selected');
+    const slots = [];
+    for (const silo of silos) for (let i=0;i<silo.slots;i++) slots.push({
+      flightTicks:silo.flightTicks,interceptable:silo.interceptable,arcUp:silo.arcUp!==false});
+    const halfCooldown=Math.floor(actor.game.config().SAMCooldown()/2);
+    const totalBombs=requiredBase+Math.floor(requiredBase/5);
+    const failure=needsMoreSilos=>({ok:false,needsMoreSilos,coveringSamIds,totalBombs});
+    const clear=[];
+    for(let i=0;i<slots.length;i++)if(!slots[i].interceptable)clear.push({index:i,flightTicks:slots[i].flightTicks});
+    if(clear.length<totalBombs)return failure(true);
+    clear.sort((a,b)=>a.flightTicks-b.flightTicks);
+    const windows=[];
+    for(let start=0;start<clear.length;start++){
+      let end=start;while(end<clear.length&&clear[end].flightTicks-clear[start].flightTicks<=halfCooldown)end++;
+      if(end-start>=totalBombs)windows.push({start,end,count:end-start});
+    }
+    if(!windows.length)return failure(true);
+    windows.sort((a,b)=>b.count-a.count||a.start-b.start);
+    const window=choose(hooks,'salvo-window',windows.slice(0,79).map(w=>({
+      id:`window:${w.start}`,start:w.start,count:w.count,firstFlight:clear[w.start].flightTicks,
+      lastFlight:clear[w.end-1].flightTicks,reason:'Largest arrival cluster within half SAM cooldown; preserve first tie'})),
+      {parentDecisionId:order.decision.decisionId,totalBombs,halfCooldown,windowCount:windows.length});
+    if(!window.selected||!hooks.allowed())return stopped();
+    const chosenWindow=windows.find(w=>w.start===window.selected.start);
+    window.report('window-selected');
+    const counts=[];
+    for(let count=totalBombs;count<=chosenWindow.count&&counts.length<79;count++)counts.push({
+      id:`count:${count}`,count,reason:'At least required SAM saturation; baseline uses minimum bomb count'});
+    const count=choose(hooks,'salvo-count',counts,{parentDecisionId:window.decision.decisionId,
+      totalBombs,capacity:chosenWindow.count});
+    if(!count.selected||!hooks.allowed())return stopped();
+    count.report('count-selected',{count:count.selected.count});
+    const selectedSlots=clear.slice(chosenWindow.start,chosenWindow.end).sort((a,b)=>a.index-b.index).slice(0,count.selected.count);
+    const selectedIndices=new Set(selectedSlots.map(s=>s.index));
+    const bombsToFire=selectedSlots[selectedSlots.length-1].index+1;
+    const firstArrival=Math.min(...selectedSlots.map(s=>s.flightTicks));
+    const spacing=Math.max(1,Math.floor(halfCooldown/count.selected.count));
+    const waitTicksPerBomb=[],arcUpPerBomb=[];let selectedIndex=0;
+    for(let i=0;i<bombsToFire;i++){
+      arcUpPerBomb.push(slots[i].arcUp!==false);
+      if(selectedIndices.has(i)){
+        waitTicksPerBomb.push(Math.max(0,firstArrival+selectedIndex*spacing-slots[i].flightTicks));selectedIndex++;
+      }else waitTicksPerBomb.push(0);
+    }
+    // Approve all schedule chunks before returning anything executable. Engine
+    // telemetry caps arrays at 80; each chunk keeps the entire tail visible.
+    let schedule,parentDecisionId=count.decision.decisionId;
+    for(let firstBomb=0;firstBomb<bombsToFire;firstBomb+=79){
+      schedule=choose(hooks,'salvo-schedule',[{id:'staggered',bombsToFire,
+        waitTicksPerBomb:waitTicksPerBomb.slice(firstBomb,firstBomb+79),
+        arcUpPerBomb:arcUpPerBomb.slice(firstBomb,firstBomb+79),
+        reason:'Original queue prefix and staggered waits; approve every chunk before execution'}],
+        {parentDecisionId,firstBomb,spacing,selectedBombs:count.selected.count});
+      if(!schedule.selected||!hooks.allowed())return stopped();
+      schedule.report('chunk-approved',{firstBomb});parentDecisionId=schedule.decision.decisionId;
+    }
+    const cost=context.cost*BigInt(bombsToFire);
+    if(actor.player.gold()<cost){schedule.report('unaffordable',{cost});return failure(false);}
+    if(!actor.nukeSpendAllowed(cost)){schedule.report('spend-blocked',{cost});return failure(false);}
+    if(!hooks.allowed()){schedule.report('stopped');return stopped();}
+    schedule.report('schedule-selected',{cost});
+    return linked(hooks,{ok:true,bombsToFire,waitTicksPerBomb,arcUpPerBomb,coveringSamIds,totalBombs},schedule.decision.decisionId);
+  }
+  function arc(actor, context, hooks) {
+    const stopped = () => ({ intercepted: true, arcUp: true, upgradeSafe: false, stopped: true });
+    if (!hooks.allowed()) return stopped();
+    const settings = deps.settings();
+    const rotate = Boolean(settings.nukeArcRotate) && actor.canSetNukeArc();
+    const margin = Boolean(settings.samUpgradeMargin);
+    let lastDecisionId;
+    for (const extraLevels of margin ? [1, 0] : [0]) {
+      const remaining = rotate ? ['up', 'down'] : ['up'];
+      while (remaining.length) {
+        if (!hooks.allowed()) return stopped();
+        const { selected, decision, report } = choose(hooks, 'nuke-arc', remaining.map(id => ({
+          id, arcUp: id === 'up', readiness: 'unchecked',
+          reason: 'Original up-first trajectory probes; upgrade margin before normal SAM levels'
+        })), { parentDecisionId: context.parentDecisionId, fromTile: context.fromTile,
+          targetTile: context.targetTile, extraLevels, rotate,
+          ignoredSamIds: context.ignoredSamIds ? Array.from(context.ignoredSamIds) : [] });
+        if (!selected || !hooks.allowed()) return stopped();
+        lastDecisionId=decision.decisionId;
+        remaining.splice(remaining.indexOf(selected.id), 1);
+        const intercepted = extraLevels === 1
+          ? actor.isTrajectoryInterceptableBySam(context.fromTile, context.targetTile, context.ignoredSamIds, selected.arcUp, 1)
+          : actor.isTrajectoryInterceptableBySam(context.fromTile, context.targetTile, context.ignoredSamIds, selected.arcUp);
+        if (!hooks.allowed()) { report('stopped'); return stopped(); }
+        report(intercepted ? 'intercepted' : 'arc-selected', { arcUp: selected.arcUp, extraLevels });
+        if (!intercepted) return linked(hooks,{ intercepted: false, arcUp: selected.arcUp, upgradeSafe: extraLevels === 1 || !margin },decision.decisionId);
+      }
+    }
+    return linked(hooks,{ intercepted: true, arcUp: true, upgradeSafe: false },lastDecisionId);
+  }
+  function search(hooks,domain,inputs,facts,check) {
+    let remaining=Array.from(inputs,(input,index)=>({input,index}));
+    while(remaining.length&&hooks.allowed()) {
+      const visible=remaining.slice(0,79);
+      const {selected,decision,report}=choose(hooks,domain,visible.map(entry=>({
+        id:`${domain}:${entry.index}`,inputIndex:entry.index,targetId:playerId(domain==='nuke-hostile-player'?entry.input.player:entry.input),
+        ...(domain==='nuke-hostile-player'?{relation:entry.input.relation}:{}),
+        readiness:'unchecked',reason:'Original input order; evaluate eligibility only after selection'
+      })),{...facts,remaining:remaining.length,candidateLimit:79});
+      if(!selected||!hooks.allowed())return {target:null,stopped:true};
+      const entry=visible.find(e=>e.index===selected.inputIndex);remaining=remaining.filter(e=>e!==entry);
+      const result=check(entry.input,decision.decisionId);
+      if(result.stopped||!hooks.allowed()){report('stopped');return {target:null,stopped:true};}
+      if(result.target){report('target-selected',{targetId:playerId(result.target)});
+        return {target:result.target,stopped:false,decisionId:result.decisionId??decision.decisionId};}
+      report('ineligible',{reason:result.reason});
+    }
+    return {target:null,stopped:!hooks.allowed()};
+  }
+  function single(hooks,domain,player,parentDecisionId,facts={}) {
+    const {selected,decision,report}=choose(hooks,domain,[{id:`${domain}:0`,targetId:playerId(player),
+      reason:'Original qualifying sole opponent or majority leader'}],{...facts,parentDecisionId});
+    if(!selected||!hooks.allowed())return {target:null,stopped:true};
+    report('target-selected',{targetId:playerId(player)});
+    return {target:player,stopped:false,decisionId:decision.decisionId};
+  }
+  function requested(actor,hooks,parentDecisionId) {
+    return search(hooks,'nuke-request-ally',actor.player.allies(),{parentDecisionId},(ally,allyDecisionId)=>{
+      if(ally.targets().length===0)return {target:null,reason:'Ally has no requested targets'};
+      if(actor.player.relation(ally)<deps.friendly)return {target:null,reason:'Ally relation below original Friendly threshold'};
+      return search(hooks,'nuke-request-player',ally.targets(),{parentDecisionId:allyDecisionId},player=>{
+        if(player.smallID()===actor.player.smallID())return {target:null,reason:'Requested player is self'};
+        if(actor.player.isFriendly(player))return {target:null,reason:'Requested player is friendly'};
+        return {target:player};
+      });
+    });
+  }
+  function hostile(actor,hooks,parentDecisionId) {
+    const ownMax=actor.game.config().maxTroops(actor.player);
+    return search(hooks,'nuke-hostile-player',actor.player.allRelationsSorted(),{parentDecisionId,ownMax},relation=>{
+      if(relation.relation!==deps.hostile)return {target:null,reason:'Relation is not exactly Hostile'};
+      if(actor.player.isFriendly(relation.player))return {target:null,reason:'Hostile relation player is friendly'};
+      if(ownMax>=actor.game.config().maxTroops(relation.player)*2)return {target:null,reason:'Own capacity is at least twice target capacity'};
+      return {target:relation.player};
+    });
+  }
+  function target(actor, hooks) {
+    const remaining = ['duel', 'incoming', 'density', 'majority', 'allied-target', 'hostile', 'crown', 'team'];
+    while (remaining.length) {
+      if (!hooks.allowed()) return null;
+      const { selected, decision, report } = choose(hooks, 'nuke-target', remaining.map(id => ({ id,
+        readiness: 'unchecked', reason: `Original target search: ${id}` })));
+      if (!selected) return null;
+      remaining.splice(remaining.indexOf(selected.id), 1);
+      let result = null;
+      let rankingStopped = false;
+      let targetDecisionId;
+      const rank = read => {
+        const lookup = hooks.lookup ? hooks.lookup(decision.decisionId,read) : { target: read(), stopped: false };
+        rankingStopped = lookup.stopped; targetDecisionId=lookup.decisionId; return lookup.target;
+      };
+      switch (selected.id) {
+        case 'duel': {
+          const difficulty = deps.difficulty();
+          if ((difficulty === 'Hard' || difficulty === 'Impossible') && actor.game.players().length === 2) {
+            result = actor.game.players().find(p => p.smallID() !== actor.player.smallID());
+            if(result){const lookup=single(hooks,'nuke-duel-player',result,decision.decisionId);
+              result=lookup.target;rankingStopped=lookup.stopped;targetDecisionId=lookup.decisionId;}
+          }
+          break;
+        }
+        case 'incoming': {
+          const response = hooks.incoming(decision.decisionId);
+          if (response.stopped) { report('stopped', { reason: 'Incoming target policy stopped lookup' }); return null; }
+          result = response.target; targetDecisionId=response.decisionId; break;
+        }
+        case 'density': result = rank(() => actor.findHighDensityTarget()); break;
+        case 'majority': {
+          const difficulty = deps.difficulty(), mode = actor.game.config().gameConfig().gameMode;
+          if (difficulty === 'Impossible' && mode === deps.ffa) {
+            const land = actor.game.numLandTiles() - actor.game.numTilesWithFallout();
+            if (land > 0) {
+              const leader = actor.game.players().slice().sort((a,b) => b.numTilesOwned()-a.numTilesOwned())[0];
+              if (leader && leader.smallID() !== actor.player.smallID() && !actor.player.isFriendly(leader) && leader.numTilesOwned()/land > .5) {
+                const lookup=single(hooks,'nuke-majority-player',leader,decision.decisionId,{land});
+                result=lookup.target;rankingStopped=lookup.stopped;targetDecisionId=lookup.decisionId;
+              }
+            }
+          }
+          break;
+        }
+        case 'allied-target': {
+          const lookup=requested(actor,hooks,decision.decisionId);result=lookup.target;rankingStopped=lookup.stopped;targetDecisionId=lookup.decisionId;
+          break;
+        }
+        case 'hostile': {
+          const lookup=hostile(actor,hooks,decision.decisionId);result=lookup.target;rankingStopped=lookup.stopped;targetDecisionId=lookup.decisionId;
+          break;
+        }
+        case 'crown': result = rank(() => actor.findFFACrownTarget()); break;
+        case 'team': result = rank(() => actor.findStrongestTeamTarget()); break;
+      }
+      if (rankingStopped) { report('stopped', { reason: 'Target ranking policy stopped lookup' }); return null; }
+      if (!hooks.allowed()) { report('stopped'); return null; }
+      if (selected.id === 'density' ? result !== null : Boolean(result)) {
+        let targetId = null; try { targetId = result?.id?.() ?? null; } catch {}
+        report('target-selected', { targetId }); hooks.selected?.(targetDecisionId ?? decision.decisionId); return result;
+      }
+      report('unfulfilled');
+    }
+    return null;
+  }
+
+  async function sam(actor, target, sams, context, hooks) {
+    const remaining = sams.map((sam,index) => ({ sam, id: `sam:${index}` }));
+    let upgrade = null;
+    while (remaining.length) {
+      if (!hooks.allowed()) return;
+      const { selected, decision, report } = choose(hooks, 'sam-target', remaining.slice(0,79).map(entry => ({
+        id: entry.id, tile: entry.sam.tile(), level: entry.sam.level(), reason: 'Original ascending SAM level; plan unchecked'
+      })), { parentDecisionId: context.parentDecisionId, cost: context.cost });
+      if (!selected) return;
+      remaining.splice(remaining.findIndex(entry => entry.id === selected.id),1);
+      let plan;
+      try { plan = actor.planSaturationSalvo(selected.tile,context.cost,context.silos,decision.decisionId); }
+      catch (error) { report('threw', { error: String(error?.message || error) }); throw error; }
+      if (plan.stopped) { report('stopped'); return; }
+      if (!plan.ok) {
+        if (plan.needsMoreSilos) upgrade ??= { targetTile: selected.tile, coveringSamIds: plan.coveringSamIds, totalBombs: plan.totalBombs };
+        report('unfulfilled', { needsMoreSilos: Boolean(plan.needsMoreSilos), totalBombs: plan.totalBombs }); continue;
+      }
+      for (let index=0; index<plan.bombsToFire; index++) {
+        if (!hooks.allowed()) { report('stopped'); return; }
+        await actor.sendNuke(selected.tile,deps.units.AtomBomb,target,plan.waitTicksPerBomb[index],true,plan.arcUpPerBomb ? plan.arcUpPerBomb[index] !== false : true,hooks.parent?.(plan) ?? decision.decisionId);
+        if (!hooks.allowed()) { report('stopped'); return; }
+        await deps.salvoPace(index,plan.bombsToFire);
+      }
+      if (!hooks.allowed()) { report('stopped'); return; }
+      deps.samMessage(plan.bombsToFire); report('salvo-attempted', { attempts: plan.bombsToFire }); return;
+    }
+    if (!upgrade || !hooks.allowed()) return;
+    const { selected, decision, report } = choose(hooks,'sam-upgrade',[{ id: 'upgrade', tile: upgrade.targetTile,
+      totalBombs: upgrade.totalBombs, reason: 'First SAM plan requiring more silo capacity' }], { parentDecisionId: context.parentDecisionId });
+    if (!selected || !hooks.allowed()) return;
+    await actor.maybeUpgradeHelpfulSilo(upgrade,decision.decisionId);
+    if (!hooks.allowed()) { report('stopped'); return; }
+    report('upgrade-attempted');
+  }
+
+  async function upgrade(actor, context, hooks) {
+    if (!hooks.allowed()) return;
+    const silos = actor.player.units(deps.units.MissileSilo);
+    if (silos.length === 0) return;
+    const reachable = [];
+    for (const silo of silos) {
+      const trajectory = actor.chooseNukeArc(silo.tile(),context.targetTile,context.coveringSamIds,context.parentDecisionId);
+      if (trajectory.stopped || !hooks.allowed()) return;
+      if (!trajectory.intercepted) reachable.push(silo);
+    }
+    if (reachable.length === 0 || reachable.length*deps.maxSiloLevel < context.totalBombs) return;
+    const sams = actor.player.units(deps.units.SAMLauncher), entries = [];
+    for (const silo of reachable) {
+      if (silo.level() >= deps.maxSiloLevel) continue;
+      let score = 0;
+      for (const sam of sams) {
+        const range = actor.game.config().samRange(sam.level());
+        if (actor.game.euclideanDistSquared(silo.tile(),sam.tile()) <= range*range) score += sam.level();
+      }
+      entries.push({ silo, score, index: entries.length });
+    }
+    entries.sort((a,b) => b.score-a.score || a.index-b.index);
+    const { selected, decision, report } = choose(hooks,'strike-silo',entries.slice(0,79).map(entry => ({
+      id: `silo:${entry.index}`, tile: entry.silo.tile(), coverage: entry.score, eligible: entry.score > -1,
+      reason: 'Highest friendly-SAM coverage; preserve first tie'
+    })), { parentDecisionId: context.parentDecisionId, targetTile: context.targetTile, totalBombs: context.totalBombs });
+    if (!selected || !hooks.allowed()) return;
+    const entry = entries.find(entry => `silo:${entry.index}` === selected.id);
+    await actor._upgradeSiloReady(entry.silo,decision.decisionId);
+    if (!hooks.allowed()) { report('stopped'); return; }
+    report('upgrade-attempted');
+  }
+  return { target, sam, upgrade, arc, salvo };
+}
+
+
+
+'use strict';
+
+function createStrikeRanking(deps) {
+  function collect(actor,mode) {
+    const entries=[];
+    const add=(player,score,facts={})=>entries.push({player,score,facts,index:entries.length});
+    if (['counter','denial','steamroll','win-fix'].includes(mode) && actor.player===null) {
+      if (mode==='win-fix') return entries;
+      throw new Error('not initialized');
+    }
+    if (mode==='counter') {
+      for(const player of actor.getValidMirvTargetPlayers().filter(p=>actor.isInboundMIRVFrom(p))) add(player,player.numTilesOwned(),{inbound:true});
+    } else if(mode==='win-fix') {
+      const valid=actor.getValidMirvTargetPlayers().filter(p=>p.isAlive());
+      if(!valid.length)return entries;
+      const land=actor.game.numLandTiles()||1, settings=deps.settings();
+      const minimum=settings.mirvTargetMinShare??.35, topN=settings.mirvTargetTopN??3;
+      const top=new Set(actor.game.players().filter(p=>p.isAlive()).sort((a,b)=>b.numTilesOwned()-a.numTilesOwned()).slice(0,topN).map(p=>p.smallID()));
+      for(const player of valid) if(top.has(player.smallID())&&player.numTilesOwned()/land>minimum) add(player,player.numTilesOwned(),{share:player.numTilesOwned()/land,minimum,topN});
+    } else if(mode==='denial') {
+      const land=actor.game.numLandTiles();if(land===0)return entries;
+      for(const player of actor.getValidMirvTargetPlayers()) {
+        let severity=0;const team=player.team();
+        if(team!==null) {
+          const members=actor.game.players().filter(p=>p.team()===team&&p.isPlayer());
+          const share=members.map(p=>p.numTilesOwned()).reduce((a,b)=>a+b,0)/land;
+          if(share>=actor.victoryDenialTeamThreshold) {
+            let leader=null,largest=-1;
+            for(const member of members) if(member.numTilesOwned()>largest){largest=member.numTilesOwned();leader=member;}
+            if(leader!==null&&leader.smallID()===player.smallID())severity=share;
+          }
+        } else {
+          const share=player.numTilesOwned()/land;
+          if(share>=actor.victoryDenialIndividualThreshold)severity=share;
+        }
+        if(severity>0)add(player,severity,{team,share:severity});
+      }
+    } else if(mode==='steamroll') {
+      const valid=actor.getValidMirvTargetPlayers();if(!valid.length)return entries;
+      const cities=actor.game.players().filter(p=>p.isPlayer()).map(p=>({player:p,count:actor.countCities(p)})).sort((a,b)=>b.count-a.count);
+      if(cities.length<2)return entries;
+      const leader=cities[0],threshold=cities[1].count*actor.steamrollCityGapMultiplier;
+      if(leader.count>actor.steamrollMinLeaderCities&&leader.count>=threshold&&valid.some(p=>p.smallID()===leader.player.smallID()))add(leader.player,leader.count,{runnerUpCities:cities[1].count,threshold});
+    } else if(mode==='density') {
+      for(const player of actor.game.players()) {
+        if(player.smallID()===actor.player.smallID()||player.type()===deps.botType||actor.player.isFriendly(player))continue;
+        const tiles=player.numTilesOwned();if(tiles===0)continue;
+        let levels=0;for(const unit of player.units(...deps.structureTypes))levels+=unit.level();
+        if(levels<deps.minLevels)continue;
+        const density=levels/tiles;if(density>deps.densityThreshold)add(player,density,{tiles,levels,threshold:deps.densityThreshold});
+      }
+    } else if(mode==='crown') {
+      const difficulty=deps.difficulty(),gameMode=actor.game.config().gameConfig().gameMode;
+      if(gameMode!==deps.ffa||actor.game.players().length<=1)return entries;
+      const players=actor.game.players().slice().sort((a,b)=>b.numTilesOwned()-a.numTilesOwned()),leader=players[0];
+      if(difficulty==='Impossible'&&leader.smallID()===actor.player.smallID()&&players.length>=2&&!actor.player.isFriendly(players[1])) {
+        add(players[1],players[1].numTilesOwned(),{reason:'Self leads; target runner-up'});return entries;
+      }
+      if(leader.smallID()===actor.player.smallID()||actor.player.isFriendly(leader))return entries;
+      const land=actor.game.numLandTiles()-actor.game.numTilesWithFallout();if(land<=0)return entries;
+      const gap=leader.numTilesOwned()/land-actor.player.numTilesOwned()/land;
+      const threshold={Easy:.4,Medium:.3,Hard:.2,Impossible:.1}[difficulty]??.1;
+      if(gap>threshold)add(leader,gap,{threshold});
+    } else if(mode==='team') {
+      if(actor.game.config().gameConfig().gameMode!==deps.team||actor.game.players().length<=1)return entries;
+      const teams=new Map(),members=new Map();
+      for(const player of actor.game.players()) {
+        const team=player.team();if(team===null)continue;
+        teams.set(team,(teams.get(team)??0)+player.numTilesOwned());
+        if(!members.has(team))members.set(team,[]);members.get(team).push(player);
+      }
+      const ordered=[...teams].sort((a,b)=>b[1]-a[1]);if(!ordered.length)return entries;
+      let team=ordered[0][0];if(team===actor.player.team()){if(ordered.length<2)return entries;team=ordered[1][0];}
+      for(const player of members.get(team).filter(p=>!actor.player.isFriendly(p))) add(player,actor.game.config().maxTroops(player),{team,teamTiles:teams.get(team)});
+    } else throw new Error(`Unknown strike ranking: ${mode}`);
+    entries.sort((a,b)=>b.score-a.score||(mode==='team'?b.index-a.index:a.index-b.index));
+    return entries;
+  }
+  function select(actor,mode,hooks) {
+    if(!hooks.allowed())return {target:null,stop:true};
+    const entries=collect(actor,mode), visible=entries.slice(0,79);
+    const domain=['counter','denial','steamroll','win-fix'].includes(mode)?'mirv-target':'nuke-player';
+    const candidates=visible.map((entry,priority)=>({id:`${mode}:${entry.index}`,kind:domain,priority,eligible:true,
+      targetId:entry.player.id(),score:entry.score,facts:entry.facts,reason:`Original ${mode} ranking; ${mode==='team'?'last':'first'} tie wins`}));
+    const decision=hooks.choose(domain,[...candidates,{id:'$wait',kind:'wait',reason:'Hold target selection'}],{mode,candidateLimit:79});
+    const index=candidates.findIndex(c=>c.id===decision.selectedId);
+    const allowed=hooks.allowed(),target=index>=0&&allowed?visible[index].player:null;
+    const stop=!allowed||index<0&&(entries.length>0||decision.selectedId===null);
+    hooks.record('strike-ranking-result',{mode,decisionId:decision.decisionId,status:!allowed?'stopped':target?'target-selected':'wait',
+      targetId:index>=0?candidates[index].targetId:null,stop});
+    return {target,stop,decisionId:decision.decisionId};
+  }
+  return {select};
+}
+
+
+
+'use strict';
+
+function createBrainRuntime(deps) {
+  const owners = new WeakMap();
+  const declined = new WeakMap();
+  const transportHeld = new WeakSet();
+  const instrumented = new WeakSet();
+  const activePlans = new WeakMap();
+  const attackScopes = new WeakMap();
+  const turnScopes = new WeakMap();
+  const spawnScopes = new WeakMap();
+  const spawnSites = new WeakMap();
+  const navalScopes = new WeakMap();
+  const strikeRankScopes = new WeakMap();
+  const strikeProvenance = new WeakMap();
+  const diplomacyParents = new WeakMap();
+  const diplomacyStops = new WeakMap();
+  const placementParents = new WeakMap();
+  const buildingScopes = new WeakMap();
+  const openingStructurePlans = new WeakMap();
+  const boatOrigins = new WeakMap();
+  const boatDestinations = new WeakMap();
+  const warshipSites = new WeakMap();
+  const warshipThreatSources = new WeakMap();
+  const warshipPatrolScopes = new WeakMap();
+  const socialScopes = new WeakMap();
+  const socialRecipients = new WeakMap();
+  const allianceEventScopes = new WeakMap();
+  const transportReservations = new WeakMap();
+  const reactiveQuotes=new WeakMap();
+  const reactiveInFlight=new WeakSet();
+  let current = null;
+  const safe = (read, fallback = null) => { try { return read(); } catch { return fallback; } };
+  const ruleMethods = {
+    emojiBehavior:['maybeSendCasualEmoji'],
+    structureBehavior: ['handleStructures', 'defensePostNeeded', 'isOnStructureCooldown',
+      'isInPostSaveUpBlockedPhase', 'shouldBuildStructure', 'getPerceivedCost', 'getSaveUpTarget',
+      'maybeSpawnStructure', 'findBestStructureToUpgrade', 'structureSpawnTile', 'samThreatLevels'],
+    attackBehavior: ['maybeAttack', 'attackBestTarget', 'attackBots', 'getBotAttackMaxParallelism',
+      'counterReady', 'hostileWaveRemaining', 'shieldThreatened', 'findIncomingAttackPlayer',
+      'findTraitor', 'findVictim', 'findVeryWeakEnemy', 'hasReserveRatioTroops', 'hasTriggerRatioTroops',
+      'findDistantBoatTarget', 'findDisconnectedBoatTarget', 'boatTargetTaken',
+      'openingVetoes', 'openingVetoesTile', 'shouldAttack',
+      'calculateBotAttackTroops', 'sendAttack', 'sendLandAttack', 'sendBoatAttack', 'maybeOpportunisticBoat'],
+    nukeBehavior: ['maybeSendNuke', 'findBestNukeTarget', 'getPerceivedNukeCost', 'nukeSpendAllowed',
+      'nukeTileScore', 'planSaturationSalvoFor', 'chooseNukeArc'],
+    mirvBehavior: ['considerMIRV', 'selectWinFixMirvTarget', 'selectVictoryDenialTarget',
+      'selectSteamrollStopTarget', 'wasRecentlyMirved'],
+    warshipBehavior: ['maybeSpawnWarship', 'shouldCounterWarshipInfestation', 'smartWarshipPatrol', 'smartWarshipCombat'],
+    allianceBehavior: ['getAllianceDecision', 'handleAllianceRequests', 'handleAllianceExtensionRequests', 'handleAllianceRequestsFromBots', 'incomingAllianceRequests']
+  };
+
+  function summarize(value, depth = 0) {
+    return safe(() => summarizeValue(value, depth), '[telemetry unavailable]');
+  }
+  function summarizeValue(value, depth = 0) {
+    if (value === null || typeof value !== 'object') return value;
+    if (depth > 2) return '[details omitted]';
+    if (Array.isArray(value)) return value.slice(0, 12).map(v => summarize(v, depth + 1));
+    if (value instanceof Set) return { count: value.size, sample: [...value].slice(0, 12) };
+    if (typeof value.isPlayer === 'function') {
+      return { playerId: safe(() => value.id()), player: safe(() => value.isPlayer()),
+        troops: safe(() => value.troops()), gold: safe(() => value.gold()), tiles: safe(() => value.numTilesOwned()) };
+    }
+    if (typeof value.tile === 'function') {
+      return { unitId: safe(() => value.id()), type: safe(() => value.type()),
+        tile: safe(() => value.tile()), level: safe(() => value.level()) };
+    }
+    const result = {};
+    for (const key of Object.keys(value).slice(0, 12)) {
+      if (key === '__src' || key === 'game' || key === 'mg') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor && 'value' in descriptor && typeof descriptor.value !== 'function') result[key] = summarize(descriptor.value, depth + 1);
+    }
+    return result;
+  }
+  function snapshot(controller) {
+    const game = controller.bot.mg;
+    const player = game.myPlayer();
+    const settings = deps.settings();
+    const units = safe(() => player.units(), []);
+    const counts = {};
+    for (const unit of units) {
+      const type = safe(() => unit.type(), 'unknown');
+      const entry = counts[type] ||= { count: 0, levels: 0, building: 0 };
+      entry.count++; entry.levels += Number(safe(() => unit.level(), 1));
+      if (safe(() => unit.isUnderConstruction(), false)) entry.building++;
+    }
+    const attacks = list => list.slice(0, 12).map(a => ({ troops: safe(() => a.troops()),
+      attacker: safe(() => a.attacker().id()), target: safe(() => a.target().id()) }));
+    return {
+      tick: game.ticks(), phase: game.inSpawnPhase() ? 'spawn' : 'play',
+      self: { id: safe(() => player.id()), gold: safe(() => player.gold()), troops: safe(() => player.troops()),
+        tiles: safe(() => player.numTilesOwned()), units: counts,
+        incoming: attacks(safe(() => player.incomingAttacks(), [])), outgoing: attacks(safe(() => player.outgoingAttacks(), [])) },
+      settings: { features: settings.features, difficulty: safe(() => game.config().gameConfig().difficulty),
+        economyFirst: settings.economyFirst, winFixes: settings.winFixes, phasedOpening: settings.phasedOpening,
+        combatReserveFloor: settings.combatReserveFloor, nukeIncomeMinutes: settings.nukeIncomeMinutes }
+    };
+  }
+  function attach(bot) {
+    if (owners.has(bot)) return owners.get(bot);
+    const controller = { bot, lastTick: null, snapshot: null, proposalSequence: 0, ruleSequence: 0,
+      observedRules: new Set(), missingRules: [], lastMessageTick: -Infinity };
+    controller.history=safe(()=>deps.startHistory?.(bot));
+    controller.commandGuard=deps.createCommandGuard?.();
+    controller.spending=deps.createSpendingLedger?.();
+    controller.engine = deps.createEngine({ maxRecords: 5000, retainImportant: true, onRecord: entry => {
+      safe(()=>controller.history?.observe(entry));
+      if (entry.kind !== 'decision') return;
+      const proposal = entry.candidates.find(c => c.id === entry.selectedId);
+      const tick = entry.snapshot.tick;
+      // Trace sampling and the protected history are independent of panel updates.
+      if (tick - controller.lastMessageTick >= 10 || !proposal) {
+        controller.lastMessageTick = tick;
+        deps.log?.(`[Brain ${entry.strategy.id}] ${proposal ? proposal.kind : 'wait'}: ${entry.reason}`);
+      }
+    } });
+    controller.engine.register(deps.createLegacyStrategy());
+    // Register additional pure policies here; the executor/trace format stays unchanged.
+    for (const strategy of deps.strategies || []) controller.engine.register(strategy);
+    controller.engine.select(deps.defaultStrategy || 'legacy-v1');
+    owners.set(bot, controller);
+    if(current&&current!==controller)safe(()=>transportReservations.get(current)?.dispose?.());
+    current = controller;
+    controller.engine.record('session', { baselineVersion: '1.84.0', adapter: 'structure, attack, target, naval, landing and warship plans; sequential commands',
+      note: 'Dispatch status is not confirmation from the game server.' });
+    return controller;
+  }
+  function begin(bot) {
+    const controller = owners.get(bot) || attach(bot);
+    current = controller;
+    if(deps.watchTransportIntents)safe(()=>transportCapacity(controller));
+    const tick = bot.mg.ticks();
+    if (tick !== controller.lastTick) {
+      controller.lastTick = tick;
+      controller.snapshot = safe(() => snapshot(controller), { tick, unavailable: true });
+      safe(() => {
+        const types=['City','Port','Factory','SAM Launcher','Missile Silo','Defense Post'];
+        const counts=Object.fromEntries(types.map(type=>[type,controller.snapshot.self.units[type]||{count:0,levels:0,building:0}]));
+        const signature=JSON.stringify(counts);
+        if(signature!==controller.infrastructureSignature){
+          const units=bot.player.units().filter(unit=>types.includes(unit.type()));
+          controller.engine.record('infrastructure-change',{tick,snapshot:controller.snapshot,
+            previous:controller.infrastructureCounts||null,counts,totalStructures:units.length,
+            structures:units.slice(0,80).map(unit=>({id:unit.id(),type:unit.type(),tile:safe(()=>unit.tile()),
+              level:safe(()=>unit.level(),1),building:safe(()=>unit.isUnderConstruction(),false)}))});
+          controller.infrastructureSignature=signature;controller.infrastructureCounts=counts;
+        }
+      });
+      controller.engine.record('observation', { snapshot: controller.snapshot });
+    }
+  }
+  function attachBehaviors(bot) {
+    const controller = owners.get(bot) || attach(bot);
+    for (const [property, methods] of Object.entries(ruleMethods)) {
+      const actor = bot[property];
+      if (!actor) continue;
+      owners.set(actor, controller);
+      if (instrumented.has(actor)) continue;
+      instrumented.add(actor);
+      for (const name of methods) {
+        const original = actor[name];
+        if (typeof original !== 'function') { controller.missingRules.push(`${property}.${name}`); continue; }
+        controller.observedRules.add(`${property}.${name}`);
+        actor[name] = function (...args) {
+          const callId = ++controller.ruleSequence;
+          const tick = safe(() => bot.mg.ticks());
+          controller.engine.record('rule-call', { callId, tick, module: property, rule: name, arguments: summarize(args) });
+          const completed = (result, error) => safe(() => controller.engine.record('rule-result', {
+            callId, tick, module: property, rule: name,
+            result: summarize(result), ...(error ? { error: String(error?.message || error) } : {})
+          }));
+          try {
+            const result = Reflect.apply(original, this, args);
+            if (safe(() => typeof result?.then === 'function', false)) {
+              Promise.resolve(result).then(value => completed(value), error => completed(undefined, error)).catch(() => {});
+            } else completed(result);
+            return result;
+          } catch (error) { completed(undefined, error); throw error; }
+        };
+      }
+    }
+  }
+  function transportCapacity(controller) {
+    const tick=controller.bot.mg.ticks();
+    const ships=controller.bot.player.units(deps.transportType).filter(ship=>ship.isActive());
+    const ids=new Set(ships.map(ship=>ship.id()));
+    let state=transportReservations.get(controller);
+    if(!state){state={seen:ids,pending:[],emitting:false};transportReservations.set(controller,state);
+      try {state.dispose=deps.watchTransportIntents?.(tile=>{
+        if(!state.emitting&&deps.isCurrent(controller.bot)){
+          state.pending.push({tile,manual:true,tick:controller.bot.mg.ticks()});
+          controller.engine.record('transport-manual-request',{tile,pending:state.pending.length});
+        }
+      });}catch(error){transportReservations.delete(controller);throw error;}}
+    else {for(const ship of ships)if(!state.seen.has(ship.id())&&state.pending.length){
+      const tile=ship.targetTile(),index=state.pending.findIndex(ticket=>ticket.tile===tile);
+      if(index>=0){state.pending.splice(index,1);
+        controller.commandGuard?.acknowledge(tile,tick);
+        controller.engine.record('transport-reservation-acknowledged',{tick,tile,unitId:ship.id()});}
+    }state.seen=ids;}
+    state.pending=state.pending.filter(ticket=>{
+      if(ticket.inFlight||tick-ticket.tick<40)return true;
+      controller.engine.record('transport-reservation-expired',{tick,tile:ticket.tile,manual:!!ticket.manual,
+        age:tick-ticket.tick,reason:'No matching active transport observed within 40 ticks'});
+      return false;
+    });
+    return {state,destinations:ships.map(ship=>safe(()=>ship.targetTile())).filter(tile=>tile!=null),facts:{active:ships.length,pending:state.pending.length,limit:2},
+      available:ships.length+state.pending.length<2};
+  }
+  function submit(actor, source, kind, args, execute, transport=false,donation=false,validate=null) {
+    transportHeld.delete(actor);
+    const controller = owners.get(actor);
+    if (!controller) throw new Error(`Unattached Auto-Bot command source: ${source}`);
+    const game = controller.bot.mg;
+    if (!deps.enabled() || !deps.isCurrent(controller.bot) || deps.isPublic(game)) {
+      declined.set(actor, true);
+      const eventScope=allianceEventScopes.get(actor);if(eventScope)eventScope.stopped=true;
+      controller.engine.record('blocked', { tick: game.ticks(), source, reason: 'Bot stopped, stale owner, or public lobby' });
+      return false;
+    }
+    // No live game objects or executable callbacks are passed to the strategy.
+    const state = !activePlans.has(actor) && controller.snapshot?.tick === game.ticks() ? controller.snapshot : safe(() => snapshot(controller), { tick: game.ticks(), unavailable: true });
+    const proposal = { id: `command-${++controller.proposalSequence}`, kind, source, arguments: summarize(args),
+      ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {}) };
+    if(transport){
+      try {const capacity=transportCapacity(controller);proposal.eligible=capacity.available;
+        if(!capacity.available)transportHeld.add(actor);
+        proposal.transportCapacity=capacity.facts;proposal.reason=capacity.available?
+          'Automatic transport capacity available':'Keep the third transport slot for manual use';}
+      catch(error){declined.set(actor,true);controller.engine.record('blocked',{source,reason:'Transport capacity unavailable',error:String(error?.message||error)});return false;}
+    }
+    if(validate){const facts=validate();proposal.eligible=facts.allowed;proposal.spending=facts;
+      if(!facts.allowed)transportHeld.add(actor);}
+    let executed = false;
+    try {
+      return controller.engine.submit(state, proposal, () => {
+        if(validate&&!validate().allowed){transportHeld.add(actor);return false;}
+        let reservation,capacity;
+        if(transport){capacity=transportCapacity(controller);if(!capacity.available){transportHeld.add(actor);return false;}}
+        const release=()=>{if(reservation){const index=capacity.state.pending.indexOf(reservation);if(index>=0)capacity.state.pending.splice(index,1);}};
+        const emit=()=>{if(transport){reservation={tile:args[0],tick:game.ticks(),inFlight:true};capacity.state.pending.push(reservation);}
+        try {executed=true;if(transport)capacity.state.emitting=true;const result=execute();if(result===false)release();
+          const settled=value=>{if(reservation){reservation.inFlight=false;reservation.tick=game.ticks();}if(value===false)release();};
+          if(result&&typeof result.then==='function')Promise.resolve(result).then(settled,release);
+          else settled(result);
+          return result;
+        }catch(error){release();throw error;}finally{if(transport)capacity.state.emitting=false;}};
+        if(controller.commandGuard&&(transport||donation)){
+          let result;
+          const guarded=controller.commandGuard.dispatch({kind:transport?'boat':'donation',
+            key:transport?args[0]:args[0].id(),tick:game.ticks(),activeBoatDestinations:capacity?.destinations,
+            emit:()=>{result=emit();return result;}});
+          if(guarded.hold==='operational'){
+            transportHeld.add(actor);controller.engine.record('command-operational-hold',{tick:game.ticks(),kind,
+              reason:guarded.reason,destination:transport?args[0]:undefined,recipient:donation?args[0].id():undefined});
+          }
+          return guarded.emitted?result:false;
+        }
+        return emit();
+      });
+    } finally { declined.set(actor, !executed);if(!executed&&!transportHeld.has(actor)){const scope=allianceEventScopes.get(actor);if(scope)scope.stopped=true;} }
+  }
+  function intent(actor, source, ctor, ...args) {
+    const kind = safe(() => deps.intentName?.(ctor)) || 'intent';
+    return submit(actor, source, kind, args, () => deps.emitIntent(ctor, ...args),deps.isTransportIntent?.(ctor)===true,
+      deps.isDonationIntent?.(ctor)===true||kind==='donateTroops');
+  }
+  function socialHooks(actor){
+    const controller=owners.get(actor);
+    if(!controller||!deps.socialPlanner)throw new Error('Social planner is not attached');
+    return {
+      allowed:()=>!socialScopes.get(actor)?.stopped&&deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
+      hold:()=>{let scope=socialScopes.get(actor);if(scope){for(const undo of [...(scope.undos||[])].reverse())undo();scope.undos=[];}while(scope){scope.stopped=true;scope=scope.parent;}},
+      undo:run=>socialScopes.get(actor)?.undos?.push(run),
+      choose:(domain,candidates,facts)=>controller.engine.decide({...safe(()=>snapshot(controller),{unavailable:true}),domain,social:facts,
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})},candidates),
+      remember:id=>socialRecipients.set(actor,id),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      execute:(id,run)=>{const previous=activePlans.get(actor);activePlans.set(actor,id);try{return run();}finally{if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);}}
+    };
+  }
+  function planSocial(actor){
+    const previous=socialScopes.get(actor);socialScopes.set(actor,{stopped:false});
+    try{return deps.socialPlanner.casual(actor,socialHooks(actor));}finally{if(previous===undefined)socialScopes.delete(actor);else socialScopes.set(actor,previous);socialRecipients.delete(actor);}
+  }
+  function selectSocialRecipient(actor,pool,mode){
+    socialRecipients.delete(actor);
+    return deps.socialPlanner.recipient(actor,pool,mode,socialHooks(actor));
+  }
+  function socialRecipientAction(actor,run){
+    const id=socialRecipients.get(actor);socialRecipients.delete(actor);
+    return id===undefined?run():socialHooks(actor).execute(id,run);
+  }
+  function planSmallAttackEmoji(actor,attacks,troops,emoji){
+    return socialRequestScope(actor,()=>deps.socialPlanner.smallAttacks(actor,attacks,troops,emoji,socialHooks(actor)));
+  }
+  function socialRequestScope(actor,run){
+    const previous=socialScopes.get(actor),scope={stopped:Boolean(previous?.stopped),parent:previous,undos:[]};socialScopes.set(actor,scope);
+    try{return run();}finally{if(!socialHooks(actor).allowed())socialHooks(actor).hold();if(previous===undefined)socialScopes.delete(actor);else socialScopes.set(actor,previous);}
+  }
+  function planEmojiRequest(actor,target,pool,attack,options){return socialRequestScope(actor,()=>deps.socialPlanner.request(actor,target,pool,attack,options,socialHooks(actor)));}
+  function planSocialWinner(actor,run){return socialRequestScope(actor,run);}
+  function markSocialWinner(actor){return deps.socialPlanner.winnerMark(actor,socialHooks(actor));}
+  function emojiPermission(actor,target,mark,options){return deps.socialPlanner.permission(actor,target,mark,options,socialHooks(actor));}
+  function selectSocialMessage(actor,pool){return deps.socialPlanner.message(actor,pool,socialHooks(actor));}
+  function selectSocialPool(actor,pools,sample,mode){return deps.socialPlanner.pool(pools,sample,mode,socialHooks(actor));}
+  function planSocialReaction(actor,run){return socialRequestScope(actor,()=>deps.socialPlanner.reaction(actor,run,socialHooks(actor)));}
+  function planAllianceEvents(actor,mode,action,run,request){
+    const controller=owners.get(actor);if(!controller||!deps.allianceEventPlanner)throw new Error('Alliance event planner is not attached');
+    const previous=allianceEventScopes.get(actor),scope=previous||{stopped:false};allianceEventScopes.set(actor,scope);
+    declined.delete(actor);diplomacyParents.delete(actor);
+    try{const hooks={
+      allowed:()=>!scope.stopped&&deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
+      hold:()=>{scope.stopped=true;diplomacyParents.delete(actor);},
+      choose:(domain,candidates,facts)=>controller.engine.decide({...safe(()=>snapshot(controller),{unavailable:true}),domain,event:facts,
+        ...(facts.parentDecisionId!==undefined||activePlans.has(actor)?{parentDecisionId:facts.parentDecisionId??activePlans.get(actor)}:{})},candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      allianceStopped:()=>diplomacyStops.get(actor)===true,
+      ruleParent:context=>diplomacyParents.get(actor)?.context===context?diplomacyParents.get(actor).decisionId:undefined,
+      parent:()=>activePlans.get(actor),
+      link:(context,id)=>diplomacyParents.set(actor,{context,decisionId:id}),
+      wasDeclined:()=>declined.get(actor)===true&&!transportHeld.has(actor),
+      execute:(id,run)=>{const old=activePlans.get(actor);activePlans.set(actor,id);declined.delete(actor);diplomacyStops.delete(actor);try{return run();}finally{if(old===undefined)activePlans.delete(actor);else activePlans.set(actor,old);}}
+    };return mode==='action'?deps.allianceEventPlanner.action(actor,action,run,hooks,request):deps.allianceEventPlanner.run(actor,mode,hooks);
+    }finally{if(!previous)allianceEventScopes.delete(actor);diplomacyParents.delete(actor);}
+  }
+  function allianceEventStopped(actor){
+    const controller=owners.get(actor);
+    return allianceEventScopes.get(actor)?.stopped===true||declined.get(actor)===true||!deps.enabled()||!controller||!deps.isCurrent(controller.bot)||deps.isPublic(controller.bot.mg);
+  }
+  function build(actor, source, menu, ...args) {
+    const bu = args[0];
+    const kind = safe(() => typeof bu?.canUpgrade === 'number' ? 'upgrade' : `build ${bu?.type || 'unit'}`, 'build');
+    const placementDecisionId = bu && typeof bu === 'object' ? placementParents.get(bu) : undefined;
+    const controller=owners.get(actor),adaptive=controller?.engine.selectedStrategy?.()==='adaptive-v1';
+    const request=()=>{
+      if(adaptive&&(deps.buildAllowed?.(bu.type)===false||controller.bot.mg.config().isUnitDisabled?.(bu.type)===true))
+        return {allowed:false,reason:'Building type disabled before final dispatch'};
+      const facts=defenseEconomyFacts(actor),upgrade=typeof bu?.canUpgrade==='number';
+      const proof=reactiveQuotes.get(bu);
+      if(adaptive&&upgrade&&bu.type===deps.units?.SAMLauncher&&(!proof||proof.tick!==controller.bot.mg.ticks()))
+        return {allowed:false,reason:'SAM upgrades require a fresh useful incoming-strike proof'};
+      if(!facts||!controller.spending)return {allowed:true};
+      const cost=upgrade?(bu.upgradeCosts?.[0]??bu.cost):bu.cost;
+      const replacement=!upgrade&&bu.type===deps.units?.SAMLauncher&&facts.stage==='first-sam'&&!facts.waitingForSam;
+      let reserve=proof||replacement?0n:facts.reserve;
+      if(!replacement&&!proof&&facts.stage!=='reserve'&&facts.requiredType&&bu.type!==facts.requiredType){
+        const structure=controller.bot.structureBehavior;
+        const requiredCost=structure?.cost?.(facts.requiredType);
+        if(typeof requiredCost==='bigint'&&requiredCost>reserve)reserve=requiredCost;
+      }
+      const key=replacement?`${bu.type}:replacement`:`${bu.type}:${upgrade?'upgrade:'+bu.canUpgrade:'build:'+bu.canBuild}`;
+      return {...controller.spending.facts({tick:controller.bot.mg.ticks(),gold:controller.bot.player.gold(),
+        cost,reserve,key}),key,tick:controller.bot.mg.ticks()};
+    };
+    const execute=()=>{
+      const facts=request();
+      if(facts.cost!==undefined&&controller.spending)return controller.spending.commit(facts,
+        ()=>Reflect.apply(menu.sendBuildOrUpgrade, menu, args));
+      return Reflect.apply(menu.sendBuildOrUpgrade, menu, args);
+    };
+    if (placementDecisionId === undefined) {
+      return submit(actor, source, kind, args, execute,false,false,adaptive?request:null);
+    }
+    placementParents.delete(bu);
+    return withPlan(actor, placementDecisionId,
+      () => submit(actor, source, kind, args, execute,false,false,adaptive?request:null));
+  }
+  function callback(actor, source, receiver, method, ...args) {
+    return submit(actor, source, source.split('.').at(-1), args, () => Reflect.apply(receiver[method], receiver, args));
+  }
+  function withDiplomacyParent(actor, context, execute) {
+    const pending = diplomacyParents.get(actor);
+    if (!pending || pending.context !== context) return execute();
+    const previous = activePlans.get(actor);
+    diplomacyParents.delete(actor);
+    activePlans.set(actor, pending.decisionId);
+    try { return execute(); }
+    finally {
+      if (previous === undefined) activePlans.delete(actor);
+      else activePlans.set(actor, previous);
+    }
+  }
+  function diplomacyIntent(actor, context, source, ctor, ...args) {
+    return withDiplomacyParent(actor, context, () => intent(actor, source, ctor, ...args));
+  }
+  function diplomacyCallback(actor, context, source, receiver, method, ...args) {
+    return withDiplomacyParent(actor, context, () => callback(actor, source, receiver, method, ...args));
+  }
+  function decideAlliance(actor, target, incoming, context) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.diplomacyPlanner) throw new Error('Diplomacy planner is not attached');
+    diplomacyParents.delete(actor);
+    diplomacyStops.set(actor, false);
+    const allowed = () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped;
+    const result = deps.diplomacyPlanner.decide(actor, target, incoming, {
+      allowed,
+      choose: (domain, candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, diplomacy: facts,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+      }, candidates),
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (decisionId, execute) => {
+        const previous = activePlans.get(actor);
+        activePlans.set(actor, decisionId);
+        try { return execute(); }
+        finally {
+          if (previous === undefined) activePlans.delete(actor);
+          else activePlans.set(actor, previous);
+        }
+      }
+    });
+    diplomacyStops.set(actor, result.stopped);
+    if (result.stopped && attackScopes.has(actor)) {
+      attackScopes.get(actor).stopped = true;
+      controller.engine.record('attack-stop', { decisionId: result.decisionId, reason: 'Alliance rule stopped the enclosing attack sequence' });
+    }
+    if (!result.stopped && result.decisionId !== null &&
+        (context === 'incoming' || result.accepted && (context === 'renewal' || context === 'outgoing'))) {
+      diplomacyParents.set(actor, { context, decisionId: result.decisionId });
+    }
+    return result.accepted;
+  }
+  function diplomacyDetailsHooks(actor) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.diplomacyDetailsPlanner)throw new Error('Diplomacy details planner is not attached');
+    return {
+      allowed:()=>deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg)&&!attackScopes.get(actor)?.stopped,
+      choose:(domain,candidates,facts)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain,diplomacy:facts,
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})
+      },candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      hold:()=>{const scope=attackScopes.get(actor);if(scope)scope.stopped=true;},
+      wasDeclined:()=>declined.get(actor)===true&&!transportHeld.has(actor),
+      allianceStopped:()=>diplomacyStops.get(actor)===true,
+      execute:(decisionId,execute)=>{
+        const previous=activePlans.get(actor);activePlans.set(actor,decisionId);
+        declined.delete(actor);diplomacyStops.delete(actor);
+        try{return execute();}finally{
+          if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);
+        }
+      }
+    };
+  }
+  function planDonation(actor,targets) {
+    return deps.diplomacyDetailsPlanner.donate(actor,targets,diplomacyDetailsHooks(actor));
+  }
+  function planAttackAllocation(actor,mode,target,value) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.attackAllocationPlanner)throw new Error('Attack allocation planner is not attached');
+    const previousScope=attackScopes.get(actor),scope=previousScope||{stopped:false};
+    const budget=actor.botAttackTroopsSent;
+    if(!previousScope)attackScopes.set(actor,scope);
+    const hooks={
+      allowed:()=>deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg)&&!scope.stopped,
+      setBotMinimum:minimum=>{scope.botMinimum=minimum;},
+      minimumBotForce:()=>scope.botMinimum??0,
+      choose:(domain,candidates,facts)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain,allocation:facts,
+        ...(domain==='opening-expansion'?{openingExpansion:facts}:{}),
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})
+      },candidates),
+      hold:()=>{scope.stopped=true;},
+      record:(kind,details)=>controller.engine.record(kind,details),
+      wasDeclined:()=>declined.get(actor)===true,
+      execute:(decisionId,execute)=>{
+        const previous=activePlans.get(actor);activePlans.set(actor,decisionId);declined.delete(actor);
+        try{return execute();}finally{if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);}
+      }
+    };
+    try{
+      if(mode==='land'&&!value&&!target.isPlayer()&&deps.openingExpansion){
+        const opening=deps.openingExpansion.run(actor,target,openingFacts(actor),hooks);
+        if(opening!==undefined)return opening.result;
+      }
+      return deps.attackAllocationPlanner[mode](actor,target,...(mode==='forced'?[]:[value]),hooks);
+    }
+    finally{
+      if(scope.stopped)actor.botAttackTroopsSent=budget;
+      if(!previousScope)attackScopes.delete(actor);
+    }
+  }
+  function attackRoutingHooks(actor) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.attackRoutingPlanner)throw new Error('Attack routing planner is not attached');
+    const scope=attackScopes.get(actor)||{stopped:false},parent=activePlans.get(actor);
+    return {
+      allowed:()=>deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg)&&!scope.stopped,
+      stopped:()=>scope.stopped,
+      hold:()=>{scope.stopped=true;},
+      minimumBotForce:()=>scope.botMinimum??0,
+      wasDeclined:()=>declined.get(actor)===true&&!transportHeld.has(actor),
+      choose:(domain,candidates,facts,parentId=parent)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain,routing:facts,
+        ...(parentId!==undefined?{parentDecisionId:parentId}:{})
+      },candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      probe:tile=>deps.probeLanding(actor,tile,false),
+      // Async children capture these IDs/scopes on entry. Restore immediately,
+      // so no shared active parent remains installed during worker awaits.
+      execute:(decisionId,execute)=>{
+        const previousParent=activePlans.get(actor),previousScope=attackScopes.get(actor);
+        activePlans.set(actor,decisionId);attackScopes.set(actor,scope);declined.delete(actor);
+        try{return execute();}finally{
+          if(previousParent===undefined)activePlans.delete(actor);else activePlans.set(actor,previousParent);
+          if(previousScope===undefined)attackScopes.delete(actor);else attackScopes.set(actor,previousScope);
+        }
+      }
+    };
+  }
+  function planAttackRoute(actor,target,counter) {
+    return deps.attackRoutingPlanner.route(actor,target,counter,attackRoutingHooks(actor));
+  }
+  function planTargetedBoat(actor,target) {
+    return deps.attackRoutingPlanner.targeted(actor,target,attackRoutingHooks(actor));
+  }
+  function planFreeBoat(actor,tiles) {
+    return deps.attackRoutingPlanner.free(actor,tiles,attackRoutingHooks(actor));
+  }
+  function planEmbargos(actor,targets,context) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.embargoPlanner)throw new Error('Embargo planner is not attached');
+    const turn=turnScopes.get(controller.bot);let stopped=false;
+    const hooks={
+      allowed:()=>!stopped&&!turn?.stopped&&deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
+      stopped:()=>stopped,
+      hold:()=>{stopped=true;if(turn)turn.stopped=true;},
+      choose:(domain,candidates,facts)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain,embargo:facts,
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})
+      },candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      wasDeclined:()=>declined.get(actor)===true,
+      execute:(decisionId,execute)=>{
+        const previous=activePlans.get(actor);activePlans.set(actor,decisionId);declined.delete(actor);
+        try{return execute();}finally{if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);}
+      }
+    };
+    return deps.embargoPlanner.run(actor,targets,context,hooks);
+  }
+  function planSpawn(actor,mode,tick) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.spawnPlanner)throw new Error('Spawn planner is not attached');
+    const previousScope=spawnScopes.get(actor),scope=previousScope||{stopped:false};
+    if(!previousScope)spawnScopes.set(actor,scope);
+    const hooks={
+      allowed:()=>!scope.stopped&&deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
+      stopped:()=>scope.stopped,hold:()=>{scope.stopped=true;},
+      wasDeclined:()=>declined.get(actor)===true,
+      clearSite:()=>spawnSites.delete(actor),remember:(tile,decisionId)=>spawnSites.set(actor,{tile,decisionId}),
+      siteParent:()=>spawnSites.get(actor)?.decisionId??activePlans.get(actor),
+      choose:(domain,candidates,facts)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain,spawn:facts,
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})
+      },candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      execute:(decisionId,execute)=>{
+        const previous=activePlans.get(actor);if(decisionId!==undefined)activePlans.set(actor,decisionId);declined.delete(actor);
+        try{return execute();}finally{if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);}
+      }
+    };
+    try{return deps.spawnPlanner[mode](actor,...(mode==='tick'?[tick]:[]),hooks);}
+    finally{if(!previousScope){spawnScopes.delete(actor);spawnSites.delete(actor);}}
+  }
+  function planAllianceOutreach(actor,targets) {
+    return deps.diplomacyDetailsPlanner.outreach(actor,targets,diplomacyDetailsHooks(actor));
+  }
+  function planFarOutreach(actor,targets,now,ctors) {
+    return deps.diplomacyDetailsPlanner.far(actor,targets,now,ctors,diplomacyDetailsHooks(actor));
+  }
+  async function withCombatDiplomacyPlan(actor, decisionId, execute) {
+    const alliance = actor.allianceBehavior;
+    const previousActor = activePlans.get(actor);
+    const previousAlliance = alliance ? activePlans.get(alliance) : undefined;
+    activePlans.set(actor, decisionId);
+    if (alliance) activePlans.set(alliance, decisionId);
+    try { return await execute(); }
+    finally {
+      if (previousActor === undefined) activePlans.delete(actor); else activePlans.set(actor, previousActor);
+      if (alliance) {
+        if (previousAlliance === undefined) activePlans.delete(alliance); else activePlans.set(alliance, previousAlliance);
+      }
+    }
+  }
+  function combatDiplomacyHooks(actor) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.diplomacyPlanner) throw new Error('Combat diplomacy planner is not attached');
+    return {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped,
+      choose: (domain, candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, diplomacy: facts,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+      }, candidates),
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (decisionId, execute) => withCombatDiplomacyPlan(actor, decisionId, execute)
+    };
+  }
+  function finishCombatDiplomacy(actor, hooks, result, purpose) {
+    if (result.stopped) {
+      const scope = attackScopes.get(actor);
+      if (scope) scope.stopped = true;
+      hooks.record('attack-stop', { decisionId: result.decisionId, purpose,
+        reason: 'Combat diplomacy policy stopped the enclosing attack pass' });
+    }
+    return result.completed;
+  }
+  async function planAssist(actor) {
+    const hooks = combatDiplomacyHooks(actor);
+    const result = await deps.diplomacyPlanner.assist(actor, hooks);
+    return finishCombatDiplomacy(actor, hooks, result, 'assist');
+  }
+  async function planBetray(actor, friends, enemies) {
+    const hooks = combatDiplomacyHooks(actor);
+    const result = await deps.diplomacyPlanner.betray(actor, friends, enemies, hooks);
+    return finishCombatDiplomacy(actor, hooks, result, 'betray');
+  }
+  async function withPlan(actor, decisionId, execute) {
+    const previous = activePlans.get(actor);
+    activePlans.set(actor, decisionId);
+    try { return await execute(); }
+    finally {
+      if (previous === undefined) activePlans.delete(actor);
+      else activePlans.set(actor, previous);
+    }
+  }
+  async function withTurnPlan(bot, decisionId, execute) {
+    const actors = [...new Set([bot, bot.emojiBehavior, bot.allianceBehavior, bot.mirvBehavior,
+      bot.structureBehavior, bot.warshipBehavior, bot.attackBehavior, bot.nukeBehavior].filter(Boolean))];
+    const previous = actors.map(actor => ({ actor, had: activePlans.has(actor), value: activePlans.get(actor) }));
+    for (const actor of actors) activePlans.set(actor, decisionId);
+    try { return await execute(); }
+    finally {
+      for (const entry of previous) {
+        if (entry.had) activePlans.set(entry.actor, entry.value);
+        else activePlans.delete(entry.actor);
+      }
+    }
+  }
+  function turnHooks(bot) {
+    const controller = owners.get(bot);
+    if (!controller || !deps.turnPlanner) throw new Error('Turn planner is not attached');
+    return {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !turnScopes.get(bot)?.stopped,
+      choose: (domain, candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, turn: facts,
+        teamNaval: teamNavalFacts(bot.warshipBehavior || bot),
+        ...(activePlans.has(bot) ? { parentDecisionId: activePlans.get(bot) } : {})
+      }, candidates),
+      execute: (decisionId, execute) => withTurnPlan(bot, decisionId, execute),
+      record: (kind, details) => controller.engine.record(kind, details)
+    };
+  }
+  async function planTurn(bot, context) {
+    const previous=turnScopes.get(bot);
+    if(!previous)turnScopes.set(bot,{stopped:false});
+    try{return await deps.turnPlanner.run(bot, context, turnHooks(bot));}
+    finally{if(!previous)turnScopes.delete(bot);}
+  }
+  function warshipCombatHooks(actor, planner = deps.warshipCombatPlanner) {
+    const controller = owners.get(actor);
+    if (!controller || !planner) throw new Error('Warship planner is not attached');
+    return {
+      allowed: () => !warshipPatrolScopes.get(actor)?.stopped && deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg),
+      choose: (domain, candidates, facts, parentDecisionId = activePlans.get(actor)) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, warship: facts,
+        teamNaval: teamNavalFacts(actor),
+        ...(parentDecisionId === undefined ? {} : { parentDecisionId })
+      }, candidates),
+      remember: decisionId => warshipSites.set(actor, decisionId),
+      wasDeclined: () => declined.get(actor) === true,
+      hold: () => { const scope = warshipPatrolScopes.get(actor); if (scope) {scope.stopped = true;scope.onHold?.();} },
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (decisionId, execute) => {
+        const previous = activePlans.get(actor);
+        activePlans.set(actor, decisionId);
+        declined.delete(actor);
+        try { return execute(); }
+        finally {
+          if (declined.get(actor) === true) {
+            const scope = warshipPatrolScopes.get(actor);
+            if (scope) scope.stopped = true;
+          }
+          if (previous === undefined) activePlans.delete(actor);
+          else activePlans.set(actor, previous);
+        }
+      }
+    };
+  }
+  function planWarshipCombat(actor, context) {
+    if (deps.teamGeography) context = { ...context, transports: deps.teamGeography.transportTargets(actor.game, actor.player, context.ship) };
+    const hooks = warshipCombatHooks(actor);
+    hooks.waypoint = (start,home,enemies) => {
+      warshipSites.delete(actor);
+      const tile=actor.findSafeWaypoint(start,home,enemies);
+      return {tile,decisionId:warshipSites.get(actor) ?? activePlans.get(actor)};
+    };
+    const run=()=>deps.warshipCombatPlanner.combat(actor, context, hooks);
+    return context.homeDecisionId===undefined?run():hooks.execute(context.homeDecisionId,run);
+  }
+  function selectWarshipHome(actor,ship) {
+    return deps.warshipSafetyPlanner.home(actor,ship,warshipCombatHooks(actor,deps.warshipSafetyPlanner));
+  }
+  function selectWarshipNukeEscape(actor,x,y,zones,eta) {
+    return deps.warshipSafetyPlanner.escape(actor,x,y,zones,eta,warshipCombatHooks(actor,deps.warshipSafetyPlanner));
+  }
+  function planWarshipNukeDodge(actor,ships,context) {
+    const hooks=warshipCombatHooks(actor,deps.warshipSafetyPlanner);
+    hooks.escape=(x,y,zones,eta)=>{
+      warshipSites.delete(actor);
+      const selection=actor.findNukeEscapeTile(x,y,zones,eta);
+      return {selection,decisionId:warshipSites.get(actor)??activePlans.get(actor)};
+    };
+    return deps.warshipSafetyPlanner.dodge(actor,ships,context,hooks);
+  }
+  function selectWarshipWaypoint(actor,start,home,enemies) {
+    return deps.warshipCombatPlanner.waypoint(actor,start,home,enemies,warshipCombatHooks(actor));
+  }
+  function planWarshipRetaliation(actor, tile, target, cause, onDecline) {
+    const hooks = warshipCombatHooks(actor);
+    if(onDecline){
+      const hold=hooks.hold,execute=hooks.execute;
+      hooks.hold=()=>{hold();onDecline();};
+      hooks.execute=(decisionId,action)=>{
+        const previous=warshipPatrolScopes.get(actor),scope={stopped:false,onHold:onDecline};
+        warshipPatrolScopes.set(actor,scope);
+        try{return execute(decisionId,action);}
+        finally{
+          if(scope.stopped||declined.get(actor)===true)onDecline();
+          if(previous===undefined)warshipPatrolScopes.delete(actor);else warshipPatrolScopes.set(actor,previous);
+        }
+      };
+    }
+    return deps.warshipCombatPlanner.retaliate(actor, tile, target, cause, hooks);
+  }
+  function planWarshipThreatPass(actor,run){
+    const previous=warshipPatrolScopes.get(actor);
+    warshipPatrolScopes.set(actor,{stopped:false});warshipThreatSources.set(actor,new Map());
+    try{return run();}finally{if(previous===undefined)warshipPatrolScopes.delete(actor);else warshipPatrolScopes.set(actor,previous);warshipThreatSources.delete(actor);}
+  }
+  function warshipThreatAllowed(actor){return warshipCombatHooks(actor,deps.warshipThreatPlanner).allowed();}
+  function selectWarshipThreat(actor,mode,input){
+    const previous=warshipPatrolScopes.get(actor);
+    if(!previous)warshipPatrolScopes.set(actor,{stopped:false});
+    try{
+      const hooks=warshipCombatHooks(actor,deps.warshipThreatPlanner);
+      hooks.remember=(kind,tile,id)=>warshipThreatSources.get(actor)?.set(`${kind}:${tile}`,id);
+      return deps.warshipThreatPlanner.select(actor,mode,input,hooks);
+    }finally{if(!previous)warshipPatrolScopes.delete(actor);}
+  }
+  function planIncomingTransports(actor){return planShipResponses(actor,'incoming');}
+  function planOutgoingShips(actor,mode){return planShipResponses(actor,mode);}
+  function planWarshipTracking(actor){return planShipResponses(actor,'tracking');}
+  function planShipResponses(actor,mode){
+    const previous=warshipPatrolScopes.get(actor),scope={stopped:false};
+    warshipPatrolScopes.set(actor,scope);
+    try{
+      const hooks=warshipCombatHooks(actor,deps.warshipTransportPlanner),choose=hooks.choose;
+      hooks.choose=(domain,candidates,facts)=>choose(domain,candidates,facts,facts.parentDecisionId??activePlans.get(actor));
+      hooks.spawnParent=()=>warshipSites.get(actor);
+      hooks.clearSpawn=()=>warshipSites.delete(actor);
+      if(mode==='incoming')return deps.warshipTransportPlanner.incoming(actor,hooks);
+      if(mode==='tracking')return deps.warshipTransportPlanner.tracking(actor,hooks);
+      return deps.warshipTransportPlanner.outgoing(actor,mode,hooks);
+    }
+    finally{if(previous===undefined)warshipPatrolScopes.delete(actor);else{if(scope.stopped)previous.stopped=true;warshipPatrolScopes.set(actor,previous);}}
+  }
+  function planWarshipDeployment(actor) {
+    const hooks = warshipCombatHooks(actor, deps.warshipDeploymentPlanner);
+    hooks.naval = () => teamNavalFacts(actor);
+    hooks.strategicSite = (ports, parentDecisionId, rejected = new Set()) => {
+      const facts = hooks.naval(), game = actor.game;
+      const entries = [];
+      for (const port of ports) {
+        if (port.isActive && !port.isActive() || port.isUnderConstruction?.()) continue;
+        if (!facts.defensePortTiles.includes(port.tile())) continue;
+        const samples = [...game.neighbors(port.tile())];
+        for (const radius of [8,20,40]) for (let i=0;i<8;i++) {
+          const x = Math.round(game.x(port.tile()) + Math.cos(i*Math.PI/4)*radius);
+          const y = Math.round(game.y(port.tile()) + Math.sin(i*Math.PI/4)*radius);
+          if (game.isValidCoord(x,y)) samples.push(game.ref(x,y));
+        }
+        for (const tile of samples) if (!rejected.has(tile) && game.isWater(tile) && facts.sharedComponents.includes(game.getWaterComponent(tile))) {
+          if (!entries.some(e => e.tile === tile)) entries.push({ id:'island-site:'+entries.length,kind:'warship-placement',
+            tile,portTile:port.tile(),eligible:true,priority:entries.length,reason:'Usable own port on water shared with the enemy coast' });
+        }
+      }
+      const choice = hooks.choose('warship-placement', [...entries.slice(0,79),{id:'$wait',kind:'wait',reason:'Hold island fleet placement'}],
+        {island:true,ports:ports.length}, parentDecisionId);
+      return {tile:entries.slice(0,79).find(e=>e.id===choice.selectedId)?.tile ?? null,decisionId:choice.decisionId};
+    };
+    hooks.spawn = (center, radius, parent) => hooks.execute(parent, () => {
+      warshipSites.delete(actor);
+      const tile = actor.warshipSpawnTile(center, radius);
+      return { tile, decisionId: warshipSites.get(actor) ?? parent };
+    });
+    return deps.warshipDeploymentPlanner.deploy(actor, hooks);
+  }
+  function selectWarshipSpawn(actor, center, radius) {
+    return deps.warshipDetailsPlanner.spawn(actor, center, radius, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
+  }
+  function selectMovingWarship(actor, tile, context) {
+    return deps.warshipDetailsPlanner.move(actor, tile, context, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
+  }
+  function planWarshipInfestation(actor, teamGame) {
+    return deps.warshipDeploymentPlanner.counter(actor, teamGame, warshipCombatHooks(actor, deps.warshipDeploymentPlanner));
+  }
+  function selectWarshipInfestation(actor, teamGame) {
+    return deps.warshipDeploymentPlanner.select(actor, teamGame, warshipCombatHooks(actor, deps.warshipDeploymentPlanner)).target;
+  }
+  function strikeAllowed(actor) {
+    const controller = owners.get(actor);
+    return Boolean(controller && deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg));
+  }
+  function planWarshipMaintenance(bot, tick) {
+    const controller=owners.get(bot),actor=bot.warshipBehavior;
+    if(!controller||!deps.warshipMaintenancePlanner)throw new Error('Warship maintenance planner is not attached');
+    return deps.warshipMaintenancePlanner.run(bot,tick,{
+      allowed:()=>deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
+      choose:(candidates,facts)=>controller.engine.decide({
+        ...safe(()=>snapshot(controller),{unavailable:true}),domain:'warship-maintenance',maintenance:facts
+      },candidates),
+      record:(kind,details)=>controller.engine.record(kind,details),
+      execute:(decisionId,execute)=>{
+        const previous=activePlans.get(actor);activePlans.set(actor,decisionId);
+        try{return execute();}finally{
+          if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);
+        }
+      }
+    });
+  }
+  function strikeHooks(actor, planner = deps.strikePlanner) {
+    const controller = owners.get(actor);
+    if (!controller || !planner) throw new Error('Strike planner is not attached');
+    return {
+      link: (result, decisionId) => { strikeProvenance.set(result,decisionId); return result; },
+      parent: strikeDecisionId,
+      allowed: () => strikeAllowed(actor),
+      choose: (domain, candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, strike: facts,
+        ...(facts.parentDecisionId !== undefined || strikeRankScopes.has(actor) ? { parentDecisionId: facts.parentDecisionId ?? strikeRankScopes.get(actor)?.parentDecisionId } : {})
+      }, candidates),
+      record: (kind, details) => controller.engine.record(kind, details),
+      lookup: (parentDecisionId, read) => {
+        const previous = strikeRankScopes.get(actor), scope = { parentDecisionId, stopped: false };
+        strikeRankScopes.set(actor,scope);
+        try { return { target: read(), stopped: scope.stopped, decisionId: scope.decisionId }; }
+        finally { if (previous === undefined) strikeRankScopes.delete(actor); else strikeRankScopes.set(actor,previous); }
+      }
+    };
+  }
+  function selectStrikePlayer(actor, mode) {
+    const hooks = strikeHooks(actor, deps.strikeRanking);
+    const result = deps.strikeRanking.select(actor, mode, hooks);
+    const scope = strikeRankScopes.get(actor);
+    if (result.target && scope) scope.decisionId = result.decisionId;
+    if (result.stop && scope) scope.stopped = true;
+    return result.target;
+  }
+  function planMirv(actor, cost) { return deps.strikePlanner.mirv(actor, cost, strikeHooks(actor)); }
+  function selectNukeWeapon(actor, context, selection) {
+    if (selection) delete selection.decisionId;
+    const hooks=strikeHooks(actor);
+    hooks.selected=decisionId=>{if(selection)selection.decisionId=decisionId;};
+    return deps.strikePlanner.weapon(actor, context, hooks);
+  }
+  function planNuke(actor, sites, context) { return deps.strikePlanner.nuke(actor, sites, context, strikeHooks(actor)); }
+  function selectNukeTarget(actor, selection) {
+    if(selection)delete selection.decisionId;
+    const hooks = strikeHooks(actor, deps.strikeTargetPlanner);
+    hooks.selected=decisionId=>{if(selection)selection.decisionId=decisionId;};
+    hooks.incoming = decisionId => {
+      const attacker = actor.attackBehavior;
+      const previousScope = attackScopes.get(attacker), previousParent = activePlans.get(attacker);
+      const scope = { stopped: false };
+      attackScopes.set(attacker, scope); activePlans.set(attacker, decisionId);
+      try { return { target: attacker.findIncomingAttackPlayer(), stopped: scope.stopped, decisionId: scope.decisionId }; }
+      finally {
+        if (previousScope === undefined) attackScopes.delete(attacker); else attackScopes.set(attacker, previousScope);
+        if (previousParent === undefined) activePlans.delete(attacker); else activePlans.set(attacker, previousParent);
+      }
+    };
+    return deps.strikeTargetPlanner.target(actor, hooks);
+  }
+  function planSamClear(actor, target, sams, context) {
+    return deps.strikeTargetPlanner.sam(actor, target, sams, context, strikeHooks(actor, deps.strikeTargetPlanner));
+  }
+  function planHelpfulSilo(actor, context) {
+    return deps.strikeTargetPlanner.upgrade(actor, context, strikeHooks(actor, deps.strikeTargetPlanner));
+  }
+  function selectNukeArc(actor, context) {
+    return deps.strikeTargetPlanner.arc(actor, context, strikeHooks(actor, deps.strikeTargetPlanner));
+  }
+  function planSaturationSalvo(actor, context) {
+    return deps.strikeTargetPlanner.salvo(actor, context, strikeHooks(actor, deps.strikeTargetPlanner));
+  }
+  function strikeDecisionId(result) { return strikeProvenance.get(result); }
+  function strikeBuild(actor, decisionId, source, menu, ...args) {
+    const previous = activePlans.get(actor);
+    if (decisionId !== undefined) activePlans.set(actor, decisionId);
+    try { return build(actor, source, menu, ...args); }
+    finally {
+      if (previous === undefined) activePlans.delete(actor);
+      else activePlans.set(actor, previous);
+    }
+  }
+  function planWarshipPatrol(actor, sites, context) {
+    if(warshipPatrolScopes.get(actor)?.stopped)return;
+    sites=sites.map(site=>({...site,sourceDecisionId:warshipThreatSources.get(actor)?.get(`${({'loss-zone':'loss','trade-lane':'trade'}[site.kind]||site.kind)}:${site.tile}`)}));
+    const controller = owners.get(actor);
+    if (!controller || !deps.warshipPatrolPlanner) throw new Error('Warship patrol planner is not attached');
+    const naval = teamNavalFacts(actor);
+    if (deps.teamGeography) sites = [...sites, ...deps.teamGeography.coastalPatrols(actor.game, actor.player, naval).map(s=>({...s,adaptiveOnly:true}))];
+    const previousScope = warshipPatrolScopes.get(actor);
+    const scope = { stopped: false };
+    warshipPatrolScopes.set(actor, scope);
+    try { return deps.warshipPatrolPlanner.run(actor, sites, context, {
+      allowed: () => !scope.stopped && deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg),
+      choose: candidates => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain: 'warship-patrol',
+        teamNaval: naval,
+        patrol: { tick: context.tick, cellSize: context.cellSize, serviceTicks: context.serviceTicks },
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+      }, candidates),
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (decisionId, execute) => {
+        const previous = activePlans.get(actor);
+        activePlans.set(actor, decisionId);
+        try { return execute(); }
+        finally {
+          if (previous === undefined) activePlans.delete(actor);
+          else activePlans.set(actor, previous);
+        }
+      }
+    }); } finally {
+      if (previousScope === undefined) warshipPatrolScopes.delete(actor);
+      else warshipPatrolScopes.set(actor, previousScope);
+    }
+  }
+  async function planStructures(actor, context) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.structurePlanner) throw new Error('Structure planner is not attached');
+    context = { ...context, teamOpening: openingFacts(actor, context) };
+    context.defenseEconomy=defenseEconomyFacts(actor);
+    if(context.defenseEconomy){const gold=actor.player.gold();context.defenseEconomy={...context.defenseEconomy,
+      availableGold:gold-(controller.spending?.facts({tick:actor.game.ticks(),gold,cost:0n,key:'plan'}).pendingCost||0n)};}
+    const allowed = () => buildingAllowed(actor);
+    return deps.structurePlanner.run(actor, context, {
+      allowed,
+      choose: candidates => {
+        const choice = controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }),
+        domain: 'structure-plan', structure: context, teamOpening: context.teamOpening, teamNaval: teamNavalFacts(actor),
+        defenseEconomy:context.defenseEconomy,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+        }, candidates);
+        if (buildingScopes.has(actor) && !candidates.some(candidate => candidate.id === choice.selectedId && candidate.kind === 'structure-plan' && candidate.eligible)) buildingScopes.get(actor).stopped = true;
+        return choice;
+      },
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: async (plan, decisionId, execute) => {
+        const previous = openingStructurePlans.get(actor);
+        openingStructurePlans.set(actor, plan);
+        try { return await withPlan(actor, decisionId, execute); }
+        finally {
+          if (previous === undefined) openingStructurePlans.delete(actor);
+          else openingStructurePlans.set(actor, previous);
+        }
+      }
+    });
+  }
+  function buildingAllowed(actor) {
+    const controller = owners.get(actor);
+    return !!controller && deps.enabled() && deps.isCurrent(controller.bot) &&
+      !deps.isPublic(controller.bot.mg) && !buildingScopes.get(actor)?.stopped;
+  }
+  async function planBuilding(actor, mode, first, second) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.buildingPlanner) throw new Error('Building planner is not attached');
+    if (!['handle', 'action', 'upgrade', 'defense'].includes(mode)) throw new Error('Unknown building planner mode: ' + mode);
+    const existing = buildingScopes.get(actor);
+    const scope = existing || { stopped: false };
+    if (!existing) buildingScopes.set(actor, scope);
+    const hooks = {
+      forceNew: openingStructurePlans.get(actor)?.forceNew === true,
+      allowed: () => buildingAllowed(actor),
+      choose: (domain, candidates, facts) => {
+        const choice = controller.engine.decide({
+          ...safe(() => snapshot(controller), { unavailable: true }), domain, building: facts,
+          teamOpening: openingFacts(actor),defenseEconomy:defenseEconomyFacts(actor),
+          ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+        }, candidates);
+        if (!candidates.some(candidate => candidate.id === choice.selectedId && candidate.kind === domain && candidate.eligible)) {
+          scope.stopped = true;
+          controller.engine.record('building-result', { domain, decisionId: choice.decisionId,
+            status: 'stopped', reason: choice.reason });
+        }
+        return choice;
+      },
+      execute: (decisionId, execute) => withPlan(actor, decisionId, execute),
+      record: (kind, details) => controller.engine.record(kind, details),
+      remember: (quote, decisionId) => {
+        if (quote && typeof quote === 'object') placementParents.set(quote, decisionId);
+      }
+    };
+    try {
+      if (mode === 'handle') {
+        if(await maybeReactiveSam(actor))return true;
+        if(!buildingAllowed(actor))return false;
+        return await deps.buildingPlanner.handle(actor, hooks);
+      }
+      if (mode === 'action') return await deps.buildingPlanner.action(actor, first, second, hooks);
+      return await deps.buildingPlanner[mode](actor, first, hooks, second);
+    } finally {
+      if (!existing) buildingScopes.delete(actor);
+    }
+  }
+  async function planStructurePlacement(actor, unitType) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.structurePlacementPlanner) throw new Error('Structure placement planner is not attached');
+    return deps.structurePlacementPlanner.run(actor, unitType, {
+      allowed: () => buildingAllowed(actor),
+      execute: (decisionId,execute) => withPlan(actor,decisionId,execute),
+      choose: (candidates, facts) => {
+        const choice = controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain: 'structure-placement',
+        structurePlacement: facts,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+        }, candidates);
+        if (buildingScopes.has(actor) && !candidates.some(candidate => candidate.id === choice.selectedId && candidate.kind === 'structure-placement' && candidate.eligible)) buildingScopes.get(actor).stopped = true;
+        return choice;
+      },
+      record: (kind, details) => controller.engine.record(kind, details),
+      remember: (buildable, decisionId) => {
+        if (buildable && typeof buildable === 'object') placementParents.set(buildable, decisionId);
+      }
+    });
+  }
+  function inspect() {
+    if (!current) return { schemaVersion: 1, strategy: 'legacy-v1', records: [], droppedRecords: 0 };
+    return { ...current.engine.exportTrace(), coverage: { rules: [...current.observedRules],
+      unavailableRuleHooks: [...current.missingRules] } };
+  }
+  async function planBotTargets(actor) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.botTargetPlanner) throw new Error('Bot-target planner is not attached');
+    const previousScope=attackScopes.get(actor);
+    if(!previousScope)attackScopes.set(actor,{stopped:false});
+    try { return await deps.botTargetPlanner.run(actor, {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped,
+      choose: (candidates, context) => {
+        const choice = controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain: 'bot-target', botTargets: context,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+        }, candidates);
+        if (attackScopes.has(actor) && (choice.selectedId === null || candidates.some(c => c.kind === 'bot-target' && c.eligible)) &&
+          !candidates.some(c => c.id === choice.selectedId && c.kind === 'bot-target' && c.eligible)) attackScopes.get(actor).stopped = true;
+        return choice;
+      },
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (plan, decisionId, execute) => withPlan(actor, decisionId, execute)
+    }); } finally { if(!previousScope)attackScopes.delete(actor); }
+  }
+  function attackHooks(actor) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.attackPlanner) throw new Error('Attack planner is not attached');
+    return {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped,
+      choose: (domain, candidates, context) => {
+        const choice = controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, attack: context,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+        }, candidates);
+        if (domain === 'attack-plan' && attackScopes.has(actor) && !candidates.some(c => c.id === choice.selectedId && c.kind === domain && c.eligible)) attackScopes.get(actor).stopped = true;
+        return choice;
+      },
+      record: (kind, details) => controller.engine.record(kind, details),
+      execute: (decisionId, execute) => withPlan(actor, decisionId, execute),
+      geography: mode => chooseAttackGeography(actor, mode)
+    };
+  }
+  function attackGeographyHooks(actor) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.attackGeographyPlanner) throw new Error('Attack-geography planner is not attached');
+    return {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) &&
+        !attackScopes.get(actor)?.stopped,
+      choose: (domain, candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain, attackGeography: facts,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+      }, candidates),
+      probe: tile => deps.probeLanding(actor, tile, false),
+      record: (kind, details) => controller.engine.record(kind, details)
+    };
+  }
+  function boatHooks(actor) {
+    const controller=owners.get(actor);
+    if(!controller||!deps.boatPlanner)throw new Error('Boat planner is not attached');
+    let stopped=false;
+    const allowed=()=>!stopped && deps.enabled() && deps.isCurrent(controller.bot) &&
+      !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped && !navalScopes.get(actor)?.stopped;
+    const executeSync=(decisionId,run)=>{
+      const previous=activePlans.get(actor);activePlans.set(actor,decisionId);
+      try{return run();}finally{if(previous===undefined)activePlans.delete(actor);else activePlans.set(actor,previous);}
+    };
+    const dispatch=(id,run)=>{
+      if(!allowed())return false;
+      declined.delete(actor);
+      transportHeld.delete(actor);
+      try {
+        const sent=executeSync(id,run);
+        if(declined.get(actor)===true&&!transportHeld.has(actor)){
+          stopped=true;
+          if(navalScopes.has(actor))navalScopes.get(actor).stopped=true;
+          if(attackScopes.has(actor))attackScopes.get(actor).stopped=true;
+        }
+        return sent;
+      } catch(error){
+        controller.engine.record('boat-detail-result',{domain:'boat-allocation',decisionId:id,status:'threw'});
+        throw error;
+      }
+    };
+    return {
+      allowed,
+      choose:(domain,candidates,facts)=>{
+        let parent=activePlans.get(actor);
+        const origin=boatOrigins.get(actor),destination=boatDestinations.get(actor);
+        if(domain==='boat-allocation'&&destination?.tile===facts.tile)parent=destination.decisionId;
+        else if((domain==='boat-search'||domain==='boat-destination'&&facts.mode==='random')&&origin&&parent===origin.parentId)parent=origin.decisionId;
+        const choice=controller.engine.decide({...safe(()=>snapshot(controller),{unavailable:true}),domain,boat:facts,
+          ...(parent!==undefined?{parentDecisionId:parent}:{})},candidates);
+        if(!candidates.some(c=>c.id===choice.selectedId&&c.kind===domain&&c.eligible)) {
+          stopped=true;
+          if(navalScopes.has(actor))navalScopes.get(actor).stopped=true;
+          if(attackScopes.has(actor))attackScopes.get(actor).stopped=true;
+        }
+        return choice;
+      },
+      execute:(id,run)=>withPlan(actor,id,run),
+      probe:(id,tile)=>withPlan(actor,id,()=>deps.probeLanding(actor,tile,false)),
+      remember:(tile,id,kind)=>{
+        if(kind==='origin'){boatOrigins.set(actor,{tile,decisionId:id,parentId:activePlans.get(actor)});boatDestinations.delete(actor);}
+        else boatDestinations.set(actor,{tile,decisionId:id});
+      },
+      record:(kind,details)=>controller.engine.record(kind,details),
+      launch:(id,tile,troops)=>{
+        boatDestinations.delete(actor);boatOrigins.delete(actor);
+        return dispatch(id,()=>actor._launchTacticalBoat(tile,troops));
+      },
+      emit:(id,tile,troops,label)=>{
+        boatDestinations.delete(actor);boatOrigins.delete(actor);
+        return dispatch(id,()=>actor.emitBoat(tile,troops,label));
+      }
+    };
+  }
+  function chooseBoatOrigin(actor,shore){return deps.boatPlanner.origin(actor,shore,boatHooks(actor));}
+  function chooseBoatCrater(actor,hits){return deps.boatPlanner.crater(actor,hits,boatHooks(actor));}
+  async function planBoatSites(actor,sites,context){
+    const inputs=sites.map(site=>({...site,ownerId:site.owner?.isPlayer()?site.owner.id():site.ownerId??null}));
+    return deps.boatPlanner.destination(actor,inputs,context,boatHooks(actor));
+  }
+  function launchBoat(actor,tile,mode,label){
+    const hooks=boatHooks(actor),choice=deps.boatPlanner.allocation(actor,{tile,mode},hooks);
+    if(!choice)return false;
+    const sent=hooks.emit(choice.decisionId,tile,choice.troops,label);
+    hooks.record('boat-detail-result',{domain:'boat-allocation',decisionId:choice.decisionId,status:'launch-result',tile,troops:choice.troops,submitted:!!sent});
+    return sent;
+  }
+  async function planTacticalBoat(actor,shore,enemies){
+    const previous=navalScopes.get(actor);
+    if(!previous)navalScopes.set(actor,{stopped:false});
+    boatOrigins.delete(actor);boatDestinations.delete(actor);
+    try{return await deps.boatPlanner.tactical(actor,shore,enemies,boatHooks(actor));}
+    finally{if(!previous)navalScopes.delete(actor);}
+  }
+  function planNavalLanding(actor, sites, context) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.navalLandingPlanner) throw new Error('Naval landing planner is not attached');
+    return deps.navalLandingPlanner.run(actor, sites, context, {
+      allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped && !navalScopes.get(actor)?.stopped,
+      stop: choice => {
+        const scope = navalScopes.get(actor);
+        if (scope) {
+          scope.stopped = true;
+          controller.engine.record('naval-stop', { decisionId: choice.decisionId, reason: 'Landing policy stopped the enclosing naval pass' });
+        }
+      },
+      choose: (candidates, facts) => controller.engine.decide({
+        ...safe(() => snapshot(controller), { unavailable: true }), domain: 'naval-landing', navalLanding: facts,
+        ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+      }, candidates),
+      probe: async (decisionId, tile, fallback) => {
+        const result=await withPlan(actor,decisionId,()=>deps.probeLanding(actor,tile,fallback));
+        if(result!==false&&result!==fallback)boatDestinations.set(actor,{tile,decisionId});
+        return result;
+      },
+      record: (kind, details) => controller.engine.record(kind, details),
+      diagnostics: data => deps.landingDiagnostics(data)
+    });
+  }
+  async function planNavalActions(actor, context) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.navalActionPlanner) throw new Error('Naval action planner is not attached');
+    const previous = navalScopes.get(actor);
+    navalScopes.set(actor, { stopped: false });
+    boatOrigins.delete(actor);boatDestinations.delete(actor);
+    try {
+      return await deps.navalActionPlanner.run(actor, context, {
+        allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !attackScopes.get(actor)?.stopped && !navalScopes.get(actor)?.stopped,
+        choose: (candidates, facts) => {
+          const choice = controller.engine.decide({
+          ...safe(() => snapshot(controller), { unavailable: true }), domain: 'naval-action', navalAction: facts,
+          teamOpening:openingFacts(actor),
+          ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+          }, candidates);
+          if (attackScopes.has(actor) && !candidates.some(c => c.id === choice.selectedId && c.kind === 'naval-action' && c.eligible)) attackScopes.get(actor).stopped = true;
+          return choice;
+        },
+        execute: (decisionId, execute) => withPlan(actor, decisionId, execute),
+        probe: tile => deps.probeLanding(actor, tile, false),
+        origin: shore=>chooseBoatOrigin(actor,shore),
+        nearby: (sites,cap)=>planBoatSites(actor,sites,{mode:'nearby',cap}),
+        launch: (tile,mode,label)=>launchBoat(actor,tile,mode,label),
+        record: (kind, details) => controller.engine.record(kind, details)
+      });
+    } finally {
+      if (navalScopes.get(actor)?.stopped && attackScopes.has(actor)) attackScopes.get(actor).stopped = true;
+      if (previous === undefined) navalScopes.delete(actor);
+      else navalScopes.set(actor, previous);
+    }
+  }
+  async function findEnemyProbeTarget(actor){
+    const controller=owners.get(actor);
+    if(!controller||!deps.boatPlanner)throw new Error('Enemy probe planner is not attached');
+    const sites=deps.boatPlanner.enemyProbeSites(actor);
+    controller.engine.record('transport-target-search',{tick:actor.game.ticks(),mode:'enemy-probe',
+      candidates:sites.length,reason:sites.length?'Hostile shore on reachable water':'No hostile shore shares owned water'});
+    return planNavalLanding(actor,sites,{mode:'distant',probeCap:deps.settings().distantBoatProbeMax||12});
+  }
+  function openingFacts(actor, context) {
+    if (!deps.twoTeamOpening) return null;
+    if (context?.sharedWater === undefined && actor._sharedWaterComponents !== undefined) {
+      context = {...context,sharedWater:actor._sharedWaterComponents !== null};
+    }
+    return deps.twoTeamOpening.observe(actor.game, actor.player, context);
+  }
+  function defenseEconomyFacts(actor){
+    const controller=owners.get(actor);
+    if(!deps.defenseEconomy||controller?.engine.selectedStrategy?.()!=='adaptive-v1')return null;
+    const game=actor.game||actor.mg||controller.bot.mg,player=actor.player||controller.bot.player;
+    const structure=controller.bot.structureBehavior;
+    return deps.defenseEconomy.observe(game,player,openingFacts({game,player,_sharedWaterComponents:structure?._sharedWaterComponents}));
+  }
+  async function maybeReactiveSam(actor){
+    const controller=owners.get(actor);
+    if(!deps.samDefenseObserver||!deps.createReactiveSam||!deps.sendSamUpgrade||reactiveInFlight.has(actor)||
+        controller?.engine.selectedStrategy?.()!=='adaptive-v1'||!buildingAllowed(actor))return false;
+    const game=actor.game,player=actor.player,config=game.config();
+    if(config.isUnitDisabled(deps.units.SAMLauncher)||deps.buildAllowed?.(deps.units.SAMLauncher)===false)return false;
+    const predictor=()=>deps.createReactiveSam({range:level=>config.samRange(level),
+      distance:(a,b)=>game.manhattanDist(a,b),distanceSquared:(a,b)=>game.euclideanDistSquared(a,b),
+      cooldown:typeof config.SAMCooldown==='function'?config.SAMCooldown():90,
+      upgradeDuration:typeof config.samUpgradeDuration==='function'?config.samUpgradeDuration():45});
+    let observation=deps.samDefenseObserver.observe(game,player);
+    if(observation.reason||!observation.threats.some(t=>t.threatensSelf))return false;
+    const previews=predictor().assess({...observation,candidates:observation.ownSams.map(s=>({unitId:s.id(),cost:0n}))});
+    const quotes=new Map();reactiveInFlight.add(actor);
+    try{
+      for(const preview of previews.filter(p=>p.canDefend)){
+        const unit=observation.ownSams.find(s=>s.id()===preview.unitId);
+        const quote=await actor.buildableFor(deps.units.SAMLauncher,unit.tile());
+        if(!buildingAllowed(actor))return false;
+        if(quote&&quote.canUpgrade===unit.id())quotes.set(unit.id(),quote);
+      }
+      observation=deps.samDefenseObserver.observe(game,player);
+      const assessments=observation.reason?[]:predictor().assess({...observation,candidates:[...quotes].map(([unitId,q])=>({unitId,
+        cost:q.upgradeCosts?.[0]??q.cost}))});
+      const cs=assessments.map((p,i)=>({...p,interceptionKind:p.kind,id:`reactive-sam:${i}`,kind:'reactive-sam-upgrade',
+        eligible:p.canDefend&&controller.spending.facts({tick:game.ticks(),gold:player.gold(),cost:p.cost,
+          reserve:0n,key:`${deps.units.SAMLauncher}:upgrade:${p.unitId}`}).allowed}));
+      const choice=controller.engine.decide({...snapshot(controller),domain:'reactive-sam-upgrade',
+        defenseEconomy:defenseEconomyFacts(actor),assessment:previews.map(({targetIds,unitId,reason,canDefend})=>({targetIds,unitId,reason,canDefend}))},
+        [...cs,{id:'$wait',kind:'wait',eligible:true,reason:'Keep emergency funds; no proven useful upgrade'}]);
+      const selected=cs.find(c=>c.id===choice.selectedId&&c.eligible);
+      controller.engine.record('reactive-sam-result',{tick:game.ticks(),decisionId:choice.decisionId,
+        status:selected?'selected':'held',reason:choice.reason,assessments:cs.length?cs:previews});
+      if(!selected){if(cs.some(c=>c.eligible)&&choice.selectedId==='$wait'&&buildingScopes.has(actor))buildingScopes.get(actor).stopped=true;return false;}
+      if(!buildingAllowed(actor))return false;
+      const quote=quotes.get(selected.unitId);reactiveQuotes.set(quote,{tick:game.ticks(),...selected});
+      try{return withPlan(actor,choice.decisionId,()=>deps.sendSamUpgrade(actor,quote));}
+      finally{reactiveQuotes.delete(quote);}
+    }finally{reactiveInFlight.delete(actor);}
+  }
+  function teamNavalFacts(actor) {
+    if (!deps.teamGeography || !actor?.player) return null;
+    const game = actor.game || actor.mg;
+    const naval = deps.teamGeography.navalFacts(game, actor.player);
+    if (!naval) return null;
+    const controller = owners.get(actor), structure = controller?.bot.structureBehavior;
+    if (!structure || !deps.units) throw new Error('Two-team naval economy requires the structure planner');
+    const U = deps.units, opening = openingFacts({game,player:actor.player,_sharedWaterComponents:structure._sharedWaterComponents});
+    const available = type => !game.config().isUnitDisabled(type) && (!deps.buildAllowed || deps.buildAllowed(type));
+    const development = [U.City,U.Port,U.Factory].find(available);
+    const type = opening && opening.ports < Math.min(1,opening.portTarget) ? U.Port :
+      opening && opening.cities < opening.cityTarget ? U.City :
+      opening && opening.ports < opening.portTarget ? U.Port :
+      opening && opening.factories < opening.factoryTarget ? U.Factory :
+      opening?.samEnabled && !opening.sams ? U.SAMLauncher : development;
+    let reserve = 0n;
+    if (type !== undefined && available(type)) reserve = BigInt(structure.getPerceivedCost(type));
+    reserve += BigInt(deps.reserveGold ? deps.reserveGold(actor.player.gold()) : 0n);
+    const defense=defenseEconomyFacts(actor);
+    if(defense)reserve=defense.reserve+(defense.requiredType?BigInt(structure.cost(defense.requiredType)):0n);
+    const settings = deps.settings();
+    const enabled = settings.features?.warship !== false && settings.warshipAutoSpawn !== false && !game.config().isUnitDisabled(U.Warship);
+    return {...naval,reserve,fleetNeeded:naval.fleetNeeded && enabled};
+  }
+  function twoTeamOpeningVeto(actor, target) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.twoTeamOpening || !target.isPlayer()) return undefined;
+    const teamOpening = openingFacts(actor);
+    if (!teamOpening) return undefined;
+    const candidates = ['legacy', 'allow', 'defer'].map((mode, priority) => ({
+      id: 'team-attack:' + mode, kind: 'team-opening-attack', eligible: true, priority,
+      reason: mode === 'legacy' ? 'Use existing opening rules' : mode === 'allow' ?
+        'Reachable wilderness cleared' : 'Finish reachable wilderness first' }));
+    candidates.push({ id: '$wait', kind: 'wait', eligible: true, reason: 'Hold country expansion' });
+    const choice = controller.engine.decide({ ...snapshot(controller), domain: 'team-opening-attack', teamOpening,
+      ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {}) }, candidates);
+    if (choice.selectedId === 'team-attack:legacy') return undefined;
+    if (choice.selectedId === 'team-attack:allow') return false;
+    if (choice.selectedId !== 'team-attack:defer' && attackScopes.has(actor)) attackScopes.get(actor).stopped = true;
+    return true;
+  }
+  function twoTeamOpeningTileVeto(actor, tile) {
+    if (!deps.twoTeamOpening || !owners.has(actor) || !actor.game.hasOwner(tile)) return undefined;
+    const target = actor.game.playerBySmallID(actor.game.ownerID(tile));
+    if (!target || target.smallID() === actor.player.smallID()) return undefined;
+    return twoTeamOpeningVeto(actor, target);
+  }
+  async function planAttackSequence(actor, context) {
+    const controller = owners.get(actor);
+    if (!controller || !deps.attackSequencePlanner) throw new Error('Attack sequence planner is not attached');
+    context = { ...context, teamOpening: openingFacts(actor) };
+    deps.openingExpansion?.finishIfCleared(actor,context.teamOpening);
+    const previous = attackScopes.get(actor);
+    const scope = previous || { stopped: false };
+    if (!previous) attackScopes.set(actor, scope);
+    const alliance = actor.allianceBehavior;
+    const previousAllianceScope = alliance ? attackScopes.get(alliance) : undefined;
+    if (alliance) attackScopes.set(alliance, scope);
+    try {
+      return await deps.attackSequencePlanner.run(actor, context, {
+        allowed: () => deps.enabled() && deps.isCurrent(controller.bot) && !deps.isPublic(controller.bot.mg) && !scope.stopped,
+        choose: (domain, candidates, facts) => {
+          const choice = controller.engine.decide({
+            ...safe(() => snapshot(controller), { unavailable: true }), domain, attackSequence: facts,
+            teamOpening: context.teamOpening,
+            ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {})
+          }, candidates);
+          if (!candidates.some(c => c.id === choice.selectedId && c.kind === domain && c.eligible)) scope.stopped = true;
+          return choice;
+        },
+        execute: (decisionId, execute) => withCombatDiplomacyPlan(actor, decisionId, execute),
+        record: (kind, details) => controller.engine.record(kind, details)
+      });
+    } finally {
+      if (!previous) attackScopes.delete(actor);
+      if (alliance) {
+        if (previousAllianceScope === undefined) attackScopes.delete(alliance);
+        else attackScopes.set(alliance, previousAllianceScope);
+      }
+    }
+  }
+  async function planAttacks(actor, friends, enemies) {
+    const previous = attackScopes.get(actor);
+    if (!previous) attackScopes.set(actor, { stopped: false });
+    try { return await deps.attackPlanner.run(actor, friends, enemies, attackHooks(actor)); }
+    finally {
+      if (previous === undefined) attackScopes.delete(actor);
+      else attackScopes.set(actor, previous);
+    }
+  }
+  function selectAttackTarget(actor, mode, targets) {
+    const hooks = attackHooks(actor);
+    const choice = deps.attackPlanner.select(actor, mode, targets, hooks);
+    const scope = attackScopes.get(actor);
+    if (choice.target && scope) scope.decisionId = choice.decisionId;
+    // counterReady is an original synchronous routine. Its nested lookup must
+    // communicate an explicit policy stop without changing its boolean API.
+    if (choice.stop && scope) {
+      scope.stopped = true;
+      hooks.record('attack-stop', { decisionId: choice.decisionId, mode, reason: 'Target policy stopped the enclosing attack pass' });
+    }
+    return choice.target;
+  }
+  async function chooseAttackGeography(actor, mode) {
+    const hooks = attackGeographyHooks(actor);
+    const choice = await deps.attackGeographyPlanner.select(actor, mode, hooks);
+    const scope = attackScopes.get(actor);
+    if (choice.stop && scope) {
+      scope.stopped = true;
+      hooks.record('attack-stop', { decisionId: choice.decisionId, mode,
+        reason: 'Geographic target policy stopped the enclosing attack pass' });
+    }
+    return choice;
+  }
+  async function selectAttackGeography(actor, mode) {
+    return (await chooseAttackGeography(actor, mode)).target;
+  }
+  function replay(strategyId, trace) {
+    if (!current) throw new Error('Enter a private game before replaying a trace.');
+    return current.engine.replay(strategyId, trace);
+  }
+  return { attach, attachBehaviors, begin, intent, build, callback, diplomacyIntent, diplomacyCallback, decideAlliance,
+    allianceDecisionStopped: actor => diplomacyStops.get(actor) === true,
+    planBuilding, buildingAllowed, defenseEconomyFacts, twoTeamOpeningVeto, twoTeamOpeningTileVeto,
+    planAttackSequence, planAttackAllocation, planAttackRoute, planTargetedBoat, planFreeBoat, planEmbargos, planSpawn, planDonation, planAllianceOutreach, planFarOutreach,
+    chooseBoatOrigin, chooseBoatCrater, planBoatSites, launchBoat, planTacticalBoat, findEnemyProbeTarget,
+    selectWarshipSpawn, selectMovingWarship, selectWarshipWaypoint,
+    selectWarshipHome, selectWarshipNukeEscape, planWarshipNukeDodge,
+    planWarshipThreatPass, selectWarshipThreat, warshipThreatAllowed,
+    planOutgoingShips, planWarshipTracking,
+    planSocial, selectSocialRecipient, socialRecipientAction, planSmallAttackEmoji,
+    planEmojiRequest, planSocialWinner, markSocialWinner, emojiPermission, selectSocialMessage, selectSocialPool,
+    planAllianceEvents,
+    allianceEventStopped,
+    planSocialReaction,
+    planTurn, planWarshipMaintenance, planAssist, planBetray, planStructures, planStructurePlacement, planBotTargets, planAttacks, selectAttackTarget, selectAttackGeography, planNavalLanding, planNavalActions, planWarshipPatrol, planWarshipCombat, planWarshipRetaliation, planIncomingTransports, planWarshipDeployment, planWarshipInfestation, selectWarshipInfestation, planMirv, selectNukeWeapon, planNuke, selectNukeTarget, planSamClear, planHelpfulSilo, selectNukeArc, planSaturationSalvo, strikeDecisionId, selectStrikePlayer, strikeBuild, strikeAllowed, inspect, replay, wasDeclined: actor => declined.get(actor) === true,
+    select: id => { if (!current) throw new Error('No active bot.'); current.engine.select(id); },
+    strategies: () => current?.engine.strategies() || [] };
+}
+
+
+
+// Runs in the original Auto-Bot closure. No patches to the game's own event bus.
+const ofhTeamGeography = createTeamGeography({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team});
+const ofhTeamOpening = createTwoTeamOpening({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team,
+  buildAllowed:type=>autoBotBuildAllowed(type)});
+const ofhMatchArchive=createMatchArchive({createSummary:createMatchSummary,
+  onError:message=>pushLog('Match history storage warning: '+message,'system'),
+  indexedDB:(()=>{try{return window.indexedDB;}catch{return null;}})()});
+window.addEventListener('pagehide',()=>{ofhMatchArchive.flush().catch(()=>{});});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ofhMatchArchive.flush().catch(()=>{});});
+const ofhBrainRuntime = createBrainRuntime({
+  createEngine: createDecisionEngine,
+  createCommandGuard,createSpendingLedger,createReactiveSam,
+  defenseEconomy:createDefenseEconomy({units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type)}),
+  samDefenseObserver:createSamDefenseObserver({units:UNIT}),
+  sendSamUpgrade:(actor,quote)=>{
+    const menu=getBuildMenu();if(!menu||typeof menu.sendBuildOrUpgrade!=='function')return false;
+    ofhBrainRuntime.build(actor,'ReactiveSAM',menu,quote);
+    if(ofhBrainRuntime.wasDeclined(actor))return false;
+    state.stats.builds++;setLastAction(tr('🛡️ Reactive SAM upgrade'),'build');return true;
+  },
+  openingExpansion:createOpeningExpansion({settings:()=>state.settings}),
+  startHistory:bot=>{
+    const identity=()=>{
+      let gameId=null,playerId=null;
+      try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
+      return {gameId,playerId};
+    };
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.56'},identity);
+  },
+  createLegacyStrategy,
+  teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
+  twoTeamOpening: ofhTeamOpening,
+  socialPlanner:createSocialPlanner(),
+  allianceEventPlanner:createAllianceEventPlanner({collect:()=>collectAllianceEvents(),requestTypes:()=>ALLIANCE_REQUEST_TYPES,renewTypes:()=>RENEW_TYPES,
+    isActioned:event=>_allianceBehaviorActioned.has(event),veto:target=>typeof companionAllianceVeto==='function'&&companionAllianceVeto(target),pick:pickAllianceButton}),
+  strategies: [createAdaptiveStrategy(createLegacyStrategy())],
+  defaultStrategy: 'adaptive-v1',
+  boatPlanner: createBoatPlanner({state}),
+  embargoPlanner: createEmbargoPlanner(),
+  spawnPlanner: createSpawnPlanner({settings:()=>state.settings,geography:ofhTeamGeography}),
+  attackAllocationPlanner: createAttackAllocationPlanner({settings:()=>state.settings,difficulty:currentDifficulty,
+    easy:Difficulty.Easy,botType:PlayerType.Bot}),
+  attackRoutingPlanner: createAttackRoutingPlanner({settings:()=>state.settings,botType:PlayerType.Bot,closestTwoTiles}),
+  diplomacyDetailsPlanner: createDiplomacyDetailsPlanner({settings:()=>state.settings,debug:ofhDebug}),
+  buildingPlanner: createBuildingPlanner({ units: UNIT, settings: () => state.settings,
+    difficulty: currentDifficulty, densityThreshold: UPGRADE_DENSITY_THRESHOLD, samProtectWeight }),
+  turnPlanner: createTurnPlanner({ warshipAutoSpawn: () => state.settings.warshipAutoSpawn !== false }),
+  warshipMaintenancePlanner: createWarshipMaintenancePlanner({ settings: () => state.settings }),
+  warshipTransportPlanner: createWarshipTransportPlanner({ transportType: UNIT.TransportShip, tradeType: UNIT.TradeShip, warshipType: UNIT.Warship }),
+  structurePlanner: createStructurePlanner({ units: UNIT, settings: () => state.settings, difficulty: currentDifficulty,
+    spendableGold: actor => { const gold = actor.player.gold(); const hold = mirvReserveHold(gold); return gold > hold ? gold - hold : 0n; } }),
+  structurePlacementPlanner: createStructurePlacementPlanner({ units: UNIT, settings: () => state.settings,
+    opening:ofhTeamOpening,samPlacement:createSamPlacement({units:UNIT}),
+    geography:ofhTeamGeography,
+    randomTerritoryTiles: randTerritoryTileArray, maxProbes: MAX_SPAWN_PROBES }),
+  botTargetPlanner: createBotTargetPlanner({ botType: PlayerType.Bot, attackStructures: AttackStructures }),
+  attackGeographyPlanner: createAttackGeographyPlanner({ settings: () => state.settings,
+    transportType: UNIT.TransportShip, ffaMode: GameMode.FFA, closestTwoTiles,
+    encircleScanTicks: ENCIRCLE_SCAN_TICKS }),
+  attackPlanner: createAttackPlanner({ settings: () => state.settings, difficulty: currentDifficulty,
+    botType: PlayerType.Bot, hostileRelation: Relation.Hostile }),
+  attackSequencePlanner: createAttackSequencePlanner({ state, botType: PlayerType.Bot,
+    now: () => performance.now(), debug: ofhDebug }),
+  diplomacyPlanner: createDiplomacyPlanner({ settings: () => state.settings, neutralRelation: Relation.Neutral,
+    friendlyRelation: Relation.Friendly, difficulty: currentDifficulty,
+    difficulties: { easy: Difficulty.Easy, medium: Difficulty.Medium }, humanType: PlayerType.Human,
+    emojis: { confused: EMOJI_CONFUSED, scared: EMOJI_SCARED_OF_THREAT, love: EMOJI_LOVE, handshake: EMOJI_HANDSHAKE,
+      assistLow: EMOJI_ASSIST_RELATION_TOO_LOW, assistMe: EMOJI_ASSIST_TARGET_ME,
+      assistAlly: EMOJI_ASSIST_TARGET_ALLY, assistAccept: EMOJI_ASSIST_ACCEPT } }),
+  navalLandingPlanner: createNavalLandingPlanner(),
+  warshipPatrolPlanner: createWarshipPatrolPlanner(),
+  warshipThreatPlanner: createWarshipThreatPlanner({transportType:UNIT.TransportShip,tradeType:UNIT.TradeShip,warshipType:UNIT.Warship,settings:()=>state.settings}),
+  warshipDetailsPlanner: createWarshipDetailsPlanner({warshipType: UNIT.Warship, settings: () => state.settings}),
+  warshipCombatPlanner: createWarshipCombatPlanner({ warshipType: UNIT.Warship, difficulty: currentDifficulty }),
+  warshipSafetyPlanner: createWarshipSafetyPlanner({portType: UNIT.Port, settings: () => state.settings}),
+  warshipDeploymentPlanner: createWarshipDeploymentPlanner({ portType: UNIT.Port, warshipType: UNIT.Warship }),
+  strikePlanner: createStrikePlanner({ state, units: UNIT, difficulty: currentDifficulty, salvoPace,
+    salvoMessage: count => setLastAction(tr('☢️ Salvo ×{n} → dense target', { n: count }), 'nuke') }),
+  strikeTargetPlanner: createStrikeTargetPlanner({ units: UNIT, settings: () => state.settings, difficulty: currentDifficulty,
+    ffa: GameMode.FFA, friendly: Relation.Friendly, hostile: Relation.Hostile, maxSiloLevel: MAX_NATION_SILO_UPGRADE_LEVEL,
+    salvoPace, samMessage: count => setLastAction(tr('☢️ Salvo ×{n} → SAM break', { n: count }), 'nuke') }),
+  strikeRanking: createStrikeRanking({ settings: () => state.settings, difficulty: currentDifficulty,
+    ffa: GameMode.FFA, team: GameMode.Team, botType: PlayerType.Bot, structureTypes: NUKE_STRUCTURES_TYPES,
+    densityThreshold: HIGH_DENSITY_NUKE_THRESHOLD, minLevels: MIN_LEVEL_SUM_FOR_HIGH_DENSITY_NUKE }),
+  navalActionPlanner: createNavalActionPlanner({ state, transportType: UNIT.TransportShip, debug: ofhDebug }),
+  probeLanding: (actor, tile, fallback) => withTimeout(actor.player.bestTransportShipSpawn(tile), WORKER_TIMEOUT_MS, fallback),
+  landingDiagnostics: data => { state._distantDiag = data; },
+  enabled: () => state.settings.enabled,
+  settings: () => state.settings,
+  isCurrent: bot => typeof _bot !== 'undefined' && _bot === bot && getGame() === bot.mg.__src,
+  isPublic: game => isPublicLobby(game.__src || game),
+  emitIntent: (ctor, ...args) => emitIntent(ctor, ...args),
+  transportType: UNIT.TransportShip,
+  isTransportIntent: ctor => ctor === _ctors.boat,
+  isDonationIntent:ctor=>ctor===_ctors.donateTroops,
+  watchTransportIntents: observe => {
+    const bus=getEventBus(),ctor=discoverCtors(bus).boat;
+    if(!bus||typeof bus.on!=='function'||typeof bus.off!=='function'||!ctor)throw new Error('Transport launch observer unavailable');
+    const listener=event=>observe(event.dst);
+    bus.on(ctor,listener);
+    return ()=>bus.off(ctor,listener);
+  },
+  intentName: ctor => Object.keys(_ctors).find(key => _ctors[key] === ctor) || 'intent',
+  log: message => pushLog(message, 'system')
+});
+function ofhDownloadBrainJSON(trace,prefix,pretty=false) {
+  const blob = new Blob([JSON.stringify(trace, null, pretty?2:undefined)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${prefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function ofhExportBrainTrace(){ofhDownloadBrainJSON(ofhBrainRuntime.inspect(),'openfront-decisions',true);}
+async function ofhExportMatchSummary(){
+  try{
+    const summary=await ofhMatchArchive.exportSummary();
+    if(summary.persistence.error)pushLog('History storage warning: '+summary.persistence.error,'system');
+    ofhDownloadBrainJSON(summary,'openfront-match');
+  }catch(error){pushLog('Match summary unavailable: '+String(error?.message||error),'system');}
+}
+window.OpenFrontBrain = Object.freeze({
+  inspect: () => ofhBrainRuntime.inspect(),
+  exportJSON: () => JSON.stringify(ofhBrainRuntime.inspect(), null, 2),
+  download: ofhExportBrainTrace,
+  matchSummary:()=>ofhMatchArchive.exportSummary(),
+  downloadSummary:ofhExportMatchSummary,
+  saveHistory:()=>ofhMatchArchive.flush(),
+  strategies: () => ofhBrainRuntime.strategies(),
+  replay: (id, trace) => ofhBrainRuntime.replay(id, trace),
+  useStrategy: id => ofhBrainRuntime.select(id)
+});
+
+// END CENTRAL BRAIN
+class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=true;this.behaviorsInitialized=false;this.spawnExecAdded=false;this.lastSpawnTile=null;this.lastSpawnTopKey=null;this.lastSpawnPickTick=null;this.status="";this.lastSeenTick=-1;this.embargoMalusApplied=new Set;this.random=new PseudoRandom(simpleHash(String(t&&t.playerId))+simpleHash(String(t&&t.gameId)));this.triggerRatio=this.random.nextInt(50,60)/100;this.reserveRatio=this.random.nextInt(30,40)/100;this.expandRatio=this.random.nextInt(10,20)/100;this.attackRate=this.getAttackRate();this.attackTick=this.random.nextInt(0,this.attackRate);ofhBrainRuntime.attach(this)}getAttackRate(){switch(currentDifficulty()){case Difficulty.Easy:return this.random.nextInt(65,100);case Difficulty.Medium:return this.random.nextInt(55,70);case Difficulty.Hard:return this.random.nextInt(45,60);case Difficulty.Impossible:return 30;default:return 30}}feat(e){return!!(state.settings.features&&state.settings.features[e])}async tick(e){this.player=this.mg.myPlayer();ofhBrainRuntime.begin(this);const t=this.player;if(t!==null&&typeof sampleBotIncome==="function"){if(typeof maybeResetForNewGame==="function"){try{let c=Number(this.mg.ticks());if(maybeResetForNewGame(c)){pushLog(tr("♻️ New game detected — cleared stale per-game state"),"system")}}catch(c){}}sampleBotIncome(this.mg,t)}if(this.behaviorsInitialized&&t!==null&&t.isAlive()&&this.feat("warship")&&currentDifficulty()!==Difficulty.Easy&&t.unitsConstructed(UNIT.Port)&&!this.mg.config().isUnitDisabled(UNIT.Warship)){try{ofhBrainRuntime.planWarshipMaintenance(this,e)}catch(c){console.error("[AutoBot] trackShips error:",c)}}if(t===null)return;if(this.mg.inSpawnPhase()){ofhBrainRuntime.planSpawn(this,"tick",e);this.status=tr("Spawn phase…");return}if(!t.isAlive()){this.active=false;this.status=tr("💀 Eliminated");return}if(!this.behaviorsInitialized){this.initializeBehaviors();if(this.feat("expand")){await this.attackBehavior.forceSendAttack(this.mg.terraNullius())}this.lastSeenTick=e;return}const a=this.lastSeenTick<0?e:this.lastSeenTick+1;this.lastSeenTick=e;let i=this.attackRate;if(state.settings.winFixes){const c=state.settings.combatCadenceScale??1;if(c>0&&c!==1){i=Math.max(1,Math.round(this.attackRate*c))}}const s=this.attackTick%i;const r=(s+Math.floor(i/3))%i;const o=(s+Math.floor(i*2/3))%i;let l=false;let u=false;for(let c=a;c<=e;c++){const d=(c%i+i)%i;if(d===s)l=true;else if(d===r||d===o)u=true}if(!l){if(u&&this.feat("build")){await ofhBrainRuntime.planTurn(this,{path:"build-only",tick:e,attackRate:i})}return}this.status=tr("Thinking…");try{await ofhBrainRuntime.planTurn(this,{path:"full",tick:e,attackRate:i})}catch(c){console.error("[AutoBot] decision chain error:",c)}}initializeBehaviors(){const e=this.random;const t=this.mg;const a=this.player;this.emojiBehavior=new EmojiBehavior(e,t,a);this.mirvBehavior=new MirvBehavior(e,t,a,this.emojiBehavior);this.allianceBehavior=new AllianceBehavior(e,t,a,this.emojiBehavior);this.warshipBehavior=new WarshipBehavior(e,t,a,this.emojiBehavior);this.attackBehavior=new AttackBehavior(e,t,a,this.triggerRatio,this.reserveRatio,this.expandRatio,this.allianceBehavior,this.emojiBehavior);this.nukeBehavior=new NukeBehavior(e,t,a,this.attackBehavior,this.emojiBehavior);this.structureBehavior=new StructureBehavior(e,t,a);this.behaviorsInitialized=true;ofhBrainRuntime.attachBehaviors(this)}currentSpawnTopKey(){if(!state.settings.smartSpawn)return null;let e=null;try{if(typeof getSpawnHeatmapTopSpots==="function")e=getSpawnHeatmapTopSpots();if((!e||e.length===0)&&typeof computeSpawnTopSpotsForBot==="function"){e=computeSpawnTopSpotsForBot(this.mg,this.player)}}catch(t){e=null}return e&&e.length>0?`${e[0].x},${e[0].y}`:null}doSpawn(){return ofhBrainRuntime.planSpawn(this,"dispatch")}_spawnReady(e){if(e==null){this.status=tr("Spawn phase…");return}if(this.spawnExecAdded&&e===this.lastSpawnTile){return}const t=discoverCtors(getEventBus());if(t.spawn){ofhBrainRuntime.intent(this,"NationBot",t.spawn,e);if(ofhBrainRuntime.wasDeclined(this))return false;const a=this.spawnExecAdded;this.spawnExecAdded=true;this.lastSpawnTile=e;if(!a){state.stats.spawns++}setLastAction(tr("🏁 Spawned"),"spawn")}}pickSpawnCenter(){return ofhBrainRuntime.planSpawn(this,"pick")}_spawnCompanion(){if(typeof companionSpawnCenter==="function"){const h=companionSpawnCenter(this.mg,this.player);if(h!=null)return h}return null}_spawnFacts(){const e=this.mg;const t=e.width();const a=e.height();let i=30;try{const h=e.config().minDistanceBetweenPlayers();if(Number.isFinite(h))i=h}catch(h){}let s=null;try{const h=this.player.team();if(h!==null&&typeof e.__src?.teamSpawnArea==="function"){s=e.__src.teamSpawnArea(h)??null}}catch(h){}const r=e.players().filter(h=>h.smallID()!==this.player.smallID()&&h.hasSpawned());const o=h=>{const p=e.x(h);const g=e.y(h);for(const m of r){const y=m.nameLocation();if(!y)continue;if(e.manhattanDist(e.ref(y.x,y.y),h)<i)return true}return false};const l=state.settings.smartSpawn;const u=h=>h!=null&&e.isLand(h)&&!e.hasOwner(h)&&!e.isBorder(h)&&!o(h);return {game:e,width:t,height:a,team:s,players:r,smart:l,valid:u,tooClose:o}}_spawnHeatmap(){const e=this.mg;let h=null;try{if(typeof getSpawnHeatmapTopSpots==="function"){h=getSpawnHeatmapTopSpots()}if(!h&&typeof computeSpawnTopSpotsForBot==="function"){h=computeSpawnTopSpotsForBot(e,this.player)}}catch(p){h=null}return h}scoreSpawnTile(e,t,a,i,s){const r=this.mg;const o=r.x(e);const l=r.y(e);let u=0;const c=12;let d=0;let f=0;for(let g=-c;g<=c;g++){for(let m=-c;m<=c;m++){const y=o+m;const b=l+g;if(!r.isValidCoord(y,b))continue;f++;if(r.isLand(r.ref(y,b)))d++}}u+=(f>0?d/f:0)*40;let h=Infinity;for(const g of t){const m=g.nameLocation();if(!m)continue;const y=Math.abs(m.x-o)+Math.abs(m.y-l);if(y<h)h=y}u+=Math.min(1,h/200)*30;const p=Math.min(o,l,a-1-o,i-1-l);u+=Math.min(1,p/30)*20;if(s){const g=s.x+s.width/2;const m=s.y+s.height/2;const y=Math.abs(o-g)+Math.abs(l-m);const b=(s.width+s.height)/2;u+=Math.max(0,1-y/Math.max(1,b))*10}return u}updateRelationsFromEmbargos(){const e=this.player;if(e===null)return;const t=this.mg.players().filter(i=>i.id()!==e.id());const a=-20;return ofhBrainRuntime.planEmbargos(this,t,{mode:"relations"})}_embargoRelationAction(i){const e=this.player;if(i.hasEmbargoAgainst(e)&&!this.embargoMalusApplied.has(i.smallID())){return "penalty"}else if(!i.hasEmbargoAgainst(e)&&this.embargoMalusApplied.has(i.smallID())){return "restore"}}_embargoRelationReady(i,response){const e=this.player;const a=-20;if(response==="penalty"){e.updateRelation(i,a);this.embargoMalusApplied.add(i.smallID())}else{e.updateRelation(i,-a);this.embargoMalusApplied.delete(i.smallID())}}handleEmbargoesToHostileNations(){const e=this.player;if(e===null)return;const t=this.mg.players().filter(r=>r.id()!==e.id());const a=currentDifficulty();const i=a===Difficulty.Hard||a===Difficulty.Impossible;const s=this.mg.config().gameConfig().gameMode===GameMode.Team;return ofhBrainRuntime.planEmbargos(this,t,{mode:"outgoing",hard:i,team:s})}_embargoAction(r,i,s){const e=this.player;if(s&&i&&r.type()!==PlayerType.Bot&&!e.isOnSameTeam(r)&&!e.isAlliedWith(r)){if(this.embargoIsWorthIt(r)){if(!e.hasEmbargoAgainst(r))return "start"}else if(e.hasEmbargoAgainst(r)){return "stop"}return}if(e.relation(r)<=Relation.Hostile&&!e.hasEmbargoAgainst(r)&&!e.isOnSameTeam(r)&&!e.isAlliedWith(r)&&this.embargoIsWorthIt(r)){return "start"}else if(e.hasEmbargoAgainst(r)&&(e.relation(r)>=Relation.Neutral||e.isAlliedWith(r)||!this.embargoIsWorthIt(r))){return "stop"}}embargoIsWorthIt(e){try{const t=this.mg.numLandTiles()||1;if(e.numTilesOwned()/t>=EMBARGO_DENIAL_SHARE)return true;return this.tradeStationCount(e)<=this.tradeStationCount(this.player)}catch(t){return false}}tradeStationCount(e){let t=0;for(const a of e.units(UNIT.City,UNIT.Port,UNIT.Factory)){if(typeof a.hasTrainStation==="function"&&a.hasTrainStation()){t+=1}}return t}addEmbargo(e,t){const a=discoverCtors(getEventBus());if(!a.embargo)return;ofhBrainRuntime.intent(this,"NationBot",a.embargo,e.__src??e,"start");if(ofhBrainRuntime.wasDeclined(this))return false;setLastAction(tr("🚫 Embargo {name}",{name:safeName(e)}),"diplo")}stopEmbargo(e){const t=discoverCtors(getEventBus());if(!t.embargo)return;ofhBrainRuntime.intent(this,"NationBot",t.embargo,e.__src??e,"stop");if(ofhBrainRuntime.wasDeclined(this))return false;setLastAction(tr("✅ Trade resumed {name}",{name:safeName(e)}),"diplo")}}"use strict";let _api=null;let _apiSrc=null;let _bot=null;let _botSeedKey=null;function ensureGameApi(n){if(_api&&_apiSrc===n)return _api;_api=createGameApi(n);_apiSrc=n;_bot=null;_botSeedKey=null;return _api}function resolveGameId(n){try{if(typeof n.gameID==="function")return String(n.gameID())}catch(e){}try{const e=n.config().gameConfig();if(e&&e.gameID!=null)return String(e.gameID)}catch(e){}return"openfront"}async function botTick(){if(!state.settings.enabled||state.tickInFlight)return;const n=getGame();if(!n){setStatus(tr("Waiting to enter game…"));return}if(isPublicLobby(n)){setStatus(tr("⛔ Blocked in a public lobby"));refreshGateBanner();return}const e=n.myPlayer?.();if(!e||!e.isPlayer?.()){setStatus(tr("Waiting for player…"));return}state.tickInFlight=true;state.tickStartedAt=performance.now();try{updateSpeedFactor(n);const t=ensureGameApi(n);const a=e.id?.();if((!_bot||_botSeedKey!==a)&&typeof NationBot==="function"){_bot=new NationBot(t.game,{gameId:resolveGameId(n),playerId:String(a)});_botSeedKey=a}await t.beginTick(e);const i=t.game.myPlayer();updateLive(t.game,i);if(_bot){await _bot.tick(t.game.ticks());setStatus(_bot.status||tr("Thinking…"))}else{setStatus(tr("Loading bot…"))}}catch(t){console.error("[AutoBot] tick error:",t);setStatus(tr("Error (see console)"))}finally{state.tickInFlight=false;renderStatus()}}function updateLive(n,e){try{const t=toNum(e.troops?.());const a=safeMaxTroops(n,e);state.live={troops:t,gold:toNum(e.gold?.()),tiles:toNum(e.numTilesOwned?.()),fill:a>0?t/a:0}}catch(t){}}function desiredTickInterval(){const n=state.settings.tickMs||200;return clamp(n/Math.max(.25,state.speed.factor||1),100,n)}function startEngine(){if(state.tickTimer!==null)return;state.tickIntervalMs=desiredTickInterval();state.tickTimer=window.setInterval(botTick,state.tickIntervalMs);botTick()}function stopEngine(){if(state.tickTimer!==null){window.clearInterval(state.tickTimer);state.tickTimer=null}state.tickInFlight=false}function retuneEngine(){if(state.tickTimer===null)return;const n=desiredTickInterval();if(Math.abs(n-(state.tickIntervalMs||0))>60){window.clearInterval(state.tickTimer);state.tickIntervalMs=n;state.tickTimer=window.setInterval(botTick,n)}}function setEnabled(n){state.settings.enabled=Boolean(n);saveSettings();if(state.settings.enabled){setStatus(tr("Starting…"));startEngine()}else{stopEngine();setStatus(tr("Disabled"))}renderHeader()}function setStatus(n){state.status=n}function setLastAction(n,e){const t=Date.now();state.lastAction=n+"  ·  T+"+new Date(t).toLocaleTimeString();pushLog(n,e||"combat",t)}function pushLog(n,e,t){state.log.unshift({t:t||Date.now(),cat:e,text:String(n)});if(state.log.length>LOG_CAP)state.log.length=LOG_CAP;if(state.activeTab==="log")renderLog()}"use strict";function ensureStyles(){if(document.getElementById(STYLE_ID))return;const n=document.createElement("style");n.id=STYLE_ID;n.textContent=`
       #${PANEL_ID} {
         --ab-accent: var(--oh-accent, #60a5fa);
         --ab-border: var(--oh-panel-border, rgba(148, 163, 184, 0.34));
@@ -1276,13 +8295,18 @@ try {
       #${PANEL_ID} .ab-log-filters {
         display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
       }
-      #${PANEL_ID} .ab-chip {
+      #${PANEL_ID} .ab-chip,
+      #${PANEL_ID} .ab-trace-export {
         cursor: pointer; padding: 3px 7px; border-radius: 999px;
         font-size: 10px; font-weight: 700; color: #cbd5e1;
         background: rgba(255,255,255,0.05); border: 1px solid transparent;
         transition: background 0.12s, color 0.12s, border-color 0.12s;
       }
-      #${PANEL_ID} .ab-chip:hover { background: rgba(255,255,255,0.09); }
+      #${PANEL_ID} .ab-chip:hover,
+      #${PANEL_ID} .ab-trace-export:hover { background: rgba(255,255,255,0.09); }
+      #${PANEL_ID} .ab-trace-export { appearance: none; font-family: inherit; }
+      #${PANEL_ID} .ab-trace-export:focus-visible { outline: 2px solid var(--oh-accent, #60a5fa); outline-offset: 2px; }
+      #${PANEL_ID} .ab-trace-export:active { background: var(--oh-accent-soft, rgba(96,165,250,0.18)); }
       #${PANEL_ID} .ab-chip.on {
         background: var(--oh-accent-soft, rgba(96,165,250,0.18)); color: var(--oh-accent, #60a5fa);
         border-color: var(--oh-accent-muted, rgba(96,165,250,0.4));
@@ -1303,7 +8327,7 @@ try {
       #${PANEL_ID} .ab-log-time { color: #6b7280; font-size: 10px; flex: none; }
       #${PANEL_ID} .ab-log-text { color: #e5e7eb; font-size: 11px; word-break: break-word; }
       #${PANEL_ID} .ab-log-empty { color: #6b7280; font-size: 11px; text-align: center; padding: 16px 0; }
-    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP={spawn:["Auto-spawn","Automatically pick a spawn tile."],expand:["Auto-expand / attack","Expand into land and attack targets."],boat:["Auto-landing (1% boat)","Send probe and landing boats overseas."],warship:["Auto-deploy warships","Build and dispatch warships."],build:["Auto-build","Build and upgrade structures."],nuke:["Auto-launch nukes","Fire nukes at high-value targets."],alliance:["Auto-accept alliances","Send and accept alliance requests."],embargo:["Auto-embargo enemies","Stop trading with hostile nations."],donate:["Auto-donate troops (allies)","Donate troops to needy allies."],betray:["Auto-betray allies","Off = stay loyal (defensive retaliation only)."]};function cfgStructIcon(n,e){var t=typeof window.__OFH_gameIconUrl==="function"&&window.__OFH_gameIconUrl(n)||"";if(!t)return'<span class="ab-cfg-struct-emoji">'+e+"</span>";return'<img class="ab-cfg-struct-icon" src="'+t+'" alt="'+n+`" onerror="this.replaceWith(document.createTextNode('`+e+`'))" draggable="false">`}function attrEsc(n){return String(n==null?"":n).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}function featRow(n,e,t){const a=state.settings.features[n];const i=FEAT_TIP[n];const s=attrEsc(tr(i?i[0]:e));const r=i?attrEsc(tr(i[1])):"";return`
+    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP={spawn:["Auto-spawn","Automatically pick a spawn tile."],expand:["Auto-expand / attack","Expand into land and attack targets."],boat:["Auto-landing (1% boat)","Send probe and landing boats overseas."],warship:["Warship automation","Build, patrol and command warships."],build:["Auto-build","Build and upgrade structures."],nuke:["Auto-launch nukes","Fire nukes at high-value targets."],alliance:["Auto-accept alliances","Send and accept alliance requests."],embargo:["Auto-embargo enemies","Stop trading with hostile nations."],donate:["Auto-donate troops (allies)","Donate troops to needy allies."],betray:["Auto-betray allies","Off = stay loyal (defensive retaliation only)."]};function cfgStructIcon(n,e){var t=typeof window.__OFH_gameIconUrl==="function"&&window.__OFH_gameIconUrl(n)||"";if(!t)return'<span class="ab-cfg-struct-emoji">'+e+"</span>";return'<img class="ab-cfg-struct-icon" src="'+t+'" alt="'+n+`" onerror="this.replaceWith(document.createTextNode('`+e+`'))" draggable="false">`}function attrEsc(n){return String(n==null?"":n).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}function featRow(n,e,t){const a=state.settings.features[n];const i=FEAT_TIP[n];const s=attrEsc(tr(i?i[0]:e));const r=i?attrEsc(tr(i[1])):"";return`
       <div class="ab-feat ab-feat-mini ${a?"on":""}" data-feat="${n}" data-tip="${s}" data-tip-desc="${r}">
         <span class="ab-feat-emoji">${t}</span>
       </div>`}function buildPanel(){ensureStyles();let n=document.getElementById(PANEL_ID);if(state.settings.hidden){if(n)n.remove();return null}if(n)return n;n=document.createElement("div");n.id=PANEL_ID;if(state.settings.minimized)n.classList.add("ab-collapsed");if(state.activeTab==="log")n.classList.add("ab-tab-log");if(state.activeTab==="config")n.classList.add("ab-tab-config");n.innerHTML=`
@@ -1318,17 +8342,17 @@ try {
       </div>
       <div class="ab-tabs">
         <div class="ab-tab ${state.activeTab==="control"?"on":""}" data-tab="control" data-tip-desc="${tr("Master switch, live status, feature toggles and the action counters.")}" data-tip="${tr("🎮 Controls")}">🎮</div>
-        <div class="ab-tab ${state.activeTab==="config"?"on":""}" data-tab="config" data-tip-desc="${tr("Difficulty-free strategy switches, build allow-list, and donate/warship tuning.")}" data-tip="${tr("⚙️ Config")}">⚙️</div>
+        <div class="ab-tab ${state.activeTab==="config"?"on":""}" data-tab="config" data-tip-desc="${tr("Choose allowed buildings. Donation limits and timing are under Advanced tuning.")}" data-tip="${tr("⚙️ Config")}">⚙️</div>
         <div class="ab-tab ${state.activeTab==="log"?"on":""}" data-tab="log" data-tip-desc="${tr("Timestamped feed of everything the bot has done, filterable by category.")}" data-tip="${tr("📜 Log")}">📜</div>
       </div>
       <div class="ab-body">
         <div class="ab-pane" data-pane="control">
-          <div class="ab-adv-toggle" data-role="feats-toggle">${state.settings.featsOpen?tr("Auto toggles ▴"):tr("Auto toggles ▾")}</div>
+          <div class="ab-adv-toggle" data-role="feats-toggle">${state.settings.featsOpen?tr("Allowed actions ▴"):tr("Allowed actions ▾")}</div>
           <div class="ab-feats-grid ${state.settings.featsOpen?"open":""}" data-role="feats">
             ${featRow("spawn","Auto-spawn","🏁")}
             ${featRow("expand","Auto-expand / attack","⚔️")}
             ${featRow("boat","Auto-landing (1% boat)","⛵")}
-            ${featRow("warship","Auto-deploy warships","🚢")}
+            ${featRow("warship","Warship automation","🚢")}
             ${featRow("build","Auto-build","🏗️")}
             ${featRow("nuke","Auto-launch nukes","☢️")}
             ${featRow("alliance","Auto-accept alliances","🤝")}
@@ -1355,7 +8379,7 @@ try {
         </div>
         <div class="ab-pane" data-pane="config">
           <div class="ab-cfg-body">
-            <div class="ab-cfg-sec">${tr("Auto-build structures")}</div>
+            <div class="ab-cfg-sec">${tr("Allowed buildings")}</div>
             <div class="ab-cfg-grid" data-role="cfg-structs">
               ${[["City","🏙️"],["Port","⚓"],["Factory","🏭"],["Defense Post","🛡️"],["SAM Launcher","🛰️"],["Missile Silo","🚀"]].map(([e,t])=>`<div class="ab-cfg-struct ${(state.settings.buildStructures||{})[e]!==false?"on":""}" data-struct="${e}">
                        ${cfgStructIcon(e,t)}
@@ -1363,220 +8387,85 @@ try {
                      </div>`).join("")}
             </div>
 
-            <div class="ab-cfg-sec">${tr("Advanced")}</div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Win-condition fixes")}" data-tip-desc="${tr("Divergences from the faithful AI that exist purely to close out a win: size-aware troop reserve, cheap 1% boat probes, MIRV war-chest and smart diplomacy.")}">${tr("Win-condition fixes")}</span>
-              <div class="ab-cfg-sw ${state.settings.winFixes?"on":""}" data-cfg="winFixes"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Smart spawn")}" data-tip-desc="${tr("Pick the opening tile from the spawn heatmap's best spot instead of a random valid tile, and keep moving it while the spawn phase lasts.")}">${tr("Smart spawn")}</span>
-              <div class="ab-cfg-sw ${state.settings.smartSpawn?"on":""}" data-cfg="smartSpawn"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Tick interval (ms)")}" data-tip-desc="${tr("How often the engine polls. The bot gates its own decisions on game ticks, so lowering this costs CPU without making it act more often.")}">${tr("Tick interval (ms)")}</span>
-              <input class="ab-cfg-num" type="number" min="50" max="2000" step="50" value="${state.settings.tickMs||200}" data-cfg-num="tickMs">
-            </div>
-
-            <!-- DIVERGENCE: none of these four behaviours exist in src's Nation AI. -->
-            <div class="ab-cfg-sec">${tr("Strategy")}</div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Build cities, ports and factories far more aggressively and stop hoarding gold for nukes.")}" data-tip="${tr("Economy first")}">${tr("Economy first")}</span>
-              <div class="ab-cfg-sw ${state.settings.economyFirst?"on":""}" data-cfg="economyFirst"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Salvo enough nukes to overwhelm an enemy SAM battery (interceptions + 1). Normally Impossible-only.")}" data-tip="${tr("Crack enemy SAMs")}">${tr("Crack enemy SAMs")}</span>
-              <div class="ab-cfg-sw ${state.settings.samCrack?"on":""}" data-cfg="samCrack"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Size SAM coverage from enemy silo levels and the per-player average rather than a fixed ratio, and always weight placement for overlap.")}" data-tip="${tr("Scale SAMs to threat")}">${tr("Scale SAMs to threat")}</span>
-              <div class="ab-cfg-sw ${state.settings.samDefense?"on":""}" data-cfg="samDefense"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Build defense posts whenever we border a hostile player, sized by gold/min, instead of only once an attack has already landed.")}" data-tip="${tr("Proactive defense posts")}">${tr("Proactive defense posts")}</span>
-              <div class="ab-cfg-sw ${state.settings.defensePosts?"on":""}" data-cfg="defensePosts"></div>
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Always aim at the densest structure cluster we can actually land on. If SAMs cover it, fire a full saturation salvo (interceptions + 1) instead of picking an easier target.")}" data-tip="${tr("Nuke densest target")}">${tr("Nuke densest target")}</span>
-              <div class="ab-cfg-sw ${state.settings.nukeDensityFirst?"on":""}" data-cfg="nukeDensityFirst"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Hold back more troops for every extra hostile player bordering us (+7% each, capped at 65%).")}" data-tip="${tr("Reserve vs neighbours")}">${tr("Reserve vs neighbours")}</span>
-              <div class="ab-cfg-sw ${state.settings.reserveByNeighbors?"on":""}" data-cfg="reserveByNeighbors"></div>
-            </div>
-
-            <!-- These were all in PERSISTED_KEYS and read by the engine, but had no
-                 control anywhere — including the two that decide whether the bot ever
-                 attacks a neighbour at all. The generic [data-cfg] / [data-cfg-range]
-                 handlers already cover them, so this is markup only. -->
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Reserve while fighting")}" data-tip-desc="${tr("While a real fight is on, size expansion against a raised reserve floor instead of the plain expand ratio, and keep a share of the CURRENT army home after a counter-attack. Tribes do not count as a fight.")}">${tr("Reserve while fighting")}</span>
-              <div class="ab-cfg-sw ${state.settings.combatReserve?"on":""}" data-cfg="combatReserve"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Go easy on neighbours")}" data-tip-desc="${tr("After the opening, a non-retaliation attack on a human or nation keeps at least half of max troops at home. Counter-attacks and everything defensive are untouched.")}">${tr("Go easy on neighbours")}</span>
-              <div class="ab-cfg-sw ${state.settings.gentleNeighbors?"on":""}" data-cfg="gentleNeighbors"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("No trickle attacks")}" data-tip-desc="${tr("Refuse attacks too small to be worth making. By the game's own attack maths a trickle is the worst possible attack: its per-tile losses clamp to the 2x maximum while its tile budget clamps to the minimum. Counter-attacks, tribe fights and land grabs are exempt.")}">${tr("No trickle attacks")}</span>
-              <div class="ab-cfg-sw ${state.settings.minAttackForce?"on":""}" data-cfg="minAttackForce"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Absorb, then counter")}" data-tip-desc="${tr("Wait out an incoming wave before countering, rather than trading into their full mass. Countering immediately also speeds their front up. Never counters while their front is near one of our defense posts.")}">${tr("Absorb, then counter")}</span>
-              <div class="ab-cfg-sw ${state.settings.absorbThenCounter?"on":""}" data-cfg="absorbThenCounter"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Finish off pockets")}" data-tip-desc="${tr("Spot bordering enemies whose land perimeter is already mostly ours and sealable, and prioritise eating their remaining ring until the game's wholesale capture fires.")}">${tr("Finish off pockets")}</span>
-              <div class="ab-cfg-sw ${state.settings.encirclePockets?"on":""}" data-cfg="encirclePockets"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Time defense posts")}" data-tip-desc="${tr("Measure how fast the attack front is advancing and place a post deep enough to FINISH building before the front arrives — or buy nothing at all when no site can finish in time.")}">${tr("Time defense posts")}</span>
-              <div class="ab-cfg-sw ${state.settings.defensePostTiming?"on":""}" data-cfg="defensePostTiming"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Posts for real players only")}" data-tip-desc="${tr("Tribes neither trigger reactive defense posts with their trickle waves nor count as a hostile front for proactive ones. Humans and nations both count as real players.")}">${tr("Posts for real players only")}</span>
-              <div class="ab-cfg-sw ${state.settings.defensePostPlayersOnly?"on":""}" data-cfg="defensePostPlayersOnly"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Test both nuke arcs")}" data-tip-desc="${tr("The game lets each launch pick its arc direction, but the Nation AI hardcodes 'up' and only corridor-checks that one. Test both and launch on whichever dodges enemy SAM rings.")}">${tr("Test both nuke arcs")}</span>
-              <div class="ab-cfg-sw ${state.settings.nukeArcRotate?"on":""}" data-cfg="nukeArcRotate"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Aim past SAM upgrades")}" data-tip-desc="${tr("Trajectories that clear a SAM's current ring but sit inside its level+1 ring die to a single enemy upgrade. Prefer aim points clean against every SAM's upgraded ring.")}">${tr("Aim past SAM upgrades")}</span>
-              <div class="ab-cfg-sw ${state.settings.samUpgradeMargin?"on":""}" data-cfg="samUpgradeMargin"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Nuke spend (minutes of income)")}" data-tip-desc="${tr("A single warhead decision may consume at most this many minutes of NET income. Warheads are otherwise uncapped — the only hard rule is that our gold must still be growing.")}">${tr("Nuke spend (minutes of income)")}</span>
-              <input class="ab-cfg-num" type="number" min="1" max="10" step="1" value="${state.settings.nukeIncomeMinutes??2}" data-cfg-num="nukeIncomeMinutes">
-            </div>
-
-            <div class="ab-cfg-sec">${tr("Opening")}</div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Opening in every mode")}" data-tip-desc="${tr("Apply the early build-up gate in team games too, not only when boxed in. A team spawn with open land otherwise had no build-up gate at all and picked fights from minute one.")}">${tr("Opening in every mode")}</span>
-              <div class="ab-cfg-sw ${state.settings.openingAllModes?"on":""}" data-cfg="openingAllModes"></div>
-            </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;gap:2px;">
+            
+            <p class="ab-cfg-label" style="margin:8px 0 12px;opacity:.8;">${tr("Action switches are in Controls. The bot manages its strategy rules automatically.")}</p>
+            <details class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
+              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:10px 0;">${tr("Advanced tuning")}</summary>
+<div class="ab-cfg-sec">${tr("Opening reserve")}</div>
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;gap:2px;">
               <div style="display:flex;justify-content:space-between;">
                 <span class="ab-cfg-label" data-tip="${tr("Army grown at")}" data-tip-desc="${tr("Troop fill (troops divided by max troops) that counts as 'army grown' and ends the build-up. Keep above 60% or it collapses into a restatement of the trigger ratio.")}">${tr("Army grown at")}</span>
                 <span class="ab-cfg-val" data-cfg-val="openingArmyFill">${Math.round((state.settings.openingArmyFill??.65)*100)}%</span>
               </div>
               <input type="range" min="60" max="95" step="5" value="${Math.round((state.settings.openingArmyFill??.65)*100)}" data-cfg-range="openingArmyFill" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Stocked up at (city levels)")}" data-tip-desc="${tr("Summed City LEVELS that count as 'stocked up on buildings' and end the opening.")}">${tr("Stocked up at (city levels)")}</span>
-              <input class="ab-cfg-num" type="number" min="1" max="20" step="1" value="${state.settings.openingMinCityLevels??5}" data-cfg-num="openingMinCityLevels">
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Opening hard stop (ticks)")}" data-tip-desc="${tr("Stall-breaker: after this many game ticks the opening is over no matter what, so no veto can freeze the bot on a map where land never runs out. 0 turns it off.")}">${tr("Opening hard stop (ticks)")}</span>
-              <input class="ab-cfg-num" type="number" min="0" max="30000" step="500" value="${state.settings.openingMaxTicks??9e3}" data-cfg-num="openingMaxTicks">
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Boxed in at (hostile players)")}" data-tip-desc="${tr("Team games: how many distinct hostile PLAYERS bordering us counts as having spawned boxed in. Tribes are excluded.")}">${tr("Boxed in at (hostile players)")}</span>
-              <input class="ab-cfg-num" type="number" min="1" max="6" step="1" value="${state.settings.openingSurroundedNeighbors??2}" data-cfg-num="openingSurroundedNeighbors">
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Invader memory (ticks)")}" data-tip-desc="${tr("How long an attacker stays exempt from the no-trickle and gentle-neighbour rules after its wave ends. The game lists only in-flight waves, so without a memory an invader becomes un-attackable between waves and we could never retake our own ground.")}">${tr("Invader memory (ticks)")}</span>
-              <input class="ab-cfg-num" type="number" min="0" max="3000" step="100" value="${state.settings.openingInvaderMemoryTicks??600}" data-cfg-num="openingInvaderMemoryTicks">
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("When we are being invaded, counter-attack the attacker even if our troops are below the reserve, and size that attack off the expand ratio instead of the reserve.")}" data-tip="${tr("Counter-attack first")}">${tr("Counter-attack first")}</span>
-              <div class="ab-cfg-sw ${state.settings.counterAttackFirst?"on":""}" data-cfg="counterAttackFirst"></div>
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Site buildings away from any border we don't trust — enemies, and allies too, since an alliance can be broken — and close to real teammates for mutual defence. Also weights sites by how far they are from our other buildings, so one atom bomb is less likely to destroy two.")}" data-tip="${tr("Safe placement")}">${tr("Safe placement")}</span>
-              <div class="ab-cfg-sw ${state.settings.safePlacement?"on":""}" data-cfg="safePlacement"></div>
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Build inside a SAM umbrella - ours or a teammate's, since a launcher shoots down any enemy nuke aimed underneath it no matter who owns the ground. Sites are pulled deep enough in that an atom fired from outside the umbrella cannot reach them, and once about three intercept slots cover a spot, buildings stop being spread apart there at all.")}" data-tip="${tr("SAM umbrella")}">${tr("SAM umbrella")}</span>
-              <div class="ab-cfg-sw ${state.settings.samUmbrella?"on":""}" data-cfg="samUmbrella"></div>
-            </div>
-
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip-desc="${tr("Opening plan: take empty land first, then bordering tribes, and only fight nations and humans once the cities and army are up. Retaliation, defending an ally, and recapturing structures from tribes always still fire. FFA always; team games only when we spawn boxed in.")}" data-tip="${tr("Phased opening")}">${tr("Phased opening")}</span>
-              <div class="ab-cfg-sw ${state.settings.phasedOpening?"on":""}" data-cfg="phasedOpening"></div>
-            </div>
-
-            <div class="ab-cfg-sec">${tr("Donate tuning")}</div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-sec">${tr("Donations")}</div>
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Keep fraction")}" data-tip-desc="${tr("Share of our maximum troops to hold back when donating to a teammate.")}">${tr("Keep fraction")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateKeepFrac">${Math.round((state.settings.donateKeepFrac||.45)*100)}%</span>
               </div>
               <input type="range" min="0" max="100" step="5" value="${Math.round((state.settings.donateKeepFrac||.45)*100)}" data-cfg-range="donateKeepFrac" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Need threshold")}" data-tip-desc="${tr("Donate to any teammate sitting below this share of their own maximum troops.")}">${tr("Need threshold")}</span>
-                <span class="ab-cfg-val" data-cfg-val="donateNeedThreshold">${Math.round((state.settings.donateNeedThreshold||.8)*100)}%</span>
+                <span class="ab-cfg-val" data-cfg-val="donateNeedThreshold">${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}%</span>
               </div>
-              <input type="range" min="0" max="100" step="5" value="${Math.round((state.settings.donateNeedThreshold||.8)*100)}" data-cfg-range="donateNeedThreshold" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
+              <input type="range" min="0" max="65" step="5" value="${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}" data-cfg-range="donateNeedThreshold" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Min donate %")}" data-tip-desc="${tr("Skip the donation entirely unless it would move at least this share of our current troops — avoids a stream of pointless tiny gifts.")}">${tr("Min donate %")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateMinDonatePct">${Math.round((state.settings.donateMinDonatePct||.2)*100)}%</span>
               </div>
               <input type="range" min="5" max="80" step="5" value="${Math.round((state.settings.donateMinDonatePct||.2)*100)}" data-cfg-range="donateMinDonatePct" data-cfg-div="100" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Throttle (ms)")}" data-tip-desc="${tr("Minimum real time between proactive team donations.")}">${tr("Throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="donateThrottleMs">${state.settings.donateThrottleMs||1200}ms</span>
               </div>
               <input type="range" min="500" max="10000" step="100" value="${state.settings.donateThrottleMs||1200}" data-cfg-range="donateThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-
-            <div class="ab-cfg-sec">${tr("Warship tuning")}</div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Auto-build warships")}" data-tip-desc="${tr("Build new warships. Turn off to keep commanding the ones you already have without paying for more.")}">${tr("Auto-build warships")}</span>
-              <div class="ab-cfg-sw ${state.settings.warshipAutoSpawn!==false?"on":""}" data-cfg="warshipAutoSpawn"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Hunt enemy trade")}" data-tip-desc="${tr("Send idle warships after enemy trade ships to capture them, when no enemy warship is nearby.")}">${tr("Hunt enemy trade")}</span>
-              <div class="ab-cfg-sw ${state.settings.warshipHuntTrade!==false?"on":""}" data-cfg="warshipHuntTrade"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Evade enemies")}" data-tip-desc="${tr("Break off and reposition when the battle simulation says the fight is lost.")}">${tr("Evade enemies")}</span>
-              <div class="ab-cfg-sw ${state.settings.warshipEvade!==false?"on":""}" data-cfg="warshipEvade"></div>
-            </div>
-            <div class="ab-cfg-row">
-              <span class="ab-cfg-label" data-tip="${tr("Dodge nukes")}" data-tip-desc="${tr("Move warships out of a predicted blast radius before the warhead lands.")}">${tr("Dodge nukes")}</span>
-              <div class="ab-cfg-sw ${state.settings.warshipNukeDodge!==false?"on":""}" data-cfg="warshipNukeDodge"></div>
-            </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-sec">${tr("Warship response")}</div>
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Retreat HP %")}" data-tip-desc="${tr("Send a damaged warship back to port below this share of its health. The same threshold also decides which of our ships count as combat-effective in the fight-or-flee simulation.")}">${tr("Retreat HP %")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipRetreatHealthPct">${state.settings.warshipRetreatHealthPct||75}%</span>
               </div>
               <input type="range" min="10" max="90" step="5" value="${state.settings.warshipRetreatHealthPct||75}" data-cfg-range="warshipRetreatHealthPct" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Combat throttle (ms)")}" data-tip-desc="${tr("Minimum real time between warship combat passes.")}">${tr("Combat throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipCombatThrottleMs">${state.settings.warshipCombatThrottleMs||800}ms</span>
               </div>
               <input type="range" min="200" max="5000" step="100" value="${state.settings.warshipCombatThrottleMs||800}" data-cfg-range="warshipCombatThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-            <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
+<div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="ab-cfg-label" data-tip="${tr("Patrol throttle (ms)")}" data-tip-desc="${tr("Minimum real time between warship patrol repositioning passes.")}">${tr("Patrol throttle (ms)")}</span>
                 <span class="ab-cfg-val" data-cfg-val="warshipPatrolThrottleMs">${state.settings.warshipPatrolThrottleMs||1500}ms</span>
               </div>
               <input type="range" min="500" max="10000" step="100" value="${state.settings.warshipPatrolThrottleMs||1500}" data-cfg-range="warshipPatrolThrottleMs" style="width:100%;accent-color:var(--oh-accent);">
             </div>
-          </div>
-        </div>
+</details>
+</div>
+</div>
         <div class="ab-pane" data-pane="log">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="flex:1;font-size:10px">Match history · local autosave / recent detail</span>
+            <button type="button" class="ab-trace-export" data-role="brain-summary" title="Download compact full-match actions and aggregated holds; resumes saved history after refresh">Match summary</button>
+            <button type="button" class="ab-trace-export" data-role="brain-export" title="Download bounded recent candidates, calculations and debug detail">Detailed trace</button>
+          </div>
           <div class="ab-log-filters" data-role="log-filters">
             <div class="ab-chip ${state.logFilter==="all"?"on":""}" data-filter="all">${tr("All")}</div>
             ${Object.entries(LOG_CATS).map(([e,t])=>`<div class="ab-chip ${state.logFilter===e?"on":""}" data-filter="${e}">${t.emoji} ${tr(t.label)}</div>`).join("")}
           </div>
           <div class="ab-log-list" data-role="log-list"></div>
         </div>
-      </div>`;(document.body||document.documentElement).appendChild(n);wirePanel(n);applyStoredPosition(n);return n}function wirePanel(n){n.querySelector('[data-role="switch"]').addEventListener("click",()=>{setEnabled(!state.settings.enabled)});n.querySelector('[data-role="mini"]').addEventListener("click",()=>{state.settings.minimized=!state.settings.minimized;n.classList.toggle("ab-collapsed",state.settings.minimized);n.querySelector('[data-role="mini"]').textContent=state.settings.minimized?"▢":"—";saveSettings()});n.querySelector('[data-role="close"]').addEventListener("click",()=>{state.settings.hidden=true;saveSettings();n.remove();try{window.dispatchEvent(new CustomEvent("ofh-quick-panel-setting",{detail:{key:"showAutoBotPanel",value:false}}))}catch(f){}});n.querySelectorAll(".ab-feat").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.feat;if(!h)return;const p=!state.settings.features[h];state.settings.features[h]=p;f.classList.toggle("on",p);saveSettings()})});const e=n.querySelector('[data-role="feats-toggle"]');const t=n.querySelector('[data-role="feats"]');if(e&&t){e.addEventListener("click",()=>{state.settings.featsOpen=!state.settings.featsOpen;t.classList.toggle("open",state.settings.featsOpen);e.textContent=state.settings.featsOpen?tr("Auto toggles ▴"):tr("Auto toggles ▾");saveSettings()})}document.querySelectorAll(".ab-tip").forEach(function(f){f.remove()});var a=null;function i(f){return String(f==null?"":f).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}var s=null;var r=typeof OFH_TIP_DELAY_MS==="number"?OFH_TIP_DELAY_MS:800;function o(f){var h=f.dataset.tip||"";var p=f.dataset.tipDesc||"";if(!h&&!p)return;l();s=setTimeout(function(){if(a&&!a.parentNode)a=null;if(!a){a=document.createElement("div");a.className="ab-tip";(document.body||document.documentElement).appendChild(a)}a.innerHTML=(h?"<b>"+i(h)+"</b>":"")+(p?(h?"<br>":"")+i(p):"");var g=f.getBoundingClientRect();a.style.left=g.left+g.width/2+"px";a.style.top=g.top-6+"px";a.classList.add("show")},r)}function l(){if(s){clearTimeout(s);s=null}if(a)a.classList.remove("show")}n.querySelectorAll("[data-tip], [data-tip-desc]").forEach(function(f){f.addEventListener("mouseenter",function(){o(f)});f.addEventListener("mouseleave",l)});const u=n.querySelector('[data-role="status-toggle"]');const c=n.querySelector('[data-role="status-wrap"]');if(u&&c){u.addEventListener("click",()=>{state.settings.statusOpen=!state.settings.statusOpen;c.classList.toggle("open",state.settings.statusOpen);u.textContent=state.settings.statusOpen?tr("Status & stats ▴"):tr("Status & stats ▾");saveSettings()})}n.querySelectorAll("[data-struct]").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.struct;if(!state.settings.buildStructures)state.settings.buildStructures={};const p=state.settings.buildStructures[h]===false;state.settings.buildStructures[h]=p;f.classList.toggle("on",p);saveSettings()})});n.querySelectorAll("[data-cfg]").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.cfg;const p=!f.classList.contains("on");f.classList.toggle("on",p);state.settings[h]=p;saveSettings()})});n.querySelectorAll("[data-cfg-num]").forEach(f=>{f.addEventListener("change",()=>{const h=f.dataset.cfgNum;const p=Number(f.value);if(String(f.value).trim()===""||!Number.isFinite(p)){f.value=String(state.settings[h]);return}const g=f.min===""?-Infinity:Number(f.min);const m=f.max===""?Infinity:Number(f.max);const y=Math.min(Math.max(p,g),m);if(y!==p)f.value=String(y);state.settings[h]=y;saveSettings();if(h==="tickMs"&&typeof retuneEngine==="function")retuneEngine()})});n.querySelectorAll("[data-cfg-range]").forEach(f=>{f.addEventListener("input",()=>{const h=f.dataset.cfgRange;const p=Number(f.dataset.cfgDiv)||1;const g=Number(f.value);const m=p>1?g/p:g;state.settings[h]=m;saveSettings();const y=n.querySelector(`[data-cfg-val="${h}"]`);if(y){y.textContent=p>1?Math.round(m*100)+"%":g+"ms"}})});const d=n.querySelector(".ab-cfg-body");if(d){const f="openfront-helper-autobot-config-scroll";try{const h=Number(localStorage.getItem(f));if(h>0)setTimeout(()=>{d.scrollTop=h},50)}catch(h){}d.addEventListener("scroll",()=>{try{localStorage.setItem(f,String(d.scrollTop))}catch(h){}},{passive:true})}n.querySelectorAll(".ab-tab").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.tab;if(h===state.activeTab)return;state.activeTab=h;n.classList.toggle("ab-tab-log",h==="log");n.classList.toggle("ab-tab-config",h==="config");n.querySelectorAll(".ab-tab").forEach(p=>p.classList.toggle("on",p.dataset.tab===h));if(h==="log")renderLog()})});n.querySelectorAll(".ab-chip").forEach(f=>{f.addEventListener("click",()=>{state.logFilter=f.dataset.filter;n.querySelectorAll(".ab-chip").forEach(h=>h.classList.toggle("on",h.dataset.filter===state.logFilter));renderLog()})});makeDraggable(n,n.querySelector(".ab-head"))}function renderLog(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=n.querySelector('[data-role="log-list"]');if(!e)return;const t=state.logFilter==="all"?state.log:state.log.filter(i=>i.cat===state.logFilter);if(t.length===0){e.innerHTML=`<div class="ab-log-empty">${tr("No actions yet")}</div>`;return}const a=document.createDocumentFragment();for(const i of t){const s=document.createElement("div");s.className="ab-log-item";const r=document.createElement("span");r.className="ab-log-time";r.textContent=new Date(i.t).toLocaleTimeString();const o=document.createElement("span");o.className="ab-log-text";o.textContent=i.text;s.appendChild(r);s.appendChild(o);a.appendChild(s)}e.replaceChildren(a)}function makeDraggable(n,e){let t=0;let a=0;let i=0;let s=0;let r=false;function o(c){if(c.target.closest('[data-role="switch"], [data-role="mini"], [data-role="close"]'))return;r=true;const d=n.getBoundingClientRect();i=d.left;s=d.top;t=c.clientX;a=c.clientY;n.style.right="auto";n.style.bottom="auto";n.style.left=i+"px";n.style.top=s+"px";window.addEventListener("pointermove",l);window.addEventListener("pointerup",u);c.preventDefault()}function l(c){if(!r)return;const d=clamp(i+(c.clientX-t),0,window.innerWidth-60);const f=clamp(s+(c.clientY-a),0,window.innerHeight-30);n.style.left=d+"px";n.style.top=f+"px"}function u(){if(!r)return;r=false;window.removeEventListener("pointermove",l);window.removeEventListener("pointerup",u);state.settings.pos={left:parseInt(n.style.left,10),top:parseInt(n.style.top,10)};saveSettings();ofhDebug("[Panel] saved pos",state.settings.pos)}e.addEventListener("pointerdown",o)}function applyStoredPosition(n){const e=state.settings.pos;ofhDebug("[Panel] applyStoredPosition",e);if(e&&Number.isFinite(e.left)&&Number.isFinite(e.top)){n.style.right="auto";n.style.bottom="auto";n.style.left=clamp(e.left,0,window.innerWidth-60)+"px";n.style.top=clamp(e.top,0,window.innerHeight-30)+"px"}}function renderHeader(){const n=document.getElementById(PANEL_ID);if(!n)return;n.querySelector('[data-role="switch"]').classList.toggle("on",state.settings.enabled)}function refreshGateBanner(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=n.querySelector('[data-role="gate-dot"]');if(!e)return;const t=getGame();if(!t){e.style.color="#fbbf24";e.dataset.live="waiting";e.dataset.tipDesc=tr("Waiting to enter game…");return}const a=gameType(t);if(a){e.style.color="#4ade80";e.dataset.live="in-game";let i;if(a==="Singleplayer")i=tr("Singleplayer");else if(a==="Public")i=tr("Public lobby");else i=tr("Private lobby");e.dataset.tipDesc=i}else{e.style.color="#fbbf24";e.dataset.live="waiting";e.dataset.tipDesc=tr("Waiting to enter game…")}}function fmt(n){const e=Math.round(n);if(e>=1e6)return(e/1e6).toFixed(1)+"M";if(e>=1e3)return(e/1e3).toFixed(1)+"k";return String(e)}function renderStatus(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=(t,a)=>{const i=n.querySelector(`[data-role="${t}"]`);if(i)i.textContent=a};e("status",state.status);e("lastaction",state.lastAction);e("s-troops",fmt(state.live.troops));e("s-gold",fmt(state.live.gold));e("s-tiles",fmt(state.live.tiles));e("c-spawns",String(state.stats.spawns));e("c-attacks",String(state.stats.attacks));e("c-builds",String(state.stats.builds));e("c-nukes",String(state.stats.nukes))}"use strict";function watcher(){buildPanel();refreshGateBanner();if(!state.settings.enabled&&!state.status){setStatus(tr("Disabled"))}renderStatus();if(state.tickInFlight&&performance.now()-state.tickStartedAt>8e3){console.warn("[AutoBot] tick watchdog: clearing stuck tickInFlight");state.tickInFlight=false}const n=getGame();if(n&&state.settings.enabled&&isPublicLobby(n)){setEnabled(false);setStatus(tr("⛔ Public lobby — auto-disabled"))}retuneEngine()}if(!window.__openfrontAutoBotLoaded){window.__openfrontAutoBotLoaded=true;window.setInterval(watcher,1200);try{watcher()}catch(n){console.error("[ofh] auto-bot first paint failed (retrying in 1.2s):",n)}if(state.settings.enabled)setEnabled(true);console.info("[AutoBot] page bridge loaded (private-lobby training tool).")}(function(){"use strict";ofhDebug("[AtomMacro] script start — file is injected & executing");if(window.__ofhAtomMacroInstalled){ofhDebug("[AtomMacro] already installed in this page → skip duplicate");return}const n="openfront-helper-atom-macro-dialog";const e="openfront-helper-atom-macro-banner";const t="openfront-helper-atom-macro-styles";const a="openfront-helper-atom-range";const i="openfront-helper-atom-range-styles";const s="Atom Bomb";const r="Hydrogen Bomb";const o="Missile Silo";const l="SAM Launcher";const u=30;const c=100;const d=10;let f=false;let h=false;let p=null;let g=null;let m=0;let y=false;let b=0;let v=0;let T=0;let x=0;function I(){return document.querySelector("main-radial-menu")}function M(){const w=I();const A=w?.game||(typeof lastOpenFrontGameContext!=="undefined"?lastOpenFrontGameContext?.game:null);const E=w?.transformHandler||w?.transform||(typeof lastOpenFrontGameContext!=="undefined"?lastOpenFrontGameContext?.transform:null);const D=w?.buildMenu||document.querySelector("build-menu");const R=A?.myPlayer?.();return{game:A,transform:E,buildMenu:D,myPlayer:R}}function _(w,A,E){const{game:D,transform:R}=w;if(!D||!R?.screenToWorldCoordinates)return null;try{const H=R.screenToWorldCoordinates(A,E);if(!D.isValidCoord?.(H.x,H.y))return null;const $=D.ref(H.x,H.y);return $==null?null:$}catch(H){return null}}function k(w){let A=0;let E=[];try{E=w.units(o)||[]}catch(D){return 0}for(const D of E){try{if(D.isUnderConstruction&&D.isUnderConstruction())continue;if(D.isActive&&D.isActive()===false)continue;const R=D.level&&Number(D.level())||1;const H=D.missileTimerQueue&&D.missileTimerQueue()||[];const $=Array.isArray(H)?H.length:0;A+=Math.max(0,R-$)}catch(R){A+=1}}return A}function N(w,A,E,D,R,H,$){const U=H.unit||H;const j=U.owner&&U.owner();if(!j)return null;if(j.smallID&&j.smallID()===D)return null;if(!R&&E.isFriendly&&E.isFriendly(j))return null;if(U.isUnderConstruction&&U.isUnderConstruction())return null;const ae=U.level&&Number(U.level())||1;const K=A&&A.samRange?Number(A.samRange(ae)):0;let X=H.distSquared;if(X==null&&w.euclideanDistSquared&&U.tile){X=w.euclideanDistSquared($,U.tile())}if(K>0&&X!=null&&X<=K*K){return{unit:U,level:ae}}return null}function B(w,A,E){const D=[];try{const R=je(w,A);const H=w.config&&w.config();const $=H&&H.maxSamRange?Number(H.maxSamRange()):200;const U=w.nearbyUnits?w.nearbyUnits(E,$,l):[];const j=A.smallID?A.smallID():-1;for(const ae of U){const K=N(w,H,A,j,R,ae,E);if(K)D.push(K)}}catch(R){}return D}function G(w,A,E){try{const D=A.units&&A.units(o)||[];let R=null;let H=Infinity;for(const $ of D){if($.isUnderConstruction&&$.isUnderConstruction())continue;if($.isActive&&$.isActive()===false)continue;const U=$.tile&&$.tile();if(U==null)continue;const j=w.manhattanDist?w.manhattanDist(U,E):0;if(j<H){H=j;R=U}}return R}catch(D){return null}}function V(w,A,E,D){try{if(typeof UniversalPathFinding==="undefined"||!UniversalPathFinding.Parabola||!w.euclideanDistSquared){return B(w,A,E)}const R=G(w,A,E);if(R==null)return B(w,A,E);const H=w.config&&w.config();const $=H&&H.defaultNukeSpeed?Number(H.defaultNukeSpeed()):8;const U=UniversalPathFinding.Parabola(w,{increment:$,distanceBasedHeight:true,directionUp:D!==false});const j=U.findPath(R,E)||[];if(j.length===0)return B(w,A,E);const ae=je(w,A);const K=A.smallID?A.smallID():-1;const X=H&&H.maxSamRange?Number(H.maxSamRange()):200;const le=H&&H.defaultNukeTargetableRange?Number(H.defaultNukeTargetableRange()):150;const we=le*le;const ce=new Map;for(const te of j){const De=w.euclideanDistSquared(te,E);const Ae=w.euclideanDistSquared(te,R);if(!(De<we||Ae<we))continue;const xe=w.nearbyUnits?w.nearbyUnits(te,X,l):[];for(const me of xe){const fe=N(w,H,A,K,ae,me,te);if(!fe)continue;const Ne=fe.unit.id?fe.unit.id():fe.unit;if(!ce.has(Ne))ce.set(Ne,fe)}}return Array.from(ce.values())}catch(R){return B(w,A,E)}}const O=140;function C(w,A){const E=w>=1?(A||0)/w:A||0;return Math.max(O,Math.floor(E)||0)}function F(w,A,E){const D=Math.max(0,Math.floor(w));if(D<=0)return{recommended:1,achievable:true};let R=1;try{const j=Number(state.speed&&state.speed.factor);if(Number.isFinite(j)&&j>0)R=j}catch(j){R=1}const H=Math.max(1,A/100*R);const $=E>0?E:90;const U=D*H;return{recommended:D+1,achievable:U<$}}function J(w,A,E,D,R){const H=V(w,A,E,D);const $=H.reduce((X,le)=>X+le.level,0);let U=90;try{const X=w.config&&w.config().SAMCooldown?Number(w.config().SAMCooldown()):90;if(Number.isFinite(X)&&X>0)U=X}catch(X){}const j=Number.isFinite(R)&&R>0?R:O;const ae=F($,j,U);const K=F($,O,U);return{sams:H.length,intercept:$,recommended:ae.recommended,achievable:ae.achievable,achievableAtMaxRate:K.achievable}}function ue(w){try{return typeof w==="bigint"?w:BigInt(Math.floor(Number(w)||0))}catch(A){return 0n}}function S(w){const A=ue(w);const E=A<0n;const D=E?-A:A;let R;if(D>=1000000n)R=(Number(D)/1e6).toFixed(2).replace(/\.?0+$/,"")+"M";else if(D>=1000n)R=(Number(D)/1e3).toFixed(1).replace(/\.0$/,"")+"k";else R=D.toString();return(E?"-":"")+R}function P(w){try{if(typeof tr==="function")return tr(w)}catch(A){}return w}function q(){if(document.getElementById(t))return;const w=document.createElement("style");w.id=t;w.textContent=`
+      </div>`;(document.body||document.documentElement).appendChild(n);wirePanel(n);applyStoredPosition(n);return n}function wirePanel(n){n.querySelector('[data-role="brain-summary"]')?.addEventListener("click",ofhExportMatchSummary);n.querySelector('[data-role="brain-export"]')?.addEventListener("click",ofhExportBrainTrace);n.querySelector('[data-role="switch"]').addEventListener("click",()=>{setEnabled(!state.settings.enabled)});n.querySelector('[data-role="mini"]').addEventListener("click",()=>{state.settings.minimized=!state.settings.minimized;n.classList.toggle("ab-collapsed",state.settings.minimized);n.querySelector('[data-role="mini"]').textContent=state.settings.minimized?"▢":"—";saveSettings()});n.querySelector('[data-role="close"]').addEventListener("click",()=>{state.settings.hidden=true;saveSettings();n.remove();try{window.dispatchEvent(new CustomEvent("ofh-quick-panel-setting",{detail:{key:"showAutoBotPanel",value:false}}))}catch(f){}});n.querySelectorAll(".ab-feat").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.feat;if(!h)return;const p=!state.settings.features[h];state.settings.features[h]=p;f.classList.toggle("on",p);saveSettings()})});const e=n.querySelector('[data-role="feats-toggle"]');const t=n.querySelector('[data-role="feats"]');if(e&&t){e.addEventListener("click",()=>{state.settings.featsOpen=!state.settings.featsOpen;t.classList.toggle("open",state.settings.featsOpen);e.textContent=state.settings.featsOpen?tr("Auto toggles ▴"):tr("Auto toggles ▾");saveSettings()})}document.querySelectorAll(".ab-tip").forEach(function(f){f.remove()});var a=null;function i(f){return String(f==null?"":f).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}var s=null;var r=typeof OFH_TIP_DELAY_MS==="number"?OFH_TIP_DELAY_MS:800;function o(f){var h=f.dataset.tip||"";var p=f.dataset.tipDesc||"";if(!h&&!p)return;l();s=setTimeout(function(){if(a&&!a.parentNode)a=null;if(!a){a=document.createElement("div");a.className="ab-tip";(document.body||document.documentElement).appendChild(a)}a.innerHTML=(h?"<b>"+i(h)+"</b>":"")+(p?(h?"<br>":"")+i(p):"");var g=f.getBoundingClientRect();a.style.left=g.left+g.width/2+"px";a.style.top=g.top-6+"px";a.classList.add("show")},r)}function l(){if(s){clearTimeout(s);s=null}if(a)a.classList.remove("show")}n.querySelectorAll("[data-tip], [data-tip-desc]").forEach(function(f){f.addEventListener("mouseenter",function(){o(f)});f.addEventListener("mouseleave",l)});const u=n.querySelector('[data-role="status-toggle"]');const c=n.querySelector('[data-role="status-wrap"]');if(u&&c){u.addEventListener("click",()=>{state.settings.statusOpen=!state.settings.statusOpen;c.classList.toggle("open",state.settings.statusOpen);u.textContent=state.settings.statusOpen?tr("Status & stats ▴"):tr("Status & stats ▾");saveSettings()})}n.querySelectorAll("[data-struct]").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.struct;if(!state.settings.buildStructures)state.settings.buildStructures={};const p=state.settings.buildStructures[h]===false;state.settings.buildStructures[h]=p;f.classList.toggle("on",p);saveSettings()})});n.querySelectorAll("[data-cfg]").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.cfg;const p=!f.classList.contains("on");f.classList.toggle("on",p);state.settings[h]=p;saveSettings()})});n.querySelectorAll("[data-cfg-num]").forEach(f=>{f.addEventListener("change",()=>{const h=f.dataset.cfgNum;const p=Number(f.value);if(String(f.value).trim()===""||!Number.isFinite(p)){f.value=String(state.settings[h]);return}const g=f.min===""?-Infinity:Number(f.min);const m=f.max===""?Infinity:Number(f.max);const y=Math.min(Math.max(p,g),m);if(y!==p)f.value=String(y);state.settings[h]=y;saveSettings();if(h==="tickMs"&&typeof retuneEngine==="function")retuneEngine()})});n.querySelectorAll("[data-cfg-range]").forEach(f=>{f.addEventListener("input",()=>{const h=f.dataset.cfgRange;const p=Number(f.dataset.cfgDiv)||1;const g=Number(f.value);const m=p>1?g/p:g;state.settings[h]=m;saveSettings();const y=n.querySelector(`[data-cfg-val="${h}"]`);if(y){y.textContent=p>1?Math.round(m*100)+"%":g+"ms"}})});const d=n.querySelector(".ab-cfg-body");if(d){const f="openfront-helper-autobot-config-scroll";try{const h=Number(localStorage.getItem(f));if(h>0)setTimeout(()=>{d.scrollTop=h},50)}catch(h){}d.addEventListener("scroll",()=>{try{localStorage.setItem(f,String(d.scrollTop))}catch(h){}},{passive:true})}n.querySelectorAll(".ab-tab").forEach(f=>{f.addEventListener("click",()=>{const h=f.dataset.tab;if(h===state.activeTab)return;state.activeTab=h;n.classList.toggle("ab-tab-log",h==="log");n.classList.toggle("ab-tab-config",h==="config");n.querySelectorAll(".ab-tab").forEach(p=>p.classList.toggle("on",p.dataset.tab===h));if(h==="log")renderLog()})});n.querySelectorAll(".ab-chip[data-filter]").forEach(f=>{f.addEventListener("click",()=>{state.logFilter=f.dataset.filter;n.querySelectorAll(".ab-chip[data-filter]").forEach(h=>h.classList.toggle("on",h.dataset.filter===state.logFilter));renderLog()})});makeDraggable(n,n.querySelector(".ab-head"))}function renderLog(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=n.querySelector('[data-role="log-list"]');if(!e)return;const t=state.logFilter==="all"?state.log:state.log.filter(i=>i.cat===state.logFilter);if(t.length===0){e.innerHTML=`<div class="ab-log-empty">${tr("No actions yet")}</div>`;return}const a=document.createDocumentFragment();for(const i of t){const s=document.createElement("div");s.className="ab-log-item";const r=document.createElement("span");r.className="ab-log-time";r.textContent=new Date(i.t).toLocaleTimeString();const o=document.createElement("span");o.className="ab-log-text";o.textContent=i.text;s.appendChild(r);s.appendChild(o);a.appendChild(s)}e.replaceChildren(a)}function makeDraggable(n,e){let t=0;let a=0;let i=0;let s=0;let r=false;function o(c){if(c.target.closest('[data-role="switch"], [data-role="mini"], [data-role="close"]'))return;r=true;const d=n.getBoundingClientRect();i=d.left;s=d.top;t=c.clientX;a=c.clientY;n.style.right="auto";n.style.bottom="auto";n.style.left=i+"px";n.style.top=s+"px";window.addEventListener("pointermove",l);window.addEventListener("pointerup",u);c.preventDefault()}function l(c){if(!r)return;const d=clamp(i+(c.clientX-t),0,window.innerWidth-60);const f=clamp(s+(c.clientY-a),0,window.innerHeight-30);n.style.left=d+"px";n.style.top=f+"px"}function u(){if(!r)return;r=false;window.removeEventListener("pointermove",l);window.removeEventListener("pointerup",u);state.settings.pos={left:parseInt(n.style.left,10),top:parseInt(n.style.top,10)};saveSettings();ofhDebug("[Panel] saved pos",state.settings.pos)}e.addEventListener("pointerdown",o)}function applyStoredPosition(n){const e=state.settings.pos;ofhDebug("[Panel] applyStoredPosition",e);if(e&&Number.isFinite(e.left)&&Number.isFinite(e.top)){n.style.right="auto";n.style.bottom="auto";n.style.left=clamp(e.left,0,window.innerWidth-60)+"px";n.style.top=clamp(e.top,0,window.innerHeight-30)+"px"}}function renderHeader(){const n=document.getElementById(PANEL_ID);if(!n)return;n.querySelector('[data-role="switch"]').classList.toggle("on",state.settings.enabled)}function refreshGateBanner(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=n.querySelector('[data-role="gate-dot"]');if(!e)return;const t=getGame();if(!t){e.style.color="#fbbf24";e.dataset.live="waiting";e.dataset.tipDesc=tr("Waiting to enter game…");return}const a=gameType(t);if(a){e.style.color="#4ade80";e.dataset.live="in-game";let i;if(a==="Singleplayer")i=tr("Singleplayer");else if(a==="Public")i=tr("Public lobby");else i=tr("Private lobby");e.dataset.tipDesc=i}else{e.style.color="#fbbf24";e.dataset.live="waiting";e.dataset.tipDesc=tr("Waiting to enter game…")}}function fmt(n){const e=Math.round(n);if(e>=1e6)return(e/1e6).toFixed(1)+"M";if(e>=1e3)return(e/1e3).toFixed(1)+"k";return String(e)}function renderStatus(){const n=document.getElementById(PANEL_ID);if(!n)return;const e=(t,a)=>{const i=n.querySelector(`[data-role="${t}"]`);if(i)i.textContent=a};e("status",state.status);e("lastaction",state.lastAction);e("s-troops",fmt(state.live.troops));e("s-gold",fmt(state.live.gold));e("s-tiles",fmt(state.live.tiles));e("c-spawns",String(state.stats.spawns));e("c-attacks",String(state.stats.attacks));e("c-builds",String(state.stats.builds));e("c-nukes",String(state.stats.nukes))}"use strict";function watcher(){buildPanel();refreshGateBanner();if(!state.settings.enabled&&!state.status){setStatus(tr("Disabled"))}renderStatus();if(state.tickInFlight&&performance.now()-state.tickStartedAt>8e3){console.warn("[AutoBot] tick watchdog: clearing stuck tickInFlight");state.tickInFlight=false}const n=getGame();if(n&&state.settings.enabled&&isPublicLobby(n)){setEnabled(false);setStatus(tr("⛔ Public lobby — auto-disabled"))}retuneEngine()}if(!window.__openfrontAutoBotLoaded){window.__openfrontAutoBotLoaded=true;window.setInterval(watcher,1200);try{watcher()}catch(n){console.error("[ofh] auto-bot first paint failed (retrying in 1.2s):",n)}if(state.settings.enabled)setEnabled(true);console.info("[AutoBot] page bridge loaded (private-lobby training tool).")}(function(){"use strict";ofhDebug("[AtomMacro] script start — file is injected & executing");if(window.__ofhAtomMacroInstalled){ofhDebug("[AtomMacro] already installed in this page → skip duplicate");return}const n="openfront-helper-atom-macro-dialog";const e="openfront-helper-atom-macro-banner";const t="openfront-helper-atom-macro-styles";const a="openfront-helper-atom-range";const i="openfront-helper-atom-range-styles";const s="Atom Bomb";const r="Hydrogen Bomb";const o="Missile Silo";const l="SAM Launcher";const u=30;const c=100;const d=10;let f=false;let h=false;let p=null;let g=null;let m=0;let y=false;let b=0;let v=0;let T=0;let x=0;function I(){return document.querySelector("main-radial-menu")}function M(){const w=I();const A=w?.game||(typeof lastOpenFrontGameContext!=="undefined"?lastOpenFrontGameContext?.game:null);const E=w?.transformHandler||w?.transform||(typeof lastOpenFrontGameContext!=="undefined"?lastOpenFrontGameContext?.transform:null);const D=w?.buildMenu||document.querySelector("build-menu");const R=A?.myPlayer?.();return{game:A,transform:E,buildMenu:D,myPlayer:R}}function _(w,A,E){const{game:D,transform:R}=w;if(!D||!R?.screenToWorldCoordinates)return null;try{const H=R.screenToWorldCoordinates(A,E);if(!D.isValidCoord?.(H.x,H.y))return null;const $=D.ref(H.x,H.y);return $==null?null:$}catch(H){return null}}function k(w){let A=0;let E=[];try{E=w.units(o)||[]}catch(D){return 0}for(const D of E){try{if(D.isUnderConstruction&&D.isUnderConstruction())continue;if(D.isActive&&D.isActive()===false)continue;const R=D.level&&Number(D.level())||1;const H=D.missileTimerQueue&&D.missileTimerQueue()||[];const $=Array.isArray(H)?H.length:0;A+=Math.max(0,R-$)}catch(R){A+=1}}return A}function N(w,A,E,D,R,H,$){const U=H.unit||H;const j=U.owner&&U.owner();if(!j)return null;if(j.smallID&&j.smallID()===D)return null;if(!R&&E.isFriendly&&E.isFriendly(j))return null;if(U.isUnderConstruction&&U.isUnderConstruction())return null;const ae=U.level&&Number(U.level())||1;const K=A&&A.samRange?Number(A.samRange(ae)):0;let X=H.distSquared;if(X==null&&w.euclideanDistSquared&&U.tile){X=w.euclideanDistSquared($,U.tile())}if(K>0&&X!=null&&X<=K*K){return{unit:U,level:ae}}return null}function B(w,A,E){const D=[];try{const R=je(w,A);const H=w.config&&w.config();const $=H&&H.maxSamRange?Number(H.maxSamRange()):200;const U=w.nearbyUnits?w.nearbyUnits(E,$,l):[];const j=A.smallID?A.smallID():-1;for(const ae of U){const K=N(w,H,A,j,R,ae,E);if(K)D.push(K)}}catch(R){}return D}function G(w,A,E){try{const D=A.units&&A.units(o)||[];let R=null;let H=Infinity;for(const $ of D){if($.isUnderConstruction&&$.isUnderConstruction())continue;if($.isActive&&$.isActive()===false)continue;const U=$.tile&&$.tile();if(U==null)continue;const j=w.manhattanDist?w.manhattanDist(U,E):0;if(j<H){H=j;R=U}}return R}catch(D){return null}}function V(w,A,E,D){try{if(typeof UniversalPathFinding==="undefined"||!UniversalPathFinding.Parabola||!w.euclideanDistSquared){return B(w,A,E)}const R=G(w,A,E);if(R==null)return B(w,A,E);const H=w.config&&w.config();const $=H&&H.defaultNukeSpeed?Number(H.defaultNukeSpeed()):8;const U=UniversalPathFinding.Parabola(w,{increment:$,distanceBasedHeight:true,directionUp:D!==false});const j=U.findPath(R,E)||[];if(j.length===0)return B(w,A,E);const ae=je(w,A);const K=A.smallID?A.smallID():-1;const X=H&&H.maxSamRange?Number(H.maxSamRange()):200;const le=H&&H.defaultNukeTargetableRange?Number(H.defaultNukeTargetableRange()):150;const we=le*le;const ce=new Map;for(const te of j){const De=w.euclideanDistSquared(te,E);const Ae=w.euclideanDistSquared(te,R);if(!(De<we||Ae<we))continue;const xe=w.nearbyUnits?w.nearbyUnits(te,X,l):[];for(const me of xe){const fe=N(w,H,A,K,ae,me,te);if(!fe)continue;const Ne=fe.unit.id?fe.unit.id():fe.unit;if(!ce.has(Ne))ce.set(Ne,fe)}}return Array.from(ce.values())}catch(R){return B(w,A,E)}}const O=140;function C(w,A){const E=w>=1?(A||0)/w:A||0;return Math.max(O,Math.floor(E)||0)}function F(w,A,E){const D=Math.max(0,Math.floor(w));if(D<=0)return{recommended:1,achievable:true};let R=1;try{const j=Number(state.speed&&state.speed.factor);if(Number.isFinite(j)&&j>0)R=j}catch(j){R=1}const H=Math.max(1,A/100*R);const $=E>0?E:90;const U=D*H;return{recommended:D+1,achievable:U<$}}function J(w,A,E,D,R){const H=V(w,A,E,D);const $=H.reduce((X,le)=>X+le.level,0);let U=90;try{const X=w.config&&w.config().SAMCooldown?Number(w.config().SAMCooldown()):90;if(Number.isFinite(X)&&X>0)U=X}catch(X){}const j=Number.isFinite(R)&&R>0?R:O;const ae=F($,j,U);const K=F($,O,U);return{sams:H.length,intercept:$,recommended:ae.recommended,achievable:ae.achievable,achievableAtMaxRate:K.achievable}}function ue(w){try{return typeof w==="bigint"?w:BigInt(Math.floor(Number(w)||0))}catch(A){return 0n}}function S(w){const A=ue(w);const E=A<0n;const D=E?-A:A;let R;if(D>=1000000n)R=(Number(D)/1e6).toFixed(2).replace(/\.?0+$/,"")+"M";else if(D>=1000n)R=(Number(D)/1e3).toFixed(1).replace(/\.0$/,"")+"k";else R=D.toString();return(E?"-":"")+R}function P(w){try{if(typeof tr==="function")return tr(w)}catch(A){}return w}function q(){if(document.getElementById(t))return;const w=document.createElement("style");w.id=t;w.textContent=`
       #${e} {
         position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
         z-index: 9000; padding: 7px 14px; border-radius: 8px;
