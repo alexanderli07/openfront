@@ -75,3 +75,20 @@ test('an enclave cannot classify ports on enemy continuous mainland as an island
  const f=fixture();f.add(U.Port,f.ref(26,10));f.add(U.Port,f.ref(26,14),f.enemy);
  const facts=f.geo.navalFacts(f.game,f.self);assert.equal(facts.island,false);assert.equal(facts.fleetNeeded,false);
 });
+
+test('spawn safety beats a modest open-space and coast advantage near the enemy',()=>{
+ const candidates=[
+  {id:'near-coast',kind:'team-spawn-site',eligible:true,openSpace:1,waterAccess:true,allyDistance:80,enemyDistance:180,edgeDistance:40},
+  {id:'safer',kind:'team-spawn-site',eligible:true,openSpace:.85,waterAccess:false,allyDistance:80,enemyDistance:300,edgeDistance:40}];
+ assert.equal(adaptive.decide({domain:'team-spawn-site'},candidates).selectedId,'safer');
+});
+test('spawning keeps rewarding enemy separation beyond the old200tile cap',()=>{
+ const base={kind:'team-spawn-site',eligible:true,openSpace:1,waterAccess:true,allyDistance:80,edgeDistance:40};
+ assert.equal(adaptive.decide({domain:'team-spawn-site'},[
+  {...base,id:'closer',enemyDistance:220},{...base,id:'rear',enemyDistance:400}]).selectedId,'rear');
+});
+test('crowded maps still select a legal spawn instead of demanding an impossible distance',()=>{
+ const base={kind:'team-spawn-site',eligible:true,openSpace:1,waterAccess:false,allyDistance:80,edgeDistance:40};
+ assert.equal(adaptive.decide({domain:'team-spawn-site'},[
+  {...base,id:'closest',enemyDistance:90},{...base,id:'less-exposed',enemyDistance:150}]).selectedId,'less-exposed');
+});

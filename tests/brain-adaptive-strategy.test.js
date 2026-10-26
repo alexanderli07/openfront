@@ -10,7 +10,7 @@ test('adaptive strategy delegates unchanged scenarios and makes only expected ga
   const legacy = createLegacyStrategy();
   const adaptive = createAdaptiveStrategy(legacy);
   assert.deepEqual({ id: adaptive.id, name: adaptive.name, version: adaptive.version }, {
-    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.16.0-economic-recovery'
+    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.17.0-safer-spawning'
   });
   for (const scenario of scenarios) {
     const original = legacy.decide(scenario.snapshot, scenario.candidates);

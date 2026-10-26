@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.16.0-economic-recovery',
+    version: '1.17.0-safer-spawning',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -74,15 +74,16 @@ function createAdaptiveStrategy(legacyStrategy) {
         return select(chosen, candidates, 'Use companion override or measured two-team group/coastal spawning');
       }
       if (snapshot.domain === 'team-spawn-site') {
+        const enemyDistance=c=>Number.isFinite(c.enemyDistance)?Math.max(0,c.enemyDistance):400;
+        const enemyPenalty=c=>Math.max(0,1-enemyDistance(c)/240)*180;
         const score = c => (c.openSpace || 0) * 100 + Number(c.waterAccess) * 25 +
           (c.allyDistance <= 160 ? 20 * Math.max(0, 1 - Math.abs(c.allyDistance - 80) / 100) : 0) +
-          Math.min(1, (c.enemyDistance || 0) / 200) * 30 + Math.min(1, (c.edgeDistance || 0) / 30) * 10 -
-          (c.enemyDistance < 80 ? 100 : 0);
+          Math.min(1,enemyDistance(c)/400)*60 + Math.min(1, (c.edgeDistance || 0) / 30) * 10 - enemyPenalty(c);
         const ranked = candidates.filter(c => c.kind === 'team-spawn-site' && c.eligible).sort((a, b) => score(b) - score(a) || a.priority - b.priority);
         const choice = select(ranked[0] || candidates.find(c => c.id === '$wait'), candidates,
-          'Prefer open safe expansion, useful water and nearby teammates without crowding');
+          'Prefer safe separation from enemy spawns, with open expansion, water and nearby teammates');
         choice.evaluations = candidates.map(c => ({ id: c.id, verdict: c === ranked[0] ? 'select' : 'not-selected',
-          reason: c.kind === 'team-spawn-site' ? `score=${score(c).toFixed(2)}; open=${c.openSpace}, coast=${c.waterAccess}, ally=${c.allyDistance}, enemy=${c.enemyDistance}` : c.reason }));
+          reason: c.kind === 'team-spawn-site' ? `score=${score(c).toFixed(2)}; open=${c.openSpace}, coast=${c.waterAccess}, ally=${c.allyDistance}, enemy=${c.enemyDistance}; enemyPenalty=${enemyPenalty(c).toFixed(2)}; preferredBuffer=240` : c.reason }));
         return choice;
       }
       if (snapshot.domain === 'turn-plan' && snapshot.teamNaval?.island && snapshot.teamNaval.fleetNeeded) {
