@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.63) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.64) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.63)
+## Install and update (1.84.64)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,12 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Native team embargo (1.84.64)
+
+With auto-embargo enabled, the adaptive strategy in team games uses the native stop-trading-with-all-enemies command. Teammates, allies and Bots are excluded by the native action. The bot checks for eligible live enemies still missing an embargo and retries on the native cooldown (100 ticks if unavailable); confirmed embargoes do not produce repeated commands. A failed local emission does not start the submission cooldown. Decisions and dispatch remain centrally logged and gated. Missing native event discovery raises an explicit error. Individual FFA and legacy-strategy rules remain unchanged.
+
+Warships still follow native capture restrictions: trade ships marked safe from pirates or destined for our/friendly ports are not capturable. Embargo does not override this. Live capture behavior remains unverified.
 
 ## Expand before donating (1.84.63)
 

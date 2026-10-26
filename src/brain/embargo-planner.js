@@ -1,5 +1,6 @@
 'use strict';
 function createEmbargoPlanner() {
+  const submissions=new WeakMap();
   const wait={id:'$wait',kind:'wait',reason:'Hold remaining embargo responses'};
   function choose(hooks,domain,entries,facts) {
     const candidates=entries.slice(0,79).map((entry,priority)=>({...entry,id:`${domain}:${priority}`,kind:domain,
@@ -11,8 +12,32 @@ function createEmbargoPlanner() {
     }
     return {...entries[index],decisionId:decision.decisionId};
   }
+  function allEnemies(actor,targets,context,hooks){
+    if(!hooks.allowed())return;
+    const player=actor.player,game=actor.mg;
+    const missing=targets.filter(target=>target.id()!==player.id()&&target.isAlive()&&
+      target.type()!==hooks.botType&&!player.isOnSameTeam(target)&&!player.isAlliedWith(target)&&
+      !player.hasEmbargoAgainst(target));
+    const tick=game.ticks(),previous=submissions.get(actor);
+    const configured=game.config().embargoAllCooldown?.();
+    const cooldown=Number.isFinite(configured)&&configured>0?configured:100;
+    const pending=previous?.game===game&&tick>=previous.tick&&tick-previous.tick<cooldown;
+    if(!missing.length||pending){
+      hooks.record('embargo-result',{domain:'embargo-action',status:'kept',allEnemies:true,
+        reason:missing.length?'Await native embargo confirmation/cooldown':'All eligible enemies already embargoed',missing:missing.length});return;
+    }
+    const choice=choose(hooks,'embargo-action',[{action:'start',allEnemies:true,
+      reason:'Stop trading with all enemies using the native team action'}],{...context,missing:missing.length});
+    if(!choice)return;
+    const result=hooks.execute(choice.decisionId,()=>hooks.sendAll());
+    if(result===true)submissions.set(actor,{game,tick});
+    if(hooks.wasDeclined())hooks.hold();
+    hooks.record('embargo-result',{domain:'embargo-action',decisionId:choice.decisionId,allEnemies:true,
+      action:'start',status:result===true?'submitted':'not-submitted',missing:missing.length});
+  }
   function run(actor,targets,context,hooks) {
     const relations=context.mode==='relations';
+    if(!relations&&context.nativeAll)return allEnemies(actor,targets,context,hooks);
     const targetDomain=relations?'embargo-relation-target':'embargo-target';
     const actionDomain=relations?'embargo-relation-response':'embargo-action';
     let remaining=targets.map((target,index)=>({target,index}));

@@ -62,6 +62,9 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     if (parts.length !== 2) throw new Error(`Expected one baseline anchor: ${before.slice(0, 100)}`);
     source = parts.join(after);
   }
+  replaceOne('_ctors.embargo&&_ctors.donateTroops','_ctors.embargo&&_ctors.embargoAll&&_ctors.donateTroops');
+  replaceOne('if(!_ctors.embargo){try{',
+    'if(!_ctors.embargoAll){try{const a=new t("start"),i=new t("stop");if(a?.action==="start"&&i?.action==="stop"&&Object.keys(a).length===1&&Object.keys(i).length===1){_ctors.embargoAll=t;continue}}catch(a){}}if(!_ctors.embargo){try{');
   replaceMethodRange('maybeSendCasualEmoji(){','checkOverwhelmedByAttacks(){',
     'maybeSendCasualEmoji(){return ofhBrainRuntime.planSocial(this)}');
   replaceMethodRange('for(const a of e){const i=a.attacker();','congratulateWinner(){',
@@ -520,7 +523,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.63';
+  const version='1.84.64';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);

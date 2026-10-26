@@ -30,7 +30,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.63'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.64'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -42,6 +42,8 @@ const ofhBrainRuntime = createBrainRuntime({
   defaultStrategy: 'adaptive-v1',
   boatPlanner: createBoatPlanner({state}),
   embargoPlanner: createEmbargoPlanner(),
+  embargoAllCtor:()=>discoverCtors(getEventBus()).embargoAll,
+  botType:PlayerType.Bot,
   spawnPlanner: createSpawnPlanner({settings:()=>state.settings,geography:ofhTeamGeography}),
   attackAllocationPlanner: createAttackAllocationPlanner({settings:()=>state.settings,difficulty:currentDifficulty,
     easy:Difficulty.Easy,botType:PlayerType.Bot}),

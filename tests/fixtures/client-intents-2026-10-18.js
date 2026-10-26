@@ -70,3 +70,6 @@ class SendTargetPlayerIntentEvent {
 }
 
 module.exports={SendSpawnIntentEvent,SendAttackIntentEvent,SendBoatAttackIntentEvent,MoveWarshipIntentEvent,SendDonateTroopsIntentEvent,SendEmbargoIntentEvent,SendEmojiIntentEvent,SendTargetPlayerIntentEvent};
+
+class SendEmbargoAllIntentEvent {constructor(action){this.action=action;}}
+module.exports.SendEmbargoAllIntentEvent=SendEmbargoAllIntentEvent;

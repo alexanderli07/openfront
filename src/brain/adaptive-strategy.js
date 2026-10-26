@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.11.0-expansion-priority',
+    version: '1.11.1-team-embargo',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||

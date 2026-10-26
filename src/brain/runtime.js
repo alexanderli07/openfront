@@ -553,7 +553,14 @@ function createBrainRuntime(deps) {
     const controller=owners.get(actor);
     if(!controller||!deps.embargoPlanner)throw new Error('Embargo planner is not attached');
     const turn=turnScopes.get(controller.bot);let stopped=false;
+    context={...context,nativeAll:context.team&&controller.engine.selectedStrategy?.()==='adaptive-v1'};
     const hooks={
+      botType:deps.botType,
+      sendAll:()=>{
+        const ctor=deps.embargoAllCtor?.();
+        if(typeof ctor!=='function')throw new Error('Native embargo-all constructor unavailable');
+        return intent(actor,'NationBot',ctor,'start');
+      },
       allowed:()=>!stopped&&!turn?.stopped&&deps.enabled()&&deps.isCurrent(controller.bot)&&!deps.isPublic(controller.bot.mg),
       stopped:()=>stopped,
       hold:()=>{stopped=true;if(turn)turn.stopped=true;},

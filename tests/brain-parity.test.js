@@ -103,7 +103,7 @@ function fixture(source, name, options = {}) {
     commands.push({ kind: 'build', args, arc: this.uiState.rocketDirectionUp });
     return options.buildReturn;
   } };
-  const ctors = Object.fromEntries(['spawn', 'attack', 'boat', 'embargo', 'moveWarship', 'allianceRequest', 'donateTroops'].map(key => [key, Object.defineProperty(function () {}, 'name', { value: key })]));
+  const ctors = Object.fromEntries(['spawn', 'attack', 'boat', 'embargoAll', 'embargo', 'moveWarship', 'allianceRequest', 'donateTroops'].map(key => [key, Object.defineProperty(function () {}, 'name', { value: key })]));
   const emitIntent = (ctor, ...args) => { commands.push({ kind: ctor.name, args }); return options.emitReturn ?? true; };
   const runtime = createRuntime({ createEngine, createLegacyStrategy, openingExpansion:options.openingExpansion,
     twoTeamOpening: options.twoTeamOpening, teamGeography:options.teamGeography, units:UNIT, isCurrent: () => options.current?.()??true,
@@ -116,6 +116,7 @@ function fixture(source, name, options = {}) {
       now: () => context.performance.now(), debug:()=>{} }),
     boatPlanner: require('../src/brain/boat-planner')({state}),
     embargoPlanner: require('../src/brain/embargo-planner')(),
+    embargoAllCtor:()=>context.discoverCtors().embargoAll,botType:'Bot',
     spawnPlanner: require('../src/brain/spawn-planner')({settings:()=>state.settings,geography:options.teamGeography}),
     attackAllocationPlanner: require('../src/brain/attack-allocation-planner')({settings:()=>state.settings,
       difficulty:()=>context.currentDifficulty(),easy:'Easy',botType:'Bot'}),
@@ -3587,4 +3588,54 @@ test('runtime island deployment builds through the central build gateway and log
  const decision=f.runtime.inspect().records.find(r=>r.kind==='decision'&&r.snapshot.domain==='warship-deployment');
  assert.equal(decision.selectedId,'deploy:island');assert.equal(decision.snapshot.teamNaval.reserve,'100');
  assert.ok(f.runtime.replay('adaptive-v1',f.runtime.inspect()).every(r=>r.sameChoice));
+});
+
+function nativeEmbargoFixture(options={}){
+ const legacy=createLegacyStrategy(),adaptive=require('../src/brain/adaptive-strategy')(legacy);
+ const f=fixture(instrumented,'NationBot',{...options,strategies:[options.strategy||adaptive]});
+ const targets=setupEmbargo(f,{team:true,relation:0,targetStations:10});
+ targets[0].isAlive=()=>true;f.attach();f.runtime.select('adaptive-v1');return {f,targets};
+}
+test('adaptive team embargo uses one native all-enemies command regardless of trade advantage',()=>{
+ const {f}=nativeEmbargoFixture();f.actor.handleEmbargoesToHostileNations();
+ assert.deepEqual(f.commands.map(c=>c.kind),['embargoAll']);assert.deepEqual(f.commands[0].args,['start']);
+ f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,1);
+ f.setTick(1000);f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,2);
+});
+test('native team embargo excludes allies, teammates, Bots and dead players',()=>{
+ for(const mode of ['allied','teammate','bot','dead','active']){
+  const {f,targets}=nativeEmbargoFixture();
+  if(mode==='allied')f.player.isAlliedWith=()=>true;
+  if(mode==='teammate')f.player.isOnSameTeam=()=>true;
+  if(mode==='bot')targets[0].type=()=> 'Bot';
+  if(mode==='dead')targets[0].isAlive=()=>false;
+  if(mode==='active')f.player.hasEmbargoAgainst=()=>true;
+  f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,0,mode);
+ }
+});
+test('native team embargo throws if native constructor is missing',()=>{
+ const {f}=nativeEmbargoFixture();delete f.context.discoverCtors().embargoAll;
+ assert.throws(()=>f.actor.handleEmbargoesToHostileNations(),/embargo.all.*unavailable/i);
+});
+test('failed native embargo emission can retry without a successful-submission cooldown',()=>{
+ const {f}=nativeEmbargoFixture({emitReturn:false});f.actor.handleEmbargoesToHostileNations();f.actor.handleEmbargoesToHostileNations();
+ assert.equal(f.commands.length,2);
+});
+
+test('confirmed native embargo stays quiet and alliance changes trigger a fresh embargo',()=>{
+ const {f}=nativeEmbargoFixture();let embargoed=false,allied=false;
+ f.player.hasEmbargoAgainst=()=>embargoed;f.player.isAlliedWith=()=>allied;
+ f.actor.handleEmbargoesToHostileNations();embargoed=true;f.setTick(1000);
+ f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,1);
+ embargoed=false;allied=true;f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,1);
+ allied=false;f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,2);
+});
+test('central embargo action hold prevents native submission and releases next pass',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());let hold=true;
+ const {f}=nativeEmbargoFixture({strategy:{...adaptive,decide(s,c){return hold&&s.domain==='embargo-action'?{selectedId:'$wait',reason:'hold embargo'}:adaptive.decide(s,c);}}});
+ f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,0);
+ hold=false;f.actor.handleEmbargoesToHostileNations();assert.equal(f.commands.length,1);
+ const decisions=f.runtime.inspect().records.filter(r=>r.kind==='decision');
+ const command=decisions.find(d=>d.candidates.some(c=>c.kind==='embargoAll'));
+ assert.ok(command.candidates[0].parentDecisionId);
 });

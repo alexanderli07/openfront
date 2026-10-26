@@ -12,8 +12,17 @@ test('generated constructor discovery matches current upstream attack, boat, don
   const bus={listeners:new Map(Object.values(events).reverse().map(Event=>[Event,[]]))};
   discover(bus);
   const expected={spawn:'SendSpawnIntentEvent',attack:'SendAttackIntentEvent',boat:'SendBoatAttackIntentEvent',
-    moveWarship:'MoveWarshipIntentEvent',donateTroops:'SendDonateTroopsIntentEvent',embargo:'SendEmbargoIntentEvent',
+    moveWarship:'MoveWarshipIntentEvent',donateTroops:'SendDonateTroopsIntentEvent',embargo:'SendEmbargoIntentEvent',embargoAll:'SendEmbargoAllIntentEvent',
     emoji:'SendEmojiIntentEvent',target:'SendTargetPlayerIntentEvent'};
   for(const [key,name] of Object.entries(expected))assert.equal(ctors[key],events[name],key);
   assert.equal(discover(bus),ctors);
+});
+
+test('embargo-all discovery retries when its listener appears after other constructors were cached',()=>{
+ const source=buildSource().source,start=source.indexOf('function discoverCtors('),end=source.indexOf('function emitIntent(',start);
+ const ctors={},discover=vm.runInNewContext(source.slice(start,end)+';discoverCtors',{_ctors:ctors,getListenersMap:b=>b.listeners});
+ const bus={listeners:new Map(Object.entries(events).filter(([name])=>name!=='SendEmbargoAllIntentEvent').map(([,ctor])=>[ctor,[]]))};
+ discover(bus);assert.equal(ctors.embargoAll,undefined);
+ bus.listeners.set(events.SendEmbargoAllIntentEvent,[]);discover(bus);
+ assert.equal(ctors.embargoAll,events.SendEmbargoAllIntentEvent);
 });
