@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.12.0-trade-hotspots',
+    version: '1.13.0-posted-piracy',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -90,7 +90,7 @@ function createAdaptiveStrategy(legacyStrategy) {
         if (deploy) return select(deploy, candidates, 'Island defense fleet before routine spending; deployment preserves economy reserve');
       }
       if (snapshot.domain === 'warship-deployment' && snapshot.teamNaval?.island) {
-        const deploy = candidates.find(c => c.id === 'deploy:island' && c.eligible);
+        const deploy = candidates.find(c=>c.id==='deploy:replacement'&&c.eligible)||candidates.find(c => c.id === 'deploy:island' && c.eligible);
         return select(deploy || candidates.find(c => c.id === '$wait'), candidates,
           deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
       }

@@ -30,7 +30,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.65'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.66'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -79,7 +79,7 @@ const ofhBrainRuntime = createBrainRuntime({
   warshipPatrolPlanner: createWarshipPatrolPlanner(),
   warshipThreatPlanner: createWarshipThreatPlanner({transportType:UNIT.TransportShip,tradeType:UNIT.TradeShip,warshipType:UNIT.Warship,settings:()=>state.settings}),
   warshipDetailsPlanner: createWarshipDetailsPlanner({warshipType: UNIT.Warship, settings: () => state.settings}),
-  warshipTradeHotspots:createWarshipTradeHotspots({units:UNIT}),
+  warshipTradeHotspots:createWarshipTradeHotspots({units:UNIT,now:()=>performance.now()}),
   warshipMoveCtor:()=>discoverCtors(getEventBus()).moveWarship,
   warshipCombatPlanner: createWarshipCombatPlanner({ warshipType: UNIT.Warship, difficulty: currentDifficulty }),
   warshipSafetyPlanner: createWarshipSafetyPlanner({portType: UNIT.Port, settings: () => state.settings}),

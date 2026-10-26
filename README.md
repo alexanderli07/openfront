@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.65) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.66) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.65)
+## Install and update (1.84.66)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,16 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Posted piracy and budgeted replacement (1.84.66)
+
+Piracy ships park at an assigned post. Traffic is reviewed approximately every30seconds of monotonic wall time, independent of game speed; a still-viable post is retained even when another area scores higher. Both traffic samples and anchors need a12tile circular clearance of water. This rejects narrow river/channel postings. It is a geometric heuristic, not proof of hidden native piracy immunity. Native sailing paths may still pass through narrow water.
+
+Routine coast/loss patrols cannot borrow posted ships. Posted ships only divert for close imminent hostile landings (landing distance<=40 and interception distance<=60); nuke dodge, retreat and nearby enemy warships keep priority. Surviving ships return to the same post after danger clears.
+
+A destroyed ship leaves a durable vacancy. An existing unassigned ship fills it first; otherwise the central deployment decision buys a replacement from a usable connected port, subject to the economy/SAM reserve and ten-ship ceiling. Distance ranks replacement ports but cannot permanently disqualify an established viable post. Replacement confirmation binds the new ship to that post. Pending submissions expire after10seconds, and successful replacement submissions are spaced by at least30seconds. Waiting replacements cannot fall through into extra first-ship/island purchases. Unaffordable or unsafe posts wait without spending their reserve. New piracy deployment requires a viable post rather than random water parking; existing island-defense deployment remains available.
+
+Traces include post clearance, review timestamps, assignment changes and replacement targets. Full-match archive remains preferable to the bounded detailed-trace export for a whole game. Live capture yield and routing still require match testing.
 
 ## Stable trade-area warship patrols (1.84.65)
 

@@ -734,11 +734,14 @@ function createBrainRuntime(deps) {
     if(tradeAreasEnabled(actor)){
       const last=context.smart.cooldown.get(context.ship.id()),tick=actor.game.ticks();
       const ready=last===undefined||tick<last||tick-last>=60;
+      const posted=deps.warshipTradeHotspots.posted?.(actor,context.ship);
+      if(posted)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
       context={...context,hotspotMode:true,hotspotCandidates:ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[]};
       hooks.assigned=area=>{
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
+        if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
-          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown});
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt});
       };
       hooks.move=(ship,tile)=>{
         const ctor=deps.warshipMoveCtor?.();
@@ -831,11 +834,15 @@ function createBrainRuntime(deps) {
         const defense=defenseEconomyFacts(actor),structure=owners.get(actor)?.bot.structureBehavior;
         return defense?defense.reserve+(defense.requiredType?BigInt(structure.cost(defense.requiredType)):0n):0n;
       };
-      hooks.tradeSite=(ports,parentDecisionId)=>{
-        const entries=deps.warshipTradeHotspots.deployment(actor,ports);
-        if(!entries.length)return null;
+      hooks.hasTradePost=ports=>deps.warshipTradeHotspots.deployment(actor,ports).length>0;
+      hooks.replacement=()=>deps.warshipTradeHotspots.replacement?.(actor);
+      hooks.waitingReplacement=()=>deps.warshipTradeHotspots.waitingReplacement?.(actor);
+      hooks.deployed=area=>deps.warshipTradeHotspots.replacementSubmitted(actor,area);
+      hooks.tradeSite=(ports,parentDecisionId,post=null)=>{
+        const entries=deps.warshipTradeHotspots.deployment(actor,ports,post);
+        if(!entries.length)return post?{tile:null}:null;
         const candidates=entries.map((entry,priority)=>({...entry,id:'trade-port:'+priority,kind:'warship-placement',priority,eligible:true}));
-        const choice=hooks.choose('warship-placement',[...candidates,{id:'$wait',kind:'wait',reason:'Hold trade-area deployment'}],{purpose:'trade-area'},parentDecisionId);
+        const choice=hooks.choose('warship-placement',[...candidates,{id:'$wait',kind:'wait',reason:'Hold trade-area deployment'}],{purpose:post?'replace-piracy-post':'trade-area',postTile:post?.tile,postKey:post?.key},parentDecisionId);
         return {tile:candidates.find(c=>c.id===choice.selectedId)?.tile??null,decisionId:choice.decisionId};
       };
     }
@@ -877,7 +884,9 @@ function createBrainRuntime(deps) {
     return deps.warshipDetailsPlanner.spawn(actor, center, radius, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
   }
   function selectMovingWarship(actor, tile, context) {
-    return deps.warshipDetailsPlanner.move(actor, tile, context, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
+    const hooks=warshipCombatHooks(actor,deps.warshipDetailsPlanner);
+    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship);
+    return deps.warshipDetailsPlanner.move(actor,tile,context,hooks);
   }
   function planWarshipInfestation(actor, teamGame) {
     return deps.warshipDeploymentPlanner.counter(actor, teamGame, warshipCombatHooks(actor, deps.warshipDeploymentPlanner));

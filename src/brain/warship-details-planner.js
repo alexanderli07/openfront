@@ -33,6 +33,7 @@ function createWarshipDetailsPlanner(deps) {
     const cooldownTicks = settings.warshipMoveCooldownTicks || 60;
     const component = smart ? actor.game.getWaterComponent(tile) : undefined;
     const ships = actor.player.units(deps.warshipType).filter(ship => {
+      if(hooks.canMove&&!hooks.canMove(ship))return false;
       if (!smart) {
         const patrol = ship.warshipState().patrolTile;
         return patrol !== undefined && actor.game.manhattanDist(ship.tile(),patrol) < 130;

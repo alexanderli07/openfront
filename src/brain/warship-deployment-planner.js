@@ -21,16 +21,21 @@ function createWarshipDeploymentPlanner(deps) {
     const ticket = pending.get(actor);
     if (ticket && (ships.length > ticket.count || actor.game.ticks() - ticket.tick >= 40)) pending.delete(actor);
     const reserve=()=>BigInt(hooks.reserve?.()??0n);
-    const eligible = ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType) &&
+    const waiting=hooks.hotspotMode&&hooks.waitingReplacement?.();
+    const eligible = !waiting&&(!hooks.hotspotMode||hooks.hasTradePost?.(ports)!==false)&&ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType) &&
       (!hooks.hotspotMode || !inFlight.has(actor) && !pending.has(actor) &&
         BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + reserve());
     const candidate = { id: 'deploy:first', kind: 'warship-deployment', priority: 0, eligible,
       reason: eligible ? 'Build first warship from an existing port' : 'Requires a port, no warships and gold above cost' };
     const naval = hooks.naval?.();
-    const strategicEligible = naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
+    const strategicEligible = !waiting&&naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
       ports.some(p => (!p.isActive || p.isActive()) && !p.isUnderConstruction?.()) &&
       BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + BigInt(naval.reserve);
-    const choices = [candidate];
+    const replacement=hooks.hotspotMode?hooks.replacement?.():null;
+    const replaceEligible=!!replacement&&ports.length>0&&ships.length<10&&!inFlight.has(actor)&&!pending.has(actor)&&
+      BigInt(actor.player.gold())>=BigInt(actor.cost(deps.warshipType))+reserve();
+    const choices = [{id:'deploy:replacement',kind:'warship-deployment',priority:-1,eligible:replaceEligible,
+      postKey:replacement?.key,postTile:replacement?.tile,reason:'Replace the lost piracy-post ship while preserving economy/SAM cash'},candidate];
     if (naval?.island) choices.push({ id:'deploy:island', kind:'warship-deployment', priority:100, adaptiveOnly:true,
       eligible:!!strategicEligible, reason:'Bounded island fleet; keep the next economy/SAM purchase in reserve',
       reserve:naval.reserve, targetShips:naval.targetShips, ships:naval.ships });
@@ -38,7 +43,7 @@ function createWarshipDeploymentPlanner(deps) {
     const report = (status, details = {}) => hooks.record('warship-deployment-result', { decisionId: decision.decisionId, status, ...details });
     const selected = choices.find(c => c.id === decision.selectedId && c.eligible);
     if (!selected) { report('wait', { reason: decision.reason }); return false; }
-    const strategic = selected.id === 'deploy:island';
+    const strategic = selected.id === 'deploy:island',replacing=selected.id==='deploy:replacement';
     if (!hooks.allowed()) { report('stopped'); return false; }
     try {
       if (strategic||hooks.hotspotMode) inFlight.add(actor);
@@ -46,9 +51,11 @@ function createWarshipDeploymentPlanner(deps) {
       for (let attempt=0; attempt<(strategic ? 8 : 1); attempt++) {
         if (!hooks.allowed()) { report('stopped'); return false; }
         let site;
-        if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
+        if(replacing)site=hooks.tradeSite?.(ports,decision.decisionId,replacement)||{tile:null};
+        else if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
         else {
           site=hooks.tradeSite?.(ports,decision.decisionId);
+          if(!site&&hooks.hotspotMode&&hooks.hasTradePost){report('no-viable-piracy-post');return false;}
           if(!site){
             const { unit: port, decision: portDecision } = randomUnit(actor, ports, 'warship-port', decision.decisionId, hooks);
             if (!port) { report('wait'); return false; }
@@ -75,7 +82,9 @@ function createWarshipDeploymentPlanner(deps) {
         if(hooks.hotspotMode&&BigInt(actor.player.gold())<BigInt(buildable.cost??actor.cost(deps.warshipType))+reserve()){
           report('reserve-changed',{tile});return false;
         }
+        if(replacing&&hooks.replacement?.()?.key!==replacement.key){report('replacement-changed',{tile});return false;}
         const result = hooks.execute(site.decisionId, () => actor._deployWarshipReady(tile, buildable));
+        if(result&&replacing)hooks.deployed?.(replacement);
         if ((strategic||hooks.hotspotMode) && result) pending.set(actor, {tick:actor.game.ticks(),count:ships.length});
         report(result ? 'build-attempted' : 'not-built', { tile });
         return result;

@@ -3666,3 +3666,24 @@ test('recent dodge or defensive movement holds hotspot commands without losing s
   retreatRatio:.75,evade:false,enemies:[],trades:[],home:50,hunt:true,patrol:{}});
  assert.equal(f.commands.length,0);
 });
+
+for(const urgent of [false,true])test(`posted piracy ships only divert for close imminent landings: ${urgent}`,()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());
+ const f=fixture(instrumented,'WarshipBehavior',{strategies:[adaptive],warshipTradeHotspots:{
+  posted:()=>true,rank:()=>[{key:'post',tile:180,density:3,score:300,component:1}],assign:()=>false}});
+ Object.assign(f.game,{manhattanDist:(a,b)=>Math.abs(a-b),getWaterComponent:()=>1});
+ f.setTick(100);f.attach();f.runtime.select('adaptive-v1');
+ f.runtime.planWarshipCombat(f.actor,{ship:{id:()=>7,tile:()=>0},smart:{cooldown:new Map()},health:100,maxHealth:100,
+  retreatRatio:.75,evade:false,enemies:[],trades:[],home:50,hunt:true,patrol:{},
+  transports:[{tile:30,landingDistance:urgent?10:80,interceptDistance:30}]});
+ assert.equal(f.commands.find(c=>c.kind==='moveWarship').args[1],urgent?30:180);
+});
+
+test('old retaliation repositioning cannot borrow a ship assigned to a piracy post',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());
+ const f=fixture(instrumented,'WarshipBehavior',{strategies:[adaptive],warshipTradeHotspots:{posted:()=>true}});
+ const ship={id:()=>7,tile:()=>0,warshipState:()=>({state:'patrolling',patrolTile:0})};
+ f.player.units=()=>[ship];Object.assign(f.game,{isWater:()=>true,manhattanDist:(a,b)=>Math.abs(a-b),getWaterComponent:()=>1});
+ f.attach();f.runtime.select('adaptive-v1');f.actor.maybeMoveWarship(30);
+ assert.equal(f.commands.length,0);
+});

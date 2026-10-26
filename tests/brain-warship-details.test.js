@@ -29,6 +29,11 @@ test('default unit selection keeps nearest ship and first ties', () => {
   f.ships[1] = f.unit(2,10); f.planner.move(f.actor,0,{},f.hooks);
   assert.equal(f.calls.filter(c=>c[0]==='move')[1][1],f.ships[0]);
 });
+test('routine patrols use an unposted ship instead of pulling a ship off its piracy post',()=>{
+ const f=fixture();f.hooks.canMove=ship=>ship.id()!==1;
+ assert.equal(f.planner.move(f.actor,0,{smart:{cooldown:new Map()},tick:100},f.hooks),true);
+ assert.equal(f.calls.find(c=>c[0]==='move')[1],f.ships[1]);
+});
 test('policy can choose a different eligible ship', () => {
   const f=fixture((d,c)=>({selectedId:c[1].id,reason:'second'}));
   f.planner.move(f.actor,0,{},f.hooks); assert.equal(f.calls.find(c=>c[0]==='move')[1],f.ships[1]);

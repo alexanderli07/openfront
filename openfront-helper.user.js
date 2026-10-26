@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.65
+// @version      1.84.66
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.65","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.66","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -2557,7 +2557,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.12.0-trade-hotspots',
+    version: '1.13.0-posted-piracy',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -2581,7 +2581,7 @@ function createAdaptiveStrategy(legacyStrategy) {
         if (deploy) return select(deploy, candidates, 'Island defense fleet before routine spending; deployment preserves economy reserve');
       }
       if (snapshot.domain === 'warship-deployment' && snapshot.teamNaval?.island) {
-        const deploy = candidates.find(c => c.id === 'deploy:island' && c.eligible);
+        const deploy = candidates.find(c=>c.id==='deploy:replacement'&&c.eligible)||candidates.find(c => c.id === 'deploy:island' && c.eligible);
         return select(deploy || candidates.find(c => c.id === '$wait'), candidates,
           deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
       }
@@ -5736,6 +5736,7 @@ function createWarshipDetailsPlanner(deps) {
     const cooldownTicks = settings.warshipMoveCooldownTicks || 60;
     const component = smart ? actor.game.getWaterComponent(tile) : undefined;
     const ships = actor.player.units(deps.warshipType).filter(ship => {
+      if(hooks.canMove&&!hooks.canMove(ship))return false;
       if (!smart) {
         const patrol = ship.warshipState().patrolTile;
         return patrol !== undefined && actor.game.manhattanDist(ship.tile(),patrol) < 130;
@@ -5806,21 +5807,34 @@ function createWarshipPatrolPlanner() {
 
 'use strict';
 
-function createWarshipTradeHotspots({units:U}) {
-  const states=new WeakMap(),sampleLimit=512,historyTicks=400,graceTicks=300;
+function createWarshipTradeHotspots({units:U,now=()=>performance.now()}) {
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12;
   const raw=unit=>unit?.__src||unit;
   function state(actor){
-    const game=actor.game,tick=game.ticks();let s=states.get(actor.player);
-    if(!s||s.game!==game||tick<s.tick){s={game,tick:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map()};states.set(actor.player,s);}
+    const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
+    if(!s||s.game!==game||tick<s.lastTick||time<s.sampleAt){
+      s={game,tick:-Infinity,sampleAt:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map(),vacancies:new Map(),geometry:new Map(),lastReplacementAt:-Infinity};states.set(actor.player,s);
+    }
+    s.lastTick=tick;
+    const fleet=actor.player.units(U.Warship).filter(ship=>ship.isActive?.()!==false),ids=new Set(fleet.map(ship=>ship.id()));
+    for(const [id,area] of s.assignments)if(!ids.has(id)){
+      s.vacancies.set(area.key,{...area,lostAt:time,lostShipId:id});s.assignments.delete(id);
+    }
+    for(const [key,area] of s.vacancies)if(area.pending){
+      const fresh=fleet.find(ship=>!area.pending.ids.has(ship.id())&&!s.assignments.has(ship.id())&&game.getWaterComponent(ship.tile())===area.component);
+      if(fresh){s.assignments.set(fresh.id(),{...area,pending:undefined,reviewedAt:time});s.vacancies.delete(key);}
+      else if(time-area.pending.at>=10000)delete area.pending;
+    }
+    while(s.vacancies.size>10)s.vacancies.delete(s.vacancies.keys().next().value);
     hazards(actor,s,tick);
-    if(tick-s.tick<20)return s;
-    s.tick=tick;
+    if(time-s.sampleAt<reviewMs)return s;
+    s.tick=tick;s.sampleAt=time;
     const ports=new Map(game.units(U.Port).map(port=>[port.id(),port]));
-    const trades=game.units(U.TradeShip),offset=trades.length?Math.floor(tick/20)*sampleLimit%trades.length:0;
+    const trades=game.units(U.TradeShip),offset=trades.length?Math.floor(time/reviewMs)*sampleLimit%trades.length:0,seen=new Set();
     for(let i=0;i<Math.min(trades.length,sampleLimit);i++){
       const unit=trades[(offset+i)%trades.length];let id;
       try{
-        id=unit.id();const source=raw(unit),owner=unit.owner();
+        id=unit.id();seen.add(id);const source=raw(unit),owner=unit.owner();
         // Browser UnitView exposes destination IDs, not the engine's targetUnit().
         const destination=source.targetUnit?.()?.owner?.()||ports.get(source.targetUnitId?.())?.owner();
         const protectionKnown=typeof source.isSafeFromPirates==='function';
@@ -5830,14 +5844,12 @@ function createWarshipTradeHotspots({units:U}) {
           s.samples.delete(id);continue;
         }
         const tile=unit.tile(),component=game.getWaterComponent(tile);
-        if(!game.isWater(tile)||component==null){s.samples.delete(id);continue;}
-        s.samples.set(id,{tile,component,tick,protectionKnown});
+        if(!openWater(game,s,tile)||component==null){s.samples.delete(id);continue;}
+        s.samples.set(id,{tile,component,tick,time,protectionKnown});
       }catch{if(id!==undefined)s.samples.delete(id);}
     }
-    for(const [id,p] of s.samples)if(tick-p.tick>historyTicks)s.samples.delete(id);
+    for(const [id,p] of s.samples)if(time-p.time>40000||trades.length<=sampleLimit&&!seen.has(id))s.samples.delete(id);
     while(s.samples.size>sampleLimit)s.samples.delete(s.samples.keys().next().value);
-    const fleet=actor.player.units(U.Warship),ids=new Set(fleet.map(ship=>ship.id()));
-    for(const id of s.assignments.keys())if(!ids.has(id))s.assignments.delete(id);
     const areas=new Map();
     for(const p of s.samples.values()){
       const key=p.component+':'+Math.floor(game.x(p.tile)/80)+','+Math.floor(game.y(p.tile)/80);
@@ -5847,11 +5859,11 @@ function createWarshipTradeHotspots({units:U}) {
     s.areas=[...areas.values()].map(area=>{
       let density=0,lastTraffic=-Infinity,protectionUnknown=0;
       for(const p of s.samples.values())if(p.component===area.component&&game.manhattanDist(p.tile,area.tile)<=100){
-        density+=Math.max(0,1-(tick-p.tick)/historyTicks);lastTraffic=Math.max(lastTraffic,p.tick);
+        density+=Math.max(0,1-(time-p.time)/40000);lastTraffic=Math.max(lastTraffic,p.tick);
         if(!p.protectionKnown)protectionUnknown++;
       }
-      return {...area,density,lastTraffic,protectionUnknown};
-    }).filter(a=>a.density>=.25&&tick-a.lastTraffic<=graceTicks).sort((a,b)=>b.density-a.density).slice(0,128);
+      return {...area,density,lastTraffic,protectionUnknown,clearance,reviewedAt:time};
+    }).filter(a=>a.density>=.25).sort((a,b)=>b.density-a.density).slice(0,128);
     return s;
   }
   function hazards(actor,s,tick){
@@ -5872,58 +5884,84 @@ function createWarshipTradeHotspots({units:U}) {
     if(s.blasts.some(b=>Math.hypot(game.x(tile)-game.x(b.tile),game.y(tile)-game.y(b.tile))<=b.radius))return true;
     return s.enemies.some(ship=>game.getWaterComponent(ship.tile())===game.getWaterComponent(tile)&&game.manhattanDist(tile,ship.tile())<=130);
   }
+  function openWater(game,s,tile){
+    if(s.geometry.has(tile))return s.geometry.get(tile);
+    let allowed=true;
+    try{
+      if(!game.isWater(tile))allowed=false;
+      const x=game.x(tile),y=game.y(tile);
+      for(let dx=-clearance;allowed&&dx<=clearance;dx++)for(let dy=-clearance;dy<=clearance;dy++){
+        if(dx*dx+dy*dy>clearance*clearance)continue;
+        if(!game.isValidCoord(x+dx,y+dy)||!game.isWater(game.ref(x+dx,y+dy))){allowed=false;break;}
+      }
+    }catch{allowed=false;}
+    if(s.geometry.size>=4096)s.geometry.delete(s.geometry.keys().next().value);
+    s.geometry.set(tile,allowed);return allowed;
+  }
+  function viable(actor,s,area){
+    if(!openWater(actor.game,s,area.tile)||unsafe(actor,s,area.tile))return false;
+    return [...s.samples.values()].some(p=>p.component===area.component&&actor.game.manhattanDist(p.tile,area.tile)<=100);
+  }
+  function posted(actor,ship){return state(actor).assignments.has(ship.id());}
   function rank(actor,ship){
-    const s=state(actor),game=actor.game,tick=game.ticks(),component=game.getWaterComponent(ship.tile());
+    const s=state(actor),game=actor.game,time=now(),component=game.getWaterComponent(ship.tile());
     if(component==null||unsafe(actor,s,ship.tile()))return [];
     const previous=s.assignments.get(ship.id());
-    const areas=[...s.areas];
-    if(previous&&!areas.some(a=>a.key===previous.key)){
-      let density=0,lastTraffic=previous.lastTraffic;
-      for(const p of s.samples.values())if(p.component===previous.component&&game.manhattanDist(p.tile,previous.tile)<=100){
-        density+=Math.max(0,1-(tick-p.tick)/historyTicks);lastTraffic=Math.max(lastTraffic,p.tick);
-      }
-      if(tick-lastTraffic<=graceTicks)areas.push({...previous,density:Math.max(density,previous.density*.5),lastTraffic});
-    }
-    const candidates=areas.filter(a=>a.component===component).map(area=>{
-      const retained=previous?.key===area.key,tile=retained?previous.tile:area.tile;
+    if(previous&&openWater(game,s,previous.tile)&&!unsafe(actor,s,previous.tile)&&
+      (time-previous.reviewedAt<reviewMs||viable(actor,s,previous)))
+      return [{...previous,retained:true,distance:game.manhattanDist(ship.tile(),previous.tile),reviewed:time-previous.reviewedAt>=reviewMs,reviewedAt:time-previous.reviewedAt<reviewMs?previous.reviewedAt:time,
+        reason:'Stay at the viable piracy post; review every30seconds'}];
+    const vacant=[...s.vacancies.values()].filter(a=>!a.pending&&a.component===component&&viable(actor,s,a));
+    const areas=vacant.length?vacant:s.areas;
+    return areas.filter(a=>a.component===component).map(area=>{
       let occupancy=0;
-      for(const [id,a] of s.assignments)if(id!==ship.id()&&a.component===component&&tick-a.lastTraffic<=graceTicks&&game.manhattanDist(a.tile,tile)<=120)occupancy++;
-      const distance=game.manhattanDist(ship.tile(),tile);
-      return {...area,tile,retained,occupancy,distance,score:(area.density*100-Math.min(distance,1200)*.08)/(1+occupancy*1.5),
-        reason:retained?'Keep the established productive trade area':'Patrol dense capturable trade traffic'};
-    }).filter(a=>a.score>0&&game.isWater(a.tile)&&!unsafe(actor,s,a.tile));
-    candidates.sort((a,b)=>b.score-a.score||a.distance-b.distance||a.key.localeCompare(b.key));
-    const retained=candidates.find(a=>a.retained);
-    if(retained&&(tick-previous.since<300||candidates[0].score<retained.score*1.6)){
-      candidates.splice(candidates.indexOf(retained),1);candidates.unshift(retained);
-    }
-    return candidates.slice(0,79);
+      for(const [id,a] of s.assignments)if(id!==ship.id()&&a.component===component&&game.manhattanDist(a.tile,area.tile)<=120)occupancy++;
+      const distance=game.manhattanDist(ship.tile(),area.tile);
+      return {...area,clearance,reviewed:true,reviewedAt:time,retained:false,occupancy,distance,
+        score:(area.density*100-Math.min(distance,1200)*.4)/(1+occupancy*1.5),
+        reason:vacant.length?'Fill a vacant piracy post with an existing ship':'Post in open water with dense enemy trade'};
+    }).filter(a=>(vacant.length||a.score>0)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
+      .sort((a,b)=>b.score-a.score||a.distance-b.distance||a.key.localeCompare(b.key)).slice(0,79);
+  }
+  function replacement(actor){
+    const s=state(actor),fleet=actor.player.units(U.Warship);
+    if(fleet.length>=10||now()-s.lastReplacementAt<reviewMs)return null;
+    return [...s.vacancies.values()].find(area=>!area.pending&&viable(actor,s,area)&&
+      !fleet.some(ship=>!s.assignments.has(ship.id())&&actor.game.getWaterComponent(ship.tile())===area.component))||null;
+  }
+  function waitingReplacement(actor){
+    const s=state(actor);return [...s.vacancies.values()].some(area=>area.pending||viable(actor,s,area));
+  }
+  function replacementSubmitted(actor,area){
+    const s=state(actor),vacancy=s.vacancies.get(area.key);if(!vacancy)return;
+    s.lastReplacementAt=now();vacancy.pending={at:now(),ids:new Set(actor.player.units(U.Warship).map(ship=>ship.id()))};
   }
   function assign(actor,ship,area){
     const s=state(actor),previous=s.assignments.get(ship.id());
     s.assignments.set(ship.id(),{...area,since:previous?.key===area.key?previous.since:actor.game.ticks()});
+    s.vacancies.delete(area.key);
     return !previous||previous.key!==area.key||previous.tile!==area.tile;
   }
-  function deployment(actor,ports){
+  function deployment(actor,ports,post=null){
     const s=state(actor),game=actor.game,entries=[];
     for(const port of ports.slice(0,79)){
       if(!port.isActive()||port.isUnderConstruction())continue;
       for(const tile of game.neighbors(port.tile())){
         if(!game.isWater(tile)||unsafe(actor,s,tile))continue;
         const component=game.getWaterComponent(tile);if(component==null)continue;
-        const areas=s.areas.filter(a=>a.component===component&&!unsafe(actor,s,a.tile));
+        const areas=(post?[post]:s.areas).filter(a=>a.component===component&&viable(actor,s,a));
         let best;
         for(const area of areas){
-          const score=area.density*100-game.manhattanDist(tile,area.tile)*.08;
+          const score=area.density*100-game.manhattanDist(tile,area.tile)*.4;
           if(!best||score>best.score)best={tile,portTile:port.tile(),hotspot:area.tile,
-            density:area.density,score,reason:'Deploy from a usable port connected to productive trade traffic'};
+            density:area.density,postKey:area.key,score,reason:'Deploy from a usable port connected to productive trade traffic'};
         }
         if(best)entries.push(best);
       }
     }
-    return entries.filter(e=>e.score>0).sort((a,b)=>b.score-a.score||a.portTile-b.portTile).slice(0,79);
+    return entries.filter(e=>post||e.score>0).sort((a,b)=>b.score-a.score||a.portTile-b.portTile).slice(0,79);
   }
-  return {rank,assign,deployment};
+  return {rank,assign,deployment,posted,replacement,waitingReplacement,replacementSubmitted};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipTradeHotspots;
 
@@ -6234,16 +6272,21 @@ function createWarshipDeploymentPlanner(deps) {
     const ticket = pending.get(actor);
     if (ticket && (ships.length > ticket.count || actor.game.ticks() - ticket.tick >= 40)) pending.delete(actor);
     const reserve=()=>BigInt(hooks.reserve?.()??0n);
-    const eligible = ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType) &&
+    const waiting=hooks.hotspotMode&&hooks.waitingReplacement?.();
+    const eligible = !waiting&&(!hooks.hotspotMode||hooks.hasTradePost?.(ports)!==false)&&ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType) &&
       (!hooks.hotspotMode || !inFlight.has(actor) && !pending.has(actor) &&
         BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + reserve());
     const candidate = { id: 'deploy:first', kind: 'warship-deployment', priority: 0, eligible,
       reason: eligible ? 'Build first warship from an existing port' : 'Requires a port, no warships and gold above cost' };
     const naval = hooks.naval?.();
-    const strategicEligible = naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
+    const strategicEligible = !waiting&&naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
       ports.some(p => (!p.isActive || p.isActive()) && !p.isUnderConstruction?.()) &&
       BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + BigInt(naval.reserve);
-    const choices = [candidate];
+    const replacement=hooks.hotspotMode?hooks.replacement?.():null;
+    const replaceEligible=!!replacement&&ports.length>0&&ships.length<10&&!inFlight.has(actor)&&!pending.has(actor)&&
+      BigInt(actor.player.gold())>=BigInt(actor.cost(deps.warshipType))+reserve();
+    const choices = [{id:'deploy:replacement',kind:'warship-deployment',priority:-1,eligible:replaceEligible,
+      postKey:replacement?.key,postTile:replacement?.tile,reason:'Replace the lost piracy-post ship while preserving economy/SAM cash'},candidate];
     if (naval?.island) choices.push({ id:'deploy:island', kind:'warship-deployment', priority:100, adaptiveOnly:true,
       eligible:!!strategicEligible, reason:'Bounded island fleet; keep the next economy/SAM purchase in reserve',
       reserve:naval.reserve, targetShips:naval.targetShips, ships:naval.ships });
@@ -6251,7 +6294,7 @@ function createWarshipDeploymentPlanner(deps) {
     const report = (status, details = {}) => hooks.record('warship-deployment-result', { decisionId: decision.decisionId, status, ...details });
     const selected = choices.find(c => c.id === decision.selectedId && c.eligible);
     if (!selected) { report('wait', { reason: decision.reason }); return false; }
-    const strategic = selected.id === 'deploy:island';
+    const strategic = selected.id === 'deploy:island',replacing=selected.id==='deploy:replacement';
     if (!hooks.allowed()) { report('stopped'); return false; }
     try {
       if (strategic||hooks.hotspotMode) inFlight.add(actor);
@@ -6259,9 +6302,11 @@ function createWarshipDeploymentPlanner(deps) {
       for (let attempt=0; attempt<(strategic ? 8 : 1); attempt++) {
         if (!hooks.allowed()) { report('stopped'); return false; }
         let site;
-        if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
+        if(replacing)site=hooks.tradeSite?.(ports,decision.decisionId,replacement)||{tile:null};
+        else if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
         else {
           site=hooks.tradeSite?.(ports,decision.decisionId);
+          if(!site&&hooks.hotspotMode&&hooks.hasTradePost){report('no-viable-piracy-post');return false;}
           if(!site){
             const { unit: port, decision: portDecision } = randomUnit(actor, ports, 'warship-port', decision.decisionId, hooks);
             if (!port) { report('wait'); return false; }
@@ -6288,7 +6333,9 @@ function createWarshipDeploymentPlanner(deps) {
         if(hooks.hotspotMode&&BigInt(actor.player.gold())<BigInt(buildable.cost??actor.cost(deps.warshipType))+reserve()){
           report('reserve-changed',{tile});return false;
         }
+        if(replacing&&hooks.replacement?.()?.key!==replacement.key){report('replacement-changed',{tile});return false;}
         const result = hooks.execute(site.decisionId, () => actor._deployWarshipReady(tile, buildable));
+        if(result&&replacing)hooks.deployed?.(replacement);
         if ((strategic||hooks.hotspotMode) && result) pending.set(actor, {tick:actor.game.ticks(),count:ships.length});
         report(result ? 'build-attempted' : 'not-built', { tile });
         return result;
@@ -7657,11 +7704,14 @@ function createBrainRuntime(deps) {
     if(tradeAreasEnabled(actor)){
       const last=context.smart.cooldown.get(context.ship.id()),tick=actor.game.ticks();
       const ready=last===undefined||tick<last||tick-last>=60;
+      const posted=deps.warshipTradeHotspots.posted?.(actor,context.ship);
+      if(posted)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
       context={...context,hotspotMode:true,hotspotCandidates:ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[]};
       hooks.assigned=area=>{
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
+        if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
-          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown});
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt});
       };
       hooks.move=(ship,tile)=>{
         const ctor=deps.warshipMoveCtor?.();
@@ -7754,11 +7804,15 @@ function createBrainRuntime(deps) {
         const defense=defenseEconomyFacts(actor),structure=owners.get(actor)?.bot.structureBehavior;
         return defense?defense.reserve+(defense.requiredType?BigInt(structure.cost(defense.requiredType)):0n):0n;
       };
-      hooks.tradeSite=(ports,parentDecisionId)=>{
-        const entries=deps.warshipTradeHotspots.deployment(actor,ports);
-        if(!entries.length)return null;
+      hooks.hasTradePost=ports=>deps.warshipTradeHotspots.deployment(actor,ports).length>0;
+      hooks.replacement=()=>deps.warshipTradeHotspots.replacement?.(actor);
+      hooks.waitingReplacement=()=>deps.warshipTradeHotspots.waitingReplacement?.(actor);
+      hooks.deployed=area=>deps.warshipTradeHotspots.replacementSubmitted(actor,area);
+      hooks.tradeSite=(ports,parentDecisionId,post=null)=>{
+        const entries=deps.warshipTradeHotspots.deployment(actor,ports,post);
+        if(!entries.length)return post?{tile:null}:null;
         const candidates=entries.map((entry,priority)=>({...entry,id:'trade-port:'+priority,kind:'warship-placement',priority,eligible:true}));
-        const choice=hooks.choose('warship-placement',[...candidates,{id:'$wait',kind:'wait',reason:'Hold trade-area deployment'}],{purpose:'trade-area'},parentDecisionId);
+        const choice=hooks.choose('warship-placement',[...candidates,{id:'$wait',kind:'wait',reason:'Hold trade-area deployment'}],{purpose:post?'replace-piracy-post':'trade-area',postTile:post?.tile,postKey:post?.key},parentDecisionId);
         return {tile:candidates.find(c=>c.id===choice.selectedId)?.tile??null,decisionId:choice.decisionId};
       };
     }
@@ -7800,7 +7854,9 @@ function createBrainRuntime(deps) {
     return deps.warshipDetailsPlanner.spawn(actor, center, radius, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
   }
   function selectMovingWarship(actor, tile, context) {
-    return deps.warshipDetailsPlanner.move(actor, tile, context, warshipCombatHooks(actor, deps.warshipDetailsPlanner));
+    const hooks=warshipCombatHooks(actor,deps.warshipDetailsPlanner);
+    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship);
+    return deps.warshipDetailsPlanner.move(actor,tile,context,hooks);
   }
   function planWarshipInfestation(actor, teamGame) {
     return deps.warshipDeploymentPlanner.counter(actor, teamGame, warshipCombatHooks(actor, deps.warshipDeploymentPlanner));
@@ -8565,7 +8621,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.65'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.66'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -8614,7 +8670,7 @@ const ofhBrainRuntime = createBrainRuntime({
   warshipPatrolPlanner: createWarshipPatrolPlanner(),
   warshipThreatPlanner: createWarshipThreatPlanner({transportType:UNIT.TransportShip,tradeType:UNIT.TradeShip,warshipType:UNIT.Warship,settings:()=>state.settings}),
   warshipDetailsPlanner: createWarshipDetailsPlanner({warshipType: UNIT.Warship, settings: () => state.settings}),
-  warshipTradeHotspots:createWarshipTradeHotspots({units:UNIT}),
+  warshipTradeHotspots:createWarshipTradeHotspots({units:UNIT,now:()=>performance.now()}),
   warshipMoveCtor:()=>discoverCtors(getEventBus()).moveWarship,
   warshipCombatPlanner: createWarshipCombatPlanner({ warshipType: UNIT.Warship, difficulty: currentDifficulty }),
   warshipSafetyPlanner: createWarshipSafetyPlanner({portType: UNIT.Port, settings: () => state.settings}),

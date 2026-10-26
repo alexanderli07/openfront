@@ -3,21 +3,21 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),file='../src/brain/warship-trade-hotspots';
 const create=fs.existsSync(require('node:path').join(__dirname,file+'.js'))?require(file):null;
 function fixture(){
- let tick=100,traffic=[],enemies=[],nukes=[],ports=[];
+ let clock=10000,tick=100,traffic=[],enemies=[],nukes=[],ports=[];
  const self={id:()=>1,isFriendly:p=>p.id()===1||p.id()===2,units:()=>fleet};
  const hostile={id:()=>3},friend={id:()=>2};
  const ship=(id,tile)=>({id:()=>id,tile:()=>tile,isActive:()=>true,isUnderConstruction:()=>false});
  const fleet=[ship(1,0),ship(2,0)];
- const game={ticks:()=>tick,x:t=>t,y:()=>0,isWater:t=>t!==200,getWaterComponent:t=>t>=1000?2:1,
+ const game={ticks:()=>tick,x:t=>typeof t==='object'?t.x:t,y:t=>typeof t==='object'?t.y:0,ref:(x,y)=>({x,y}),isValidCoord:()=>true,isWater:()=>true,getWaterComponent:t=>t>=1000?2:1,
   manhattanDist:(a,b)=>Math.abs(a-b),neighbors:t=>[t-1,t+1],
   units:(...types)=>types.includes('TradeShip')?traffic:types.includes('Warship')?enemies:types.includes('Port')?ports:nukes};
  const actor={game,player:self,nukeOuterRadius:()=>50};
  const trade=(id,tile,opts={})=>({id:()=>id,tile:()=>tile,isActive:()=>true,
   owner:()=>opts.friendly?friend:hostile,isSafeFromPirates:()=>!!opts.safe,
   targetUnit:()=>({owner:()=>opts.ownDestination?self:hostile})});
- const observer=create?.({units:{Port:'Port',TradeShip:'TradeShip',Warship:'Warship',AtomBomb:'Atom',HydrogenBomb:'Hydro',MIRVWarhead:'Mirv'}});
+ const observer=create?.({now:()=>clock,units:{Port:'Port',TradeShip:'TradeShip',Warship:'Warship',AtomBomb:'Atom',HydrogenBomb:'Hydro',MIRVWarhead:'Mirv'}});
  return {observer,actor,fleet,trade,ship,setTraffic:v=>traffic=v,setEnemies:v=>enemies=v,setNukes:v=>nukes=v,
-  setPorts:v=>ports=v,next:(n=20)=>tick+=n,rank:(s=fleet[0])=>observer.rank(actor,s)};
+  setPorts:v=>ports=v,advanceMs:n=>clock+=n,next:(n=20)=>{tick+=n;clock+=n*100;},rank:(s=fleet[0])=>observer.rank(actor,s)};
 }
 test('hotspot observer exists',()=>assert.equal(typeof create,'function'));
 test('dense traffic outranks a nearby lone ship and never picks a land centroid',()=>{
@@ -71,14 +71,56 @@ test('current browser UnitView destination IDs work without engine-only piracy g
  f.setTraffic([currentView(1,70),currentView(2,71)]);
  const area=f.rank()[0];assert.equal(area.density,1);assert.equal(area.protectionUnknown,1);
 });
-test('a better area must wait out the minimum assignment period before switching',()=>{
+test('a viable post stays assigned even when another area scores much higher',()=>{
  const f=fixture(),original=[f.trade(1,180),f.trade(2,185)];f.setTraffic(original);
  const chosen=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],chosen);
  f.setTraffic([...original,...Array.from({length:8},(_,i)=>f.trade(10+i,450+i))]);
  f.next();assert.equal(f.rank()[0].tile,chosen.tile);
- f.next(300);assert.ok(f.rank()[0].tile>=450);
+ f.next(300);assert.equal(f.rank()[0].tile,chosen.tile);
 });
 test('a ship inside an incoming blast zone cannot receive a trade-area command',()=>{
  const f=fixture();f.setTraffic([f.trade(1,180)]);
  f.setNukes([{isActive:()=>true,targetTile:()=>0}]);assert.deepEqual(f.rank(),[]);
+});
+
+test('narrow rivers do not contribute traffic or qualify as piracy posts',()=>{
+ const f=fixture();f.actor.game.isWater=t=>f.actor.game.x(t)>=300||Math.abs(f.actor.game.y(t))<=2;
+ f.setTraffic([...Array.from({length:10},(_,i)=>f.trade(i,180+i)),f.trade(20,450),f.trade(21,460)]);
+ const area=f.rank()[0];assert.ok(area.tile>=450);assert.equal(area.density,2);assert.equal(area.clearance,12);
+});
+test('post viability uses30seconds of wall time even if game ticks race ahead',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,180)]);const area=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],area);
+ f.setTraffic([]);f.next(1);assert.equal(f.rank()[0].tile,area.tile);
+ f.advanceMs(30000);assert.deepEqual(f.rank(),[]);
+});
+test('destroyed ships leave a replaceable post that survives waiting for money',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,180)]);const area=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],area);
+ f.fleet.splice(0);assert.equal(f.observer.replacement(f.actor).tile,area.tile);
+ f.next(400);assert.equal(f.observer.replacement(f.actor).tile,area.tile);
+});
+test('replacement submission waits for confirmation and binds the new ship to the same post',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,180)]);const area=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],area);
+ f.fleet.splice(0);const replacement=f.observer.replacement(f.actor);f.observer.replacementSubmitted(f.actor,replacement);
+ assert.equal(f.observer.replacement(f.actor),null);
+ const fresh=f.ship(9,10);f.fleet.push(fresh);assert.equal(f.rank(fresh)[0].tile,area.tile);
+ assert.equal(f.observer.replacement(f.actor),null);
+});
+test('an unassigned ship can fill a vacant post without buying another',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,180)]);const area=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],area);
+ f.fleet.splice(0,1);assert.equal(f.observer.replacement(f.actor),null);
+ assert.equal(f.rank(f.fleet[0])[0].tile,area.tile);
+});
+test('distance cannot deadlock replacement or reuse of an existing viable post',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,600)]);
+ const near=f.ship(8,590);f.fleet.push(near);const area=f.rank(near)[0];f.observer.assign(f.actor,near,area);
+ f.fleet.splice(0);const post=f.observer.replacement(f.actor);
+ const sites=f.observer.deployment(f.actor,[f.ship(7,0)],post);assert.ok(sites.length);
+ const idle=f.ship(9,0);f.fleet.push(idle);assert.equal(f.observer.replacement(f.actor),null);
+ assert.equal(f.rank(idle)[0].tile,area.tile);
+});
+test('unconfirmed replacement expires and can retry without forgetting the post',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,180)]);const area=f.rank()[0];f.observer.assign(f.actor,f.fleet[0],area);
+ f.fleet.splice(0);f.observer.replacementSubmitted(f.actor,f.observer.replacement(f.actor));
+ f.advanceMs(11000);assert.equal(f.observer.replacement(f.actor),null);
+ f.advanceMs(20000);assert.equal(f.observer.replacement(f.actor).tile,area.tile);
 });

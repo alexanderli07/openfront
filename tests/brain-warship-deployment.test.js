@@ -28,6 +28,32 @@ function enemy(id, count, team = null) {
   return { id: () => id, team: () => team, units: () => Array.from({ length: count }, (_, i) => ({ id: () => `${id}-${i}`, tile: () => i })) };
 }
 test('deployment planner exists', () => assert.equal(typeof create, 'function'));
+test('a lost piracy post is replaced even while another warship exists',async()=>{
+ const f=fixture({gold:1000}),units=f.actor.player.units;
+ f.actor.player.units=type=>type==='Warship'?[{id:()=>9}]:units(type);f.actor.game.ticks=()=>100;
+ const post={key:'piracy',tile:180};f.hooks.hotspotMode=true;f.hooks.reserve=()=>500n;f.hooks.replacement=()=>post;
+ f.hooks.tradeSite=(ports,parent,target)=>{assert.equal(target,post);return {tile:70,decisionId:8};};
+ const replaced=[];f.hooks.deployed=target=>replaced.push(target);
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),true);assert.deepEqual(replaced,[post]);
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);
+});
+test('replacement waits for cash and never exceeds the existing ten-ship ceiling',async()=>{
+ for(const [gold,count] of [[550,1],[10000,10]]){
+  const f=fixture({gold}),units=f.actor.player.units;
+  f.actor.player.units=type=>type==='Warship'?Array.from({length:count},(_,id)=>({id:()=>id})):units(type);
+  f.hooks.hotspotMode=true;f.hooks.reserve=()=>500n;f.hooks.replacement=()=>({key:'post',tile:180});
+  assert.equal(await f.planner.deploy(f.actor,f.hooks),false);assert.deepEqual(f.calls,[]);
+ }
+});
+test('a pending or cooling-down replacement cannot fall through to a new first-ship purchase',async()=>{
+ const f=fixture({gold:1000});f.hooks.hotspotMode=true;f.hooks.waitingReplacement=()=>true;
+ f.hooks.replacement=()=>null;
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);assert.deepEqual(f.calls,[]);
+});
+test('piracy deployment waits for a viable post instead of random river parking',async()=>{
+ const f=fixture({gold:1000});f.hooks.hotspotMode=true;f.hooks.hasTradePost=()=>false;
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);assert.deepEqual(f.calls,[]);
+});
 test('hotspot deployment chooses connected productive port water rather than random sampling',async()=>{
  const f=fixture({gold:1000});f.actor.game.ticks=()=>100;f.hooks.hotspotMode=true;
  f.hooks.reserve=()=>500n;f.hooks.tradeSite=()=>({tile:70,decisionId:8});
