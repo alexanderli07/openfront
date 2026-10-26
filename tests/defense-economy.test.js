@@ -84,18 +84,35 @@ test('disabled nuclear defense does not impose arbitrary savings', () => {
   const f = fixture(); f.opening.samEnabled = false; assert.equal(f.observe(), null);
   f.opening.samEnabled = true; f.disabled.add(units.SAMLauncher); assert.equal(f.observe(), null);
 });
-test('activated reserve survives economic losses and a new frontline', () => {
-  const f = fixture(); f.set(units.Port, 4); f.set(units.City, 3); f.set(units.SAMLauncher, 1);
-  assert.equal(f.observe().reserve, 3000000n);
-  f.set(units.Port, 1); assert.equal(f.observe().reserve, 3000000n);
-  f.opening.frontline = true;
-  assert.equal(f.observe().reserve, 3000000n); assert.equal(f.observe().requiredType, null);
+test('economic destruction restarts missing development without requiring the old3M reserve',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);
+ assert.equal(f.observe().reserve,3000000n);
+ f.set(units.Port,1);let facts=f.observe();assert.equal(facts.recovering,true);
+ assert.equal(facts.stage,'initial-economy');assert.equal(facts.reserve,0n);assert.equal(facts.requiredType,units.Port);
+ f.opening.frontline=true;assert.equal(f.observe().requiredType,units.Port);
+ f.set(units.Port,2);facts=f.observe();assert.equal(facts.stage,'development');assert.equal(facts.reserve,0n);
+ f.set(units.Port,4);facts=f.observe();assert.equal(facts.stage,'reserve');assert.equal(facts.recovering,false);assert.equal(facts.reserve,3000000n);
+});
+test('complete nuclear wipe repeats the physical opening and restores the reserve only after recovery',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);f.observe();
+ f.set(units.Port,0);f.set(units.City,0);f.set(units.SAMLauncher,0);
+ assert.equal(f.observe().requiredType,units.Port);assert.equal(f.observe().reserve,0n);
+ f.set(units.Port,1);assert.equal(f.observe().requiredType,units.City);
+ f.set(units.City,1);assert.equal(f.observe().requiredType,units.Port);
+ f.set(units.Port,2);assert.equal(f.observe().requiredType,units.SAMLauncher);
+ f.set(units.SAMLauncher,1,true);assert.equal(f.observe().waitingForSam,true);assert.equal(f.observe().requiredType,null);
+ f.set(units.SAMLauncher,1);assert.equal(f.observe().stage,'development');assert.equal(f.observe().reserve,0n);
+ f.set(units.Port,4);f.set(units.City,3);assert.equal(f.observe().reserve,3000000n);
+});
+test('a frontline without physical economic loss retains its emergency reserve',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);f.observe();
+ f.opening.frontline=true;assert.equal(f.observe().reserve,3000000n);assert.equal(f.observe().recovering,false);
 });
 test('SAM replacement can use reserve and restores its latch after completion', () => {
   const f = fixture(); f.set(units.Port, 4); f.set(units.City, 3); f.set(units.SAMLauncher, 1); f.observe();
   f.set(units.SAMLauncher, 0); assert.equal(f.observe().stage, 'first-sam'); assert.equal(f.observe().reserve, 3000000n);
   f.opening.frontline = true; assert.equal(f.observe().requiredType, units.SAMLauncher);
-  f.set(units.Port, 1); f.set(units.SAMLauncher, 1);
+  f.set(units.SAMLauncher, 1);
   assert.equal(f.observe().reserve, 3000000n);
 });
 test('reserve state resets for a different game identity', () => {
@@ -118,4 +135,19 @@ test('missing, negative, fractional and imprecise quote values fail closed', () 
   assert.equal(create.affordable({ gold: 4000000, cost: 1000000, reserve: 3000000 }), true);
   assert.equal(create.affordable({ gold: -1n, cost: 0n, reserve: 0n }), false);
   assert.equal(create.affordable({ gold: 4000000n, cost: 1n, reserve: -1n }), false);
+});
+
+test('factory economy losses recover cities and factories before rebuilding the reserve',()=>{
+ const f=fixture();Object.assign(f.opening,{portTarget:0,cityTarget:2,factoryTarget:1});
+ f.set(units.City,4);f.set(units.Factory,3);f.set(units.SAMLauncher,1);f.observe();
+ f.set(units.City,0);f.set(units.Factory,0);
+ assert.equal(f.observe().requiredType,units.City);assert.equal(f.observe().reserve,0n);
+ f.set(units.City,2);assert.equal(f.observe().requiredType,units.Factory);
+ f.set(units.Factory,1);assert.equal(f.observe().stage,'development');assert.equal(f.observe().counts.sams,1);
+});
+test('uncertain port-water topology alone cannot reset the reserve',()=>{
+ let allowed=true;const f=fixture({portWaterAccess:{assess:()=>({allowed})}});
+ f.owned.Port=Array.from({length:4},()=>({isActive:()=>true,tile:()=>99}));
+ f.set(units.City,3);f.set(units.SAMLauncher,1);f.observe();allowed=false;
+ assert.equal(f.observe().reserve,3000000n);assert.equal(f.observe().recovering,false);
 });

@@ -10,7 +10,7 @@ test('adaptive strategy delegates unchanged scenarios and makes only expected ga
   const legacy = createLegacyStrategy();
   const adaptive = createAdaptiveStrategy(legacy);
   assert.deepEqual({ id: adaptive.id, name: adaptive.name, version: adaptive.version }, {
-    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.15.0-coastal-defense'
+    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.16.0-economic-recovery'
   });
   for (const scenario of scenarios) {
     const original = legacy.decide(scenario.snapshot, scenario.candidates);
@@ -113,4 +113,12 @@ test('SAMs prefer proximity to their primary economy anchors over total structur
  samAnchorKind:kind,samAnchorDistance:5,samAnchorProtection:0}];
  assert.equal(policy.decide({domain:'structure-placement'},cs).selectedId,'near');
  }
+});
+
+test('economic recovery selects normal staged rebuilding even after a strike exposes a frontline',()=>{
+ const adaptive=createAdaptiveStrategy(createLegacyStrategy());
+ const choice=adaptive.decide({domain:'structure-phase',defenseEconomy:{recovering:true,frontline:true,stage:'initial-economy'}},[
+  {id:'building:emergency',kind:'structure-phase',eligible:true,priority:0},
+  {id:'building:normal',kind:'structure-phase',eligible:true,priority:1},{id:'$wait',kind:'wait'}]);
+ assert.equal(choice.selectedId,'building:normal');
 });

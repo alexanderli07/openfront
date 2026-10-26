@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.69
+// @version      1.84.70
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.69","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.70","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -1801,9 +1801,10 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     const safe = opening.borderKnown === true && !opening.frontline;
     // A newly detected frontline keeps the ordinary policy. Once activated,
     // however, the reserve cannot disappear merely because geography changes.
-    if (!safe && !state.reserveActivated) return null;
-    const active = type => (player.units(type) || []).filter(unit => (!unit.isActive || unit.isActive())&&
-      (type!==U.Port||!portWaterAccess||portWaterAccess.assess(game,unit.tile()).allowed));
+    if (!safe && !state.reserveActivated && !state.recovering) return null;
+    const physical=type=>(player.units(type)||[]).filter(unit=>!unit.isActive||unit.isActive());
+    const active = type => physical(type).filter(unit=>
+      type!==U.Port||!portWaterAccess||portWaterAccess.assess(game,unit.tile()).allowed);
     const samUnits = active(U.SAMLauncher);
     const counts = { ports: active(U.Port).length, cities: active(U.City).length,
       factories: active(U.Factory).length, sams: samUnits.length };
@@ -1814,6 +1815,12 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     const developed = { ports: coastal ? 4 : 0, cities: enabled(U.City) ? (coastal ? 3 : 4) : 0,
       factories: !coastal && enabled(U.Factory) ? 3 : 0, sams: 1 };
     const meetsEconomy = targets => ['ports', 'cities', 'factories'].every(key => counts[key] >= targets[key]);
+    const physicalCounts={ports:physical(U.Port).length,cities:physical(U.City).length,factories:physical(U.Factory).length};
+    const lostEconomy=state.lastPhysical&&Object.keys(physicalCounts).some(key=>physicalCounts[key]<state.lastPhysical[key]);
+    if(state.reserveActivated&&lostEconomy&&!meetsEconomy(developed)){
+      state.reserveActivated=false;state.recovering=true;
+    }
+    state.lastPhysical=physicalCounts;
     const nextType = targets => {
       const sequence = coastal ? [
         ['ports', U.Port], ['cities', U.City], ['ports', U.Port],
@@ -1841,11 +1848,11 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     } else if (!meetsEconomy(developed)) {
       stage = 'development'; targetCounts = developed; requiredType = nextType(developed);
     } else {
-      state.reserveActivated = true;
+      state.reserveActivated = true;state.recovering=false;
       stage = 'reserve'; targetCounts = developed;
     }
-    return { stage, reserve: state.reserveActivated ? 3000000n : 0n,
-      requiredType: safe || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
+    return { stage,recovering:!!state.recovering, reserve: state.reserveActivated ? 3000000n : 0n,
+      requiredType: safe || state.recovering || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
       waitingForSam: stage === 'first-sam' && counts.sams > 0,
       samUpgradeReactiveOnly: true, frontline: !!opening.frontline };
   }
@@ -2557,7 +2564,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.15.0-coastal-defense',
+    version: '1.16.0-economic-recovery',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -2607,14 +2614,14 @@ function createAdaptiveStrategy(legacyStrategy) {
           const plan=eligible('structure:defense-economy');
           return select(plan?.affordable?plan:wait(),candidates,defense.waitingForSam?
             'First SAM is under construction; do not order another':plan?.affordable?
-            'Complete the physical economy stage before saving the emergency reserve':'Save for the required economy or first SAM');
+            (defense.recovering?'Rebuild missing infrastructure before restoring the emergency reserve':'Complete the physical economy stage before saving the emergency reserve'):'Save for the required economy or first SAM');
         }
         const chosen=candidates.filter(c=>c.kind==='structure-plan'&&c.eligible&&c.affordable!==false&&
           c.unitType!=='SAM Launcher'&&c.stage!=='team-opening').sort((a,b)=>a.priority-b.priority)[0];
         return select(chosen||wait(),candidates,chosen?'Spend only the surplus above the SAM defense reserve':
           'Preserve the emergency SAM upgrade reserve');
       }
-      if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam')&&defense.stage!=='reserve')
+      if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam'||defense.recovering)&&defense.stage!=='reserve')
         return select(eligible('building:normal')||wait(),candidates,'Prioritize the staged economy and first SAM');
       if(snapshot.domain==='reactive-sam-upgrade'){
         const chosen=candidates.filter(c=>c.kind==='reactive-sam-upgrade'&&c.eligible&&(c.canDefend||c.mode==='planned'))
@@ -3466,7 +3473,7 @@ function createBuildingPlanner(deps) {
           return actor.tryBuildDefensePost();
         }
         if (selected.phase === 'normal') {
-          normalGated = actor.isOnStructureCooldown() || actor.isInPostSaveUpBlockedPhase();
+          normalGated = actor.isOnStructureCooldown() || !hooks.recovering?.()&&actor.isInPostSaveUpBlockedPhase();
           if (normalGated) return false;
           normalResult = await actor.doHandleStructures();
           if (!hooks.allowed()) return false;
@@ -5808,7 +5815,7 @@ function createWarshipPatrolPlanner() {
 'use strict';
 
 function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffic=3}) {
-  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=160;
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=480;
   const raw=unit=>unit?.__src||unit;
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
@@ -5910,10 +5917,10 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
       const distance=game.manhattanDist(tile,coast.tile);
       if(coast.team&&distance<teamDistance){teamDistance=distance;teamTile=coast.tile;}else if(!coast.team)enemyDistance=Math.min(enemyDistance,distance);
     }
-    // Ports give exact support anchors. Bound land probes to112points per queried tile.
+    // Ports give exact support anchors. Bound land probes to176points per queried tile.
     if(game.isLand&&game.hasOwner&&game.ownerID&&s.teamIds.size){
       const x=game.x(tile),y=game.y(tile);
-      for(const radius of [16,32,48,64,96,128,160])for(let i=0;i<16;i++){
+      for(const radius of [16,32,48,64,96,128,160,240,320,400,480])for(let i=0;i<16;i++){
         const px=Math.round(x+Math.cos(i*Math.PI/8)*radius),py=Math.round(y+Math.sin(i*Math.PI/8)*radius);
         if(!game.isValidCoord(px,py))continue;const point=game.ref(px,py);
         if(!game.isLand(point)||!game.hasOwner(point))continue;
@@ -8161,6 +8168,7 @@ function createBrainRuntime(deps) {
     if (!existing) buildingScopes.set(actor, scope);
     const hooks = {
       forceNew: openingStructurePlans.get(actor)?.forceNew === true,
+      recovering:()=>defenseEconomyFacts(actor)?.recovering===true,
       allowed: () => buildingAllowed(actor),
       choose: (domain, candidates, facts) => {
         const choice = controller.engine.decide({
@@ -8742,7 +8750,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.69'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.70'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

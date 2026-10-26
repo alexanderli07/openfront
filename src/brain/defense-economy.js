@@ -27,9 +27,10 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     const safe = opening.borderKnown === true && !opening.frontline;
     // A newly detected frontline keeps the ordinary policy. Once activated,
     // however, the reserve cannot disappear merely because geography changes.
-    if (!safe && !state.reserveActivated) return null;
-    const active = type => (player.units(type) || []).filter(unit => (!unit.isActive || unit.isActive())&&
-      (type!==U.Port||!portWaterAccess||portWaterAccess.assess(game,unit.tile()).allowed));
+    if (!safe && !state.reserveActivated && !state.recovering) return null;
+    const physical=type=>(player.units(type)||[]).filter(unit=>!unit.isActive||unit.isActive());
+    const active = type => physical(type).filter(unit=>
+      type!==U.Port||!portWaterAccess||portWaterAccess.assess(game,unit.tile()).allowed);
     const samUnits = active(U.SAMLauncher);
     const counts = { ports: active(U.Port).length, cities: active(U.City).length,
       factories: active(U.Factory).length, sams: samUnits.length };
@@ -40,6 +41,12 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     const developed = { ports: coastal ? 4 : 0, cities: enabled(U.City) ? (coastal ? 3 : 4) : 0,
       factories: !coastal && enabled(U.Factory) ? 3 : 0, sams: 1 };
     const meetsEconomy = targets => ['ports', 'cities', 'factories'].every(key => counts[key] >= targets[key]);
+    const physicalCounts={ports:physical(U.Port).length,cities:physical(U.City).length,factories:physical(U.Factory).length};
+    const lostEconomy=state.lastPhysical&&Object.keys(physicalCounts).some(key=>physicalCounts[key]<state.lastPhysical[key]);
+    if(state.reserveActivated&&lostEconomy&&!meetsEconomy(developed)){
+      state.reserveActivated=false;state.recovering=true;
+    }
+    state.lastPhysical=physicalCounts;
     const nextType = targets => {
       const sequence = coastal ? [
         ['ports', U.Port], ['cities', U.City], ['ports', U.Port],
@@ -67,11 +74,11 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     } else if (!meetsEconomy(developed)) {
       stage = 'development'; targetCounts = developed; requiredType = nextType(developed);
     } else {
-      state.reserveActivated = true;
+      state.reserveActivated = true;state.recovering=false;
       stage = 'reserve'; targetCounts = developed;
     }
-    return { stage, reserve: state.reserveActivated ? 3000000n : 0n,
-      requiredType: safe || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
+    return { stage,recovering:!!state.recovering, reserve: state.reserveActivated ? 3000000n : 0n,
+      requiredType: safe || state.recovering || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
       waitingForSam: stage === 'first-sam' && counts.sams > 0,
       samUpgradeReactiveOnly: true, frontline: !!opening.frontline };
   }

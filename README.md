@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.69) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.70) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.69)
+## Install and update (1.84.70)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,14 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## 480-tile support and economic recovery (1.84.70)
+
+Piracy team support now reaches480Manhattan tiles from an active team port or observed team-owned land. The bounded land probes extend through480 (176sample points per query). No separate trip cap was added. Enemy-coast exclusion, traffic requirements, coastal defense and30second posts remain unchanged.
+
+When a developed staged economy physically loses ports/cities/factories and falls below its development goals, it now enters recovery instead of keeping the3M reserve locked indefinitely. Missing opening economy is rebuilt first, then a SAM if missing, then remaining development targets; afterward the3M reserve returns. Surviving buildings and SAMs count, so recovery does not order an entire duplicate opening. Coastal targets remain2ports/1city before SAM, then4ports/3cities; factory starts keep their corresponding city/factory goals. This uses the existing safe two-team economy model.
+
+Recovery persists if the strike exposes a frontline. It bypasses the legacy periodic post-save-up pause while keeping build cooldown, native quotes, placement checks, disabled-building goals and pending-spend protection. SAM-only loss retains its existing reserve-funded replacement path; geography changes or temporarily unverified port water do not reset the reserve without physical economic losses. Useful incoming-nuke SAM reactions remain available. Trace economy facts include the recovery flag and the chosen missing structure. Full-match testing is still needed.
 
 ## Coastal defense when piracy is unavailable (1.84.69)
 

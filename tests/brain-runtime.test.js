@@ -21,7 +21,7 @@ function fixture(options = {}) {
   const bot = { mg: game, player, status: 'Thinking' };
   const runtime = createRuntime && createRuntime({ createEngine, createLegacyStrategy,
     createCommandGuard:options.createCommandGuard,isDonationIntent:options.isDonationIntent,
-    createSpendingLedger:options.createSpendingLedger,defenseEconomy:options.defenseEconomy,units:options.units,
+    createSpendingLedger:options.createSpendingLedger,defenseEconomy:options.defenseEconomy,units:options.units,twoTeamOpening:options.twoTeamOpening,
     createSupportPosture:options.createSupportPosture,
     portWaterAccess:options.portWaterAccess,
     startHistory:options.startHistory,
@@ -910,4 +910,24 @@ test('broken telemetry getters preserve original rule execution and return', () 
   assert.equal(behavior.shouldBuildStructure(hostile), hostile);
   assert.equal(called, true);
   assert.equal(f.runtime.intent(f.bot, 'test', function Event() {}, hostile), true);
+});
+
+test('after economic destruction the final gateway can rebuild below3M while protecting pending commitments',()=>{
+ const units={Port:'Port',City:'City',Factory:'Factory',SAMLauncher:'SAM'};
+ const opening={borderKnown:true,frontline:false,samEnabled:true,portTarget:2,cityTarget:1};
+ const model=require('../src/brain/defense-economy')({units});
+ const f=fixture({strategies:[createAdaptiveStrategy(createLegacyStrategy())],defaultStrategy:'adaptive-v1',
+  createSpendingLedger:require('../src/brain/spending-ledger'),defenseEconomy:model,units,
+  twoTeamOpening:{observe:()=>opening}});
+ const config=f.game.config();config.isUnitDisabled=()=>false;f.game.config=()=>config;
+ let counts={Port:4,City:3,Factory:0,SAM:1};
+ f.player.units=(...types)=>(types.length?types:Object.keys(counts)).flatMap(type=>Array.from({length:counts[type]||0},()=>({
+  type:()=>type,level:()=>1,isActive:()=>true,isUnderConstruction:()=>false})));
+ f.bot.structureBehavior={cost:()=>500000n};assert.equal(f.runtime.defenseEconomyFacts(f.bot).reserve,3000000n);
+ counts={Port:0,City:0,Factory:0,SAM:0};f.player.gold=()=>1000000n;
+ assert.equal(f.runtime.defenseEconomyFacts(f.bot).recovering,true);
+ let builds=0;const menu={sendBuildOrUpgrade:()=>{builds++;}};
+ f.runtime.build(f.bot,'recovery',menu,{type:'Port',canBuild:10,canUpgrade:false,cost:500000n});
+ f.runtime.build(f.bot,'optional',menu,{type:'City',canBuild:20,canUpgrade:false,cost:500000n});
+ assert.equal(builds,1);
 });

@@ -47,7 +47,7 @@ function createBuildingPlanner(deps) {
           return actor.tryBuildDefensePost();
         }
         if (selected.phase === 'normal') {
-          normalGated = actor.isOnStructureCooldown() || actor.isInPostSaveUpBlockedPhase();
+          normalGated = actor.isOnStructureCooldown() || !hooks.recovering?.()&&actor.isInPostSaveUpBlockedPhase();
           if (normalGated) return false;
           normalResult = await actor.doHandleStructures();
           if (!hooks.allowed()) return false;

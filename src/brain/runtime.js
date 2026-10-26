@@ -1075,6 +1075,7 @@ function createBrainRuntime(deps) {
     if (!existing) buildingScopes.set(actor, scope);
     const hooks = {
       forceNew: openingStructurePlans.get(actor)?.forceNew === true,
+      recovering:()=>defenseEconomyFacts(actor)?.recovering===true,
       allowed: () => buildingAllowed(actor),
       choose: (domain, candidates, facts) => {
         const choice = controller.engine.decide({

@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.15.0-coastal-defense',
+    version: '1.16.0-economic-recovery',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -116,14 +116,14 @@ function createAdaptiveStrategy(legacyStrategy) {
           const plan=eligible('structure:defense-economy');
           return select(plan?.affordable?plan:wait(),candidates,defense.waitingForSam?
             'First SAM is under construction; do not order another':plan?.affordable?
-            'Complete the physical economy stage before saving the emergency reserve':'Save for the required economy or first SAM');
+            (defense.recovering?'Rebuild missing infrastructure before restoring the emergency reserve':'Complete the physical economy stage before saving the emergency reserve'):'Save for the required economy or first SAM');
         }
         const chosen=candidates.filter(c=>c.kind==='structure-plan'&&c.eligible&&c.affordable!==false&&
           c.unitType!=='SAM Launcher'&&c.stage!=='team-opening').sort((a,b)=>a.priority-b.priority)[0];
         return select(chosen||wait(),candidates,chosen?'Spend only the surplus above the SAM defense reserve':
           'Preserve the emergency SAM upgrade reserve');
       }
-      if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam')&&defense.stage!=='reserve')
+      if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam'||defense.recovering)&&defense.stage!=='reserve')
         return select(eligible('building:normal')||wait(),candidates,'Prioritize the staged economy and first SAM');
       if(snapshot.domain==='reactive-sam-upgrade'){
         const chosen=candidates.filter(c=>c.kind==='reactive-sam-upgrade'&&c.eligible&&(c.canDefend||c.mode==='planned'))

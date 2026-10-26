@@ -145,11 +145,11 @@ test('captured support invalidates a retained post before its30second traffic re
  f.setHomePorts([{...f.ship(70,90),owner:()=>owner}]);f.setTraffic([f.trade(1,140)]);
  f.observer.assign(f.actor,f.fleet[0],f.rank()[0]);owner={id:()=>3};f.next(1);assert.deepEqual(f.rank(),[]);
 });
-test('a supported post cannot be assigned or replaced from a faraway ship or port',()=>{
- const f=fixture(),friend={id:()=>2};f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
- f.setPorts([{...f.ship(71,600),owner:()=>friend}]);f.setTraffic([f.trade(1,620)]);
+test('a supported post beyond an unsupported corridor cannot be assigned or replaced',()=>{
+ const f=fixture(),friend={id:()=>2};f.actor.game.getWaterComponent=()=>1;f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ f.setPorts([{...f.ship(71,1400),owner:()=>friend}]);f.setTraffic([f.trade(1,1420)]);
  assert.deepEqual(f.rank(),[]);
- const post={key:'old',tile:620,component:1,density:10,reviewedAt:10000};
+ const post={key:'old',tile:1420,component:1,density:10,reviewedAt:10000};
  assert.deepEqual(f.observer.deployment(f.actor,[f.ship(70,0)],post),[]);
 });
 test('unsupported warships receive a coastal defense point instead of port-side parking',()=>{
@@ -158,10 +158,10 @@ test('unsupported warships receive a coastal defense point instead of port-side 
  assert.ok(area);assert.ok(f.actor.game.manhattanDist(area.tile,0)>=16);
 });
 test('a distant vacancy cannot hide useful nearby traffic',()=>{
- const f=fixture({minTraffic:3}),friend={id:()=>2};
- f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);f.setPorts([{...f.ship(71,600),owner:()=>friend}]);
- f.setTraffic([f.trade(1,100),f.trade(2,110),f.trade(3,120),f.trade(4,620),f.trade(5,625),f.trade(6,630)]);
- const remote=f.ship(9,610);f.fleet.push(remote);f.observer.assign(f.actor,remote,f.rank(remote)[0]);f.fleet.pop();
+ const f=fixture({minTraffic:3}),friend={id:()=>2};f.actor.game.getWaterComponent=()=>1;
+ f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);f.setPorts([{...f.ship(71,1400),owner:()=>friend}]);
+ f.setTraffic([f.trade(1,100),f.trade(2,110),f.trade(3,120),f.trade(4,1420),f.trade(5,1425),f.trade(6,1430)]);
+ const remote=f.ship(9,1410);f.fleet.push(remote);f.observer.assign(f.actor,remote,f.rank(remote)[0]);f.fleet.pop();
  assert.equal(f.rank()[0].tile,100);
 });
 test('nearby-looking posts behind land do not request a detour',()=>{
@@ -210,4 +210,20 @@ test('an intercepted defender does not return to a watchpoint across an unsafe d
  assert.ok(game.x(area.tile)<0);f.observer.coastalAssigned(f.actor,f.fleet[0],area);
  f.fleet[0]=f.ship(1,40);f.next(1);const next=f.observer.coastalDefense(f.actor,f.fleet[0]);
  assert.ok(game.x(next.tile)>0);assert.notEqual(next.retained,true);
+});
+
+test('production team support reaches480tiles from our port',()=>{
+ const f=fixture({useProductionThreshold:true});f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ f.setTraffic([f.trade(1,360),f.trade(2,370),f.trade(3,380)]);assert.ok(f.rank().length);
+});
+test('production team support beyond480tiles still rejects a remote post',()=>{
+ const f=fixture({useProductionThreshold:true});f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ f.setTraffic([f.trade(1,520),f.trade(2,530),f.trade(3,540)]);assert.deepEqual(f.rank(),[]);
+});
+
+test('team-land support probes reach beyond the old160tile radius',()=>{
+ const f=fixture({useProductionThreshold:true}),game=f.actor.game;f.setHomePorts([]);
+ game.isLand=t=>game.x(t)<=0;game.isWater=t=>!game.isLand(t);game.hasOwner=t=>game.isLand(t);game.ownerID=()=>1;
+ f.fleet[0]=f.ship(1,300);f.setTraffic([f.trade(1,360),f.trade(2,370),f.trade(3,380)]);
+ const area=f.rank()[0];assert.ok(area);assert.ok(area.teamDistance>160&&area.teamDistance<=480);
 });

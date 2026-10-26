@@ -106,3 +106,10 @@ test('a physical opening target forces new construction even in dense territory'
  assert.deepEqual(f.calls,['build']);
  assert.equal(f.decisions[0].facts.forceNew,true);
 });
+
+test('recovery bypasses the stale post-save-up pause but retains structure cooldown',async()=>{
+ const f=fixture({normalSuccess:true});f.actor.isInPostSaveUpBlockedPhase=()=>true;f.hooks.recovering=()=>true;
+ assert.equal(await f.planner.handle(f.actor,f.hooks),true);assert.deepEqual(f.calls,['normal']);
+ const g=fixture({normalSuccess:true,cooldown:true});g.actor.isInPostSaveUpBlockedPhase=()=>true;g.hooks.recovering=()=>true;
+ assert.equal(await g.planner.handle(g.actor,g.hooks),false);assert.deepEqual(g.calls,[]);
+});
