@@ -736,12 +736,14 @@ function createBrainRuntime(deps) {
       const ready=last===undefined||tick<last||tick-last>=60;
       const posted=deps.warshipTradeHotspots.posted?.(actor,context.ship);
       if(posted)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
-      context={...context,hotspotMode:true,hotspotCandidates:ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[]};
+      const hotspotCandidates=ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[];
+      context={...context,hotspotMode:true,hotspotCandidates,returnToTeam:ready&&context.hunt&&!hotspotCandidates.length?deps.warshipTradeHotspots.returnToTeam?.(actor,context.ship):null};
+      if(context.returnToTeam!=null)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
       hooks.assigned=area=>{
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
         if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
-          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt});
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,enemyDistance:area.enemyDistance,tripRange:area.tripRange});
       };
       hooks.move=(ship,tile)=>{
         const ctor=deps.warshipMoveCtor?.();
@@ -885,7 +887,7 @@ function createBrainRuntime(deps) {
   }
   function selectMovingWarship(actor, tile, context) {
     const hooks=warshipCombatHooks(actor,deps.warshipDetailsPlanner);
-    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship);
+    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship)&&deps.warshipTradeHotspots.returnToTeam?.(actor,ship)==null;
     return deps.warshipDetailsPlanner.move(actor,tile,context,hooks);
   }
   function planWarshipInfestation(actor, teamGame) {

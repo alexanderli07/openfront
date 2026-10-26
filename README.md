@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.66) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.67) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.66)
+## Install and update (1.84.67)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,16 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Piracy close to our team (1.84.67)
+
+The adaptive piracy policy now requires at least3eligible enemy trade ships and team support within160Manhattan tiles. Support comes from active owned/same-team ports on the same water or bounded ownership measurements of nearby team land. A nearby enemy coast rejects the post when it is within100tiles and our support is not at least24tiles closer. Both traffic samples and patrol anchors must satisfy locality.
+
+New posts, retained posts, vacant-post reuse and replacement launches enforce a240tile direct trip limit. They also require a direct water corridor with periodic team-support checks; land-separated targets are rejected rather than relying on a potentially long native detour. This is conservative screening, not control over the game's exact sailing route. Returns to friendly harbors may be longer because they withdraw an unsupported ship rather than assign a new piracy post.
+
+Team/coast eligibility refreshes every game tick independently of the30second traffic review. A remote or newly unsupported old post cannot keep requesting replacements or freeze useful local deployment. A distant vacant post cannot hide nearby eligible traffic. Ships outside supported waters return toward safe same-component team port water when available; nonurgent transport chases and routine patrol borrowing cannot override that withdrawal. Survival and imminent local defense keep priority. If no local dense trade area qualifies, the piracy policy waits.
+
+The30second parking behavior,12tile open-water clearance and economy/SAM reserves remain. New traces include team/enemy support distances and trip limits. Live routing and piracy income still require match testing; the numerical limits are initial conservative heuristics.
 
 ## Posted piracy and budgeted replacement (1.84.66)
 

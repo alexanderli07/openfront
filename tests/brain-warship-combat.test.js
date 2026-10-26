@@ -26,6 +26,12 @@ function fixture(options = {}) {
   return { actor, context, hooks, calls, records, planner, stop: () => { active = false; }, run: () => planner.combat(actor, context, hooks) };
 }
 test('combat planner exists', () => assert.equal(typeof create, 'function'));
+test('unsupported piracy ships return toward their team instead of waiting at enemy posts',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(legacy());
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[],returnToTeam:70},
+  choose:(domain,cs)=>adaptive.decide({domain},cs)});
+ f.run();assert.deepEqual(f.calls,[['move',70]]);
+});
 
 test('hotspot patrol uses a fixed area even with no current trade targets',()=>{
  const assigned=[],f=fixture({context:{hotspotMode:true,hotspotCandidates:[{tile:180,score:300,density:3,reason:'Dense lane'}]}});

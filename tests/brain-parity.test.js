@@ -3687,3 +3687,15 @@ test('old retaliation repositioning cannot borrow a ship assigned to a piracy po
  f.attach();f.runtime.select('adaptive-v1');f.actor.maybeMoveWarship(30);
  assert.equal(f.commands.length,0);
 });
+
+test('returning to team water is not overridden by a nonurgent transport chase',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());
+ const f=fixture(instrumented,'WarshipBehavior',{strategies:[adaptive],warshipTradeHotspots:{
+  posted:()=>false,rank:()=>[],returnToTeam:()=>70}});
+ Object.assign(f.game,{manhattanDist:(a,b)=>Math.abs(a-b),getWaterComponent:()=>1});
+ f.setTick(100);f.attach();f.runtime.select('adaptive-v1');
+ f.runtime.planWarshipCombat(f.actor,{ship:{id:()=>7,tile:()=>0},smart:{cooldown:new Map()},health:100,maxHealth:100,
+  retreatRatio:.75,evade:false,enemies:[],trades:[],home:50,hunt:true,patrol:{},
+  transports:[{tile:30,landingDistance:100,interceptDistance:40}]});
+ assert.equal(f.commands.find(c=>c.kind==='moveWarship').args[1],70);
+});
