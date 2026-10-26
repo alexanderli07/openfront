@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.11.1-team-embargo',
+    version: '1.12.0-trade-hotspots',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -94,7 +94,7 @@ function createAdaptiveStrategy(legacyStrategy) {
         return select(deploy || candidates.find(c => c.id === '$wait'), candidates,
           deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
       }
-      if (snapshot.domain === 'warship-combat' && snapshot.teamNaval?.twoTeam) {
+      if (snapshot.domain === 'warship-combat') {
         const chosen = ['retreat', 'evade', 'engage', 'intercept', 'trade-hunt'].map(p =>
           candidates.find(c => c.purpose === p && c.eligible)).find(Boolean);
         return select(chosen || candidates.find(c => c.id === '$wait'), candidates,

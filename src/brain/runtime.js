@@ -725,9 +725,27 @@ function createBrainRuntime(deps) {
       }
     };
   }
+  function tradeAreasEnabled(actor){
+    return !!deps.warshipTradeHotspots&&owners.get(actor)?.engine.selectedStrategy?.()==='adaptive-v1'&&deps.settings().warshipHuntTrade!==false;
+  }
   function planWarshipCombat(actor, context) {
     if (deps.teamGeography) context = { ...context, transports: deps.teamGeography.transportTargets(actor.game, actor.player, context.ship) };
     const hooks = warshipCombatHooks(actor);
+    if(tradeAreasEnabled(actor)){
+      const last=context.smart.cooldown.get(context.ship.id()),tick=actor.game.ticks();
+      const ready=last===undefined||tick<last||tick-last>=60;
+      context={...context,hotspotMode:true,hotspotCandidates:ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[]};
+      hooks.assigned=area=>{
+        const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
+        if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown});
+      };
+      hooks.move=(ship,tile)=>{
+        const ctor=deps.warshipMoveCtor?.();
+        if(typeof ctor!=='function')throw new Error('Native warship move constructor unavailable');
+        return intent(actor,'WarshipBehavior',ctor,[ship.id()],tile);
+      };
+    }
     hooks.waypoint = (start,home,enemies) => {
       warshipSites.delete(actor);
       const tile=actor.findSafeWaypoint(start,home,enemies);
@@ -806,6 +824,21 @@ function createBrainRuntime(deps) {
   function planWarshipDeployment(actor) {
     const hooks = warshipCombatHooks(actor, deps.warshipDeploymentPlanner);
     hooks.naval = () => teamNavalFacts(actor);
+    if(tradeAreasEnabled(actor)){
+      hooks.hotspotMode=true;
+      hooks.reserve=()=>{
+        const naval=hooks.naval();if(naval)return BigInt(naval.reserve);
+        const defense=defenseEconomyFacts(actor),structure=owners.get(actor)?.bot.structureBehavior;
+        return defense?defense.reserve+(defense.requiredType?BigInt(structure.cost(defense.requiredType)):0n):0n;
+      };
+      hooks.tradeSite=(ports,parentDecisionId)=>{
+        const entries=deps.warshipTradeHotspots.deployment(actor,ports);
+        if(!entries.length)return null;
+        const candidates=entries.map((entry,priority)=>({...entry,id:'trade-port:'+priority,kind:'warship-placement',priority,eligible:true}));
+        const choice=hooks.choose('warship-placement',[...candidates,{id:'$wait',kind:'wait',reason:'Hold trade-area deployment'}],{purpose:'trade-area'},parentDecisionId);
+        return {tile:candidates.find(c=>c.id===choice.selectedId)?.tile??null,decisionId:choice.decisionId};
+      };
+    }
     hooks.strategicSite = (ports, parentDecisionId, rejected = new Set()) => {
       const facts = hooks.naval(), game = actor.game;
       const entries = [];
@@ -822,6 +855,12 @@ function createBrainRuntime(deps) {
           if (!entries.some(e => e.tile === tile)) entries.push({ id:'island-site:'+entries.length,kind:'warship-placement',
             tile,portTile:port.tile(),eligible:true,priority:entries.length,reason:'Usable own port on water shared with the enemy coast' });
         }
+      }
+      if(tradeAreasEnabled(actor)){
+        const traffic=deps.warshipTradeHotspots.deployment(actor,ports);
+        for(const entry of entries)entry.tradeScore=traffic.find(t=>t.portTile===entry.portTile)?.score||0;
+        entries.sort((a,b)=>b.tradeScore-a.tradeScore||a.priority-b.priority);
+        entries.forEach((entry,index)=>entry.priority=index);
       }
       const choice = hooks.choose('warship-placement', [...entries.slice(0,79),{id:'$wait',kind:'wait',reason:'Hold island fleet placement'}],
         {island:true,ports:ports.length}, parentDecisionId);
@@ -944,6 +983,7 @@ function createBrainRuntime(deps) {
   }
   function planWarshipPatrol(actor, sites, context) {
     if(warshipPatrolScopes.get(actor)?.stopped)return;
+    if(tradeAreasEnabled(actor))sites=sites.filter(site=>site.kind!=='trade-lane');
     sites=sites.map(site=>({...site,sourceDecisionId:warshipThreatSources.get(actor)?.get(`${({'loss-zone':'loss','trade-lane':'trade'}[site.kind]||site.kind)}:${site.tile}`)}));
     const controller = owners.get(actor);
     if (!controller || !deps.warshipPatrolPlanner) throw new Error('Warship patrol planner is not attached');

@@ -27,6 +27,30 @@ function fixture(options = {}) {
 }
 test('combat planner exists', () => assert.equal(typeof create, 'function'));
 
+test('hotspot patrol uses a fixed area even with no current trade targets',()=>{
+ const assigned=[],f=fixture({context:{hotspotMode:true,hotspotCandidates:[{tile:180,score:300,density:3,reason:'Dense lane'}]}});
+ f.hooks.assigned=area=>assigned.push(area);f.run();
+ assert.deepEqual(f.calls,[['move',180]]);assert.equal(assigned[0].tile,180);
+});
+test('hotspot mode does not fall back to chasing an individual ship',()=>{
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[],trades:[{tile:()=>40}]}});
+ f.run();assert.deepEqual(f.calls,[]);
+});
+test('retreat retains priority over productive trade areas',()=>{
+ const f=fixture({context:{health:1,hotspotMode:true,hotspotCandidates:[{tile:180,score:300}]}});
+ f.run();assert.deepEqual(f.calls,[['move',50]]);
+});
+test('held hotspot policy does not move or confirm an assignment',()=>{
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[{tile:180}]},
+  choose:(domain,cs)=>domain==='warship-hotspot'?{selectedId:'$wait'}:legacy().decide({domain},cs)});
+ f.hooks.assigned=()=>assert.fail('held assignment');f.run();assert.deepEqual(f.calls,[]);
+});
+test('failed hotspot movement does not update assignments or cooldown',()=>{
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[{tile:180}]}});
+ f.actor.moveWarship=()=>false;f.hooks.assigned=()=>assert.fail('failed assignment');f.run();
+ assert.equal(f.context.smart.cooldown.size,0);
+});
+
 test('trade hunting chooses reachable water before nearest distance and candidate truncation', () => {
   const f=fixture({context:{trades:[...Array.from({length:90},(_,i)=>i+1),200].map(tile=>({tile:()=>tile}))}});
   f.actor.game.getWaterComponent=tile=>tile===0||tile===200?1:2;

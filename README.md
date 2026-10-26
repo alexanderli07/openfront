@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.64) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.65) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.64)
+## Install and update (1.84.65)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,16 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Stable trade-area warship patrols (1.84.65)
+
+The adaptive strategy replaces chasing individual trade ships with persistent patrol areas based on recent capturable hostile traffic. Nearby clusters are scored for density, distance, enemy warships and fleet coverage. An assignment stays at a real water tile while traffic shifts through the lane. Ships distribute across useful areas and switch only when their lane dries up or a materially better area remains after the minimum assignment period. No proven useful traffic means no individual-ship chase.
+
+Observation is shared across our fleet and refreshed every20ticks, with at most512trade samples retained for400ticks. Areas without traffic lose eligibility after300ticks. Assignments normally stay for300ticks and need a1.6xscore improvement to switch; retreat and defense can interrupt immediately. Hazard checks refresh each game tick. Fleet coverage discounts nearby occupied areas. At most128areas are retained and candidate lists are capped at79. Ordinary trade-loss patrols no longer compete with this policy.
+
+Nuke dodging, retreat, enemy-warship combat and approaching transport interception retain priority. Trade-area commands wait60ticks after a dodge or defensive move and avoid active nuclear blast zones; productive assignments remain available afterward. Ships destined for our/friendly ports, disconnected water, and known piracy-protected ships are excluded. Current browser views expose destination IDs but not the engine piracy-immunity flag; hidden immunity is enforced by the game and cannot be guaranteed from client observations. Move failures do not confirm assignments or start movement cooldowns.
+
+First deployment prefers usable ports connected to productive traffic and rechecks the economy/SAM reserve against the native build quote. Island defense retains its fleet caps and reserve and prefers productive connected ports when available. Pending builds prevent duplicate first-ship purchases; failed attempts release their locks. No new switches were added; existing hunt/deployment controls and the legacy strategy remain available. Offline regressions pass; live routing and capture yield still need match testing.
 
 ## Native team embargo (1.84.64)
 

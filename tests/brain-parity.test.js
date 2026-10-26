@@ -137,6 +137,7 @@ function fixture(source, name, options = {}) {
     warshipTransportPlanner: require('../src/brain/warship-transport-planner')({transportType:UNIT.TransportShip,tradeType:UNIT.TradeShip,warshipType:UNIT.Warship}),
     warshipPatrolPlanner: require('../src/brain/warship-patrol-planner')(),
     warshipThreatPlanner: require('../src/brain/warship-threat-planner')({transportType:UNIT.TransportShip,tradeType:UNIT.TradeShip,warshipType:UNIT.Warship,settings:()=>state.settings}),
+    warshipTradeHotspots:options.warshipTradeHotspots,warshipMoveCtor:()=>context.discoverCtors().moveWarship,
     warshipCombatPlanner: require('../src/brain/warship-combat-planner')({ warshipType: UNIT.Warship, difficulty: () => context.currentDifficulty() }),
     warshipSafetyPlanner: require('../src/brain/warship-safety-planner')({portType: UNIT.Port, settings:()=>state.settings}),
     navalLandingPlanner: createNavalLandingPlanner(),
@@ -3638,4 +3639,30 @@ test('central embargo action hold prevents native submission and releases next p
  const decisions=f.runtime.inspect().records.filter(r=>r.kind==='decision');
  const command=decisions.find(d=>d.candidates.some(c=>c.kind==='embargoAll'));
  assert.ok(command.candidates[0].parentDecisionId);
+});
+
+for(const emitReturn of [true,false])test(`hotspot moves use the native central gateway and confirm only submission: ${emitReturn}`,()=>{
+ const assignments=[],adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());
+ const f=fixture(instrumented,'WarshipBehavior',{emitReturn,strategies:[adaptive],warshipTradeHotspots:{
+  rank:()=>[{key:'lane',tile:180,density:3,score:300,component:1,lastTraffic:100}],assign:(a,s,c)=>assignments.push(c)}});
+ Object.assign(f.game,{manhattanDist:(a,b)=>Math.abs(a-b),getWaterComponent:()=>1});
+ f.setTick(100);f.attach();f.runtime.select('adaptive-v1');
+ const ship={id:()=>7,tile:()=>0},smart={cooldown:new Map()},context={ship,smart,health:100,maxHealth:100,
+  retreatRatio:.75,evade:false,enemies:[],trades:[],home:50,hunt:true,patrol:{}};
+ f.runtime.planWarshipCombat(f.actor,context);
+ assert.deepEqual(f.commands.map(c=>c.kind),['moveWarship']);assert.equal(assignments.length,emitReturn?1:0);
+ assert.equal(smart.cooldown.size,emitReturn?1:0);
+ const ds=f.runtime.inspect().records.filter(r=>r.kind==='decision');
+ const area=ds.find(d=>d.snapshot.domain==='warship-hotspot'),move=ds.find(d=>d.candidates[0].kind==='moveWarship');
+ assert.equal(move.candidates[0].parentDecisionId,area.decisionId);
+});
+test('recent dodge or defensive movement holds hotspot commands without losing safety phases',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(createLegacyStrategy());
+ const f=fixture(instrumented,'WarshipBehavior',{strategies:[adaptive],warshipTradeHotspots:{rank:()=>assert.fail('recent dodge must hold hotspot lookup')}});
+ Object.assign(f.game,{manhattanDist:(a,b)=>Math.abs(a-b),getWaterComponent:()=>1});
+ f.setTick(100);f.attach();f.runtime.select('adaptive-v1');
+ const smart={cooldown:new Map([[7,90]])};
+ f.runtime.planWarshipCombat(f.actor,{ship:{id:()=>7,tile:()=>0},smart,health:100,maxHealth:100,
+  retreatRatio:.75,evade:false,enemies:[],trades:[],home:50,hunt:true,patrol:{}});
+ assert.equal(f.commands.length,0);
 });

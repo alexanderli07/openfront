@@ -18,12 +18,15 @@ function createWarshipDeploymentPlanner(deps) {
     if (!hooks.allowed()) return false;
     const ports = actor.player.units(deps.portType);
     const ships = actor.player.units(deps.warshipType);
-    const eligible = ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType);
+    const ticket = pending.get(actor);
+    if (ticket && (ships.length > ticket.count || actor.game.ticks() - ticket.tick >= 40)) pending.delete(actor);
+    const reserve=()=>BigInt(hooks.reserve?.()??0n);
+    const eligible = ports.length > 0 && ships.length === 0 && actor.player.gold() > actor.cost(deps.warshipType) &&
+      (!hooks.hotspotMode || !inFlight.has(actor) && !pending.has(actor) &&
+        BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + reserve());
     const candidate = { id: 'deploy:first', kind: 'warship-deployment', priority: 0, eligible,
       reason: eligible ? 'Build first warship from an existing port' : 'Requires a port, no warships and gold above cost' };
     const naval = hooks.naval?.();
-    const ticket = pending.get(actor);
-    if (ticket && (ships.length > ticket.count || actor.game.ticks() - ticket.tick >= 40)) pending.delete(actor);
     const strategicEligible = naval?.island && naval.fleetNeeded && !inFlight.has(actor) && !pending.has(actor) &&
       ports.some(p => (!p.isActive || p.isActive()) && !p.isUnderConstruction?.()) &&
       BigInt(actor.player.gold()) >= BigInt(actor.cost(deps.warshipType)) + BigInt(naval.reserve);
@@ -38,17 +41,20 @@ function createWarshipDeploymentPlanner(deps) {
     const strategic = selected.id === 'deploy:island';
     if (!hooks.allowed()) { report('stopped'); return false; }
     try {
-      if (strategic) inFlight.add(actor);
+      if (strategic||hooks.hotspotMode) inFlight.add(actor);
       const rejected = new Set();
       for (let attempt=0; attempt<(strategic ? 8 : 1); attempt++) {
         if (!hooks.allowed()) { report('stopped'); return false; }
         let site;
         if (strategic) site = hooks.strategicSite(ports, decision.decisionId, rejected);
         else {
-          const { unit: port, decision: portDecision } = randomUnit(actor, ports, 'warship-port', decision.decisionId, hooks);
-          if (!port) { report('wait'); return false; }
-          site = hooks.spawn ? hooks.spawn(port.tile(), 250, portDecision.decisionId) :
-            { tile: actor.warshipSpawnTile(port.tile(), 250), decisionId: portDecision.decisionId };
+          site=hooks.tradeSite?.(ports,decision.decisionId);
+          if(!site){
+            const { unit: port, decision: portDecision } = randomUnit(actor, ports, 'warship-port', decision.decisionId, hooks);
+            if (!port) { report('wait'); return false; }
+            site = hooks.spawn ? hooks.spawn(port.tile(), 250, portDecision.decisionId) :
+              { tile: actor.warshipSpawnTile(port.tile(), 250), decisionId: portDecision.decisionId };
+          }
         }
         const { tile } = site;
         if (tile === null) { report('no-site'); return false; }
@@ -66,14 +72,17 @@ function createWarshipDeploymentPlanner(deps) {
             report('reserve-or-fleet-changed', {tile}); return false;
           }
         }
+        if(hooks.hotspotMode&&BigInt(actor.player.gold())<BigInt(buildable.cost??actor.cost(deps.warshipType))+reserve()){
+          report('reserve-changed',{tile});return false;
+        }
         const result = hooks.execute(site.decisionId, () => actor._deployWarshipReady(tile, buildable));
-        if (strategic && result) pending.set(actor, {tick:actor.game.ticks(),count:ships.length});
+        if ((strategic||hooks.hotspotMode) && result) pending.set(actor, {tick:actor.game.ticks(),count:ships.length});
         report(result ? 'build-attempted' : 'not-built', { tile });
         return result;
       }
       report('sites-exhausted'); return false;
     } catch (error) { report('threw', { error: String(error?.message || error) }); throw error; }
-    finally { if (strategic) inFlight.delete(actor); }
+    finally { if (strategic||hooks.hotspotMode) inFlight.delete(actor); }
   }
 
   function select(actor, teamGame, hooks) {

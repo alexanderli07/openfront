@@ -28,6 +28,27 @@ function enemy(id, count, team = null) {
   return { id: () => id, team: () => team, units: () => Array.from({ length: count }, (_, i) => ({ id: () => `${id}-${i}`, tile: () => i })) };
 }
 test('deployment planner exists', () => assert.equal(typeof create, 'function'));
+test('hotspot deployment chooses connected productive port water rather than random sampling',async()=>{
+ const f=fixture({gold:1000});f.actor.game.ticks=()=>100;f.hooks.hotspotMode=true;
+ f.hooks.reserve=()=>500n;f.hooks.tradeSite=()=>({tile:70,decisionId:8});
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),true);
+ assert.deepEqual(f.calls,[['probe',70],['deploy',70,{canBuild:70}]]);
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);
+});
+test('first hotspot deployment preserves reserve at planning and after native quote',async()=>{
+ const f=fixture({gold:550});f.hooks.reserve=()=>500n;f.hooks.hotspotMode=true;
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);assert.deepEqual(f.calls,[]);
+ const g=fixture({gold:650});g.hooks.reserve=()=>500n;g.hooks.hotspotMode=true;g.actor.game.ticks=()=>100;
+ g.hooks.tradeSite=()=>({tile:70,decisionId:8});g.actor.buildableWarship=async()=>({canBuild:70,cost:200n});
+ assert.equal(await g.planner.deploy(g.actor,g.hooks),false);assert.equal(g.calls.length,0);
+});
+test('failed hotspot deployment releases its in-flight lock for a later attempt',async()=>{
+ const f=fixture({gold:1000});f.actor.game.ticks=()=>100;f.hooks.hotspotMode=true;
+ f.hooks.tradeSite=()=>({tile:70,decisionId:8});let ready=false;
+ f.actor.buildableWarship=async()=>({canBuild:ready?70:false});
+ assert.equal(await f.planner.deploy(f.actor,f.hooks),false);
+ ready=true;assert.equal(await f.planner.deploy(f.actor,f.hooks),true);
+});
 test('deployment gold check is strict; selected deployment keeps random port and radius', async () => {
   const f = fixture({ gold: 100 }); assert.equal(await f.planner.deploy(f.actor, f.hooks), false); assert.deepEqual(f.calls, []);
   const g = fixture(); assert.equal(await g.planner.deploy(g.actor, g.hooks), true);

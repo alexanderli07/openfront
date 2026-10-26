@@ -10,10 +10,12 @@ function createWarshipCombatPlanner(deps) {
     const allowed = hooks.allowed();
     hooks.record(`${domain}-result`,{decisionId:decision.decisionId,
       status: !allowed ? 'stopped' : selected ? 'selected' : 'wait',tile:selected?.tile,reason:decision.reason});
-    return { tile: allowed && selected ? selected.tile : null, decisionId:decision.decisionId };
+    return { tile: allowed && selected ? selected.tile : null, decisionId:decision.decisionId,selected };
   }
   function target(actor, context, purpose, hooks) {
     const entries = [];
+    if(purpose==='trade-hunt'&&context.hotspotMode)return destination(hooks,'warship-hotspot',
+      context.hotspotCandidates||[],{unitId:context.ship.id(),purpose:'trade-area'});
     if (purpose === 'intercept') return destination(hooks, 'warship-target',
       context.transports.map(t => ({ ...t, reason:'Hostile transport approaching same-team land; shortest remaining landing distance first' })),
       {purpose,unitId:context.ship.id(),targets:context.transports.length});
@@ -98,7 +100,7 @@ function createWarshipCombatPlanner(deps) {
       ['retreat', low, 'Health below retreat threshold'],
       ['evade', !low && danger, 'Battle prediction requires evasion'],
       ['engage', !low && !evade && enemies.length > 0, 'Engage weakest nearby enemy'],
-      ['trade-hunt', !low && !danger && enemies.length === 0 && hunt && trades.length > 0, 'Hunt nearest hostile trade ship'],
+      ['trade-hunt', !low && !danger && enemies.length === 0 && hunt && (context.hotspotMode?context.hotspotCandidates?.length>0:trades.length>0), context.hotspotMode?'Hold a productive trade area':'Hunt nearest hostile trade ship'],
       ...(context.transports?.length ? [['intercept', !low && !danger && enemies.length === 0,
         'Intercept hostile transports approaching same-team land', true]] : [])
     ], { unitId: ship.id(), tile: ship.tile(), health, maxHealth, retreatRatio, evade,
@@ -116,12 +118,14 @@ function createWarshipCombatPlanner(deps) {
       const distant = previous === undefined || actor.game.manhattanDist(previous, tile) > 20;
       let sameWater = true;
       try { sameWater = actor.game.getWaterComponent(tile) === actor.game.getWaterComponent(ship.tile()); } catch {}
+      if(context.hotspotMode&&selected.purpose==='trade-hunt'&&!distant&&sameWater)hooks.assigned?.(result.selected);
       if (!distant || !sameWater) { report('held', { tile, distant, sameWater }); return; }
       if (!hooks.allowed()) { report('stopped'); return; }
       let commandDeclined=false;
       hooks.execute(result.decisionId,()=>{
-        actor.moveWarship(ship, tile);
-        commandDeclined=hooks.wasDeclined?.() === true;
+        const moved=context.hotspotMode&&selected.purpose==='trade-hunt'&&hooks.move?hooks.move(ship,tile):actor.moveWarship(ship,tile);
+        commandDeclined=moved===false||hooks.wasDeclined?.() === true;
+        if(!commandDeclined&&context.hotspotMode&&selected.purpose==='trade-hunt')hooks.assigned?.(result.selected);
         if(!commandDeclined)smart.cooldown.set(ship.id(), actor.game.ticks());
       });
       report(commandDeclined?'declined':'move-attempted', { tile });

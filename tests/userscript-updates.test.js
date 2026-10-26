@@ -12,7 +12,7 @@ test('published update metadata points only to this fork on its verified default
 test('lightweight update check and downloadable script have identical version and metadata',()=>{
  const built=buildSource(),end=built.source.indexOf('// ==/UserScript==')+'// ==/UserScript=='.length;
  assert.equal(built.metadata,built.source.slice(0,end)+'\n');
- assert.equal(fields(built.metadata).version,'1.84.64');
+ assert.equal(fields(built.metadata).version,'1.84.65');
  const assets=JSON.parse(built.source.match(/window\.__OFH_ASSETS = (\{[^\n]+\});/)[1]);
  assert.equal(assets.version,fields(built.metadata).version);
 });
