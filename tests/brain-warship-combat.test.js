@@ -26,9 +26,9 @@ function fixture(options = {}) {
   return { actor, context, hooks, calls, records, planner, stop: () => { active = false; }, run: () => planner.combat(actor, context, hooks) };
 }
 test('combat planner exists', () => assert.equal(typeof create, 'function'));
-test('unsupported piracy ships return toward their team instead of waiting at enemy posts',()=>{
+test('ships without piracy targets select coastal defense instead of port waiting',()=>{
  const adaptive=require('../src/brain/adaptive-strategy')(legacy());
- const f=fixture({context:{hotspotMode:true,hotspotCandidates:[],returnToTeam:70},
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[],coastalDefense:{tile:70}},
   choose:(domain,cs)=>adaptive.decide({domain},cs)});
  f.run();assert.deepEqual(f.calls,[['move',70]]);
 });
@@ -201,4 +201,11 @@ test('adaptive interception moves toward transport ahead of trade, with retreat 
  f.run();assert.deepEqual(f.calls,[['move',90]]);
  const low=fixture({choose,context:{health:50,transports:[{tile:90,targetId:'transport'}]}});
  low.run();assert.deepEqual(low.calls,[['move',50]]);
+});
+
+test('coastal defense intercepts transports before settling at its watchpoint',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(legacy());
+ const f=fixture({context:{hotspotMode:true,hotspotCandidates:[],coastalDefense:{tile:70},
+  transports:[{tile:30,landingDistance:80,interceptDistance:40}]},choose:(domain,cs)=>adaptive.decide({domain},cs)});
+ f.run();assert.deepEqual(f.calls,[['move',30]]);
 });

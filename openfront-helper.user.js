@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.68
+// @version      1.84.69
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.68","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.69","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -2557,7 +2557,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.14.1-team-support-range',
+    version: '1.15.0-coastal-defense',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -2586,7 +2586,7 @@ function createAdaptiveStrategy(legacyStrategy) {
           deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
       }
       if (snapshot.domain === 'warship-combat') {
-        const chosen = ['retreat', 'evade', 'engage', 'intercept', 'return-to-team', 'trade-hunt'].map(p =>
+        const chosen = ['retreat', 'evade', 'engage', 'intercept', 'trade-hunt', 'coastal-defense'].map(p =>
           candidates.find(c => c.purpose === p && c.eligible)).find(Boolean);
         return select(chosen || candidates.find(c => c.id === '$wait'), candidates,
           'Survival and enemy warships first; intercept invading transports before trade hunting');
@@ -5813,10 +5813,11 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
     if(!s||s.game!==game||tick<s.lastTick||time<s.sampleAt){
-      s={game,tick:-Infinity,sampleAt:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map(),vacancies:new Map(),geometry:new Map(),lastReplacementAt:-Infinity};states.set(actor.player,s);
+      s={game,tick:-Infinity,sampleAt:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map(),defenseAssignments:new Map(),vacancies:new Map(),geometry:new Map(),lastReplacementAt:-Infinity};states.set(actor.player,s);
     }
     s.lastTick=tick;
     const fleet=actor.player.units(U.Warship).filter(ship=>ship.isActive?.()!==false),ids=new Set(fleet.map(ship=>ship.id()));
+    for(const id of s.defenseAssignments.keys())if(!ids.has(id))s.defenseAssignments.delete(id);
     for(const [id,area] of s.assignments)if(!ids.has(id)){
       s.vacancies.set(area.key,{...area,lostAt:time,lostShipId:id});s.assignments.delete(id);
     }
@@ -5904,10 +5905,10 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
   }
   function locality(actor,s,tile){
     if(s.support.has(tile))return s.support.get(tile);
-    const game=actor.game,component=game.getWaterComponent(tile);let teamDistance=Infinity,enemyDistance=Infinity;
+    const game=actor.game,component=game.getWaterComponent(tile);let teamDistance=Infinity,enemyDistance=Infinity,teamTile;
     for(const coast of s.coasts)if(coast.components.has(component)){
       const distance=game.manhattanDist(tile,coast.tile);
-      if(coast.team)teamDistance=Math.min(teamDistance,distance);else enemyDistance=Math.min(enemyDistance,distance);
+      if(coast.team&&distance<teamDistance){teamDistance=distance;teamTile=coast.tile;}else if(!coast.team)enemyDistance=Math.min(enemyDistance,distance);
     }
     // Ports give exact support anchors. Bound land probes to112points per queried tile.
     if(game.isLand&&game.hasOwner&&game.ownerID&&s.teamIds.size){
@@ -5917,17 +5918,17 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         if(!game.isValidCoord(px,py))continue;const point=game.ref(px,py);
         if(!game.isLand(point)||!game.hasOwner(point))continue;
         const owner=game.ownerID(point),distance=Math.abs(px-x)+Math.abs(py-y);
-        if(s.teamIds.has(owner))teamDistance=Math.min(teamDistance,distance);
+        if(s.teamIds.has(owner)&&distance<teamDistance){teamDistance=distance;teamTile=point;}
         else if(s.enemyIds.has(owner))enemyDistance=Math.min(enemyDistance,distance);
       }
     }
-    const facts={teamDistance,enemyDistance,teamRange,
+    const facts={teamDistance,enemyDistance,teamTile,teamRange,
       allowed:component!=null&&teamDistance<=teamRange&&!(enemyDistance<=100&&enemyDistance<=teamDistance+24)};
     if(s.support.size>=1024)s.support.delete(s.support.keys().next().value);
     s.support.set(tile,facts);return facts;
   }
   function localRoute(actor,s,start,end){
-    const game=actor.game,key=start+':'+end;if(s.routes.has(key))return s.routes.get(key);
+    const game=actor.game,key=[game.x(start),game.y(start),game.x(end),game.y(end)].join(':');if(s.routes.has(key))return s.routes.get(key);
     const x=game.x(start),y=game.y(start),dx=game.x(end)-x,dy=game.y(end)-y;
     const steps=Math.max(Math.abs(dx),Math.abs(dy)),checks=Math.min(steps,511);let allowed=true,lastSupport=-Infinity;
     for(let i=0;i<=checks;i++){
@@ -5946,13 +5947,48 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
     return s.coasts.some(c=>c.own&&c.components.has(area.component)&&
       c.water.some(tile=>actor.game.getWaterComponent(tile)===area.component&&!unsafe(actor,s,tile)&&localRoute(actor,s,tile,area.tile)));
   }
-  function returnToTeam(actor,ship){
-    const s=state(actor),game=actor.game,component=game.getWaterComponent(ship.tile());
-    if(component==null||locality(actor,s,ship.tile()).allowed||unsafe(actor,s,ship.tile()))return null;
-    const sites=s.coasts.filter(c=>c.team&&c.components.has(component)).flatMap(c=>c.water)
-      .filter(tile=>game.getWaterComponent(tile)===component&&locality(actor,s,tile).allowed&&!unsafe(actor,s,tile));
-    sites.sort((a,b)=>game.manhattanDist(ship.tile(),a)-game.manhattanDist(ship.tile(),b));
-    return sites[0]??null;
+  function coastalDefense(actor,ship){
+    const s=state(actor),game=actor.game,time=now(),component=game.getWaterComponent(ship.tile());
+    if(component==null||unsafe(actor,s,ship.tile()))return null;
+    const valid=tile=>game.isWater(tile)&&game.getWaterComponent(tile)===component&&locality(actor,s,tile).allowed&&
+      !unsafe(actor,s,tile)&&!s.coasts.some(c=>c.team&&game.manhattanDist(c.tile,tile)<16);
+    const support=locality(actor,s,ship.tile());
+    const previous=s.defenseAssignments.get(ship.id());
+    if(previous&&valid(previous.tile)&&(!support.allowed||localRoute(actor,s,ship.tile(),previous.tile)))return {...previous,retained:true,
+      reviewed:time-previous.reviewedAt>=reviewMs,reviewedAt:time-previous.reviewedAt>=reviewMs?time:previous.reviewedAt};
+    const seeds=s.coasts.filter(c=>c.team&&c.components.has(component)).map(c=>({tile:c.tile,water:c.water}));
+    if(support.teamTile!=null)seeds.push({tile:support.teamTile,water:game.neighbors(support.teamTile).filter(t=>game.isWater(t))});
+    const border=actor.player.borderTiles?.();
+    if(border&&typeof border[Symbol.iterator]==='function'){
+      const stride=Math.max(1,Math.ceil((border.size||border.length||128)/128));let index=0;
+      for(const tile of border){if(index++%stride)continue;
+        const water=game.neighbors(tile).filter(t=>game.isWater(t)&&game.getWaterComponent(t)===component);
+        if(water.length)seeds.push({tile,water});
+        if(index>=stride*128)break;
+      }
+    }
+    seeds.sort((a,b)=>game.manhattanDist(ship.tile(),a.tile)-game.manhattanDist(ship.tile(),b.tile));
+    const candidates=[];
+    for(const coast of seeds.slice(0,8))for(const radius of [24,40,64])for(let i=0;i<16;i++){
+      const x=Math.round(game.x(coast.tile)+Math.cos(i*Math.PI/8)*radius),y=Math.round(game.y(coast.tile)+Math.sin(i*Math.PI/8)*radius);
+      if(!game.isValidCoord(x,y))continue;const tile=game.ref(x,y);
+      if(support.allowed&&!localRoute(actor,s,ship.tile(),tile))continue;
+      if(!valid(tile)||game.neighbors(tile).filter(t=>game.isWater(t)).length<2)continue;
+      if(!coast.water.some(start=>game.getWaterComponent(start)===component&&localRoute(actor,s,start,tile)))continue;
+      const local=locality(actor,s,tile),distance=game.manhattanDist(ship.tile(),tile);
+      const occupied=[...s.defenseAssignments].filter(([id,a])=>id!==ship.id()&&game.manhattanDist(tile,a.tile)<48).length;
+      const score=-Math.abs(local.teamDistance-40)*2-distance*.1-occupied*40-
+        (Number.isFinite(local.enemyDistance)?local.enemyDistance*.005:0);
+      candidates.push({tile,coastTile:coast.tile,component,teamDistance:local.teamDistance,score,reviewedAt:time,
+        reason:'Watch supported team coastline when no piracy post qualifies'});
+    }
+    candidates.sort((a,b)=>b.score-a.score);return candidates[0]||null;
+  }
+  function defending(actor,ship){return state(actor).defenseAssignments.has(ship.id());}
+  function coastalAssigned(actor,ship,area){
+    const s=state(actor),previous=s.defenseAssignments.get(ship.id());
+    s.defenseAssignments.set(ship.id(),area);s.assignments.delete(ship.id());
+    return !previous||previous.tile!==area.tile;
   }
   function openWater(game,s,tile){
     if(s.geometry.has(tile))return s.geometry.get(tile);
@@ -6009,7 +6045,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
   function assign(actor,ship,area){
     const s=state(actor),previous=s.assignments.get(ship.id());
     s.assignments.set(ship.id(),{...area,since:previous?.key===area.key?previous.since:actor.game.ticks()});
-    s.vacancies.delete(area.key);
+    s.vacancies.delete(area.key);s.defenseAssignments.delete(ship.id());
     return !previous||previous.key!==area.key||previous.tile!==area.tile;
   }
   function deployment(actor,ports,post=null){
@@ -6031,7 +6067,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
     }
     return entries.filter(e=>post||e.score>0).sort((a,b)=>b.score-a.score||a.portTile-b.portTile).slice(0,79);
   }
-  return {rank,assign,deployment,posted,replacement,waitingReplacement,replacementSubmitted,returnToTeam};
+  return {rank,assign,deployment,posted,replacement,waitingReplacement,replacementSubmitted,coastalDefense,coastalAssigned,defending};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports=createWarshipTradeHotspots;
 
@@ -6056,8 +6092,8 @@ function createWarshipCombatPlanner(deps) {
     if (purpose === 'intercept') return destination(hooks, 'warship-target',
       context.transports.map(t => ({ ...t, reason:'Hostile transport approaching same-team land; shortest remaining landing distance first' })),
       {purpose,unitId:context.ship.id(),targets:context.transports.length});
-    if(purpose==='return-to-team')return destination(hooks,'warship-destination',
-      [{tile:context.returnToTeam,reason:'Withdraw toward supported team water; no eligible local piracy post'}],{purpose,unitId:context.ship.id()});
+    if(purpose==='coastal-defense')return destination(hooks,'warship-destination',
+      [context.coastalDefense],{purpose,unitId:context.ship.id()});
     if (purpose === 'retreat') {
       if (context.home !== null) entries.push({tile:context.home,reason:'Return to original home destination'});
       return destination(hooks,'warship-destination',entries,{purpose,unitId:context.ship.id()});
@@ -6140,8 +6176,8 @@ function createWarshipCombatPlanner(deps) {
       ['evade', !low && danger, 'Battle prediction requires evasion'],
       ['engage', !low && !evade && enemies.length > 0, 'Engage weakest nearby enemy'],
       ['trade-hunt', !low && !danger && enemies.length === 0 && hunt && (context.hotspotMode?context.hotspotCandidates?.length>0:trades.length>0), context.hotspotMode?'Hold a productive trade area':'Hunt nearest hostile trade ship'],
-      ...(context.returnToTeam!=null?[['return-to-team',!low&&!danger&&enemies.length===0,
-        'Withdraw from unsupported waters toward our team',true]]:[]),
+      ...(context.coastalDefense!=null?[['coastal-defense',!low&&!danger&&enemies.length===0,
+        'Defend supported coast when piracy is unavailable',true]]:[]),
       ...(context.transports?.length ? [['intercept', !low && !danger && enemies.length === 0,
         'Intercept hostile transports approaching same-team land', true]] : [])
     ], { unitId: ship.id(), tile: ship.tile(), health, maxHealth, retreatRatio, evade,
@@ -6159,14 +6195,20 @@ function createWarshipCombatPlanner(deps) {
       const distant = previous === undefined || actor.game.manhattanDist(previous, tile) > 20;
       let sameWater = true;
       try { sameWater = actor.game.getWaterComponent(tile) === actor.game.getWaterComponent(ship.tile()); } catch {}
-      if(context.hotspotMode&&selected.purpose==='trade-hunt'&&!distant&&sameWater)hooks.assigned?.(result.selected);
+      if(context.hotspotMode&&!distant&&sameWater){
+        if(selected.purpose==='trade-hunt')hooks.assigned?.(result.selected);
+        if(selected.purpose==='coastal-defense')hooks.defended?.(result.selected);
+      }
       if (!distant || !sameWater) { report('held', { tile, distant, sameWater }); return; }
       if (!hooks.allowed()) { report('stopped'); return; }
       let commandDeclined=false;
       hooks.execute(result.decisionId,()=>{
-        const moved=context.hotspotMode&&selected.purpose==='trade-hunt'&&hooks.move?hooks.move(ship,tile):actor.moveWarship(ship,tile);
+        const moved=context.hotspotMode&&['trade-hunt','coastal-defense'].includes(selected.purpose)&&hooks.move?hooks.move(ship,tile):actor.moveWarship(ship,tile);
         commandDeclined=moved===false||hooks.wasDeclined?.() === true;
-        if(!commandDeclined&&context.hotspotMode&&selected.purpose==='trade-hunt')hooks.assigned?.(result.selected);
+        if(!commandDeclined&&context.hotspotMode){
+          if(selected.purpose==='trade-hunt')hooks.assigned?.(result.selected);
+          if(selected.purpose==='coastal-defense')hooks.defended?.(result.selected);
+        }
         if(!commandDeclined)smart.cooldown.set(ship.id(), actor.game.ticks());
       });
       report(commandDeclined?'declined':'move-attempted', { tile });
@@ -7779,15 +7821,18 @@ function createBrainRuntime(deps) {
       const last=context.smart.cooldown.get(context.ship.id()),tick=actor.game.ticks();
       const ready=last===undefined||tick<last||tick-last>=60;
       const posted=deps.warshipTradeHotspots.posted?.(actor,context.ship);
-      if(posted)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
       const hotspotCandidates=ready&&context.hunt?deps.warshipTradeHotspots.rank(actor,context.ship):[];
-      context={...context,hotspotMode:true,hotspotCandidates,returnToTeam:ready&&context.hunt&&!hotspotCandidates.length?deps.warshipTradeHotspots.returnToTeam?.(actor,context.ship):null};
-      if(context.returnToTeam!=null)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
+      context={...context,hotspotMode:true,hotspotCandidates,coastalDefense:ready&&context.hunt&&!hotspotCandidates.length?deps.warshipTradeHotspots.coastalDefense?.(actor,context.ship):null};
+      if(posted&&!context.coastalDefense)context={...context,transports:(context.transports||[]).filter(t=>t.landingDistance<=40&&t.interceptDistance<=60)};
       hooks.assigned=area=>{
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
         if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
           density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,enemyDistance:area.enemyDistance});
+      };
+      hooks.defended=area=>{
+        if(deps.warshipTradeHotspots.coastalAssigned(actor,context.ship,area))hooks.record('warship-coastal-assignment',{
+          unitId:context.ship.id(),tile:area.tile,coastTile:area.coastTile,teamDistance:area.teamDistance});
       };
       hooks.move=(ship,tile)=>{
         const ctor=deps.warshipMoveCtor?.();
@@ -7931,7 +7976,7 @@ function createBrainRuntime(deps) {
   }
   function selectMovingWarship(actor, tile, context) {
     const hooks=warshipCombatHooks(actor,deps.warshipDetailsPlanner);
-    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship)&&deps.warshipTradeHotspots.returnToTeam?.(actor,ship)==null;
+    if(tradeAreasEnabled(actor))hooks.canMove=ship=>!deps.warshipTradeHotspots.posted?.(actor,ship)&&!deps.warshipTradeHotspots.defending?.(actor,ship);
     return deps.warshipDetailsPlanner.move(actor,tile,context,hooks);
   }
   function planWarshipInfestation(actor, teamGame) {
@@ -8697,7 +8742,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.68'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.69'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

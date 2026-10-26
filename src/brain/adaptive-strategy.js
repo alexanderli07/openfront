@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.14.1-team-support-range',
+    version: '1.15.0-coastal-defense',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -95,7 +95,7 @@ function createAdaptiveStrategy(legacyStrategy) {
           deploy ? 'Build a bounded island defense fleet while preserving the economy reserve' : 'Island fleet covered or economy reserve would be spent');
       }
       if (snapshot.domain === 'warship-combat') {
-        const chosen = ['retreat', 'evade', 'engage', 'intercept', 'return-to-team', 'trade-hunt'].map(p =>
+        const chosen = ['retreat', 'evade', 'engage', 'intercept', 'trade-hunt', 'coastal-defense'].map(p =>
           candidates.find(c => c.purpose === p && c.eligible)).find(Boolean);
         return select(chosen || candidates.find(c => c.id === '$wait'), candidates,
           'Survival and enemy warships first; intercept invading transports before trade hunting');

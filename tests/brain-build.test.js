@@ -31,7 +31,7 @@ test('standalone build registers the adaptive gameplay strategy', () => {
   const { source } = build.buildSource();
   assert.ok(source.includes('function createAdaptiveStrategy'));
   assert.ok(source.includes('strategies: [createAdaptiveStrategy(createLegacyStrategy())]'));
-  assert.ok(source.includes('// @version      1.84.68'));
+  assert.ok(source.includes('// @version      1.84.69'));
   assert.ok(source.includes('transportType: UNIT.TransportShip'));
   assert.ok(source.includes('isTransportIntent: ctor => ctor === _ctors.boat'));
 });
@@ -47,7 +47,7 @@ test('structure choice routes through the batch planner in the standalone build'
   const { source } = build.buildSource();
   assert.ok(source.includes('return ofhBrainRuntime.planStructures(this,{cityLevels:a,cityDisabled:t,sharedWater:i})'));
   assert.ok(source.includes('function createStructurePlanner'));
-  assert.ok(source.includes('// @version      1.84.68'));
+  assert.ok(source.includes('// @version      1.84.69'));
 });
 
 test('bot attack target selection routes through the planner', () => {
@@ -137,7 +137,7 @@ test('pocket and island searches route through attack geography', () => {
   assert.ok(source.includes('async findSealablePocket(){return ofhBrainRuntime.selectAttackGeography(this,"pocket")}'));
   assert.ok(source.includes('async findNearestIslandEnemy(){return ofhBrainRuntime.selectAttackGeography(this,"island")}'));
   assert.ok(source.includes("version: '1.84.0-plans.38'"));
-  assert.match(source, /@version\s+1\.84\.68/);
+  assert.match(source, /@version\s+1\.84\.69/);
 });
 test('standalone build contains all bot command gateways and no economy experiment', () => {
   const { source, counts } = build.buildSource();

@@ -1,0 +1,7 @@
+# Coastal defense when piracy is unavailable
+
+User requested replacing port-side waiting with a coastal watch position to defend incoming transports. When no piracy post qualifies, propose a safe watchpoint near owned/same-team coast, even if the ship is already supported. Keep the point stable for30seconds unless safety or ownership changes. Prefer24-64tiles offshore, exclude positions within16tiles of team ports, and use the same water component, team support, enemy-coast and hazard checks. Sample bounded friendly port/coast seeds, with owned cached border samples for coast without ports. If no valid watchpoint exists, hold without pretending the port is a defensive post.
+
+Keep nuke dodge, low-health retreat, enemy warship combat and incoming transport interception ahead of watchpoint positioning. Piracy posts remain preferred when eligible. Coastal defense does not require three trade ships. Central decision/dispatch confirms watchpoint assignment only after submission or when the existing patrol anchor already covers it. Entering coastal defense releases the old piracy assignment; no loss vacancy is created for a living ship. No change to spending or replacement reserves.
+
+Validate: supported and unsupported ships, no-trade watch position, port exclusion, stable position, same component, enemy/nuclear danger, interception priority, failed commands and policy holds. Geometry and native routing remain heuristics pending a live match.

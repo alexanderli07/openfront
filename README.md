@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.68) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.69) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.68)
+## Install and update (1.84.69)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,12 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Coastal defense when piracy is unavailable (1.84.69)
+
+When no piracy post qualifies, an existing warship now takes a coastal defense watchpoint instead of returning to water beside a port and waiting. This applies to ships already in supported waters too. The observer samples positions24/40/64tiles around nearby team ports/coast, excludes points within16tiles of team ports, and keeps the selected point while safe. Owned cached borders provide coast seeds when ports are unavailable. Watchpoints use the same water component, team support, enemy-coast and hazard checks. Supported ships require a supported water corridor, including when returning to a retained point after interception. Unsupported ships may return toward a safe friendly coast.
+
+Incoming transport interception takes priority over the watchpoint, including when leaving a previous piracy assignment. Nuke dodge, retreat and nearby enemy-warship combat retain priority; eligible piracy areas remain preferred over routine coastal positioning. Routine patrol/retaliation repositioning cannot borrow an assigned defender. Move failures and held decisions do not confirm an assignment; entering coastal defense releases a living ship's previous piracy assignment without creating a destruction vacancy. Defense positions do not require trade traffic or piracy's open-water disk. This change adds no purchases or spending rules. Live coastal coverage still needs match testing.
 
 ## Team support determines range (1.84.68)
 

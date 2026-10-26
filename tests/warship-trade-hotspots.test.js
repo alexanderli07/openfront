@@ -152,10 +152,10 @@ test('a supported post cannot be assigned or replaced from a faraway ship or por
  const post={key:'old',tile:620,component:1,density:10,reviewedAt:10000};
  assert.deepEqual(f.observer.deployment(f.actor,[f.ship(70,0)],post),[]);
 });
-test('unsupported warships receive a safe return toward their team',()=>{
+test('unsupported warships receive a coastal defense point instead of port-side parking',()=>{
  const f=fixture();f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
- const far=f.ship(9,600);const tile=f.observer.returnToTeam(f.actor,far);
- assert.ok(tile!=null);assert.ok(Math.abs(tile)<10);
+ const far=f.ship(9,600);const area=f.observer.coastalDefense(f.actor,far);
+ assert.ok(area);assert.ok(f.actor.game.manhattanDist(area.tile,0)>=16);
 });
 test('a distant vacancy cannot hide useful nearby traffic',()=>{
  const f=fixture({minTraffic:3}),friend={id:()=>2};
@@ -186,4 +186,28 @@ test('supported routes over240tiles remain eligible for assignment, retention an
  f.observer.assign(f.actor,f.fleet[0],area);assert.equal(f.rank()[0].tile,3000);
  f.fleet.splice(0);const post=f.observer.replacement(f.actor);assert.equal(post.tile,3000);
  assert.ok(f.observer.deployment(f.actor,[f.ship(70,0)],post).length);
+});
+
+test('without piracy, a supported ship posts offshore and keeps the defensive anchor',()=>{
+ const f=fixture();f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ const area=f.observer.coastalDefense(f.actor,f.fleet[0]);assert.ok(area);
+ assert.ok(f.actor.game.manhattanDist(area.tile,0)>=16);
+ assert.ok(f.actor.game.manhattanDist(area.tile,0)<=80);
+ f.observer.coastalAssigned(f.actor,f.fleet[0],area);f.next(20);
+ const again=f.observer.coastalDefense(f.actor,f.fleet[0]);assert.deepEqual(again.tile,area.tile);assert.equal(again.retained,true);
+});
+test('coastal defense releases a living ship from its old piracy assignment',()=>{
+ const f=fixture();f.setTraffic([f.trade(1,100)]);f.observer.assign(f.actor,f.fleet[0],f.rank()[0]);
+ assert.equal(f.observer.posted(f.actor,f.fleet[0]),true);
+ const area=f.observer.coastalDefense(f.actor,f.fleet[0]);f.observer.coastalAssigned(f.actor,f.fleet[0],area);
+ assert.equal(f.observer.posted(f.actor,f.fleet[0]),false);
+ assert.equal(f.observer.replacement(f.actor),null);
+});
+test('an intercepted defender does not return to a watchpoint across an unsafe detour',()=>{
+ const f=fixture(),game=f.actor.game;f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ game.isWater=t=>!(game.x(t)===0&&Math.abs(game.y(t))<100);
+ f.fleet[0]=f.ship(1,-20);const area=f.observer.coastalDefense(f.actor,f.fleet[0]);
+ assert.ok(game.x(area.tile)<0);f.observer.coastalAssigned(f.actor,f.fleet[0],area);
+ f.fleet[0]=f.ship(1,40);f.next(1);const next=f.observer.coastalDefense(f.actor,f.fleet[0]);
+ assert.ok(game.x(next.tile)>0);assert.notEqual(next.retained,true);
 });
