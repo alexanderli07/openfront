@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.67
+// @version      1.84.68
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.67","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.68","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -2557,7 +2557,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.14.0-local-team-piracy',
+    version: '1.14.1-team-support-range',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -5808,7 +5808,7 @@ function createWarshipPatrolPlanner() {
 'use strict';
 
 function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffic=3}) {
-  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=160,tripRange=240;
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=160;
   const raw=unit=>unit?.__src||unit;
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
@@ -5921,27 +5921,30 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         else if(s.enemyIds.has(owner))enemyDistance=Math.min(enemyDistance,distance);
       }
     }
-    const facts={teamDistance,enemyDistance,teamRange,tripRange,
+    const facts={teamDistance,enemyDistance,teamRange,
       allowed:component!=null&&teamDistance<=teamRange&&!(enemyDistance<=100&&enemyDistance<=teamDistance+24)};
     if(s.support.size>=1024)s.support.delete(s.support.keys().next().value);
     s.support.set(tile,facts);return facts;
   }
   function localRoute(actor,s,start,end){
     const game=actor.game,key=start+':'+end;if(s.routes.has(key))return s.routes.get(key);
-    if(game.manhattanDist(start,end)>tripRange)return false;
     const x=game.x(start),y=game.y(start),dx=game.x(end)-x,dy=game.y(end)-y;
-    const steps=Math.max(Math.abs(dx),Math.abs(dy));let allowed=true;
-    for(let i=0;i<=steps;i++){
-      const px=Math.round(x+dx*(steps?i/steps:0)),py=Math.round(y+dy*(steps?i/steps:0));
+    const steps=Math.max(Math.abs(dx),Math.abs(dy)),checks=Math.min(steps,511);let allowed=true,lastSupport=-Infinity;
+    for(let i=0;i<=checks;i++){
+      const fraction=checks?i/checks:0,progress=steps*fraction;
+      const px=Math.round(x+dx*fraction),py=Math.round(y+dy*fraction);
       if(!game.isValidCoord(px,py)){allowed=false;break;}const tile=game.ref(px,py);
-      if(!game.isWater(tile)||(i%16===0||i===steps)&&!locality(actor,s,tile).allowed){allowed=false;break;}
+      if(!game.isWater(tile)){allowed=false;break;}
+      if(progress-lastSupport>=16||i===checks){
+        if(!locality(actor,s,tile).allowed){allowed=false;break;}lastSupport=progress;
+      }
     }
     if(s.routes.size>=1024)s.routes.delete(s.routes.keys().next().value);
     s.routes.set(key,allowed);return allowed;
   }
   function launchable(actor,s,area){
     return s.coasts.some(c=>c.own&&c.components.has(area.component)&&
-      c.water.some(tile=>actor.game.getWaterComponent(tile)===area.component&&actor.game.manhattanDist(tile,area.tile)<=tripRange&&!unsafe(actor,s,tile)&&localRoute(actor,s,tile,area.tile)));
+      c.water.some(tile=>actor.game.getWaterComponent(tile)===area.component&&!unsafe(actor,s,tile)&&localRoute(actor,s,tile,area.tile)));
   }
   function returnToTeam(actor,ship){
     const s=state(actor),game=actor.game,component=game.getWaterComponent(ship.tile());
@@ -5985,16 +5988,16 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
       for(const [id,a] of s.assignments)if(id!==ship.id()&&a.component===component&&game.manhattanDist(a.tile,area.tile)<=120)occupancy++;
       const distance=game.manhattanDist(ship.tile(),area.tile);
       return {...area,...locality(actor,s,area.tile),clearance,reviewed:true,reviewedAt:time,retained:false,occupancy,distance,
-        score:(area.density*100-Math.min(distance,1200)*.4)/(1+occupancy*1.5),
+        score:area.density*100/((1+distance/teamRange)*(1+occupancy*1.5)),
         reason:vacant.length?'Fill a vacant piracy post with an existing ship':'Post in open water with dense enemy trade'};
-    }).filter(a=>a.allowed&&a.distance<=tripRange&&(vacant.length||a.score>0)&&localRoute(actor,s,ship.tile(),a.tile)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
+    }).filter(a=>a.allowed&&(vacant.length||a.score>0)&&localRoute(actor,s,ship.tile(),a.tile)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
       .sort((a,b)=>b.score-a.score||a.distance-b.distance||a.key.localeCompare(b.key)).slice(0,79);
   }
   function replacement(actor){
     const s=state(actor),fleet=actor.player.units(U.Warship);
     if(fleet.length>=10||now()-s.lastReplacementAt<reviewMs)return null;
     return [...s.vacancies.values()].find(area=>!area.pending&&viable(actor,s,area)&&launchable(actor,s,area)&&
-      !fleet.some(ship=>!s.assignments.has(ship.id())&&actor.game.getWaterComponent(ship.tile())===area.component&&actor.game.manhattanDist(ship.tile(),area.tile)<=tripRange&&localRoute(actor,s,ship.tile(),area.tile)))||null;
+      !fleet.some(ship=>!s.assignments.has(ship.id())&&actor.game.getWaterComponent(ship.tile())===area.component&&localRoute(actor,s,ship.tile(),area.tile)))||null;
   }
   function waitingReplacement(actor){
     const s=state(actor);return [...s.vacancies.values()].some(area=>viable(actor,s,area)&&launchable(actor,s,area));
@@ -6019,8 +6022,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         const areas=(post?[post]:s.areas).filter(a=>a.component===component&&viable(actor,s,a));
         let best;
         for(const area of areas){
-          if(game.manhattanDist(tile,area.tile)>tripRange)continue;
-          const score=area.density*100-game.manhattanDist(tile,area.tile)*.4;
+          const score=area.density*100/(1+game.manhattanDist(tile,area.tile)/teamRange);
           if((!best||score>best.score)&&localRoute(actor,s,tile,area.tile))best={tile,portTile:port.tile(),hotspot:area.tile,
             density:area.density,postKey:area.key,score,reason:'Deploy from a usable port connected to productive trade traffic'};
         }
@@ -7785,7 +7787,7 @@ function createBrainRuntime(deps) {
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
         if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
-          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,enemyDistance:area.enemyDistance,tripRange:area.tripRange});
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,enemyDistance:area.enemyDistance});
       };
       hooks.move=(ship,tile)=>{
         const ctor=deps.warshipMoveCtor?.();
@@ -8695,7 +8697,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.67'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.68'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

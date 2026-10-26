@@ -1,7 +1,7 @@
 'use strict';
 
 function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffic=3}) {
-  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=160,tripRange=240;
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=160;
   const raw=unit=>unit?.__src||unit;
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
@@ -114,27 +114,30 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         else if(s.enemyIds.has(owner))enemyDistance=Math.min(enemyDistance,distance);
       }
     }
-    const facts={teamDistance,enemyDistance,teamRange,tripRange,
+    const facts={teamDistance,enemyDistance,teamRange,
       allowed:component!=null&&teamDistance<=teamRange&&!(enemyDistance<=100&&enemyDistance<=teamDistance+24)};
     if(s.support.size>=1024)s.support.delete(s.support.keys().next().value);
     s.support.set(tile,facts);return facts;
   }
   function localRoute(actor,s,start,end){
     const game=actor.game,key=start+':'+end;if(s.routes.has(key))return s.routes.get(key);
-    if(game.manhattanDist(start,end)>tripRange)return false;
     const x=game.x(start),y=game.y(start),dx=game.x(end)-x,dy=game.y(end)-y;
-    const steps=Math.max(Math.abs(dx),Math.abs(dy));let allowed=true;
-    for(let i=0;i<=steps;i++){
-      const px=Math.round(x+dx*(steps?i/steps:0)),py=Math.round(y+dy*(steps?i/steps:0));
+    const steps=Math.max(Math.abs(dx),Math.abs(dy)),checks=Math.min(steps,511);let allowed=true,lastSupport=-Infinity;
+    for(let i=0;i<=checks;i++){
+      const fraction=checks?i/checks:0,progress=steps*fraction;
+      const px=Math.round(x+dx*fraction),py=Math.round(y+dy*fraction);
       if(!game.isValidCoord(px,py)){allowed=false;break;}const tile=game.ref(px,py);
-      if(!game.isWater(tile)||(i%16===0||i===steps)&&!locality(actor,s,tile).allowed){allowed=false;break;}
+      if(!game.isWater(tile)){allowed=false;break;}
+      if(progress-lastSupport>=16||i===checks){
+        if(!locality(actor,s,tile).allowed){allowed=false;break;}lastSupport=progress;
+      }
     }
     if(s.routes.size>=1024)s.routes.delete(s.routes.keys().next().value);
     s.routes.set(key,allowed);return allowed;
   }
   function launchable(actor,s,area){
     return s.coasts.some(c=>c.own&&c.components.has(area.component)&&
-      c.water.some(tile=>actor.game.getWaterComponent(tile)===area.component&&actor.game.manhattanDist(tile,area.tile)<=tripRange&&!unsafe(actor,s,tile)&&localRoute(actor,s,tile,area.tile)));
+      c.water.some(tile=>actor.game.getWaterComponent(tile)===area.component&&!unsafe(actor,s,tile)&&localRoute(actor,s,tile,area.tile)));
   }
   function returnToTeam(actor,ship){
     const s=state(actor),game=actor.game,component=game.getWaterComponent(ship.tile());
@@ -178,16 +181,16 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
       for(const [id,a] of s.assignments)if(id!==ship.id()&&a.component===component&&game.manhattanDist(a.tile,area.tile)<=120)occupancy++;
       const distance=game.manhattanDist(ship.tile(),area.tile);
       return {...area,...locality(actor,s,area.tile),clearance,reviewed:true,reviewedAt:time,retained:false,occupancy,distance,
-        score:(area.density*100-Math.min(distance,1200)*.4)/(1+occupancy*1.5),
+        score:area.density*100/((1+distance/teamRange)*(1+occupancy*1.5)),
         reason:vacant.length?'Fill a vacant piracy post with an existing ship':'Post in open water with dense enemy trade'};
-    }).filter(a=>a.allowed&&a.distance<=tripRange&&(vacant.length||a.score>0)&&localRoute(actor,s,ship.tile(),a.tile)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
+    }).filter(a=>a.allowed&&(vacant.length||a.score>0)&&localRoute(actor,s,ship.tile(),a.tile)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
       .sort((a,b)=>b.score-a.score||a.distance-b.distance||a.key.localeCompare(b.key)).slice(0,79);
   }
   function replacement(actor){
     const s=state(actor),fleet=actor.player.units(U.Warship);
     if(fleet.length>=10||now()-s.lastReplacementAt<reviewMs)return null;
     return [...s.vacancies.values()].find(area=>!area.pending&&viable(actor,s,area)&&launchable(actor,s,area)&&
-      !fleet.some(ship=>!s.assignments.has(ship.id())&&actor.game.getWaterComponent(ship.tile())===area.component&&actor.game.manhattanDist(ship.tile(),area.tile)<=tripRange&&localRoute(actor,s,ship.tile(),area.tile)))||null;
+      !fleet.some(ship=>!s.assignments.has(ship.id())&&actor.game.getWaterComponent(ship.tile())===area.component&&localRoute(actor,s,ship.tile(),area.tile)))||null;
   }
   function waitingReplacement(actor){
     const s=state(actor);return [...s.vacancies.values()].some(area=>viable(actor,s,area)&&launchable(actor,s,area));
@@ -212,8 +215,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         const areas=(post?[post]:s.areas).filter(a=>a.component===component&&viable(actor,s,a));
         let best;
         for(const area of areas){
-          if(game.manhattanDist(tile,area.tile)>tripRange)continue;
-          const score=area.density*100-game.manhattanDist(tile,area.tile)*.4;
+          const score=area.density*100/(1+game.manhattanDist(tile,area.tile)/teamRange);
           if((!best||score>best.score)&&localRoute(actor,s,tile,area.tile))best={tile,portTile:port.tile(),hotspot:area.tile,
             density:area.density,postKey:area.key,score,reason:'Deploy from a usable port connected to productive trade traffic'};
         }

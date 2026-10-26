@@ -128,7 +128,7 @@ test('unconfirmed replacement expires and can retry without forgetting the post'
 test('very dense remote enemy traffic cannot beat a useful local post',()=>{
  const f=fixture({minTraffic:3});f.setHomePorts([{...f.ship(100,0),owner:()=>f.actor.player}]);
  f.setTraffic([f.trade(1,100),f.trade(2,110),f.trade(3,120),...Array.from({length:30},(_,i)=>f.trade(10+i,600+i))]);
- const area=f.rank()[0];assert.ok(area.tile<160);assert.ok(area.teamDistance<=160);assert.ok(area.distance<=240);
+ const area=f.rank()[0];assert.ok(area.tile<160);assert.ok(area.teamDistance<=160);assert.ok(area.distance>=0);
 });
 test('piracy waits when nearby eligible trade is too sparse',()=>{
  const f=fixture({useProductionThreshold:true});f.setTraffic([f.trade(1,100),f.trade(2,110)]);assert.deepEqual(f.rank(),[]);
@@ -176,4 +176,14 @@ test('team-owned coast supports local piracy even without ports; enemy-owned coa
  f.fleet[0]=f.ship(1,50);f.setTraffic([f.trade(1,70),f.trade(2,72),f.trade(3,75),
   ...Array.from({length:10},(_,i)=>f.trade(10+i,100+i))]);
  const area=f.rank()[0];assert.ok(area.tile<100);assert.equal(area.density,3);
+});
+
+test('supported routes over240tiles remain eligible for assignment, retention and replacement',()=>{
+ const f=fixture({minTraffic:3});f.actor.game.getWaterComponent=()=>1;
+ f.setHomePorts(Array.from({length:21},(_,i)=>({...f.ship(100+i,i*160),owner:()=>f.actor.player})));
+ f.setTraffic([f.trade(1,3000),f.trade(2,3010),f.trade(3,3020)]);
+ const area=f.rank()[0];assert.equal(area.tile,3000);assert.ok(area.score>0);
+ f.observer.assign(f.actor,f.fleet[0],area);assert.equal(f.rank()[0].tile,3000);
+ f.fleet.splice(0);const post=f.observer.replacement(f.actor);assert.equal(post.tile,3000);
+ assert.ok(f.observer.deployment(f.actor,[f.ship(70,0)],post).length);
 });
