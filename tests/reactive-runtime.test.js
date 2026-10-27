@@ -22,18 +22,20 @@ function fixture(options={}){
  const quote={type:U.SAMLauncher,canBuild:false,canUpgrade:1,cost:9000000n,upgradeCosts:[3000000n]};
  const actor={game,player:self,buildableFor:async()=>quote,placementsCount:1,
    cost:()=>1000000n,ownedLevels:type=>type===U.SAMLauncher?sam.level():3,
-   hasHighStartingGold:()=>false,isHighNationDensity:()=>false,samThreatLevels:()=>0,samTargetLevels:()=>1,
+   hasHighStartingGold:()=>false,isHighNationDensity:()=>false,samThreatLevels:()=>0,samTargetLevels:()=>options.samTarget??1,
    getPerceivedCost:()=>1000000n,shouldBuildStructure:()=>false,maybeSpawnStructure:async()=>false};
  const bot={mg:game,player:self,structureBehavior:actor};const menu={sendBuildOrUpgrade:q=>{builds.push(q);}};
  runtime=require('../src/brain/runtime')({createEngine:engine,createLegacyStrategy:legacy,strategies:[adaptive(legacy())],defaultStrategy:'adaptive-v1',
    units:U,createSpendingLedger:require('../src/brain/spending-ledger'),
    createSamDevelopment:options.planned?require('../src/brain/sam-development'):undefined,
    buildAllowed:options.buildAllowed,
-   defenseEconomy:{observe:()=>({stage:options.stage??'reserve',reserve:3000000n,development:options.development??{samTargetLevel:2}})},
+   defenseEconomy:{observe:()=>options.noEconomy?null:({stage:options.stage??'reserve',reserve:3000000n,development:options.development??{samTargetLevel:2}}),
+     development:()=>options.development??{samTargetLevel:2}},
    createReactiveSam:require('../src/brain/reactive-sam'),samDefenseObserver:require('../src/brain/sam-defense-observer')({units:U}),
    sendSamUpgrade:(a,q)=>{runtime.build(a,'ReactiveSAM',menu,q);return!runtime.wasDeclined(a);},
    structurePlanner:require('../src/brain/structure-planner')({units:U,settings:()=>({}),difficulty:()=> 'Easy'}),
-   buildingPlanner:{handle:async()=>{if(options.planned&&await runtime.planStructures(actor,{cityLevels:3,sharedWater:true}))return true;normal++;return false;}},
+   buildingPlanner:{handle:async()=>{if(options.planned&&await runtime.planStructures(actor,{cityLevels:3,sharedWater:true}))return true;normal++;return false;},
+     action:async()=>{normal++;return false;}},
    enabled:()=>true,isCurrent:()=>true,isPublic:()=>false,settings:()=>({features:{build:true}}),emitIntent:()=>true});
  runtime.attach(bot);runtime.begin(bot);runtime.attachBehaviors(bot);
  return {runtime,actor,builds,menu,sam,game,nuke,normal:()=>normal,run:()=>runtime.planBuilding(actor,'handle')};
@@ -93,6 +95,46 @@ test('late-game planned SAM upgrade cannot spend the3M emergency reserve',async(
  const f=fixture({planned:true,noThreat:true,gold:5000000n,level:4,development:{samTargetLevel:5}});
  assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
  assert.equal(f.runtime.build(f.actor,'optional',f.menu,{type:U.Port,canBuild:50,canUpgrade:false,cost:1000000n}),false);
+});
+test('outside the safe two-team policy an existing SAM still receives a planned upgrade',async()=>{
+ const f=fixture({planned:true,noThreat:true,noEconomy:true,gold:6000000n,samTarget:3});
+ assert.equal(await f.run(),true);assert.equal(f.builds.length,1);assert.equal(f.builds[0].canUpgrade,1);
+});
+test('central final gateway blocks a new SAM while an active owned SAM exists',()=>{
+ for(const noEconomy of [false,true]){
+  const f=fixture({planned:true,noThreat:true,noEconomy,gold:20000000n});
+  assert.equal(f.runtime.build(f.actor,'normal',f.menu,{type:U.SAMLauncher,canBuild:90,canUpgrade:false,cost:1500000n}),false);
+  assert.equal(f.builds.length,0);
+ }
+});
+test('SAM placement guard permits first and destroyed-launcher replacements but waits for construction',()=>{
+ for(const state of ['none','destroyed','building']){
+  const f=fixture({planned:true,noThreat:true,gold:20000000n});
+  if(state==='none')f.actor.player.units=()=>[];
+  if(state==='destroyed')f.sam.isActive=()=>false;
+  if(state==='building')f.sam.isUnderConstruction=()=>true;
+  const result=f.runtime.build(f.actor,'normal',f.menu,{type:U.SAMLauncher,canBuild:90,canUpgrade:false,cost:1500000n});
+  assert.equal(result!==false,state!=='building',state);
+ }
+});
+test('SAM build requests with an existing launcher route to upgrade instead of density placement',async()=>{
+ const f=fixture({planned:true,noThreat:true,noEconomy:true,gold:6000000n});
+ assert.equal(await f.runtime.planBuilding(f.actor,'action',U.SAMLauncher,[f.sam]),true);
+ assert.equal(f.normal(),0);assert.equal(f.builds[0].canUpgrade,1);
+});
+test('outside-opening upgrade savings preserve3M and emergencies can still spend it',async()=>{
+ const planned=fixture({planned:true,noThreat:true,noEconomy:true,gold:5000000n});
+ assert.equal(await planned.run(),false);assert.equal(planned.builds.length,0);
+ const emergency=fixture({planned:true,noEconomy:true,gold:3000000n});
+ assert.equal(await emergency.run(),true);assert.equal(emergency.builds[0].canUpgrade,1);
+});
+test('outside-opening planning does not reserve or upgrade SAMs when nuclear defense is disabled',async()=>{
+ for(const disabled of [[U.AtomBomb,U.HydrogenBomb,U.MIRVWarhead],[U.MissileSilo]]){
+  const f=fixture({planned:true,noThreat:true,noEconomy:true,gold:6000000n,samTarget:3});
+  const config=f.game.config();f.game.config=()=>({...config,isUnitDisabled:type=>disabled.includes(type)});
+  assert.equal(f.runtime.defenseEconomyFacts(f.actor),null);
+  assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
+ }
 });
 
 test('planned upgrades preserve the opening and emergency upgrades can still use reserve',async()=>{

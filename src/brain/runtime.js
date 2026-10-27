@@ -366,6 +366,9 @@ function createBrainRuntime(deps) {
       if(adaptive&&(deps.buildAllowed?.(bu.type)===false||controller.bot.mg.config().isUnitDisabled?.(bu.type)===true))
         return {allowed:false,reason:'Building type disabled before final dispatch'};
       const facts=defenseEconomyFacts(actor),upgrade=typeof bu?.canUpgrade==='number';
+      if(adaptive&&!upgrade&&bu?.type===deps.units?.SAMLauncher&&
+          (controller.bot.player.units(deps.units.SAMLauncher)||[]).some(unit=>!unit.isActive||unit.isActive()))
+        return {allowed:false,reason:'Upgrade the existing owned SAM instead of placing another launcher'};
       const proof=reactiveQuotes.get(bu);
       if(adaptive&&upgrade&&bu.type===deps.units?.SAMLauncher&&(!proof||proof.tick!==controller.bot.mg.ticks()))
         return {allowed:false,reason:'SAM upgrades require a fresh central defense decision'};
@@ -1103,7 +1106,12 @@ function createBrainRuntime(deps) {
         if(!buildingAllowed(actor))return false;
         return await deps.buildingPlanner.handle(actor, hooks);
       }
-      if (mode === 'action') return await deps.buildingPlanner.action(actor, first, second, hooks);
+      if (mode === 'action') {
+        if(first===deps.units?.SAMLauncher&&controller.engine.selectedStrategy?.()==='adaptive-v1'&&
+            (controller.bot.player.units(first)||[]).some(unit=>!unit.isActive||unit.isActive()))
+          return await maybeReactiveSam(actor,{plannedOnly:true});
+        return await deps.buildingPlanner.action(actor, first, second, hooks);
+      }
       return await deps.buildingPlanner[mode](actor, first, hooks, second);
     } finally {
       if (!existing) buildingScopes.delete(actor);
@@ -1414,7 +1422,23 @@ function createBrainRuntime(deps) {
     if(!deps.defenseEconomy||controller?.engine.selectedStrategy?.()!=='adaptive-v1')return null;
     const game=actor.game||actor.mg||controller.bot.mg,player=actor.player||controller.bot.player;
     const structure=controller.bot.structureBehavior;
-    const facts=deps.defenseEconomy.observe(game,player,openingFacts({game,player,_sharedWaterComponents:structure?._sharedWaterComponents}));
+    let facts=deps.defenseEconomy.observe(game,player,openingFacts({game,player,_sharedWaterComponents:structure?._sharedWaterComponents}));
+    // The staged opening is two-team/safe-specific. Existing launcher upgrades
+    // and their budget must remain available in frontline, FFA and other teams.
+    const config=game.config(),U=deps.units;
+    const nuclearDefense=U?.SAMLauncher&&U.MissileSilo&&!config.isUnitDisabled(U.SAMLauncher)&&
+      !config.isUnitDisabled(U.MissileSilo)&&[U.AtomBomb,U.HydrogenBomb,U.MIRV].some(type=>type!==undefined&&!config.isUnitDisabled(type));
+    if(!facts&&nuclearDefense&&
+        deps.buildAllowed?.(deps.units.SAMLauncher)!==false&&
+        (player.units(deps.units.SAMLauncher)||[]).some(unit=>!unit.isActive||unit.isActive())){
+      const development=deps.defenseEconomy.development?.(game,player);
+      if(development){
+        const cityLevels=structure?.ownedLevels?.(deps.units.City)??0;
+        const target=structure?.samTargetLevels?.(cityLevels);
+        facts={stage:'reserve',reserve:3000000n,budgetOnly:true,requiredType:null,
+          development:{...development,samTargetLevel:Number.isFinite(target)?Math.max(development.samTargetLevel,target):development.samTargetLevel}};
+      }
+    }
     if(!facts||!controller.samDevelopment||!deps.samDefenseObserver)return facts;
     const observation=deps.samDefenseObserver.observe(game,player);
     const planned=samDevelopmentFacts(actor,observation,facts);
