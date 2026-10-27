@@ -62,6 +62,23 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     if (parts.length !== 2) throw new Error(`Expected one baseline anchor: ${before.slice(0, 100)}`);
     source = parts.join(after);
   }
+  const rewardsModule=fs.readFileSync(path.join(root,'src/lobby/post-match-rewards.js'),'utf8')
+    .replace(/^if\(typeof module.*$/m,'');
+  replaceOne('keepAutoJoinAfterMatch:true,','keepAutoJoinAfterMatch:true,autoClaimPostMatchRewards:false,');
+  replaceOne('function tryAutoJoin(){',rewardsModule+'\n'+
+    'const ofhPostMatchRewards=createPostMatchRewards({enabled:()=>settings.autoClaimPostMatchRewards===true,modal:()=>document.querySelector("win-modal")});'+
+    'window.__OFH_postMatchRewards=ofhPostMatchRewards;'+
+    'window.setInterval(()=>ofhPostMatchRewards.hold(),1000);'+
+    'function tryAutoJoin(){if(ofhPostMatchRewards.hold())return;');
+  replaceOne('autoLeaveFired=true;try{window.location.href="/"}',
+    'if(window.__OFH_postMatchRewards?.hold())return;autoLeaveFired=true;try{window.location.href="/"}');
+  replaceOne('e.append(y("Auto-leave on team win",',
+    'e.append(y("Auto claim post-match rewards","Claim available match rewards before automatically leaving. Waits up to 60 seconds.",!!l.autoClaimPostMatchRewards,i=>{l.autoClaimPostMatchRewards=i,m()})),e.append(y("Auto-leave on team win",');
+  const rewardRow='<label class="ofh-aj-notif"><span class="ofh-aj-notif-text">Auto claim post-match rewards</span><input type="checkbox" data-role="claim-rewards"><span class="ofh-aj-switch"></span></label>';
+  replaceOne('<div class="ofh-aj-summary ${settings.floatingAutoJoinFiltersCollapsed?',
+    rewardRow+'<div class="ofh-aj-summary ${settings.floatingAutoJoinFiltersCollapsed?');
+  replaceOne('function applyFloatingAutoJoinPanelState(){',
+    'function applyFloatingAutoJoinPanelState(){const rewardToggle=document.querySelector(\'[data-role="claim-rewards"]\');if(rewardToggle){rewardToggle.checked=settings.autoClaimPostMatchRewards===true;if(!rewardToggle.ofhWired){rewardToggle.ofhWired=true;rewardToggle.addEventListener("change",()=>saveSettings({...settings,autoClaimPostMatchRewards:rewardToggle.checked}).catch(error=>console.error("Failed to save reward setting",error)))}}');
   replaceOne('_ctors.embargo&&_ctors.donateTroops','_ctors.embargo&&_ctors.embargoAll&&_ctors.donateTroops');
   replaceOne('if(!_ctors.embargo){try{',
     'if(!_ctors.embargoAll){try{const a=new t("start"),i=new t("stop");if(a?.action==="start"&&i?.action==="stop"&&Object.keys(a).length===1&&Object.keys(i).length===1){_ctors.embargoAll=t;continue}}catch(a){}}if(!_ctors.embargo){try{');
@@ -523,7 +540,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.71';
+  const version='1.84.72';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);

@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.71) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.72) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.71)
+## Install and update (1.84.72)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,10 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Post-match reward claiming
+
+Auto Join now has an **Auto claim post-match rewards** toggle, off by default, also available in the main settings. It clicks only the game’s confirmed post-match Claim control, respects busy/held states, and delays automatic leave/join for at most 60 seconds. Failed claims get one retry after five seconds. Account/login rewards and manual navigation are unaffected.
 
 ## Safer two-team spawning (1.84.71)
 
