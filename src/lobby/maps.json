@@ -1,0 +1,1195 @@
+{
+  "source": {
+    "repository": "https://github.com/openfrontio/OpenFrontIO",
+    "tag": "v0.35.5",
+    "path": "packages/engine-api/src/game/Maps.gen.ts",
+    "sha256": "ac1ecf59a53050f44a7a5e46e838a14f3d1e19be2d0eab80d49e042e2846cfce"
+  },
+  "maps": [
+    {
+      "id": "achiran",
+      "name": "Achiran",
+      "aliases": [
+        "Achiran"
+      ],
+      "thumbnail": "assets/map-thumbnails/achiran/thumbnail.webp"
+    },
+    {
+      "id": "aegean",
+      "name": "Aegean",
+      "aliases": [
+        "Aegean"
+      ],
+      "thumbnail": "assets/map-thumbnails/aegean/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "africa",
+      "name": "Africa",
+      "aliases": [
+        "Africa"
+      ],
+      "thumbnail": "assets/map-thumbnails/africa/thumbnail.webp"
+    },
+    {
+      "id": "alps",
+      "name": "Alps",
+      "aliases": [
+        "Alps"
+      ],
+      "thumbnail": "assets/map-thumbnails/alps/thumbnail.webp"
+    },
+    {
+      "id": "amazonriver",
+      "name": "Amazon River",
+      "aliases": [
+        "AmazonRiver",
+        "Amazon River"
+      ],
+      "thumbnail": "assets/map-thumbnails/amazonriver/thumbnail.webp"
+    },
+    {
+      "id": "antarctica",
+      "name": "Antarctica",
+      "aliases": [
+        "Antarctica"
+      ],
+      "thumbnail": "assets/map-thumbnails/antarctica/thumbnail.webp"
+    },
+    {
+      "id": "archipelagosea",
+      "name": "Archipelago Sea",
+      "aliases": [
+        "ArchipelagoSea"
+      ],
+      "thumbnail": "assets/map-thumbnails/archipelagosea/thumbnail.webp"
+    },
+    {
+      "id": "arctic",
+      "name": "Arctic",
+      "aliases": [
+        "Arctic"
+      ],
+      "thumbnail": "assets/map-thumbnails/arctic/thumbnail.webp"
+    },
+    {
+      "id": "asia",
+      "name": "Asia",
+      "aliases": [
+        "Asia"
+      ],
+      "thumbnail": "assets/map-thumbnails/asia/thumbnail.webp"
+    },
+    {
+      "id": "australia",
+      "name": "Australia",
+      "aliases": [
+        "Australia"
+      ],
+      "thumbnail": "assets/map-thumbnails/australia/thumbnail.webp"
+    },
+    {
+      "id": "babelmandebstrait",
+      "name": "Bab el-Mandeb Strait",
+      "aliases": [
+        "BabelMandebStrait",
+        "Bab el-Mandeb Strait"
+      ],
+      "thumbnail": "assets/map-thumbnails/babelmandebstrait/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "baikal",
+      "name": "Baikal",
+      "aliases": [
+        "Baikal"
+      ],
+      "thumbnail": "assets/map-thumbnails/baikal/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "baikalnukewars",
+      "name": "Baikal (Nuke Wars)",
+      "aliases": [
+        "BaikalNukeWars",
+        "Baikal Nuke Wars"
+      ],
+      "thumbnail": "assets/map-thumbnails/baikalnukewars/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "bajacalifornia",
+      "name": "Baja California",
+      "aliases": [
+        "BajaCalifornia",
+        "Baja California"
+      ],
+      "thumbnail": "assets/map-thumbnails/bajacalifornia/thumbnail.webp"
+    },
+    {
+      "id": "balkans",
+      "name": "Balkans",
+      "aliases": [
+        "Balkans"
+      ],
+      "thumbnail": "assets/map-thumbnails/balkans/thumbnail.webp"
+    },
+    {
+      "id": "balkhash",
+      "name": "Balkhash",
+      "aliases": [
+        "Balkhash"
+      ],
+      "thumbnail": "assets/map-thumbnails/balkhash/thumbnail.webp"
+    },
+    {
+      "id": "baltics",
+      "name": "Baltics",
+      "aliases": [
+        "Baltics"
+      ],
+      "thumbnail": "assets/map-thumbnails/baltics/thumbnail.webp"
+    },
+    {
+      "id": "benelux",
+      "name": "Benelux",
+      "aliases": [
+        "Benelux"
+      ],
+      "thumbnail": "assets/map-thumbnails/benelux/thumbnail.webp"
+    },
+    {
+      "id": "beringsea",
+      "name": "Bering Sea",
+      "aliases": [
+        "BeringSea",
+        "Bering Sea"
+      ],
+      "thumbnail": "assets/map-thumbnails/beringsea/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "beringstrait",
+      "name": "Bering Strait",
+      "aliases": [
+        "BeringStrait",
+        "Bering Strait"
+      ],
+      "thumbnail": "assets/map-thumbnails/beringstrait/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "betweentwoseas",
+      "name": "Between Two Seas",
+      "aliases": [
+        "BetweenTwoSeas",
+        "Between Two Seas"
+      ],
+      "thumbnail": "assets/map-thumbnails/betweentwoseas/thumbnail.webp"
+    },
+    {
+      "id": "blacksea",
+      "name": "Black Sea",
+      "aliases": [
+        "BlackSea",
+        "Black Sea"
+      ],
+      "thumbnail": "assets/map-thumbnails/blacksea/thumbnail.webp"
+    },
+    {
+      "id": "bosphorusstraits",
+      "name": "Bosphorus Straits",
+      "aliases": [
+        "BosphorusStraits",
+        "Bosphorus Straits"
+      ],
+      "thumbnail": "assets/map-thumbnails/bosphorusstraits/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "brainrot",
+      "name": "Brain Rot",
+      "aliases": [
+        "BrainRot",
+        "Brain Rot"
+      ],
+      "thumbnail": "assets/map-thumbnails/brainrot/thumbnail.webp",
+      "specialTeamCount": 27
+    },
+    {
+      "id": "branchingpaths",
+      "name": "Branching Paths",
+      "aliases": [
+        "BranchingPaths",
+        "Branching Paths"
+      ],
+      "thumbnail": "assets/map-thumbnails/branchingpaths/thumbnail.webp",
+      "specialTeamCount": 3
+    },
+    {
+      "id": "britannia",
+      "name": "Britannia",
+      "aliases": [
+        "Britannia"
+      ],
+      "thumbnail": "assets/map-thumbnails/britannia/thumbnail.webp"
+    },
+    {
+      "id": "britanniaclassic",
+      "name": "Britannia (Classic)",
+      "aliases": [
+        "BritanniaClassic",
+        "Britannia Classic"
+      ],
+      "thumbnail": "assets/map-thumbnails/britanniaclassic/thumbnail.webp"
+    },
+    {
+      "id": "canaryislands",
+      "name": "Canary Islands",
+      "aliases": [
+        "CanaryIslands",
+        "Canary Islands"
+      ],
+      "thumbnail": "assets/map-thumbnails/canaryislands/thumbnail.webp"
+    },
+    {
+      "id": "capecod",
+      "name": "Cape Cod",
+      "aliases": [
+        "CapeCod",
+        "Cape Cod"
+      ],
+      "thumbnail": "assets/map-thumbnails/capecod/thumbnail.webp"
+    },
+    {
+      "id": "capeofgoodhope",
+      "name": "Cape Of Good Hope",
+      "aliases": [
+        "CapeOfGoodHope",
+        "Cape Of Good Hope"
+      ],
+      "thumbnail": "assets/map-thumbnails/capeofgoodhope/thumbnail.webp"
+    },
+    {
+      "id": "caribbean",
+      "name": "Caribbean",
+      "aliases": [
+        "Caribbean"
+      ],
+      "thumbnail": "assets/map-thumbnails/caribbean/thumbnail.webp"
+    },
+    {
+      "id": "caspiansea",
+      "name": "Caspian Sea",
+      "aliases": [
+        "CaspianSea",
+        "Caspian Sea"
+      ],
+      "thumbnail": "assets/map-thumbnails/caspiansea/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "caucasus",
+      "name": "Caucasus",
+      "aliases": [
+        "Caucasus"
+      ],
+      "thumbnail": "assets/map-thumbnails/caucasus/thumbnail.webp"
+    },
+    {
+      "id": "centralamerica",
+      "name": "Central America",
+      "aliases": [
+        "CentralAmerica",
+        "Central America"
+      ],
+      "thumbnail": "assets/map-thumbnails/centralamerica/thumbnail.webp"
+    },
+    {
+      "id": "channelislands",
+      "name": "Channel Islands",
+      "aliases": [
+        "ChannelIslands",
+        "Channel Islands"
+      ],
+      "thumbnail": "assets/map-thumbnails/channelislands/thumbnail.webp"
+    },
+    {
+      "id": "china",
+      "name": "China",
+      "aliases": [
+        "China"
+      ],
+      "thumbnail": "assets/map-thumbnails/china/thumbnail.webp"
+    },
+    {
+      "id": "choppingblock",
+      "name": "Chopping Block",
+      "aliases": [
+        "ChoppingBlock",
+        "Chopping Block"
+      ],
+      "thumbnail": "assets/map-thumbnails/choppingblock/thumbnail.webp",
+      "specialTeamCount": 4
+    },
+    {
+      "id": "clearwaterlakes",
+      "name": "Clearwater Lakes",
+      "aliases": [
+        "ClearwaterLakes",
+        "Clearwater Lakes"
+      ],
+      "thumbnail": "assets/map-thumbnails/clearwaterlakes/thumbnail.webp"
+    },
+    {
+      "id": "conakry",
+      "name": "Conakry",
+      "aliases": [
+        "Conakry"
+      ],
+      "thumbnail": "assets/map-thumbnails/conakry/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "crimea",
+      "name": "Crimea",
+      "aliases": [
+        "Crimea"
+      ],
+      "thumbnail": "assets/map-thumbnails/crimea/thumbnail.webp"
+    },
+    {
+      "id": "danishstraits",
+      "name": "Danish Straits",
+      "aliases": [
+        "DanishStraits",
+        "Danish Straits"
+      ],
+      "thumbnail": "assets/map-thumbnails/danishstraits/thumbnail.webp"
+    },
+    {
+      "id": "deglaciatedantarctica",
+      "name": "Deglaciated Antarctica",
+      "aliases": [
+        "DeglaciatedAntarctica",
+        "Deglaciated Antarctica"
+      ],
+      "thumbnail": "assets/map-thumbnails/deglaciatedantarctica/thumbnail.webp"
+    },
+    {
+      "id": "didier",
+      "name": "Didier",
+      "aliases": [
+        "Didier"
+      ],
+      "thumbnail": "assets/map-thumbnails/didier/thumbnail.webp"
+    },
+    {
+      "id": "didierfrance",
+      "name": "Didier (France)",
+      "aliases": [
+        "DidierFrance",
+        "Didier France"
+      ],
+      "thumbnail": "assets/map-thumbnails/didierfrance/thumbnail.webp"
+    },
+    {
+      "id": "dyslexdria",
+      "name": "Dyslexdria",
+      "aliases": [
+        "Dyslexdria"
+      ],
+      "thumbnail": "assets/map-thumbnails/dyslexdria/thumbnail.webp"
+    },
+    {
+      "id": "eastasia",
+      "name": "East Asia",
+      "aliases": [
+        "EastAsia",
+        "East Asia"
+      ],
+      "thumbnail": "assets/map-thumbnails/eastasia/thumbnail.webp"
+    },
+    {
+      "id": "europe",
+      "name": "Europe",
+      "aliases": [
+        "Europe"
+      ],
+      "thumbnail": "assets/map-thumbnails/europe/thumbnail.webp"
+    },
+    {
+      "id": "europeclassic",
+      "name": "Europe (Classic)",
+      "aliases": [
+        "EuropeClassic",
+        "Europe Classic"
+      ],
+      "thumbnail": "assets/map-thumbnails/europeclassic/thumbnail.webp"
+    },
+    {
+      "id": "falklandislands",
+      "name": "Falkland Islands",
+      "aliases": [
+        "FalklandIslands",
+        "Falkland Islands"
+      ],
+      "thumbnail": "assets/map-thumbnails/falklandislands/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "faroeislands",
+      "name": "Faroe Islands",
+      "aliases": [
+        "FaroeIslands",
+        "Faroe Islands"
+      ],
+      "thumbnail": "assets/map-thumbnails/faroeislands/thumbnail.webp"
+    },
+    {
+      "id": "fingerlakes",
+      "name": "Finger Lakes",
+      "aliases": [
+        "FingerLakes",
+        "Finger Lakes"
+      ],
+      "thumbnail": "assets/map-thumbnails/fingerlakes/thumbnail.webp"
+    },
+    {
+      "id": "fourislands",
+      "name": "Four Islands",
+      "aliases": [
+        "FourIslands",
+        "Four Islands"
+      ],
+      "thumbnail": "assets/map-thumbnails/fourislands/thumbnail.webp",
+      "specialTeamCount": 4
+    },
+    {
+      "id": "france",
+      "name": "France",
+      "aliases": [
+        "France"
+      ],
+      "thumbnail": "assets/map-thumbnails/france/thumbnail.webp"
+    },
+    {
+      "id": "gatewaytotheatlantic",
+      "name": "Gateway to the Atlantic",
+      "aliases": [
+        "GatewayToTheAtlantic",
+        "Gateway to the Atlantic"
+      ],
+      "thumbnail": "assets/map-thumbnails/gatewaytotheatlantic/thumbnail.webp"
+    },
+    {
+      "id": "germany",
+      "name": "Germany",
+      "aliases": [
+        "Germany"
+      ],
+      "thumbnail": "assets/map-thumbnails/germany/thumbnail.webp"
+    },
+    {
+      "id": "giantworldmap",
+      "name": "Giant World Map",
+      "aliases": [
+        "GiantWorldMap",
+        "Giant World Map"
+      ],
+      "thumbnail": "assets/map-thumbnails/giantworldmap/thumbnail.webp"
+    },
+    {
+      "id": "greatlakes",
+      "name": "Great Lakes",
+      "aliases": [
+        "GreatLakes",
+        "Great Lakes"
+      ],
+      "thumbnail": "assets/map-thumbnails/greatlakes/thumbnail.webp"
+    },
+    {
+      "id": "gulfofguinea",
+      "name": "Gulf Of Guinea",
+      "aliases": [
+        "GulfOfGuinea",
+        "Gulf Of Guinea"
+      ],
+      "thumbnail": "assets/map-thumbnails/gulfofguinea/thumbnail.webp"
+    },
+    {
+      "id": "gulfofmexico",
+      "name": "Gulf Of Mexico",
+      "aliases": [
+        "GulfOfMexico",
+        "Gulf Of Mexico"
+      ],
+      "thumbnail": "assets/map-thumbnails/gulfofmexico/thumbnail.webp"
+    },
+    {
+      "id": "gulfofstlawrence",
+      "name": "Gulf of St. Lawrence",
+      "aliases": [
+        "GulfOfStLawrence",
+        "Gulf of St. Lawrence"
+      ],
+      "thumbnail": "assets/map-thumbnails/gulfofstlawrence/thumbnail.webp",
+      "specialTeamCount": 3
+    },
+    {
+      "id": "halkidiki",
+      "name": "Halkidiki",
+      "aliases": [
+        "Halkidiki"
+      ],
+      "thumbnail": "assets/map-thumbnails/halkidiki/thumbnail.webp"
+    },
+    {
+      "id": "hawaii",
+      "name": "Hawaii",
+      "aliases": [
+        "Hawaii"
+      ],
+      "thumbnail": "assets/map-thumbnails/hawaii/thumbnail.webp"
+    },
+    {
+      "id": "hecatestrait",
+      "name": "Hecate Strait",
+      "aliases": [
+        "Hecatestrait",
+        "Hecate Strait"
+      ],
+      "thumbnail": "assets/map-thumbnails/hecatestrait/thumbnail.webp"
+    },
+    {
+      "id": "hongkong",
+      "name": "Hong Kong",
+      "aliases": [
+        "HongKong",
+        "Hong Kong"
+      ],
+      "thumbnail": "assets/map-thumbnails/hongkong/thumbnail.webp"
+    },
+    {
+      "id": "hornofafrica",
+      "name": "Horn Of Africa",
+      "aliases": [
+        "HornOfAfrica",
+        "Horn Of Africa"
+      ],
+      "thumbnail": "assets/map-thumbnails/hornofafrica/thumbnail.webp"
+    },
+    {
+      "id": "iceland",
+      "name": "Iceland",
+      "aliases": [
+        "Iceland"
+      ],
+      "thumbnail": "assets/map-thumbnails/iceland/thumbnail.webp"
+    },
+    {
+      "id": "indiansubcontinent",
+      "name": "Indian Subcontinent",
+      "aliases": [
+        "IndianSubcontinent",
+        "Indian Subcontinent"
+      ],
+      "thumbnail": "assets/map-thumbnails/indiansubcontinent/thumbnail.webp"
+    },
+    {
+      "id": "irishsea",
+      "name": "Irish Sea",
+      "aliases": [
+        "IrishSea",
+        "Irish Sea"
+      ],
+      "thumbnail": "assets/map-thumbnails/irishsea/thumbnail.webp",
+      "specialTeamCount": 3
+    },
+    {
+      "id": "italia",
+      "name": "Italia",
+      "aliases": [
+        "Italia"
+      ],
+      "thumbnail": "assets/map-thumbnails/italia/thumbnail.webp"
+    },
+    {
+      "id": "japan",
+      "name": "Japan",
+      "aliases": [
+        "Japan"
+      ],
+      "thumbnail": "assets/map-thumbnails/japan/thumbnail.webp"
+    },
+    {
+      "id": "juandefucastrait",
+      "name": "Juan De Fuca Strait",
+      "aliases": [
+        "JuanDeFucaStrait",
+        "Juan De Fuca Strait"
+      ],
+      "thumbnail": "assets/map-thumbnails/juandefucastrait/thumbnail.webp",
+      "specialTeamCount": 3
+    },
+    {
+      "id": "korea",
+      "name": "Korea",
+      "aliases": [
+        "Korea"
+      ],
+      "thumbnail": "assets/map-thumbnails/korea/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "labyrinth",
+      "name": "Labyrinth",
+      "aliases": [
+        "Labyrinth"
+      ],
+      "thumbnail": "assets/map-thumbnails/labyrinth/thumbnail.webp"
+    },
+    {
+      "id": "lasvegasstrip",
+      "name": "Las Vegas Strip",
+      "aliases": [
+        "LasVegasStrip",
+        "Las Vegas Strip"
+      ],
+      "thumbnail": "assets/map-thumbnails/lasvegasstrip/thumbnail.webp"
+    },
+    {
+      "id": "lemnos",
+      "name": "Lemnos",
+      "aliases": [
+        "Lemnos"
+      ],
+      "thumbnail": "assets/map-thumbnails/lemnos/thumbnail.webp"
+    },
+    {
+      "id": "levant",
+      "name": "Levant",
+      "aliases": [
+        "Levant"
+      ],
+      "thumbnail": "assets/map-thumbnails/levant/thumbnail.webp"
+    },
+    {
+      "id": "lisbon",
+      "name": "Lisbon",
+      "aliases": [
+        "Lisbon"
+      ],
+      "thumbnail": "assets/map-thumbnails/lisbon/thumbnail.webp"
+    },
+    {
+      "id": "losangeles",
+      "name": "Los Angeles",
+      "aliases": [
+        "LosAngeles",
+        "Los Angeles"
+      ],
+      "thumbnail": "assets/map-thumbnails/losangeles/thumbnail.webp"
+    },
+    {
+      "id": "luna",
+      "name": "Luna",
+      "aliases": [
+        "Luna"
+      ],
+      "thumbnail": "assets/map-thumbnails/luna/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "madagascar",
+      "name": "Madagascar",
+      "aliases": [
+        "Madagascar"
+      ],
+      "thumbnail": "assets/map-thumbnails/madagascar/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "manicouagan",
+      "name": "Manicouagan",
+      "aliases": [
+        "Manicouagan"
+      ],
+      "thumbnail": "assets/map-thumbnails/manicouagan/thumbnail.webp"
+    },
+    {
+      "id": "marenostrum",
+      "name": "Mare Nostrum",
+      "aliases": [
+        "MareNostrum",
+        "Mare Nostrum"
+      ],
+      "thumbnail": "assets/map-thumbnails/marenostrum/thumbnail.webp"
+    },
+    {
+      "id": "mars",
+      "name": "Mars",
+      "aliases": [
+        "Mars"
+      ],
+      "thumbnail": "assets/map-thumbnails/mars/thumbnail.webp"
+    },
+    {
+      "id": "mena",
+      "name": "MENA",
+      "aliases": [
+        "Mena"
+      ],
+      "thumbnail": "assets/map-thumbnails/mena/thumbnail.webp"
+    },
+    {
+      "id": "middleeast",
+      "name": "Middle East",
+      "aliases": [
+        "MiddleEast",
+        "Middle East"
+      ],
+      "thumbnail": "assets/map-thumbnails/middleeast/thumbnail.webp"
+    },
+    {
+      "id": "milkyway",
+      "name": "Milky Way",
+      "aliases": [
+        "MilkyWay"
+      ],
+      "thumbnail": "assets/map-thumbnails/milkyway/thumbnail.webp"
+    },
+    {
+      "id": "mississippiriver",
+      "name": "Mississippi River",
+      "aliases": [
+        "MississippiRiver",
+        "Mississippi River"
+      ],
+      "thumbnail": "assets/map-thumbnails/mississippiriver/thumbnail.webp"
+    },
+    {
+      "id": "montreal",
+      "name": "Montreal",
+      "aliases": [
+        "Montreal"
+      ],
+      "thumbnail": "assets/map-thumbnails/montreal/thumbnail.webp"
+    },
+    {
+      "id": "morethanluck",
+      "name": "More Than Luck",
+      "aliases": [
+        "MoreThanLuck",
+        "More Than Luck"
+      ],
+      "thumbnail": "assets/map-thumbnails/morethanluck/thumbnail.webp",
+      "specialTeamCount": 5
+    },
+    {
+      "id": "newyorkcity",
+      "name": "New York City",
+      "aliases": [
+        "NewYorkCity",
+        "New York City"
+      ],
+      "thumbnail": "assets/map-thumbnails/newyorkcity/thumbnail.webp"
+    },
+    {
+      "id": "newzealand",
+      "name": "New Zealand",
+      "aliases": [
+        "NewZealand",
+        "New Zealand"
+      ],
+      "thumbnail": "assets/map-thumbnails/newzealand/thumbnail.webp"
+    },
+    {
+      "id": "niledelta",
+      "name": "Nile Delta",
+      "aliases": [
+        "NileDelta",
+        "Nile Delta"
+      ],
+      "thumbnail": "assets/map-thumbnails/niledelta/thumbnail.webp"
+    },
+    {
+      "id": "northamerica",
+      "name": "North America",
+      "aliases": [
+        "NorthAmerica",
+        "North America"
+      ],
+      "thumbnail": "assets/map-thumbnails/northamerica/thumbnail.webp"
+    },
+    {
+      "id": "northwestpassage",
+      "name": "Northwest Passage",
+      "aliases": [
+        "NorthwestPassage",
+        "Northwest Passage"
+      ],
+      "thumbnail": "assets/map-thumbnails/northwestpassage/thumbnail.webp"
+    },
+    {
+      "id": "oceania",
+      "name": "Oceania",
+      "aliases": [
+        "Oceania"
+      ],
+      "thumbnail": "assets/map-thumbnails/oceania/thumbnail.webp"
+    },
+    {
+      "id": "ommatrypta",
+      "name": "Ommatrypta",
+      "aliases": [
+        "Ommatrypta"
+      ],
+      "thumbnail": "assets/map-thumbnails/ommatrypta/thumbnail.webp",
+      "specialTeamCount": 13
+    },
+    {
+      "id": "onion",
+      "name": "Onion",
+      "aliases": [
+        "Onion"
+      ],
+      "thumbnail": "assets/map-thumbnails/onion/thumbnail.webp"
+    },
+    {
+      "id": "pangaea",
+      "name": "Pangaea",
+      "aliases": [
+        "Pangaea"
+      ],
+      "thumbnail": "assets/map-thumbnails/pangaea/thumbnail.webp"
+    },
+    {
+      "id": "passage",
+      "name": "Passage",
+      "aliases": [
+        "Passage"
+      ],
+      "thumbnail": "assets/map-thumbnails/passage/thumbnail.webp"
+    },
+    {
+      "id": "pluto",
+      "name": "Pluto",
+      "aliases": [
+        "Pluto"
+      ],
+      "thumbnail": "assets/map-thumbnails/pluto/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "pulicatlake",
+      "name": "Pulicat Lake",
+      "aliases": [
+        "PulicatLake",
+        "Pulicat Lake"
+      ],
+      "thumbnail": "assets/map-thumbnails/pulicatlake/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "qingchina",
+      "name": "Qing China",
+      "aliases": [
+        "QingChina",
+        "Qing China"
+      ],
+      "thumbnail": "assets/map-thumbnails/qingchina/thumbnail.webp"
+    },
+    {
+      "id": "riodejaneiro",
+      "name": "Rio de Janeiro",
+      "aliases": [
+        "RioDeJaneiro",
+        "Rio de Janeiro"
+      ],
+      "thumbnail": "assets/map-thumbnails/riodejaneiro/thumbnail.webp"
+    },
+    {
+      "id": "russia",
+      "name": "Russia",
+      "aliases": [
+        "Russia"
+      ],
+      "thumbnail": "assets/map-thumbnails/russia/thumbnail.webp"
+    },
+    {
+      "id": "sanfrancisco",
+      "name": "San Francisco",
+      "aliases": [
+        "SanFrancisco",
+        "San Francisco"
+      ],
+      "thumbnail": "assets/map-thumbnails/sanfrancisco/thumbnail.webp"
+    },
+    {
+      "id": "scandinavia",
+      "name": "Scandinavia",
+      "aliases": [
+        "Scandinavia"
+      ],
+      "thumbnail": "assets/map-thumbnails/scandinavia/thumbnail.webp"
+    },
+    {
+      "id": "sierpinski",
+      "name": "Sierpinski",
+      "aliases": [
+        "Sierpinski"
+      ],
+      "thumbnail": "assets/map-thumbnails/sierpinski/thumbnail.webp"
+    },
+    {
+      "id": "sol",
+      "name": "Sol",
+      "aliases": [
+        "Sol"
+      ],
+      "thumbnail": "assets/map-thumbnails/sol/thumbnail.webp"
+    },
+    {
+      "id": "southamerica",
+      "name": "South America",
+      "aliases": [
+        "SouthAmerica",
+        "South America"
+      ],
+      "thumbnail": "assets/map-thumbnails/southamerica/thumbnail.webp"
+    },
+    {
+      "id": "southeastasia",
+      "name": "Southeast Asia",
+      "aliases": [
+        "SoutheastAsia"
+      ],
+      "thumbnail": "assets/map-thumbnails/southeastasia/thumbnail.webp"
+    },
+    {
+      "id": "straitofgibraltar",
+      "name": "Strait of Gibraltar",
+      "aliases": [
+        "StraitOfGibraltar",
+        "Strait of Gibraltar"
+      ],
+      "thumbnail": "assets/map-thumbnails/straitofgibraltar/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "straitofhormuz",
+      "name": "Strait of Hormuz",
+      "aliases": [
+        "StraitOfHormuz",
+        "Strait of Hormuz"
+      ],
+      "thumbnail": "assets/map-thumbnails/straitofhormuz/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "straitofmalacca",
+      "name": "Strait Of Malacca",
+      "aliases": [
+        "StraitOfMalacca",
+        "Strait Of Malacca"
+      ],
+      "thumbnail": "assets/map-thumbnails/straitofmalacca/thumbnail.webp"
+    },
+    {
+      "id": "surrounded",
+      "name": "Surrounded",
+      "aliases": [
+        "Surrounded"
+      ],
+      "thumbnail": "assets/map-thumbnails/surrounded/thumbnail.webp",
+      "specialTeamCount": 4
+    },
+    {
+      "id": "svalmel",
+      "name": "Svalmel",
+      "aliases": [
+        "Svalmel"
+      ],
+      "thumbnail": "assets/map-thumbnails/svalmel/thumbnail.webp"
+    },
+    {
+      "id": "taiwanstrait",
+      "name": "Taiwan Strait",
+      "aliases": [
+        "TaiwanStrait",
+        "Taiwan Strait"
+      ],
+      "thumbnail": "assets/map-thumbnails/taiwanstrait/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "thebox",
+      "name": "The Box",
+      "aliases": [
+        "TheBox",
+        "The Box"
+      ],
+      "thumbnail": "assets/map-thumbnails/thebox/thumbnail.webp"
+    },
+    {
+      "id": "tierradelfuego",
+      "name": "Tierra Del Fuego",
+      "aliases": [
+        "TierraDelFuego",
+        "Tierra Del Fuego"
+      ],
+      "thumbnail": "assets/map-thumbnails/tierradelfuego/thumbnail.webp"
+    },
+    {
+      "id": "titan",
+      "name": "Titan",
+      "aliases": [
+        "Titan"
+      ],
+      "thumbnail": "assets/map-thumbnails/titan/thumbnail.webp"
+    },
+    {
+      "id": "tourney1",
+      "name": "Tourney 2 Teams",
+      "aliases": [
+        "Tourney1",
+        "Tourney 2 Teams"
+      ],
+      "thumbnail": "assets/map-thumbnails/tourney1/thumbnail.webp"
+    },
+    {
+      "id": "tourney2",
+      "name": "Tourney 3 Teams",
+      "aliases": [
+        "Tourney2",
+        "Tourney 3 Teams"
+      ],
+      "thumbnail": "assets/map-thumbnails/tourney2/thumbnail.webp"
+    },
+    {
+      "id": "tourney3",
+      "name": "Tourney 4 Teams",
+      "aliases": [
+        "Tourney3",
+        "Tourney 4 Teams"
+      ],
+      "thumbnail": "assets/map-thumbnails/tourney3/thumbnail.webp"
+    },
+    {
+      "id": "tourney4",
+      "name": "Tourney 8 Teams",
+      "aliases": [
+        "Tourney4",
+        "Tourney 8 Teams"
+      ],
+      "thumbnail": "assets/map-thumbnails/tourney4/thumbnail.webp"
+    },
+    {
+      "id": "tradersdream",
+      "name": "Traders Dream",
+      "aliases": [
+        "TradersDream",
+        "Traders Dream"
+      ],
+      "thumbnail": "assets/map-thumbnails/tradersdream/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "twolakes",
+      "name": "Two Lakes",
+      "aliases": [
+        "TwoLakes",
+        "Two Lakes"
+      ],
+      "thumbnail": "assets/map-thumbnails/twolakes/thumbnail.webp"
+    },
+    {
+      "id": "unitedstates",
+      "name": "United States",
+      "aliases": [
+        "UnitedStates",
+        "United States"
+      ],
+      "thumbnail": "assets/map-thumbnails/unitedstates/thumbnail.webp"
+    },
+    {
+      "id": "vancouverisland",
+      "name": "Vancouver Island",
+      "aliases": [
+        "VancouverIsland",
+        "Vancouver Island"
+      ],
+      "thumbnail": "assets/map-thumbnails/vancouverisland/thumbnail.webp"
+    },
+    {
+      "id": "venice",
+      "name": "Venice",
+      "aliases": [
+        "Venice"
+      ],
+      "thumbnail": "assets/map-thumbnails/venice/thumbnail.webp"
+    },
+    {
+      "id": "vietnam",
+      "name": "Vietnam",
+      "aliases": [
+        "Vietnam"
+      ],
+      "thumbnail": "assets/map-thumbnails/vietnam/thumbnail.webp",
+      "specialTeamCount": 2
+    },
+    {
+      "id": "warshipwarship",
+      "name": "Warship Warship",
+      "aliases": [
+        "WarshipWarship",
+        "Warship Warship"
+      ],
+      "thumbnail": "assets/map-thumbnails/warshipwarship/thumbnail.webp"
+    },
+    {
+      "id": "world",
+      "name": "World",
+      "aliases": [
+        "World"
+      ],
+      "thumbnail": "assets/map-thumbnails/world/thumbnail.webp"
+    },
+    {
+      "id": "worldinverted",
+      "name": "World Inverted",
+      "aliases": [
+        "WorldInverted",
+        "World Inverted"
+      ],
+      "thumbnail": "assets/map-thumbnails/worldinverted/thumbnail.webp"
+    },
+    {
+      "id": "yangtzeriver",
+      "name": "Yangtze River",
+      "aliases": [
+        "YangtzeRiver",
+        "Yangtze River"
+      ],
+      "thumbnail": "assets/map-thumbnails/yangtzeriver/thumbnail.webp"
+    },
+    {
+      "id": "yellowsea",
+      "name": "Yellow Sea",
+      "aliases": [
+        "YellowSea",
+        "Yellow Sea"
+      ],
+      "thumbnail": "assets/map-thumbnails/yellowsea/thumbnail.webp"
+    },
+    {
+      "id": "yenisei",
+      "name": "Yenisei",
+      "aliases": [
+        "Yenisei"
+      ],
+      "thumbnail": "assets/map-thumbnails/yenisei/thumbnail.webp"
+    }
+  ]
+}

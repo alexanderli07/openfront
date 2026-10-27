@@ -62,6 +62,25 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     if (parts.length !== 2) throw new Error(`Expected one baseline anchor: ${before.slice(0, 100)}`);
     source = parts.join(after);
   }
+  const mapCatalog=JSON.parse(fs.readFileSync(path.join(root,'src/lobby/maps.json'),'utf8')).maps;
+  const mapCatalogStart=source.indexOf('(function(){const e=[{id:"achiran"');
+  const mapArrayStart=source.indexOf('[',mapCatalogStart),mapArrayEnd=source.indexOf('];globalThis.OPENFRONT_MAPS',mapArrayStart);
+  if(mapCatalogStart<0||mapArrayEnd<mapArrayStart)throw new Error('Lobby map catalog anchor changed');
+  const oldIds=[...source.slice(mapArrayStart,mapArrayEnd).matchAll(/id:"([^"]+)"/g)].map(m=>m[1]);
+  if(oldIds.some(id=>!mapCatalog.some(map=>map.id===id)))throw new Error('Map catalog would drop saved map ids');
+  replaceOne(source.slice(mapArrayStart,mapArrayEnd+1),JSON.stringify(mapCatalog));
+  const oldWeightsStart=source.indexOf('const FORECAST_MAP_FREQUENCY='),oldWeightsEnd=source.indexOf('const FORECAST_WATER_NUKES_BOOSTED_MAPS=',oldWeightsStart);
+  if(oldWeightsStart<0||oldWeightsEnd<=oldWeightsStart)throw new Error('Obsolete map forecast constants changed');
+  replaceOne(source.slice(oldWeightsStart,oldWeightsEnd),'');
+  replaceMethodRange('function getLobbyMapTokens(', 'function pruneCooldowns()',
+    fs.readFileSync(path.join(root,'src/lobby/map-filters.js'),'utf8')+'\n');
+  replaceMethodRange('function getForecastMapsForType(', 'function pickWeighted(',
+    'function getForecastMapsForType(type){return MAPS.map(map=>({id:map.id,weight:5}))}');
+  replaceMethodRange('function randomTeamConfigForMap(', 'function teamConfigToTeamSize(',
+    'function randomTeamConfigForMap(mapId){const preferred=MAPS.find(map=>map.id===mapId)?.specialTeamCount;'+
+    'if(preferred&&Math.random()<.75)return preferred;const entry=pickWeighted(FORECAST_TEAM_WEIGHTS);return entry?entry.config:2}');
+  replaceOne('<strong data-role="eta">—</strong>',
+    '<strong data-role="eta" title="Approximate: server map weights are private and change independently. Uses equal-map priors and observed lobby matches.">—</strong>');
   const rewardsModule=fs.readFileSync(path.join(root,'src/lobby/post-match-rewards.js'),'utf8')
     .replace(/^if\(typeof module.*$/m,'');
   replaceOne('keepAutoJoinAfterMatch:true,','keepAutoJoinAfterMatch:true,autoClaimPostMatchRewards:false,');
@@ -540,7 +559,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.73';
+  const version='1.84.74';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
