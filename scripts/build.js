@@ -69,6 +69,18 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   const oldIds=[...source.slice(mapArrayStart,mapArrayEnd).matchAll(/id:"([^"]+)"/g)].map(m=>m[1]);
   if(oldIds.some(id=>!mapCatalog.some(map=>map.id===id)))throw new Error('Map catalog would drop saved map ids');
   replaceOne(source.slice(mapArrayStart,mapArrayEnd+1),JSON.stringify(mapCatalog));
+  const liveMapModules=['live-map-catalog.js','live-map-runtime.js'].map(name=>
+    fs.readFileSync(path.join(root,'src/lobby',name),'utf8').replace(/^if\(typeof module.*$/m,'')).join('\n');
+  replaceOne('globalThis.OPENFRONT_MAPS=Object.freeze(e)',
+    'globalThis.OPENFRONT_MAPS=Object.freeze(e);'+liveMapModules+';installLiveMapCatalog(e,globalThis)');
+  replaceOne('const o=n.map(u=>u.id);','const o=globalThis.__OFH_liveMaps.ids;');
+  replaceOne('function O(u={},r=null){','function O(u={},r=null){u=globalThis.__OFH_liveMaps.normalizeFilters(u);');
+  replaceOne('latestLobbySnapshot=a.payload;',
+    'latestLobbySnapshot=a.payload;globalThis.__OFH_liveMaps.lobbies(latestLobbySnapshot);');
+  replaceOne('globalThis.__OFH_openPopup=xe,',
+    'globalThis.__OFH_openPopup=xe,window.addEventListener("ofh-map-catalog-update",()=>{if(f){l=F().normalizeSettings(l);if(N==="autojoin"&&H==="maps")w()}}),');
+  replaceOne('function handleBridgeMessage(e){',
+    'window.addEventListener("ofh-map-catalog-update",()=>{settings=normalizeSettings(settings);lobbyForecastModelCache.signature="";syncFloatingAutoJoinPanel()});function handleBridgeMessage(e){');
   const oldWeightsStart=source.indexOf('const FORECAST_MAP_FREQUENCY='),oldWeightsEnd=source.indexOf('const FORECAST_WATER_NUKES_BOOSTED_MAPS=',oldWeightsStart);
   if(oldWeightsStart<0||oldWeightsEnd<=oldWeightsStart)throw new Error('Obsolete map forecast constants changed');
   replaceOne(source.slice(oldWeightsStart,oldWeightsEnd),'');
@@ -559,7 +571,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.74';
+  const version='1.84.75';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);

@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.74) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.75) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.74)
+## Install and update (1.84.75)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,12 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Automatic map discovery (1.84.75)
+
+Auto Join extends its bundled catalog from the game’s native asset list and live lobby map names. New maps appear automatically, with public map metadata providing labels and preferred team counts when available. Discoveries are cached locally and loaded on the next visit; new filter choices default off, existing choices are retained, and an open map picker refreshes. Lobby names that differ from asset IDs are merged with saved filter choices migrated to the native ID. Changed manifests refresh previously discovered metadata. Removed maps remain in the catalog to preserve saved preferences.
+
+Discovery uses game data rather than downloading executable code or requiring GitHub access. Asset reads stay on the native asset origin, with no credentials, two concurrent requests, bounded retries and a streamed size limit. The bundled catalog still provides initial choices if the game’s data is unavailable. A future change to the game’s data format can still require a userscript update.
 
 ## Auto-Join map compatibility (1.84.74)
 

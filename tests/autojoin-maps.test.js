@@ -7,15 +7,16 @@ function shipped(){
  assert.ok(match,'shipped map catalog');
  const maps=vm.runInNewContext(match[1]);
  const start=source.indexOf('(function e(a){const n=Array.isArray(a.OPENFRONT_MAPS)'),end=source.indexOf('})(globalThis);',start)+'})(globalThis);'.length;
- const context=vm.createContext({OPENFRONT_MAPS:maps});vm.runInContext(source.slice(start,end),context);
+ const live=require('../src/lobby/live-map-catalog').createLiveMapCatalog({seed:maps});
+ const context=vm.createContext({OPENFRONT_MAPS:live.maps,__OFH_liveMaps:live});vm.runInContext(source.slice(start,end),context);
  const mapStart=source.indexOf('function getLobbyMapTokens('),mapEnd=source.indexOf('function pruneCooldowns()',mapStart);
- context.MAPS=maps;context.settings={mapFilters:{},mapExcludeFilters:{}};
+ context.MAPS=live.maps;context.settings={mapFilters:{},mapExcludeFilters:{}};
  context.normalizeComparableText=v=>String(v??'').trim().toLowerCase().replace(/\s+/g,' ');
  context.normalizeMapToken=v=>context.normalizeComparableText(v).replace(/[^a-z0-9]+/g,'');
  // Old helper functions are needed by the baseline, before the fix.
  const helpers=source.slice(source.indexOf('function addMapTokensFromValue('),mapStart);
  vm.runInContext(helpers+source.slice(mapStart,mapEnd),context);
- return {source,maps,context,match:lobby=>context.lobbyMatchesMapFilters(lobby)};
+ return {source,maps:live.maps,context,match:lobby=>context.lobbyMatchesMapFilters(lobby)};
 }
 test('picker includes all135released maps, retaining existing ids',()=>{
  const f=shipped();assert.equal(f.maps.length,135);
@@ -25,6 +26,13 @@ test('saved selections survive normalization and new maps default off',()=>{
  const f=shipped(),settings=f.context.OpenFrontHelperSettings.normalizeSettings({mapFilters:{baikal:true,madagascar:true},mapExcludeFilters:{newzealand:true}});
  assert.equal(settings.mapFilters.baikal,true);assert.equal(settings.mapFilters.madagascar,true);
  assert.equal(settings.mapExcludeFilters.newzealand,true);assert.equal(settings.mapFilters.clearwaterlakes,false);
+});
+test('discovery updates settings ids and matcher in the shipped closure without a reload',()=>{
+ const f=shipped();f.context.__OFH_liveMaps.lobbies({games:{team:[{gameConfig:{gameMap:'Tomorrow Island'}}]}});
+ assert.ok(f.context.OpenFrontHelperSettings.MAP_IDS.includes('tomorrowisland'));
+ const settings=f.context.OpenFrontHelperSettings.normalizeSettings({mapFilters:{baikal:true}});
+ assert.equal(settings.mapFilters.tomorrowisland,false);assert.equal(settings.mapFilters.baikal,true);
+ f.context.settings.mapFilters={tomorrowisland:true};assert.equal(f.match({gameConfig:{gameMap:'Tomorrow Island'}}),true);
 });
 test('actual wire map wins over unrelated metadata and exclusions win over inclusion',()=>{
  const f=shipped();f.context.settings.mapFilters.europe=true;
