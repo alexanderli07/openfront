@@ -17,6 +17,17 @@ function createStructurePlanner(deps) {
     }
     const hard = ['Hard', 'Impossible'].includes(deps.difficulty());
     const defense=context.defenseEconomy;
+    const preparation=defense?.samPreparation;
+    if(preparation?.savings>0n){
+      const upgrade=preparation.candidates[0];
+      add('structure:sam-development',U.SAMLauncher,-5,'sam-development',
+        upgrade?`Prepare main SAM to level ${upgrade.targetLevel}: ${upgrade.reason}`:'Save for main SAM preparation; wait for a verified idle launcher',
+        upgrade&&enabled(U.SAMLauncher)?null:'SAM preparation temporarily blocked',
+        {adaptiveOnly:true,action:'sam-upgrade',...upgrade,
+          reason:upgrade?`Prepare main SAM to level ${upgrade.targetLevel}: ${upgrade.reason}`:'SAM preparation temporarily blocked',
+          perceivedCost:preparation.savings,
+          affordable:!!upgrade&&defense.availableGold>=preparation.savings+(defense.emergencyReserve??0n)});
+    }
     if(defense?.requiredType){const type=defense.requiredType,cost=actor.cost(type);
       add('structure:defense-economy',type,-10,'defense-economy','Required physical economy before emergency reserve',
         enabled(type)?null:'Unit disabled',{adaptiveOnly:true,forceNew:true,
@@ -114,7 +125,8 @@ function createStructurePlanner(deps) {
         normalPriorities = new Map(remaining.filter(p => p.stage === 'normal').map(p => [p.id, p.priority]));
       }
       try {
-        const result = await hooks.execute(plan, choice.decisionId, () => actor.maybeSpawnStructure(plan.unitType));
+        const result = await hooks.execute(plan, choice.decisionId, () => plan.action==='sam-upgrade'?
+          hooks.upgradeSam(plan):actor.maybeSpawnStructure(plan.unitType));
         hooks.record('plan-result', { decisionId: choice.decisionId, planId: plan.id,
           status: result ? 'completed' : 'unfulfilled',
           reason: result ? 'Original placement routine returned success; consult linked dispatch record' :

@@ -20,16 +20,20 @@ function fixture(options={}){
    euclideanDistSquared:(a,b)=>(Math.floor(a/10000)-Math.floor(b/10000))**2+(a%10000-b%10000)**2,
    config:()=>({isUnitDisabled:()=>false,gameConfig:()=>({}),samRange:level=>level===1?70:82,SAMCooldown:()=>90,samUpgradeDuration:()=>45})};
  const quote={type:U.SAMLauncher,canBuild:false,canUpgrade:1,cost:9000000n,upgradeCosts:[3000000n]};
- const actor={game,player:self,buildableFor:async()=>quote};
+ const actor={game,player:self,buildableFor:async()=>quote,placementsCount:1,
+   cost:()=>1000000n,ownedLevels:type=>type===U.SAMLauncher?sam.level():3,
+   hasHighStartingGold:()=>false,isHighNationDensity:()=>false,samThreatLevels:()=>0,samTargetLevels:()=>1,
+   getPerceivedCost:()=>1000000n,shouldBuildStructure:()=>false,maybeSpawnStructure:async()=>false};
  const bot={mg:game,player:self,structureBehavior:actor};const menu={sendBuildOrUpgrade:q=>{builds.push(q);}};
  runtime=require('../src/brain/runtime')({createEngine:engine,createLegacyStrategy:legacy,strategies:[adaptive(legacy())],defaultStrategy:'adaptive-v1',
    units:U,createSpendingLedger:require('../src/brain/spending-ledger'),
    createSamDevelopment:options.planned?require('../src/brain/sam-development'):undefined,
    buildAllowed:options.buildAllowed,
-   defenseEconomy:{observe:()=>({stage:options.stage??'reserve',reserve:3000000n})},
+   defenseEconomy:{observe:()=>({stage:options.stage??'reserve',reserve:3000000n,development:options.development??{samTargetLevel:2}})},
    createReactiveSam:require('../src/brain/reactive-sam'),samDefenseObserver:require('../src/brain/sam-defense-observer')({units:U}),
    sendSamUpgrade:(a,q)=>{runtime.build(a,'ReactiveSAM',menu,q);return!runtime.wasDeclined(a);},
-   buildingPlanner:{handle:async()=>{normal++;return false;}},
+   structurePlanner:require('../src/brain/structure-planner')({units:U,settings:()=>({}),difficulty:()=> 'Easy'}),
+   buildingPlanner:{handle:async()=>{if(options.planned&&await runtime.planStructures(actor,{cityLevels:3,sharedWater:true}))return true;normal++;return false;}},
    enabled:()=>true,isCurrent:()=>true,isPublic:()=>false,settings:()=>({features:{build:true}}),emitIntent:()=>true});
  runtime.attach(bot);runtime.begin(bot);runtime.attachBehaviors(bot);
  return {runtime,actor,builds,menu,sam,game,nuke,normal:()=>normal,run:()=>runtime.planBuilding(actor,'handle')};
@@ -59,6 +63,11 @@ test('developed economy upgrades an existing SAM before optional spending and ke
  assert.equal(await f.run(),true);assert.equal(f.builds.length,1);assert.equal(f.normal(),0);
  await f.run();assert.equal(f.builds.length,1);
  assert.ok(f.runtime.inspect().records.some(r=>r.kind==='reactive-sam-result'&&r.status==='selected'&&r.assessments.some(a=>a.mode==='planned')));
+ assert.ok(f.runtime.inspect().records.some(r=>r.kind==='decision'&&r.snapshot.domain==='structure-plan'&&r.selectedId==='structure:sam-development'));
+ const records=f.runtime.inspect().records;
+ const plan=records.find(r=>r.kind==='decision'&&r.selectedId==='structure:sam-development');
+ const execution=records.find(r=>r.kind==='decision'&&r.snapshot.domain==='reactive-sam-upgrade'&&r.selectedId!=='$wait');
+ assert.equal(execution.snapshot.parentDecisionId,plan.decisionId);
 });
 
 test('planned upgrade savings block optional purchases until actual quote plus reserve is funded',async()=>{
@@ -71,6 +80,19 @@ test('planned upgrade savings block optional purchases until actual quote plus r
 test('manual level two satisfies development and does not cause another purchase',async()=>{
  const f=fixture({planned:true,noThreat:true,gold:6000000n,level:2});
  assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
+});
+test('central development upgrades main SAM through later levels without waiting for nukes',async()=>{
+ for(const level of [2,3,4,5]){
+  const f=fixture({planned:true,noThreat:true,gold:6000000n,level,development:{samTargetLevel:level+1}});
+  assert.equal(await f.run(),true);assert.equal(f.builds.length,1);
+  const decision=f.runtime.inspect().records.find(r=>r.kind==='decision'&&r.selectedId==='structure:sam-development');
+  assert.ok(decision);assert.match(decision.reason,new RegExp(`level ${level+1}`));
+ }
+});
+test('late-game planned SAM upgrade cannot spend the3M emergency reserve',async()=>{
+ const f=fixture({planned:true,noThreat:true,gold:5000000n,level:4,development:{samTargetLevel:5}});
+ assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
+ assert.equal(f.runtime.build(f.actor,'optional',f.menu,{type:U.Port,canBuild:50,canUpgrade:false,cost:1000000n}),false);
 });
 
 test('planned upgrades preserve the opening and emergency upgrades can still use reserve',async()=>{

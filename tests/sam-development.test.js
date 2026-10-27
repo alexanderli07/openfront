@@ -10,6 +10,14 @@ function fixture(){
 test('mature economy prepares level two and saves a bounded next-upgrade budget',()=>{
  const f=fixture(),r=f.assess();assert.equal(r.candidates[0].targetLevel,2);assert.equal(r.savings,3000000n);
 });
+test('shared economy assessment prepares later levels before a salvo occurs',()=>{
+ const f=fixture();f.sam.level=2;f.options.economy.development={samTargetLevel:3,income:6,cities:5};
+ const r=f.assess();assert.equal(r.candidates[0].targetLevel,3);assert.equal(r.savings,3000000n);
+ assert.equal(r.candidates[0].reason,'economic-development');
+});
+test('completed-building assessment can defer level two while economy is still building',()=>{
+ const f=fixture();f.options.economy.development={samTargetLevel:1};assert.equal(f.assess().candidates.length,0);
+});
 test('opening economy and replacement construction retain their original purchase order',()=>{
  for(const stage of ['initial-economy','first-sam','development']){
   const f=fixture();f.options.economy.stage=stage;assert.deepEqual(f.assess().candidates,[]);assert.equal(f.assess().savings,0n);

@@ -66,7 +66,7 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.17.0-safer-spawning',
+    version: '1.18.0-unified-development',
     decide(snapshot, candidates) {
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
@@ -119,10 +119,12 @@ function createAdaptiveStrategy(legacyStrategy) {
             'First SAM is under construction; do not order another':plan?.affordable?
             (defense.recovering?'Rebuild missing infrastructure before restoring the emergency reserve':'Complete the physical economy stage before saving the emergency reserve'):'Save for the required economy or first SAM');
         }
+        const preparation=candidates.find(c=>c.id==='structure:sam-development');
+        if(preparation?.eligible&&preparation.affordable)return select(preparation,candidates,preparation.reason);
         const chosen=candidates.filter(c=>c.kind==='structure-plan'&&c.eligible&&c.affordable!==false&&
           c.unitType!=='SAM Launcher'&&c.stage!=='team-opening').sort((a,b)=>a.priority-b.priority)[0];
         return select(chosen||wait(),candidates,chosen?'Spend only the surplus above the SAM defense reserve':
-          'Preserve the emergency SAM upgrade reserve');
+          preparation?'Save for main SAM preparation before optional economic purchases':'Preserve the emergency SAM upgrade reserve');
       }
       if(snapshot.domain==='structure-phase'&&defense&&(!defense.frontline||defense.stage==='first-sam'||defense.recovering)&&defense.stage!=='reserve')
         return select(eligible('building:normal')||wait(),candidates,'Prioritize the staged economy and first SAM');

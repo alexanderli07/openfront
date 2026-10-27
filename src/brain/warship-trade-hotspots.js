@@ -1,7 +1,7 @@
 'use strict';
 
 function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffic=3}) {
-  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=480;
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=1440;
   const raw=unit=>unit?.__src||unit;
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
@@ -103,10 +103,10 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
       const distance=game.manhattanDist(tile,coast.tile);
       if(coast.team&&distance<teamDistance){teamDistance=distance;teamTile=coast.tile;}else if(!coast.team)enemyDistance=Math.min(enemyDistance,distance);
     }
-    // Ports give exact support anchors. Bound land probes to176points per queried tile.
+    // Ports give exact support anchors. Bound land probes to240points per queried tile.
     if(game.isLand&&game.hasOwner&&game.ownerID&&s.teamIds.size){
       const x=game.x(tile),y=game.y(tile);
-      for(const radius of [16,32,48,64,96,128,160,240,320,400,480])for(let i=0;i<16;i++){
+      for(const radius of [16,32,48,64,96,128,160,240,320,400,480,720,960,1200,1440])for(let i=0;i<16;i++){
         const px=Math.round(x+Math.cos(i*Math.PI/8)*radius),py=Math.round(y+Math.sin(i*Math.PI/8)*radius);
         if(!game.isValidCoord(px,py))continue;const point=game.ref(px,py);
         if(!game.isLand(point)||!game.hasOwner(point))continue;

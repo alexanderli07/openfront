@@ -1039,6 +1039,7 @@ function createBrainRuntime(deps) {
     const allowed = () => buildingAllowed(actor);
     return deps.structurePlanner.run(actor, context, {
       allowed,
+      upgradeSam:()=>maybeReactiveSam(actor,{plannedOnly:true}),
       choose: candidates => {
         const choice = controller.engine.decide({
         ...safe(() => snapshot(controller), { unavailable: true }),
@@ -1098,7 +1099,7 @@ function createBrainRuntime(deps) {
     };
     try {
       if (mode === 'handle') {
-        if(await maybeReactiveSam(actor))return true;
+        if(await maybeReactiveSam(actor,{emergencyOnly:true}))return true;
         if(!buildingAllowed(actor))return false;
         return await deps.buildingPlanner.handle(actor, hooks);
       }
@@ -1417,7 +1418,7 @@ function createBrainRuntime(deps) {
     if(!facts||!controller.samDevelopment||!deps.samDefenseObserver)return facts;
     const observation=deps.samDefenseObserver.observe(game,player);
     const planned=samDevelopmentFacts(actor,observation,facts);
-    return {...facts,emergencyReserve:facts.reserve,plannedSamSavings:planned.savings,reserve:facts.reserve+planned.savings};
+    return {...facts,samPreparation:planned,emergencyReserve:facts.reserve,plannedSamSavings:planned.savings,reserve:facts.reserve+planned.savings};
   }
   function samDevelopmentFacts(actor,observation,economy){
     const controller=owners.get(actor);
@@ -1426,7 +1427,7 @@ function createBrainRuntime(deps) {
     return controller.samDevelopment.assess(observation,{economy,
       range:level=>game.config().samRange(level),distanceSquared:(a,b)=>game.euclideanDistSquared(a,b)});
   }
-  async function maybeReactiveSam(actor){
+  async function maybeReactiveSam(actor,{emergencyOnly=false,plannedOnly=false}={}){
     const controller=owners.get(actor);
     if(!deps.samDefenseObserver||!deps.createReactiveSam||!deps.sendSamUpgrade||reactiveInFlight.has(actor)||
         controller?.engine.selectedStrategy?.()!=='adaptive-v1'||!buildingAllowed(actor))return false;
@@ -1439,11 +1440,12 @@ function createBrainRuntime(deps) {
     let observation=deps.samDefenseObserver.observe(game,player);
     if(observation.reason)return false;
     let economy=defenseEconomyFacts(actor),planned=samDevelopmentFacts(actor,observation,economy);
+    if(emergencyOnly)planned={candidates:[],savings:0n,blocked:[]};
     if(!observation.threats.some(t=>t.threatensSelf||t.threatensSamArea)&&!planned.savings)return false;
     const previews=predictor().assess({...observation,candidates:observation.ownSams.map(s=>({unitId:s.id(),cost:0n}))});
     const quotes=new Map();reactiveInFlight.add(actor);
     try{
-      const useful=new Set([...previews.filter(p=>p.canDefend),...planned.candidates].map(p=>p.unitId));
+      const useful=new Set([...(plannedOnly?[]:previews.filter(p=>p.canDefend)),...planned.candidates].map(p=>p.unitId));
       for(const unitId of useful){
         const unit=observation.ownSams.find(s=>s.id()===unitId);
         if(!unit)continue;
@@ -1453,6 +1455,7 @@ function createBrainRuntime(deps) {
       }
       observation=deps.samDefenseObserver.observe(game,player);
       economy=defenseEconomyFacts(actor);planned=samDevelopmentFacts(actor,observation,economy);
+      if(emergencyOnly)planned={candidates:[],savings:0n,blocked:[]};
       const assessments=observation.reason?[]:predictor().assess({...observation,candidates:[...quotes].map(([unitId,q])=>({unitId,
         cost:q.upgradeCosts?.[0]??q.cost}))});
       const cs=assessments.map((p,i)=>{
@@ -1466,6 +1469,7 @@ function createBrainRuntime(deps) {
           spending,eligible:useful&&spending.allowed};
       });
       const choice=controller.engine.decide({...snapshot(controller),domain:'reactive-sam-upgrade',
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{}),
         defenseEconomy:defenseEconomyFacts(actor),samPreparation:planned,
         assessment:previews.map(({targetIds,unitId,reason,canDefend})=>({targetIds,unitId,reason,canDefend}))},
         [...cs,{id:'$wait',kind:'wait',eligible:true,reason:'Keep emergency funds; no proven useful upgrade'}]);

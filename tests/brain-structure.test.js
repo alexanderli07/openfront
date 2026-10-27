@@ -39,6 +39,42 @@ function fixture(options = {}) {
 }
 
 test('structure planner exists', () => assert.equal(typeof createPlanner, 'function'));
+test('temporarily blocked SAM preparation allows economic purchases only from protected surplus',()=>{
+ const strategy=createAdaptiveStrategy(createLegacyStrategy());
+ const make=affordable=>[
+  {id:'structure:sam-development',kind:'structure-plan',eligible:false,affordable:false,stage:'sam-development'},
+  {id:'port',kind:'structure-plan',unitType:'Port',eligible:true,affordable,priority:2},
+  {id:'$wait',kind:'wait',eligible:true}
+ ];
+ assert.equal(strategy.decide({domain:'structure-plan',defenseEconomy:{stage:'reserve'}},make(true)).selectedId,'port');
+ assert.equal(strategy.decide({domain:'structure-plan',defenseEconomy:{stage:'reserve'}},make(false)).selectedId,'$wait');
+});
+
+test('safe coastal development places two ports and one city then saves for its first SAM across starting gold amounts',async()=>{
+ for(const startingGold of [125000n,1000000n,5000000n]){
+  const f=fixture({adaptive:true,first:true,highGold:true,gold:startingGold});
+  const owned={Port:[],City:[],Factory:[],SAMLauncher:[]},history=[];
+  let gold=startingGold;
+  f.actor.player.gold=()=>gold;f.actor.player.units=type=>owned[type]||[];
+  f.actor.cost=type=>type===units.SAMLauncher?1500000n:125000n;
+  f.actor.maybeSpawnStructure=async type=>{
+   assert.ok(gold>=f.actor.cost(type));gold-=f.actor.cost(type);
+   owned[type].push({isActive:()=>true,isUnderConstruction:()=>false});history.push(type);return true;
+  };
+  const economy=require('../src/brain/defense-economy')({units});
+  const engine=createEngine();engine.register(createAdaptiveStrategy(createLegacyStrategy()));engine.select('adaptive-v1');
+  const planner=createPlanner({units,settings:()=>({samDefense:true}),difficulty:()=> 'Impossible'});
+  for(let tick=0;tick<30&&!owned.SAMLauncher.length;tick++){
+   const defense={...economy.observe(f.actor.game,f.actor.player,{samEnabled:true,borderKnown:true,frontline:false,portTarget:2}),availableGold:gold};
+   await planner.run(f.actor,{defenseEconomy:defense,cityLevels:owned.City.length,sharedWater:true},{
+    allowed:()=>true,record:()=>{},execute:(_p,_id,run)=>run(),
+    choose:candidates=>engine.decide({domain:'structure-plan',defenseEconomy:defense},candidates)
+   });
+   gold+=250000n;
+  }
+  assert.deepEqual(history,[units.Port,units.City,units.Port,units.SAMLauncher],String(startingGold));
+ }
+});
 test('adaptive policy saves for the first due SAM instead of spending on other structures', async () => {
   const f = fixture({ adaptive: true, gold: 1000000n, samCost: 1500000n });
   assert.equal(await f.run(), false);

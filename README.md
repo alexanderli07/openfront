@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.72) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.73) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.72)
+## Install and update (1.84.73)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,16 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Unified SAM development (1.84.73)
+
+Safe coastal starts retain two actual usable ports and one actual city before the first SAM. Once it completes, development progresses toward four total income buildings (ports plus factories) and three cities. Planned upgrades of the main launcher now compete in the ordinary structure decision, instead of running as a separate planned-upgrade prepass.
+
+Each additional two completed income levels and two completed city levels supports another main-SAM level: coastal level 2 at 4/3, level 3 at 6/5, level 4 at 8/7, and so on. Inland uses its one-income/two-city baseline: 3/4 for level 2, 5/6 for level 3. Initial placement goals count physical buildings; later defense strength counts completed levels so upgraded economies progress too. Observed salvos can raise the target sooner. These are tunable development benchmarks, not a simulation of future enemy fire.
+
+A due upgrade protects 3M of preparation funds in addition to the 3M emergency reserve. Ordinary planned upgrades retain the emergency reserve; proven useful emergency upgrades may use it. A blocked launcher does not stop economic purchases from surplus above both holds. Native quotes, upgrade ramp state, current target and money are rechecked before dispatch. Destruction recovery still rebuilds the basic economy before restoring the reserve.
+
+Warship team support is now 1,440 tiles, including expanded land probes. Enemy-coast checks, open-water piracy, 30-second post reviews and nuclear dodging remain. This is a support radius, not a separate trip cap.
 
 ## Post-match reward claiming
 

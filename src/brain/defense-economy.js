@@ -40,7 +40,22 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
       factories: !coastal && enabled(U.Factory) ? 1 : 0, sams: 1 };
     const developed = { ports: coastal ? 4 : 0, cities: enabled(U.City) ? (coastal ? 3 : 4) : 0,
       factories: !coastal && enabled(U.Factory) ? 3 : 0, sams: 1 };
-    const meetsEconomy = targets => ['ports', 'cities', 'factories'].every(key => counts[key] >= targets[key]);
+    const meetsEconomy = targets => targets===developed ? counts.cities>=targets.cities&&
+      counts.ports+counts.factories>=targets.ports+targets.factories :
+      ['ports', 'cities', 'factories'].every(key => counts[key] >= targets[key]);
+    const complete=type=>active(type).filter(unit=>!unit.isUnderConstruction||!unit.isUnderConstruction()).reduce((sum,unit)=>{
+      const level=unit.level?unit.level():1;
+      return sum+(Number.isSafeInteger(level)&&level>0?level:0);
+    },0);
+    const income=complete(U.Port)+complete(U.Factory),cities=complete(U.City);
+    const baseIncome=initial.ports+initial.factories,baseCities=initial.cities;
+    const growth=[];
+    if(baseIncome)growth.push(Math.floor((income-baseIncome)/2));
+    if(baseCities)growth.push(Math.floor((cities-baseCities)/2));
+    const samTargetLevel=1+Math.max(0,growth.length?Math.min(...growth):0);
+    const development={samTargetLevel,income,cities,
+      nextIncome:baseIncome?baseIncome+samTargetLevel*2:0,
+      nextCities:baseCities?baseCities+samTargetLevel*2:0};
     const physicalCounts={ports:physical(U.Port).length,cities:physical(U.City).length,factories:physical(U.Factory).length};
     const lostEconomy=state.lastPhysical&&Object.keys(physicalCounts).some(key=>physicalCounts[key]<state.lastPhysical[key]);
     if(state.reserveActivated&&lostEconomy&&!meetsEconomy(developed)){
@@ -58,6 +73,7 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
       const seen = { ports: 0, cities: 0, factories: 0 };
       for (const [key, type] of sequence) {
         seen[key]++;
+        if(targets===developed&&key!=='cities'&&counts.ports+counts.factories>=targets.ports+targets.factories)continue;
         if (counts[key] < Math.min(seen[key], targets[key])) return type;
       }
       return null;
@@ -80,7 +96,7 @@ function createDefenseEconomy({ units: U, buildAllowed, portWaterAccess }) {
     return { stage,recovering:!!state.recovering, reserve: state.reserveActivated ? 3000000n : 0n,
       requiredType: safe || state.recovering || state.reserveActivated&&stage==='first-sam' ? requiredType : null, targetCounts, counts,
       waitingForSam: stage === 'first-sam' && counts.sams > 0,
-      samUpgradeReactiveOnly: true, frontline: !!opening.frontline };
+      development,samUpgradePolicy:'central-development', frontline: !!opening.frontline };
   }
   return { observe, affordable: defenseEconomyAffordable };
 }

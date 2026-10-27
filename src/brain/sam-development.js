@@ -22,15 +22,16 @@ function createSamDevelopment(){
     // neither raise its target nor create additional SAM purchase goals.
     const primary=[...own].sort((a,b)=>b.level-a.level||a.id-b.id)[0];
     for(const sam of primary?[primary]:[]){
-      const targetLevel=Math.max(2,peak);
+      const economyTarget=economy.development?.samTargetLevel??2;
+      const targetLevel=Math.max(economyTarget,peak);
       if(targetLevel<=sam.level)continue;
       result.savings=3000000n;
-      const reason=peak>sam.level?'salvo-capacity':'developed-economy';
+      const reason=peak>economyTarget?'salvo-capacity':economy.development?'economic-development':'developed-economy';
       if(ramping(sam)||!Array.isArray(sam.queue)||!sam.queue.every(Number.isFinite)){
         result.blocked.push({unitId:sam.id,targetLevel,reason:ramping(sam)?'upgrade-in-progress':'uncertain-sam-state'});continue;
       }
       result.candidates.push({unitId:sam.id,targetLevel,currentLevel:sam.level,reason,
-        salvoTarget:peak,canDefend:false,mode:'planned'});
+        salvoTarget:peak,development:economy.development,canDefend:false,mode:'planned'});
     }
     return result;
   }

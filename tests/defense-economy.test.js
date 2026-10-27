@@ -27,6 +27,39 @@ test('initial economy precedes the first SAM and has no emergency reserve', () =
   assert.equal(f.observe().requiredType, units.SAMLauncher);
 });
 
+test('completed mixed income and city growth set the main SAM development target',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);
+ assert.equal(f.observe().development.samTargetLevel,2);
+ f.set(units.Factory,2);f.set(units.City,5);
+ assert.equal(f.observe().development.samTargetLevel,3);
+ f.set(units.Port,6);f.set(units.City,7);
+ assert.equal(f.observe().development.samTargetLevel,4);
+ f.set(units.Factory,4);f.set(units.City,9);
+ assert.equal(f.observe().development.samTargetLevel,5);
+});
+test('construction and unbalanced income growth do not justify premature SAM upgrades',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);
+ f.set(units.Factory,10,true);f.set(units.City,5,true);
+ assert.equal(f.observe().development.samTargetLevel,1);
+ f.set(units.City,3);assert.equal(f.observe().development.samTargetLevel,2);
+ f.set(units.Factory,10);assert.equal(f.observe().development.samTargetLevel,2);
+});
+test('upgraded income buildings and cities count toward later defense development',()=>{
+ const f=fixture();f.set(units.Port,4);f.set(units.City,3);f.set(units.SAMLauncher,1);
+ f.owned.Port[0].level=()=>3;f.owned.City[0].level=()=>3;
+ assert.equal(f.observe().development.samTargetLevel,3);
+});
+test('mixed income can complete post-SAM development without demanding unnecessary extra ports',()=>{
+ const f=fixture();f.set(units.Port,2);f.set(units.City,3);f.set(units.Factory,2);f.set(units.SAMLauncher,1);
+ assert.equal(f.observe().stage,'reserve');assert.equal(f.observe().requiredType,null);
+ assert.equal(f.observe().development.samTargetLevel,2);
+});
+test('inland growth uses its two-city one-factory baseline for later SAM levels',()=>{
+ const f=fixture();f.opening.portTarget=0;f.set(units.City,4);f.set(units.Factory,3);f.set(units.SAMLauncher,1);
+ assert.equal(f.observe().development.samTargetLevel,2);
+ f.set(units.City,6);f.set(units.Factory,5);assert.equal(f.observe().development.samTargetLevel,3);
+});
+
 test('enclosed-water ports do not satisfy a coastal opening goal',()=>{
  const f=fixture({portWaterAccess:{assess:(_,tile)=>({allowed:tile===99})}});
  f.owned.Port=[10,20].map(tile=>({isActive:()=>true,tile:()=>tile}));
@@ -50,7 +83,7 @@ test('completed SAM permits two additional ports and cities before the reserve',
   let facts = f.observe();
   assert.equal(facts.stage, 'development'); assert.equal(facts.reserve, 0n);
   assert.deepEqual(facts.targetCounts, { ports: 4, cities: 3, factories: 0, sams: 1 });
-  assert.equal(facts.samUpgradeReactiveOnly, true);
+  assert.equal(facts.samUpgradePolicy, 'central-development');
   f.set(units.Port, 4, true); f.set(units.City, 3, true);
   facts = f.observe(); assert.equal(facts.stage, 'reserve'); assert.equal(facts.reserve, 3000000n);
   assert.equal(facts.requiredType, null);
