@@ -43,6 +43,16 @@ test('another match reusing the modal can claim again after hidden interval',()=
   h.modal.isVisible=false;h.service.hold();delete h.nodes['[data-xp-claimed]'];h.modal.isVisible=true;
   assert.equal(h.service.hold(),true);assert.equal(h.clicks,2);
 });
+test('confirmed rewards arriving after a long provisional result are still claimed',()=>{
+ const h=setup();h.panel.view={kind:'provisional'};assert.equal(h.service.hold(),true);
+ h.time(70000);assert.equal(h.service.hold(),false);assert.equal(h.clicks,0);
+ h.panel.view={kind:'result'};assert.equal(h.service.hold(),true);assert.equal(h.clicks,1);
+});
+test('a new result on the same visible modal resets previous completion state',()=>{
+ const h=setup();h.panel.view={kind:'result'};h.nodes['[data-xp-claimed]']={};assert.equal(h.service.hold(),false);
+ h.time(120000);h.panel.view={kind:'provisional'};delete h.nodes['[data-xp-claimed]'];assert.equal(h.service.hold(),true);
+ h.panel.view={kind:'result'};assert.equal(h.service.hold(),true);assert.equal(h.clicks,1);
+});
 test('shipped auto-leave waits for claim coordinator then navigates',()=>{
   const source=buildSource().source;
   const start=source.indexOf('function checkAutoLeave(){');

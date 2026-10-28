@@ -1,6 +1,6 @@
 {
   "name": "openfront-userscript",
-  "version": "1.84.76",
+  "version": "1.84.77",
   "private": true,
   "description": "Standalone userscript build of the OpenFront helper (auto-join + in-game overlays + auto-bot).",
   "scripts": {

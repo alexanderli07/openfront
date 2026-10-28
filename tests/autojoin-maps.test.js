@@ -69,3 +69,28 @@ test('forecast preferred teams follow current registry instead of the old three-
  assert.equal(f.context.randomTeamConfigForMap('madagascar'),2);
  assert.equal(f.context.randomTeamConfigForMap('branchingpaths'),3);
 });
+test('custom game include/exclude filters recognize native flags and hosted lobbies',()=>{
+ const f=shipped(),c=f.context;
+ c.FILTER_KEYS=c.OpenFrontHelperSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.OpenFrontHelperSettings.START_GOLD_FILTER_KEYS;
+ c.settings=c.OpenFrontHelperSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,includeFilters:{customGames:true}});
+ const start=f.source.indexOf('function objectContainsFreeForAll('),end=f.source.indexOf('function hasSelectedCriteria(',start);
+ vm.runInContext(f.source.slice(start,end),c);
+ const lobby=custom=>({custom,gameConfig:{gameMap:'Baikal',gameMode:'Team',playerTeams:2,maxPlayers:100}});
+ assert.equal(c.lobbyMatchesFilters(lobby(true),'special'),true);
+ assert.equal(c.lobbyMatchesFilters(lobby(false),'team'),false);
+ assert.equal(c.lobbyMatchesFilters({...lobby(undefined),publicGameType:'hosted'},'hosted'),true);
+ c.settings=c.OpenFrontHelperSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,excludeFilters:{customGames:true}});
+ assert.equal(c.lobbyMatchesFilters(lobby(true),'special'),false);
+ assert.equal(c.lobbyMatchesFilters({...lobby(false),featured:true},'special'),true);
+ assert.equal(c.lobbyMatchesFilters({...lobby(undefined),publicGameType:'hosted'},'hosted'),false);
+});
+test('custom-only forecast waits for observed matches rather than claiming zero availability',()=>{
+ const f=shipped(),c=f.context;
+ c.settings.includeFilters={customGames:true};c.settings.excludeFilters={};
+ Object.assign(c,{computeLast100LobbyAverages:()=>({hitRate:null,hitSampleSize:0}),
+   hasSelectedCriteria:()=>true,lobbyForecastTotalNew:5,lobbyForecastMatchedNew:0,
+   LOBBY_FORECAST_PRIOR_STRENGTH:36,getModelHitRate:()=>{throw new Error('unmodeled custom lobby rate');}});
+ const start=f.source.indexOf('function buildLobbyForecastPayload(){'),end=f.source.indexOf('function persistLobbyForecast(',start);
+ vm.runInContext(f.source.slice(start,end),c);
+ assert.equal(c.buildLobbyForecastPayload().available,false);
+});

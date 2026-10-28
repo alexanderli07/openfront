@@ -93,11 +93,23 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     'if(preferred&&Math.random()<.75)return preferred;const entry=pickWeighted(FORECAST_TEAM_WEIGHTS);return entry?entry.config:2}');
   replaceOne('<strong data-role="eta">—</strong>',
     '<strong data-role="eta" title="Approximate: server map weights are private and change independently. Uses equal-map priors and observed lobby matches.">—</strong>');
+  replaceOne('const i=["startingGold0M",','const i=["customGames","startingGold0M",');
+  replaceOne('function qe(e){let t=[["Start gold",Ge],["Modifiers",De]];',
+    'function qe(e){let t=[["Lobby type",[["customGames","Custom games"]]],["Start gold",Ge],["Modifiers",De]];');
+  replaceOne('return{startingGold0M:s===0,',
+    'return{customGames:e?.custom===true||e?.publicGameType==="hosted"||a==="hosted",startingGold0M:s===0,');
+  const forecastStart=source.indexOf('function buildLobbyForecastPayload(){'),forecastEnd=source.indexOf('function persistLobbyForecast(',forecastStart);
+  if(forecastStart<0||forecastEnd<forecastStart)throw new Error('Forecast payload anchors changed');
+  const forecastBody=source.slice(forecastStart,forecastEnd);
+  replaceOne(forecastBody,forecastBody
+    .replace('const e=computeLast100LobbyAverages();','const e=computeLast100LobbyAverages();const ofhCustom=!!(settings.includeFilters.customGames||settings.excludeFilters.customGames);const ofhPrior=ofhCustom?0:LOBBY_FORECAST_PRIOR_STRENGTH;')
+    .replace('if(!hasSelectedCriteria())','if(!hasSelectedCriteria()||(ofhCustom&&lobbyForecastMatchedNew===0&&!(e.hitRate>0)))')
+    .replaceAll('a*LOBBY_FORECAST_PRIOR_STRENGTH','a*ofhPrior').replaceAll('o+l+LOBBY_FORECAST_PRIOR_STRENGTH','o+l+ofhPrior'));
   const rewardsModule=fs.readFileSync(path.join(root,'src/lobby/post-match-rewards.js'),'utf8')
     .replace(/^if\(typeof module.*$/m,'');
   replaceOne('keepAutoJoinAfterMatch:true,','keepAutoJoinAfterMatch:true,autoClaimPostMatchRewards:false,');
   replaceOne('function tryAutoJoin(){',rewardsModule+'\n'+
-    'const ofhPostMatchRewards=createPostMatchRewards({enabled:()=>settings.autoClaimPostMatchRewards===true,modal:()=>document.querySelector("win-modal")});'+
+    'const ofhPostMatchRewards=createPostMatchRewards({enabled:()=>settings.autoClaimPostMatchRewards===true,modal:()=>[...document.querySelectorAll("win-modal")].reverse().find(modal=>modal.isVisible===true)});'+
     'window.__OFH_postMatchRewards=ofhPostMatchRewards;'+
     'window.setInterval(()=>ofhPostMatchRewards.hold(),1000);'+
     'function tryAutoJoin(){if(ofhPostMatchRewards.hold())return;');
@@ -571,7 +583,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.76';
+  const version='1.84.77';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
