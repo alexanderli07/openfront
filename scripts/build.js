@@ -62,6 +62,12 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     if (parts.length !== 2) throw new Error(`Expected one baseline anchor: ${before.slice(0, 100)}`);
     source = parts.join(after);
   }
+  // This optional setter is absent from the baseline. Settings sync still sends
+  // its message on each lobby update; report unsupported enablement once.
+  replaceOne('window.addEventListener("message",n=>{if(n.source!==window){return}const e=n.data;if(!e||e.source!==EXTENSION_SOURCE){return}',
+    'let ofhAntiAfkUnavailableWarned=false;window.addEventListener("message",n=>{if(n.source!==window){return}const e=n.data;if(!e||e.source!==EXTENSION_SOURCE){return}');
+  replaceOne('if(e.type==="SET_ANTI_AFK"){setAntiAfkEnabled(e.payload?.enabled)}',
+    'if(e.type==="SET_ANTI_AFK"){if(typeof setAntiAfkEnabled==="function"){setAntiAfkEnabled(e.payload?.enabled)}else if(e.payload?.enabled&&!ofhAntiAfkUnavailableWarned){ofhAntiAfkUnavailableWarned=true;console.warn("[ofh] Anti-AFK helper unavailable in this build; setting cannot be applied.")}}');
   const mapCatalog=JSON.parse(fs.readFileSync(path.join(root,'src/lobby/maps.json'),'utf8')).maps;
   const mapCatalogStart=source.indexOf('(function(){const e=[{id:"achiran"');
   const mapArrayStart=source.indexOf('[',mapCatalogStart),mapArrayEnd=source.indexOf('];globalThis.OPENFRONT_MAPS',mapArrayStart);
@@ -583,7 +589,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.77';
+  const version='1.84.78';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
