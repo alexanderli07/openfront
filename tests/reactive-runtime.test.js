@@ -26,7 +26,7 @@ function fixture(options={}){
    getPerceivedCost:()=>1000000n,shouldBuildStructure:()=>false,maybeSpawnStructure:async()=>false};
  const bot={mg:game,player:self,structureBehavior:actor};const menu={sendBuildOrUpgrade:q=>{builds.push(q);}};
  runtime=require('../src/brain/runtime')({createEngine:engine,createLegacyStrategy:legacy,strategies:[adaptive(legacy())],defaultStrategy:'adaptive-v1',
-   units:U,createSpendingLedger:require('../src/brain/spending-ledger'),
+   units:U,createSpendingLedger:require('../src/brain/spending-ledger'),createBuildPacing:options.createBuildPacing,
    createSamDevelopment:options.planned?require('../src/brain/sam-development'):undefined,
    buildAllowed:options.buildAllowed,
    defenseEconomy:{observe:()=>options.noEconomy?null:({stage:options.stage??'reserve',reserve:3000000n,development:options.development??{samTargetLevel:2}}),
@@ -46,6 +46,23 @@ test('a timely useful upgrade spends the emergency reserve using its actual upgr
  assert.equal(outcome,true,JSON.stringify(diagnostics));assert.equal(f.builds.length,1);assert.equal(f.normal(),0);
  await f.run();assert.equal(f.builds.length,1);
  assert.ok(f.runtime.inspect().records.some(r=>r.kind==='reactive-sam-result'&&r.status==='selected'));
+});
+
+test('emergency SAM upgrades bypass a pending ordinary building delay',async()=>{
+ for(const hydro of [false,true]){
+ const f=fixture({hydro,gold:4000000n,createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>0,random:()=>1})});
+ assert.equal(f.runtime.build(f.actor,'economy',f.menu,{type:U.City,canBuild:12,cost:1000000n}),false);
+ assert.equal(f.builds.length,0);assert.equal(await f.run(),true);
+ assert.equal(f.builds.length,1);assert.equal(f.builds[0].type,U.SAMLauncher);
+ }
+});
+
+test('planned SAM upgrades wait and use a newly validated central quote when due',async()=>{
+ let time=0;const f=fixture({planned:true,noThreat:true,gold:6000000n,
+   createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>time,random:()=>1})});
+ let quotes=0;const quote=f.actor.buildableFor;f.actor.buildableFor=async()=>{quotes++;return {...await quote()};};
+ assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
+ time=3000;assert.equal(await f.run(),true);assert.equal(f.builds.length,1);assert.ok(quotes>=2);
 });
 test('already-intercepted and too-late strikes never consume the reserve',async()=>{
  for(const options of [{covered:true},{late:true,queue:[99]}]){

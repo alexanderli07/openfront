@@ -47,6 +47,7 @@ function createMatchSummary(options={}) {
       add({kind:'command',action:c.action||'unknown',status:e.status,arguments:c.arguments,
         source:c.source,reason:c.reason,error:e.error,plan:parent?.purpose||parent?.unitType||parent?.reason});return;
     }
+    if(e.kind==='build-delay')add({kind:e.kind,type:e.type,source:e.source,delayMs:e.delayMs,reason:e.reason});
     if(e.kind==='infrastructure-change'){
       if(!firstInfrastructure)firstInfrastructure={id:`${segment}:${e.seq}`,tick,structures:e.structures||[],partial:e.totalStructures>80};
       const next=new Map((e.structures||[]).map(s=>[s.id,s]));

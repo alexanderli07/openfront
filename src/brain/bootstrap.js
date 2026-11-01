@@ -11,7 +11,7 @@ window.addEventListener('pagehide',()=>{ofhMatchArchive.flush().catch(()=>{});})
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ofhMatchArchive.flush().catch(()=>{});});
 const ofhBrainRuntime = createBrainRuntime({
   createEngine: createDecisionEngine,
-  createCommandGuard,createSpendingLedger,createReactiveSam,createSamDevelopment,
+  createCommandGuard,createSpendingLedger,createBuildPacing,createReactiveSam,createSamDevelopment,
   createSupportPosture:()=>createSupportPosture({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team}),
   wildernessCrossing:createWildernessCrossing(),
   portWaterAccess:ofhPortWaterAccess,
@@ -30,7 +30,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.79'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.80'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

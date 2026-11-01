@@ -4,6 +4,13 @@ const summaryPath='../src/brain/match-summary';
 const fs=require('node:fs');
 const createSummary=fs.existsSync(require('node:path').join(__dirname,summaryPath+'.js'))?require(summaryPath):null;
 
+test('compact match history explains scheduled building delays',()=>{
+ const h=createSummary({segment:'delay'});
+ h.observe({kind:'build-delay',seq:1,tick:50,source:'StructureBehavior',type:'Port',delayMs:1750,reason:'Waiting for ordinary building delay'});
+ assert.deepEqual(h.export().events.map(e=>({kind:e.kind,type:e.type,delayMs:e.delayMs})),
+   [{kind:'build-delay',type:'Port',delayMs:1750}]);
+});
+
 test('compact history retains early actions through full-game getter noise',()=>{
   assert.equal(typeof createSummary,'function');
   const h=createSummary({metadata:{gameId:'game',playerId:'self'},segment:'a'});

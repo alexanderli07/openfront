@@ -22,7 +22,7 @@ function fixture(options = {}) {
   const runtime = createRuntime && createRuntime({ createEngine, createLegacyStrategy,
     createCommandGuard:options.createCommandGuard,isDonationIntent:options.isDonationIntent,
     createSpendingLedger:options.createSpendingLedger,defenseEconomy:options.defenseEconomy,units:options.units,twoTeamOpening:options.twoTeamOpening,
-    createSupportPosture:options.createSupportPosture,
+    createSupportPosture:options.createSupportPosture,createBuildPacing:options.createBuildPacing,
     portWaterAccess:options.portWaterAccess,
     startHistory:options.startHistory,
     diplomacyPlanner: createDiplomacyPlanner({ settings: () => ({ winFixes: false, features: { betray: true } }),
@@ -60,6 +60,57 @@ function allianceActor(accepted = true) {
   };
 }
 test('runtime is provided', () => assert.equal(typeof createRuntime, 'function'));
+
+test('building delay holds fresh proposals without sending, reserving, or resampling',()=>{
+ let time=0,draws=0;const builds=[];
+ const f=fixture({units:{Port:'Port',City:'City'},createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>time,random:()=>{draws++;return .5;}})});
+ const menu={sendBuildOrUpgrade:q=>{builds.push(q);return true;}};
+ const other={};f.bot.structureBehavior=other;f.runtime.attachBehaviors(f.bot);
+ const quote={type:'Port',canBuild:10,canUpgrade:false,cost:100n};
+ assert.equal(f.runtime.build(f.bot,'economy',menu,quote),false);assert.equal(f.runtime.wasDeclined(f.bot),true);
+ time=1000;assert.equal(f.runtime.build(other,'economy',menu,{...quote,canBuild:20}),false);
+ assert.equal(builds.length,0);assert.equal(draws,1);
+ time=1500;assert.equal(f.runtime.build(f.bot,'economy',menu,{...quote,canBuild:30}),true);
+ assert.equal(builds.length,1);assert.equal(builds[0].canBuild,30);assert.equal(draws,1);
+ assert.equal(f.runtime.build(f.bot,'economy',menu,{type:'City',canBuild:40,cost:100n}),false);
+ assert.equal(draws,2);
+ const logs=f.runtime.inspect().records.filter(r=>r.kind==='build-delay');
+ assert.equal(logs.length,2);assert.equal(logs[0].delayMs,1500);
+});
+
+test('delayed building still respects fresh money and stopped-owner guards',()=>{
+ let time=0,gold=4000000n;
+ const f=fixture({units:{Port:'Port'},strategies:[createAdaptiveStrategy(createLegacyStrategy())],defaultStrategy:'adaptive-v1',
+   createSpendingLedger:require('../src/brain/spending-ledger'),defenseEconomy:{observe:()=>({stage:'reserve',reserve:3000000n})},
+   createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>time,random:()=>1})});
+ f.player.gold=()=>gold;let builds=0;const menu={sendBuildOrUpgrade:()=>{builds++;return true;}};
+ const quote={type:'Port',canBuild:10,cost:1000000n};
+ f.runtime.build(f.bot,'economy',menu,quote);time=3000;gold=3000000n;
+ assert.equal(f.runtime.build(f.bot,'economy',menu,quote),false);assert.equal(builds,0);
+ gold=4000000n;f.enabled=false;assert.equal(f.runtime.build(f.bot,'economy',menu,quote),false);
+ f.enabled=true;f.current=false;assert.equal(f.runtime.build(f.bot,'economy',menu,quote),false);
+ f.current=true;assert.equal(f.runtime.build(f.bot,'economy',menu,quote),true);assert.equal(builds,1);
+});
+
+test('unit launches bypass ordinary building pacing',()=>{
+ const f=fixture({units:{City:'City',Warship:'Warship',AtomBomb:'Atom Bomb'},
+   createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>0,random:()=>1})});
+ let builds=0;const menu={sendBuildOrUpgrade:()=>{builds++;return true;}};
+ assert.equal(f.runtime.build(f.bot,'economy',menu,{type:'City',canBuild:10}),false);
+ assert.equal(f.runtime.build(f.bot,'navy',menu,{type:'Warship',canBuild:20}),true);
+ assert.equal(f.runtime.build(f.bot,'nuke',menu,{type:'Atom Bomb',canBuild:30}),true);assert.equal(builds,2);
+});
+
+test('ordinary upgrades share pacing and invalidated port sites never dispatch',()=>{
+ let time=0,open=true,builds=0;
+ const f=fixture({units:{Port:'Port'},portWaterAccess:{assess:()=>({allowed:open,reason:'Enclosed water'})},
+   createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>time,random:()=>1})});
+ f.player.units=()=>[{id:()=>4,tile:()=>20}];
+ const menu={sendBuildOrUpgrade:()=>{builds++;return true;}},quote={type:'Port',canUpgrade:4,cost:10n};
+ assert.equal(f.runtime.build(f.bot,'port',menu,quote),false);
+ time=3000;open=false;assert.equal(f.runtime.build(f.bot,'port',menu,quote),false);assert.equal(builds,0);
+ open=true;assert.equal(f.runtime.build(f.bot,'port',menu,quote),true);assert.equal(builds,1);
+});
 
 test('shared build guard keeps the SAM reserve and commits surplus across concurrent quotes',()=>{
  const adaptive=createAdaptiveStrategy(createLegacyStrategy());

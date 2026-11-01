@@ -7,6 +7,13 @@ const vm = require('node:vm');
 const location = path.join(__dirname, '../scripts/build.js');
 const build = fs.existsSync(location) ? require(location) : null;
 test('active builder targets the central decision engine', () => assert.equal(typeof build?.buildSource, 'function'));
+
+test('standalone build injects the shared building pacing gate',()=>{
+ const {source}=build.buildSource();
+ assert.ok(source.includes('function createBuildPacing('));
+ assert.ok(source.includes('controller.buildPacing=deps.createBuildPacing?.()'));
+ assert.ok(source.includes('createCommandGuard,createSpendingLedger,createBuildPacing,createReactiveSam'));
+});
 test('tactical boat search and sampled destinations route through central adapters',()=>{
   const {source}=build.buildSource();
   assert.ok(source.includes('function createBoatPlanner'));
@@ -31,7 +38,7 @@ test('standalone build registers the adaptive gameplay strategy', () => {
   const { source } = build.buildSource();
   assert.ok(source.includes('function createAdaptiveStrategy'));
   assert.ok(source.includes('strategies: [createAdaptiveStrategy(createLegacyStrategy())]'));
-  assert.ok(source.includes('// @version      1.84.79'));
+  assert.ok(source.includes('// @version      1.84.80'));
   assert.ok(source.includes('transportType: UNIT.TransportShip'));
   assert.ok(source.includes('isTransportIntent: ctor => ctor === _ctors.boat'));
 });
@@ -47,7 +54,7 @@ test('structure choice routes through the batch planner in the standalone build'
   const { source } = build.buildSource();
   assert.ok(source.includes('return ofhBrainRuntime.planStructures(this,{cityLevels:a,cityDisabled:t,sharedWater:i})'));
   assert.ok(source.includes('function createStructurePlanner'));
-  assert.ok(source.includes('// @version      1.84.79'));
+  assert.ok(source.includes('// @version      1.84.80'));
 });
 
 test('bot attack target selection routes through the planner', () => {
@@ -137,7 +144,7 @@ test('pocket and island searches route through attack geography', () => {
   assert.ok(source.includes('async findSealablePocket(){return ofhBrainRuntime.selectAttackGeography(this,"pocket")}'));
   assert.ok(source.includes('async findNearestIslandEnemy(){return ofhBrainRuntime.selectAttackGeography(this,"island")}'));
   assert.ok(source.includes("version: '1.84.0-plans.38'"));
-  assert.match(source, /@version\s+1\.84\.79/);
+  assert.match(source, /@version\s+1\.84\.80/);
 });
 test('standalone build contains all bot command gateways and no economy experiment', () => {
   const { source, counts } = build.buildSource();

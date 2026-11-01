@@ -105,6 +105,7 @@ function createBrainRuntime(deps) {
     controller.history=safe(()=>deps.startHistory?.(bot));
     controller.commandGuard=deps.createCommandGuard?.();
     controller.spending=deps.createSpendingLedger?.();
+    controller.buildPacing=deps.createBuildPacing?.();
     controller.samDevelopment=deps.createSamDevelopment?.();
     controller.supportObserver=deps.createSupportPosture?.();
     controller.supportSpending=deps.createSpendingLedger?.();
@@ -385,19 +386,36 @@ function createBrainRuntime(deps) {
       return {...controller.spending.facts({tick:controller.bot.mg.ticks(),gold:controller.bot.player.gold(),
         cost,reserve,key}),key,tick:controller.bot.mg.ticks()};
     };
-    const execute=()=>{
+    const paced=!!controller?.buildPacing&&bu?.type!==undefined&&
+      ['City','Port','Factory','SAMLauncher','MissileSilo','DefensePost'].some(name=>deps.units?.[name]===bu.type)&&
+      reactiveQuotes.get(bu)?.mode!=='emergency';
+    const validate=()=>{
       const facts=request();
+      if(!facts.allowed||!paced)return facts;
+      const timing=controller.buildPacing.facts();
+      if(timing.scheduled)controller.engine.record('build-delay',{tick:controller.bot.mg.ticks(),source,
+        type:bu.type,delayMs:timing.delayMs,reason:timing.reason,
+        ...(activePlans.has(actor)?{parentDecisionId:activePlans.get(actor)}:{})});
+      return {...facts,allowed:timing.allowed,reason:timing.reason,
+        buildingDelay:{delayMs:timing.delayMs,remainingMs:timing.remainingMs}};
+    };
+    const execute=()=>{
+      const facts=validate();
       if(!facts.allowed)return false;
+      const send=()=>{
+        if(paced)controller.buildPacing.commit();
+        return Reflect.apply(menu.sendBuildOrUpgrade,menu,args);
+      };
       if(facts.cost!==undefined&&controller.spending)return controller.spending.commit(facts,
-        ()=>Reflect.apply(menu.sendBuildOrUpgrade, menu, args));
-      return Reflect.apply(menu.sendBuildOrUpgrade, menu, args);
+        send);
+      return send();
     };
     if (placementDecisionId === undefined) {
-      return submit(actor, source, kind, args, execute,false,false,adaptive||port?request:null);
+      return submit(actor, source, kind, args, execute,false,false,adaptive||port||paced?validate:null);
     }
     placementParents.delete(bu);
     return withPlan(actor, placementDecisionId,
-      () => submit(actor, source, kind, args, execute,false,false,adaptive||port?request:null));
+      () => submit(actor, source, kind, args, execute,false,false,adaptive||port||paced?validate:null));
   }
   function callback(actor, source, receiver, method, ...args) {
     return submit(actor, source, source.split('.').at(-1), args, () => Reflect.apply(receiver[method], receiver, args));
