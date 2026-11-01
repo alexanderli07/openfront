@@ -763,7 +763,7 @@ function createBrainRuntime(deps) {
         const changed=deps.warshipTradeHotspots.assign(actor,context.ship,area);
         if(area.reviewed)hooks.record('warship-post-review',{unitId:context.ship.id(),tile:area.tile,key:area.key,clearance:area.clearance,reviewedAt:area.reviewedAt,viable:true});
         if(changed)hooks.record('warship-hotspot-assignment',{unitId:context.ship.id(),tile:area.tile,key:area.key,
-          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,enemyDistance:area.enemyDistance});
+          density:area.density,score:area.score,retained:area.retained,occupancy:area.occupancy,protectionUnknown:area.protectionUnknown,clearance:area.clearance,reviewedAt:area.reviewedAt,teamDistance:area.teamDistance,teamRange:area.teamRange,teamRangeFraction:area.teamRangeFraction,enemyDistance:area.enemyDistance});
       };
       hooks.defended=area=>{
         if(deps.warshipTradeHotspots.coastalAssigned(actor,context.ship,area))hooks.record('warship-coastal-assignment',{

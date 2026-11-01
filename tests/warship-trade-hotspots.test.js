@@ -9,7 +9,7 @@ function fixture(options={}){
  const ship=(id,tile)=>({id:()=>id,tile:()=>tile,isActive:()=>true,isUnderConstruction:()=>false});
  const fleet=[ship(1,0),ship(2,300)];
  let homePorts=[0,300,1300].map((tile,id)=>({...ship(100+id,tile),owner:()=>self}));
- const game={ticks:()=>tick,x:t=>typeof t==='object'?t.x:t,y:t=>typeof t==='object'?t.y:0,ref:(x,y)=>({x,y}),isValidCoord:()=>true,isWater:()=>true,getWaterComponent:t=>(t?.x??t)>=1000?2:1,
+ const game={width:()=>options.width??2881,height:()=>options.height??2881,ticks:()=>tick,x:t=>typeof t==='object'?t.x:t,y:t=>typeof t==='object'?t.y:0,ref:(x,y)=>({x,y}),isValidCoord:()=>true,isWater:()=>true,getWaterComponent:t=>(t?.x??t)>=1000?2:1,
   manhattanDist:(a,b)=>Math.abs((a?.x??a)-(b?.x??b))+Math.abs((a?.y??0)-(b?.y??0)),neighbors:t=>[t-1,t+1],
   players:()=>[self],units:(...types)=>types.includes('TradeShip')?traffic:types.includes('Warship')?enemies:types.includes('Port')?ports:nukes};
  const actor={game,player:self,nukeOuterRadius:()=>50};
@@ -212,13 +212,55 @@ test('an intercepted defender does not return to a watchpoint across an unsafe d
  assert.ok(game.x(next.tile)>0);assert.notEqual(next.retained,true);
 });
 
-test('production team support reaches1440tiles from our port',()=>{
+test('2881square map support reaches its1440tile percentage radius',()=>{
  const f=fixture({useProductionThreshold:true});f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
  f.actor.game.getWaterComponent=()=>1;f.setTraffic([f.trade(1,1400),f.trade(2,1410),f.trade(3,1420)]);assert.ok(f.rank().length);
 });
-test('production team support beyond1440tiles still rejects a remote post',()=>{
+test('2881square map rejects support beyond its1440tile percentage radius',()=>{
  const f=fixture({useProductionThreshold:true});f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
  f.actor.game.getWaterComponent=()=>1;f.setTraffic([f.trade(1,1500),f.trade(2,1510),f.trade(3,1520)]);assert.deepEqual(f.rank(),[]);
+});
+
+test('large maps allow supported posts beyond the previous fixed range',()=>{
+ const f=fixture({useProductionThreshold:true,width:4000,height:4000});
+ f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);f.actor.game.getWaterComponent=()=>1;
+ f.setTraffic([f.trade(1,1800),f.trade(2,1810),f.trade(3,1820)]);
+ const area=f.rank()[0];assert.ok(area);assert.equal(area.teamRange,1999);assert.equal(area.teamDistance,1800);
+});
+
+test('small maps reject a remote post even within the former fixed range',()=>{
+ const f=fixture({useProductionThreshold:true,width:1200,height:1200});
+ f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);f.actor.game.getWaterComponent=()=>1;
+ f.setTraffic([f.trade(1,700),f.trade(2,710),f.trade(3,720)]);assert.deepEqual(f.rank(),[]);
+});
+
+test('map-relative support uses both dimensions and an exact Manhattan boundary',()=>{
+ for(const [width,height,range] of [[2002,2000,1000],[6001,1001,1750]])for(const offset of [0,1]){
+  const f=fixture({useProductionThreshold:true,width,height});
+  f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);f.actor.game.getWaterComponent=()=>1;
+  f.setTraffic([1,2,3].map(id=>f.trade(id,range+offset)));
+  const areas=f.rank();assert.equal(areas.length>0,offset===0);
+  if(!offset){assert.equal(areas[0].teamRange,range);assert.equal(areas[0].teamDistance,range);}
+ }
+});
+
+test('scaled land probes find team territory beyond1440tiles without any ports',()=>{
+ const f=fixture({useProductionThreshold:true,width:6000,height:6000}),game=f.actor.game;f.setHomePorts([]);
+ game.isLand=t=>game.x(t)<=0;game.isWater=t=>!game.isLand(t);game.hasOwner=t=>game.isLand(t);game.ownerID=()=>1;
+ game.getWaterComponent=()=>1;f.fleet[0]=f.ship(1,2300);f.setTraffic([f.trade(1,2400),f.trade(2,2410),f.trade(3,2420)]);
+ const area=f.rank()[0];assert.ok(area);assert.equal(area.teamRange,2999);
+ assert.ok(area.teamDistance>1440&&area.teamDistance<=area.teamRange);
+});
+
+test('large-map percentage still rejects nearby enemy coast',()=>{
+ const f=fixture({width:6000,height:6000,minTraffic:3}),enemy={id:()=>3};
+ f.actor.game.getWaterComponent=()=>1;f.setHomePorts([{...f.ship(70,0),owner:()=>f.actor.player}]);
+ f.setPorts([{...f.ship(71,1810),owner:()=>enemy}]);
+ f.setTraffic([f.trade(1,1800),f.trade(2,1805),f.trade(3,1810)]);assert.deepEqual(f.rank(),[]);
+});
+
+test('invalid map dimensions fail explicitly instead of using a fixed fallback',()=>{
+ const f=fixture({width:NaN});assert.throws(()=>f.rank(),/valid map dimensions/);
 });
 
 test('team-land support probes reach beyond the old480tile radius',()=>{

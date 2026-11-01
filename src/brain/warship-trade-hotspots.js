@@ -1,12 +1,24 @@
 'use strict';
 
 function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffic=3}) {
-  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRange=1440;
+  const states=new WeakMap(),sampleLimit=512,reviewMs=30000,clearance=12,teamRangeFraction=.25;
   const raw=unit=>unit?.__src||unit;
+  function supportRange(game){
+    const width=game.width(),height=game.height();
+    if(!Number.isInteger(width)||!Number.isInteger(height)||width<=0||height<=0)
+      throw new Error('Warship support requires valid map dimensions');
+    return Math.max(1,Math.floor(((width-1)+(height-1))*teamRangeFraction));
+  }
+  function probeRadii(range){
+    const nearby=[16,32,48,64,96,128,160].filter(radius=>radius<=range);
+    const outer=[.2,.3,.4,.5,.65,.8,.9,1].map(fraction=>Math.max(1,Math.round(range*fraction)));
+    return [...new Set([...nearby,...outer])].sort((a,b)=>a-b);
+  }
   function state(actor){
     const game=actor.game,tick=game.ticks(),time=now();let s=states.get(actor.player);
     if(!s||s.game!==game||tick<s.lastTick||time<s.sampleAt){
-      s={game,tick:-Infinity,sampleAt:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map(),defenseAssignments:new Map(),vacancies:new Map(),geometry:new Map(),lastReplacementAt:-Infinity};states.set(actor.player,s);
+      const teamRange=supportRange(game);
+      s={game,teamRange,probeRadii:probeRadii(teamRange),tick:-Infinity,sampleAt:-Infinity,samples:new Map(),anchors:new Map(),assignments:new Map(),defenseAssignments:new Map(),vacancies:new Map(),geometry:new Map(),lastReplacementAt:-Infinity};states.set(actor.player,s);
     }
     s.lastTick=tick;
     const fleet=actor.player.units(U.Warship).filter(ship=>ship.isActive?.()!==false),ids=new Set(fleet.map(ship=>ship.id()));
@@ -98,7 +110,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
   }
   function locality(actor,s,tile){
     if(s.support.has(tile))return s.support.get(tile);
-    const game=actor.game,component=game.getWaterComponent(tile);let teamDistance=Infinity,enemyDistance=Infinity,teamTile;
+    const game=actor.game,component=game.getWaterComponent(tile),teamRange=s.teamRange;let teamDistance=Infinity,enemyDistance=Infinity,teamTile;
     for(const coast of s.coasts)if(coast.components.has(component)){
       const distance=game.manhattanDist(tile,coast.tile);
       if(coast.team&&distance<teamDistance){teamDistance=distance;teamTile=coast.tile;}else if(!coast.team)enemyDistance=Math.min(enemyDistance,distance);
@@ -106,7 +118,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
     // Ports give exact support anchors. Bound land probes to240points per queried tile.
     if(game.isLand&&game.hasOwner&&game.ownerID&&s.teamIds.size){
       const x=game.x(tile),y=game.y(tile);
-      for(const radius of [16,32,48,64,96,128,160,240,320,400,480,720,960,1200,1440])for(let i=0;i<16;i++){
+      for(const radius of s.probeRadii)for(let i=0;i<16;i++){
         const px=Math.round(x+Math.cos(i*Math.PI/8)*radius),py=Math.round(y+Math.sin(i*Math.PI/8)*radius);
         if(!game.isValidCoord(px,py))continue;const point=game.ref(px,py);
         if(!game.isLand(point)||!game.hasOwner(point))continue;
@@ -115,7 +127,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         else if(s.enemyIds.has(owner))enemyDistance=Math.min(enemyDistance,distance);
       }
     }
-    const facts={teamDistance,enemyDistance,teamTile,teamRange,
+    const facts={teamDistance,enemyDistance,teamTile,teamRange,teamRangeFraction,
       allowed:component!=null&&teamDistance<=teamRange&&!(enemyDistance<=100&&enemyDistance<=teamDistance+24)};
     if(s.support.size>=1024)s.support.delete(s.support.keys().next().value);
     s.support.set(tile,facts);return facts;
@@ -217,7 +229,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
       for(const [id,a] of s.assignments)if(id!==ship.id()&&a.component===component&&game.manhattanDist(a.tile,area.tile)<=120)occupancy++;
       const distance=game.manhattanDist(ship.tile(),area.tile);
       return {...area,...locality(actor,s,area.tile),clearance,reviewed:true,reviewedAt:time,retained:false,occupancy,distance,
-        score:area.density*100/((1+distance/teamRange)*(1+occupancy*1.5)),
+        score:area.density*100/((1+distance/s.teamRange)*(1+occupancy*1.5)),
         reason:vacant.length?'Fill a vacant piracy post with an existing ship':'Post in open water with dense enemy trade'};
     }).filter(a=>a.allowed&&(vacant.length||a.score>0)&&localRoute(actor,s,ship.tile(),a.tile)&&openWater(game,s,a.tile)&&!unsafe(actor,s,a.tile))
       .sort((a,b)=>b.score-a.score||a.distance-b.distance||a.key.localeCompare(b.key)).slice(0,79);
@@ -251,7 +263,7 @@ function createWarshipTradeHotspots({units:U,now=()=>performance.now(),minTraffi
         const areas=(post?[post]:s.areas).filter(a=>a.component===component&&viable(actor,s,a));
         let best;
         for(const area of areas){
-          const score=area.density*100/(1+game.manhattanDist(tile,area.tile)/teamRange);
+          const score=area.density*100/(1+game.manhattanDist(tile,area.tile)/s.teamRange);
           if((!best||score>best.score)&&localRoute(actor,s,tile,area.tile))best={tile,portTile:port.tile(),hotspot:area.tile,
             density:area.density,postKey:area.key,score,reason:'Deploy from a usable port connected to productive trade traffic'};
         }
