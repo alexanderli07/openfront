@@ -115,15 +115,15 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     .replace(/^if\(typeof module.*$/m,'');
   replaceOne('keepAutoJoinAfterMatch:true,','keepAutoJoinAfterMatch:true,autoClaimPostMatchRewards:false,');
   replaceOne('function tryAutoJoin(){',rewardsModule+'\n'+
-    'const ofhPostMatchRewards=createPostMatchRewards({enabled:()=>settings.autoClaimPostMatchRewards===true,modal:()=>[...document.querySelectorAll("win-modal")].reverse().find(modal=>modal.isVisible===true)});'+
+    'const ofhPostMatchRewards=createPostMatchRewards({enabled:()=>settings.autoClaimPostMatchRewards===true,modal:()=>[...document.querySelectorAll("win-modal")].reverse().find(modal=>modal.isVisible===true),accountPanels:()=>document.querySelectorAll("rewards-panel"),canClaimAccount:()=>!isOccupied()});'+
     'window.__OFH_postMatchRewards=ofhPostMatchRewards;'+
     'window.setInterval(()=>ofhPostMatchRewards.hold(),1000);'+
     'function tryAutoJoin(){if(ofhPostMatchRewards.hold())return;');
   replaceOne('autoLeaveFired=true;try{window.location.href="/"}',
     'if(window.__OFH_postMatchRewards?.hold())return;autoLeaveFired=true;try{window.location.href="/"}');
   replaceOne('e.append(y("Auto-leave on team win",',
-    'e.append(y("Auto claim post-match rewards","Claim available match rewards before automatically leaving. Waits up to 60 seconds.",!!l.autoClaimPostMatchRewards,i=>{l.autoClaimPostMatchRewards=i,m()})),e.append(y("Auto-leave on team win",');
-  const rewardRow='<label class="ofh-aj-notif"><span class="ofh-aj-notif-text">Auto claim post-match rewards</span><input type="checkbox" data-role="claim-rewards"><span class="ofh-aj-switch"></span></label>';
+    'e.append(y("Auto claim rewards","Claim match rewards and available account rewards. Waits up to 60 seconds per batch before automatic navigation.",!!l.autoClaimPostMatchRewards,i=>{l.autoClaimPostMatchRewards=i,m()})),e.append(y("Auto-leave on team win",');
+  const rewardRow='<label class="ofh-aj-notif"><span class="ofh-aj-notif-text">Auto claim rewards</span><input type="checkbox" data-role="claim-rewards"><span class="ofh-aj-switch"></span></label>';
   replaceOne('<div class="ofh-aj-summary ${settings.floatingAutoJoinFiltersCollapsed?',
     rewardRow+'<div class="ofh-aj-summary ${settings.floatingAutoJoinFiltersCollapsed?');
   replaceOne('function applyFloatingAutoJoinPanelState(){',
@@ -589,7 +589,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.78';
+  const version='1.84.79';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
