@@ -14,7 +14,11 @@ function createSamDefenseObserver({units:U}) {
   const structures=new Set([U.City,U.Port,U.Factory,U.MissileSilo,U.DefensePost,U.SAMLauncher].filter(Boolean));
   const observedTypes=[...new Set([...nuclear,...structures,U.SAMMissile].filter(Boolean))];
   function observe(game,player) {
-    const tick=call(game,'ticks'), observation={tick,threats:[],sams:[],ownSams:[],structures:[]};
+    const nuclearCapability={scannedSilos:0,hostileSilos:0,operationalSilos:0,buildingSilos:0,
+      unknownSilos:0,unknownReadinessSilos:0,capacity:0,readySlots:0,coolingSlots:0,
+      strongestEnemyCapacity:0,strongestEnemyReadySlots:0,preparationTarget:0,
+      truncated:false,confidence:'unknown',reason:'Public silo snapshot unavailable'};
+    const tick=call(game,'ticks'), observation={tick,threats:[],sams:[],ownSams:[],structures:[],nuclearCapability};
     if (call(raw(game),'isCatchingUp') === true) return {...observation,reason:'catching-up'};
     let units;
     try { units=game.units(...observedTypes); }
@@ -25,6 +29,52 @@ function createSamDefenseObserver({units:U}) {
     const own=unit => selfId!==undefined && call(ownerOf(unit),'smallID')===selfId;
     const friendly=unit => own(unit) || call(player,'isFriendly',ownerOf(unit))===true;
     const active=unit => read(unit,'isActive')===true;
+    // A bounded public-infrastructure sample is preparation evidence only:
+    // available launch slots do not establish affordability, target or intent.
+    // Use the strongest single enemy rather than adding unrelated countries'
+    // potential salvos into a runaway capacity goal. Distance is not a reliable
+    // safety boundary for nuclear weapons.
+    const enemies=new Map();
+    for(const unit of units){
+      if(read(unit,'type')!==U.MissileSilo)continue;
+      if(nuclearCapability.scannedSilos>=128){nuclearCapability.truncated=true;break;}
+      nuclearCapability.scannedSilos++;
+      if(own(unit))continue;
+      const owner=ownerOf(unit),ownerId=call(owner,'smallID');
+      const relationship=call(player,'isFriendly',owner);
+      if(relationship===true)continue;
+      if(selfId===undefined||ownerId===undefined||ownerId===null||relationship!==false){
+        nuclearCapability.unknownSilos++;continue;
+      }
+      const activeState=call(raw(unit),'isActive');
+      if(activeState===false)continue;
+      if(activeState!==true){nuclearCapability.unknownSilos++;continue;}
+      nuclearCapability.hostileSilos++;
+      const building=call(raw(unit),'isUnderConstruction'),level=call(raw(unit),'level');
+      if(building===true){nuclearCapability.buildingSilos++;continue;}
+      if(building!==false||!Number.isSafeInteger(level)||level<=0){
+        nuclearCapability.unknownSilos++;continue;
+      }
+      nuclearCapability.operationalSilos++;
+      nuclearCapability.capacity+=level;
+      // Do not trust wrapper defaults (an absent queue may be wrapped as []).
+      const queue=call(raw(unit),'missileTimerQueue');
+      const known=Array.isArray(queue)&&queue.length<=level&&queue.every(finite);
+      const ready=known?level-queue.length:0;
+      if(known){nuclearCapability.readySlots+=ready;nuclearCapability.coolingSlots+=queue.length;}
+      else nuclearCapability.unknownReadinessSilos++;
+      const enemy=enemies.get(ownerId)||{capacity:0,ready:0};
+      enemy.capacity+=level;enemy.ready+=ready;enemies.set(ownerId,enemy);
+      nuclearCapability.strongestEnemyCapacity=Math.max(nuclearCapability.strongestEnemyCapacity,enemy.capacity);
+      nuclearCapability.strongestEnemyReadySlots=Math.max(nuclearCapability.strongestEnemyReadySlots,enemy.ready);
+    }
+    nuclearCapability.confidence=nuclearCapability.truncated||nuclearCapability.unknownSilos||
+      nuclearCapability.unknownReadinessSilos?'partial':'observed';
+    nuclearCapability.preparationTarget=nuclearCapability.strongestEnemyReadySlots>=3?3:
+      nuclearCapability.operationalSilos>0?2:0;
+    nuclearCapability.reason=nuclearCapability.operationalSilos>0?
+      'Public hostile silo capacity; launch slots are not enemy funds or attack intent':
+      'No confirmed operational hostile silo in public sample';
     const ownStructures=units.filter(unit => structures.has(read(unit,'type')) && own(unit) && active(unit));
     observation.structures=ownStructures.filter(unit=>[U.City,U.Port,U.Factory,U.MissileSilo].includes(read(unit,'type')))
       .map(unit=>({id:read(unit,'id'),type:read(unit,'type'),tile:read(unit,'tile')}));

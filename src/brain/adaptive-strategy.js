@@ -66,8 +66,16 @@ function createAdaptiveStrategy(legacyStrategy) {
   return {
     id: 'adaptive-v1',
     name: 'Adaptive algorithm',
-    version: '1.18.0-unified-development',
+    version: '1.19.0-opportunity-development',
     decide(snapshot, candidates) {
+      if(snapshot.domain==='naval-landing'&&snapshot.navalLanding?.mode==='river'){
+        const ranked=candidates.filter(c=>c.kind==='naval-landing'&&c.eligible!==false).sort((a,b)=>
+          (b.opportunityScore??0)-(a.opportunityScore??0)||a.priority-b.priority);
+        const selected=ranked[0]||candidates.find(c=>c.id==='$wait');
+        return select(selected,candidates,ranked.length?
+          `Secure wilderness access: room>=${selected.room??0}, crossing=${selected.crossingSteps??'unknown'}, bottleneck=${!!selected.bottleneck}`:
+          'No reachable wilderness-access candidate remains');
+      }
       if (snapshot.domain === 'spawn-source' && snapshot.spawn?.teamSpawn) {
         const chosen = candidates.find(c => c.source === 'companion' && c.eligible) ||
           candidates.find(c => c.source === 'team-geography' && c.eligible) || candidates.find(c => c.id === '$wait');
@@ -201,12 +209,15 @@ function createAdaptiveStrategy(legacyStrategy) {
         const threshold = Number.isFinite(configured) ? Math.max(0, Math.min(.65, configured)) : .65;
         const targets = candidates.filter(candidate => candidate.kind === 'donation-target' &&
           candidate.eligible !== false && Number.isFinite(candidate.fill) && candidate.fill < threshold &&
-          (candidate.frontline === true || candidate.bordersEnemy === true));
-        targets.sort((a,b) => Number(b.frontline === true) - Number(a.frontline === true) || a.fill - b.fill);
+          (candidate.frontline === true || candidate.bordersEnemy === true)&&
+          (!Number.isFinite(candidate.donationValue)||candidate.donationValue>0));
+        targets.sort((a,b) => (b.donationValue??0)-(a.donationValue??0)||
+          Number(b.frontline === true) - Number(a.frontline === true) || a.fill - b.fill);
         const chosen = targets[0];
         return select(chosen || candidates.find(candidate => candidate.skipDonation && candidate.eligible !== false) ||
           candidates.find(candidate => candidate.id === '$wait'), candidates,
-          chosen ? `Donate to a front-line teammate below ${Math.round(threshold * 100)}% capacity` :
+          chosen ? `Donate to a front-line teammate below ${Math.round(threshold * 100)}% capacity${
+            Number.isFinite(chosen.donationValue)?`; role=${chosen.donationRole}, value=${chosen.donationValue.toFixed(1)}, confidence=${chosen.donationConfidence}`:''}` :
             `No front-line teammate below ${Math.round(threshold * 100)}% capacity; keep troops`);
       }
       if (snapshot.domain === 'structure-plan' && (!safeOpening || opening.samEnabled)) {

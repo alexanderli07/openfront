@@ -1,7 +1,27 @@
 'use strict';
 function createDiplomacyDetailsPlanner(deps) {
+  const assess=deps.donationValue||(typeof module!=='undefined'&&module.exports?
+    require('./donation-value'):assessDonationValue);
   const wait={id:'$wait',kind:'wait',reason:'Hold diplomacy action'};
   const id=target=>{try{return target.id?.()??target.smallID?.();}catch{return undefined;}};
+  const read=(target,key)=>{try{return target?.[key]?.();}catch{return undefined;}};
+  const troopNumber=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
+  function pressure(teammate,key,outgoing=false) {
+    const list=read(teammate,key),valid=Array.isArray(list);
+    const result={troops:0,count:valid?list.length:0,known:valid&&list.length<=64,targetTroops:0,targetsKnown:valid&&list.length<=64};
+    const seen=new Set();
+    for(const attack of valid?list.slice(0,64):[]){
+      const troops=read(attack,'troops');
+      if(troopNumber(troops))result.troops+=troops;else result.known=false;
+      if(!outgoing)continue;
+      const target=read(attack,'target'),key=id(target)??target;
+      if(!target){result.targetsKnown=false;continue;}
+      if(seen.has(key))continue;
+      seen.add(key);const defenders=read(target,'troops');
+      if(troopNumber(defenders))result.targetTroops+=defenders;else result.targetsKnown=false;
+    }
+    return result;
+  }
   function choose(hooks,domain,entries,facts) {
     const cs=entries.slice(0,79).map((e,priority)=>({...e,id:`${domain}:${priority}`,kind:domain,priority,
       eligible:e.eligible!==false}));
@@ -27,21 +47,33 @@ function createDiplomacyDetailsPlanner(deps) {
     })
       .sort((a,b)=>a.troopPercentage-b.troopPercentage);
     const threshold=settings.winFixes?settings.donateNeedThreshold??.8:1;
+    const donorCapacity=posture?actor.game.config().maxTroops(actor.player):null;
+    // Preserve legacy evaluation timing: effectiveReserveRatio is only queried
+    // after a recipient is approved. Without posture the estimate is marked low.
+    const availableTroops=posture?Math.max(0,actor.player.troops()-donorCapacity*posture.keepFraction):
+      Math.max(0,actor.player.troops()*(1-(settings.donateKeepFrac||.45)));
     const entries=ordered.filter(e=>e.teammate.isAlive()&&e.teammate.smallID()!==actor.player.smallID()&&e.troopPercentage<threshold)
-      .map(entry=>{let frontline=false;try{frontline=entry.teammate.incomingAttacks().length>0||entry.teammate.outgoingAttacks().length>0;}catch{}
+      .map(entry=>{const incoming=pressure(entry.teammate,'incomingAttacks'),outgoing=pressure(entry.teammate,'outgoingAttacks',true);
+        const frontline=incoming.count>0||outgoing.count>0;
         let bordersEnemy=false;
         if(!frontline)try{bordersEnemy=entry.teammate.nearby().some(neighbor=>neighbor.isPlayer()&&neighbor.isAlive()&&
           !entry.teammate.isFriendly(neighbor)&&entry.teammate.sharesBorderWith(neighbor));}catch{}
-        return {entry,frontline,bordersEnemy};});
+        const value=assess({troops:entry.teammate.troops(),capacity:actor.game.config().maxTroops(entry.teammate),
+          fillLimit:Math.min(.65,threshold),availableTroops,incomingTroops:incoming.troops,incomingCount:incoming.count,
+          incomingKnown:incoming.known,outgoingTroops:outgoing.troops,outgoingCount:outgoing.count,outgoingKnown:outgoing.known,
+          outgoingTargetTroops:outgoing.targetTroops,outgoingTargetsKnown:outgoing.targetsKnown,bordersEnemy});
+        if(!posture)value.donationConfidence='low';
+        return {entry,frontline,bordersEnemy,value};});
     entries.sort((a,b)=>a.frontline!==b.frontline?(a.frontline?-1:1):a.entry.troopPercentage-b.entry.troopPercentage);
     // Keep the legacy winner visible, then expose qualified front-line allies
     // before filling the bounded window with remaining recipients.
     const cutoff=Math.min(.65,threshold),first=entries[0];
-    const preferred=entries.filter(e=>e!==first&&(e.frontline||e.bordersEnemy)&&e.entry.troopPercentage<cutoff);
+    const preferred=entries.filter(e=>e!==first&&(e.frontline||e.bordersEnemy)&&e.entry.troopPercentage<cutoff)
+      .sort((a,b)=>b.value.donationValue-a.value.donationValue);
     const preferredSet=new Set(preferred);
     const visible=[...(first?[first]:[]),...preferred,...entries.filter(e=>e!==first&&!preferredSet.has(e))].slice(0,78);
     const target=choose(hooks,'donation-target',[...visible.map(e=>({targetId:id(e.entry.teammate),fill:e.entry.troopPercentage,
-      frontline:e.frontline,bordersEnemy:e.bordersEnemy,
+      frontline:e.frontline,bordersEnemy:e.bordersEnemy,...e.value,
       reason:`Combat=${e.frontline}, enemy border=${e.bordersEnemy}; lowest troop fill within priority`})),
       {skipDonation:true,reason:'Keep troops and continue the attack pass without donating'}],
       {threshold,targets:entries.length,visibleTargets:visible.length});
@@ -68,11 +100,13 @@ function createDiplomacyDetailsPlanner(deps) {
       const amounts=[{amount:excess,reason:'Original full excess over reserve'},
         {amount:excess/2,eligible:Number.isFinite(excess/2)&&excess/2>0&&excess/2>=minimum,reason:'Donate half excess within original minimum chunk'},
         {amount:minimum,eligible:Number.isFinite(minimum)&&minimum>0&&minimum<=excess,reason:'Donate original minimum chunk'}];
-      const choice=choose(hooks,'donation-amount',amounts,{capacity,keep,reserve,minimumExcess,minimum});
+      const choice=choose(hooks,'donation-amount',amounts,{capacity,keep,reserve,minimumExcess,minimum,...selected.value,
+        availableDonation:excess});
       if(choice.index<0)return false;
       const result=hooks.execute(choice.decisionId,()=>actor._donateReady(selected.entry.teammate,amounts[choice.index].amount));
       if(hooks.wasDeclined()){hooks.hold();return false;}
-      hooks.record('donation-amount-result',{decisionId:choice.decisionId,status:result===false?'not-submitted':'attempt-completed',amount:amounts[choice.index].amount});
+      hooks.record('donation-amount-result',{decisionId:choice.decisionId,status:result===false?'not-submitted':'attempt-completed',
+        amount:amounts[choice.index].amount,targetId:id(selected.entry.teammate),...selected.value});
       return result;
     });
   }

@@ -6,11 +6,22 @@ const createLegacyStrategy = require('../src/brain/legacy-strategy.js');
 const createAdaptiveStrategy = require('../src/brain/adaptive-strategy.js');
 const { compareScenarios } = require('../scripts/compare-strategies.js');
 
+test('donations prioritize a useful defensive gift over lowest-fill combat',()=>{
+ const policy=createAdaptiveStrategy(createLegacyStrategy());
+ const cs=[{id:'low',kind:'donation-target',fill:.1,frontline:true,eligible:true,donationValue:0,hopeless:true},
+   {id:'hold',kind:'donation-target',fill:.4,frontline:true,eligible:true,donationValue:150,donationRole:'defense'},
+   {id:'advance',kind:'donation-target',fill:.2,frontline:true,eligible:true,donationValue:60,donationRole:'advance'},
+   {id:'skip',kind:'donation-target',skipDonation:true,eligible:true},{id:'$wait',kind:'wait',eligible:true}];
+ assert.equal(policy.decide({domain:'donation-target'},cs).selectedId,'hold');
+ assert.equal(policy.decide({domain:'donation-target'},cs.filter(c=>c.id!=='hold')).selectedId,'advance');
+ assert.equal(policy.decide({domain:'donation-target'},cs.filter(c=>!['hold','advance'].includes(c.id))).selectedId,'skip');
+});
+
 test('adaptive strategy delegates unchanged scenarios and makes only expected gameplay differences', () => {
   const legacy = createLegacyStrategy();
   const adaptive = createAdaptiveStrategy(legacy);
   assert.deepEqual({ id: adaptive.id, name: adaptive.name, version: adaptive.version }, {
-    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.18.0-unified-development'
+    id: 'adaptive-v1', name: 'Adaptive algorithm', version: '1.19.0-opportunity-development'
   });
   for (const scenario of scenarios) {
     const original = legacy.decide(scenario.snapshot, scenario.candidates);

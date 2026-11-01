@@ -61,7 +61,8 @@ function createMatchSummary(options={}) {
       donationHoldReason:e.donationHoldReason,reason:e.reason,anchor:e.anchor});
     if(e.kind==='wilderness-crossing-result'){
       if(e.status==='submitted'||e.status==='landed')add({kind:e.kind,status:e.status,tile:e.tile,
-        crossingSteps:e.crossingSteps,room:e.room,reason:e.reason});
+        crossingSteps:e.crossingSteps,room:e.room,roomCapped:e.roomCapped,bottleneck:e.bottleneck,
+        entranceWidth:e.entranceWidth,enemyFrontier:e.enemyFrontier,opportunityScore:e.opportunityScore,reason:e.reason});
       else aggregate(holds,[e.kind,e.status,e.reason].join('|'),{domain:e.kind,status:e.status,reason:e.reason});
     }
     if(e.kind==='reactive-sam-result'){
@@ -71,6 +72,10 @@ function createMatchSummary(options={}) {
     }
     if(e.kind==='command-operational-hold')aggregate(holds,[e.kind,e.reason,e.destination,e.recipient].join('|'),
       {domain:e.kind,reason:e.reason,destination:e.destination,recipient:e.recipient});
+    if(e.kind==='donation-amount-result'&&['attempt-completed','not-submitted'].includes(e.status))
+      add({kind:'donation-value',status:e.status,targetId:e.targetId,amount:e.amount,role:e.donationRole,
+        value:e.donationValue,confidence:e.donationConfidence,incomingTroops:e.incomingTroops,
+        outgoingTroops:e.outgoingTroops,defenseGap:e.defenseGap,canHoldAfterDonation:e.canHoldAfterDonation});
     if(['donation-amount-result','naval-action-result','landing-probe','attack-sequence-result'].includes(e.kind)&&
         ['held','skipped','insufficient-excess','below-minimum-chunk','home-conservation','unreachable','not-submitted'].includes(e.status)){
       aggregate(holds,[e.kind,e.status,e.purpose,e.reason].join('|'),{domain:e.kind,status:e.status,purpose:e.purpose,reason:e.reason});

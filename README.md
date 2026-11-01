@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.81) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.82) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.81)
+## Install and update (1.84.82)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,16 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Expansion opportunities, useful donations, and observed nuclear capability (1.84.82)
+
+The central adaptive policy now ranks short river landings by measured neutral land unlocked, crossing length, narrow entry, and observed competition. Neutral pockets are sampled up to512tiles under the existing20kedge budget; partial measurements are marked. River candidates are ranked before spending the two actual worker-probe attempts. Tiny or already reachable pockets, worker failures, home conservation, captured origins, and the two-automatic-transport-slot limit remain guarded. Ordinary wilderness land waves still use native expansion; they cannot be aimed at a particular land tile.
+
+Frontline donation candidates now expose observed incoming/outgoing troop pressure, a predicted affordable gift, defense/offense gaps, and confidence. Adaptive ranking favors a donation that can plausibly close a defensive gap, then other useful combat support; idle or clearly overwhelming fully observed fights can be skipped. Unknown or truncated troop telemetry does not establish hopelessness. The65%recipient cutoff, own-home conservation, expansion-first rule, pending troop spending ledger, and actual donation amount guards remain. This is a pressure heuristic, not an exact combat simulation.
+
+After the staged economy, confirmed active hostile silos can raise planned primary-SAM preparation to level2, or level3 if one enemy has at least three observed ready launch slots. Inspection is bounded to128silos; native construction/queue uncertainty is reported. Economic progression and actual salvo memory remain stronger target floors when applicable. Visible capacity is not a stockpile or attack-intent estimate. Planned spending still retains3M; proven useful emergency upgrades retain their separate immediate path.
+
+Compact match history includes river opportunity measurements and donation value/confidence; detailed candidates include hostile nuclear capability and preparation reasons. The strategy version is1.19.0-opportunity-development. Offline tests and scenarios cover these rules; live match quality remains to be tested.
 
 ## Map-relative warship support (1.84.81)
 

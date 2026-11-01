@@ -33,3 +33,18 @@ test('one-tile neutral scraps are skipped and scanning stays bounded',()=>{
  f.game.isShore=t=>t%50===9||t===f.ref(12,10);
  assert.equal(f.sites().length,0);assert.ok(f.checks()<21000);
 });
+
+test('measures land unlocked beyond a narrow landing instead of only nearest crossing',()=>{
+ const edges=new Map(),own=new Set([0]),water=new Set([1,2,3]);
+ const link=(a,b)=>{for(const [x,y]of [[a,b],[b,a]]){if(!edges.has(x))edges.set(x,[]);edges.get(x).push(y);}};
+ link(0,1);link(1,2);link(2,3);link(1,10);link(3,1000);
+ for(let i=10;i<21;i++)link(i,i+1);
+ for(let i=1000;i<1199;i++)link(i,i+1);
+ const actor={player:{smallID:()=>1,borderTiles:()=>[0]},game:{ticks:()=>100,
+   isLand:t=>!water.has(t),isWater:t=>water.has(t),isShore:t=>t===0,
+   hasOwner:t=>own.has(t),ownerID:()=>1,hasFallout:()=>false,neighbors:t=>edges.get(t)||[]}};
+ const sites=create().sites(actor),small=sites.find(s=>s.tile===10),large=sites.find(s=>s.tile===1000);
+ assert.ok(small&&large);assert.equal(small.room,12);assert.equal(large.room,200);
+ assert.equal(large.bottleneck,true);assert.ok(large.opportunityScore>small.opportunityScore);
+ assert.equal(large.roomCapped,false);
+});

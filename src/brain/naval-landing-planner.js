@@ -10,8 +10,11 @@ function createNavalLandingPlanner() {
     let remaining = sites.map((site, priority) => ({ id: `landing:${context.mode}:${priority}`,
       kind: 'naval-landing', source: 'NavalLandingPlanner', mode: context.mode, tile: site.tile,
       distanceSquared: site.dist, priority, eligible: true, readiness: 'unchecked',
+      ...(context.mode==='river'?{room:site.room,roomCapped:site.roomCapped,crossingSteps:site.crossingSteps,
+        entranceWidth:site.entranceWidth,bottleneck:site.bottleneck,enemyFrontier:site.enemyFrontier,
+        opportunityScore:site.opportunityScore}:{}),
       reason: 'Original nearest-first order; check boat assignment and reachability after selection'
-    })).filter(candidate => candidate.priority < context.probeCap);
+    })).filter(candidate => context.mode==='river'||candidate.priority < context.probeCap);
     const poolSize = remaining.length;
     let probed = 0, timedOut = 0;
     const finish = tile => {
@@ -20,6 +23,7 @@ function createNavalLandingPlanner() {
       return tile;
     };
     while (hooks.allowed()) {
+      if(context.mode==='river'&&probed>=context.probeCap)return finish(null);
       const visible = remaining.slice(0, 79);
       const choice = hooks.choose([...visible, wait], {
         mode: context.mode, totalTargets: sites.length, searchPool: poolSize,

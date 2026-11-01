@@ -13,6 +13,11 @@ function createSamDevelopment(){
     const count=new Set((observation.threats||[]).filter(t=>t.threatensSelf||t.threatensSamArea).map(t=>t.id)).size;
     if(count&&count>=peak){peak=Math.min(count,8);peakTick=tick;}
     result.salvoTarget=peak;
+    const capability=observation.nuclearCapability;
+    const threatTarget=['observed','partial'].includes(capability?.confidence)&&
+      Number.isInteger(capability.preparationTarget)?Math.max(0,Math.min(3,capability.preparationTarget)):0;
+    result.nuclearCapability=capability;
+    result.threatTarget=threatTarget;
     if(economy?.stage!=='reserve')return result;
     const live=(observation.sams||[]).filter(s=>s.active===true&&s.building===false&&
       Number.isInteger(s.level)&&s.level>0&&s.tile!=null);
@@ -23,15 +28,19 @@ function createSamDevelopment(){
     const primary=[...own].sort((a,b)=>b.level-a.level||a.id-b.id)[0];
     for(const sam of primary?[primary]:[]){
       const economyTarget=economy.development?.samTargetLevel??2;
-      const targetLevel=Math.max(economyTarget,peak);
+      const targetLevel=Math.max(economyTarget,peak,threatTarget);
       if(targetLevel<=sam.level)continue;
       result.savings=3000000n;
-      const reason=peak>economyTarget?'salvo-capacity':economy.development?'economic-development':'developed-economy';
+      const reason=peak>economyTarget&&peak>=threatTarget?'salvo-capacity':
+        threatTarget>economyTarget?'observed-nuclear-capability':
+        economy.development?'economic-development':'developed-economy';
       if(ramping(sam)||!Array.isArray(sam.queue)||!sam.queue.every(Number.isFinite)){
-        result.blocked.push({unitId:sam.id,targetLevel,reason:ramping(sam)?'upgrade-in-progress':'uncertain-sam-state'});continue;
+        result.blocked.push({unitId:sam.id,targetLevel,nuclearCapability:capability,
+          reason:ramping(sam)?'upgrade-in-progress':'uncertain-sam-state'});continue;
       }
       result.candidates.push({unitId:sam.id,targetLevel,currentLevel:sam.level,reason,
-        salvoTarget:peak,development:economy.development,canDefend:false,mode:'planned'});
+        salvoTarget:peak,threatTarget,nuclearCapability:capability,
+        development:economy.development,canDefend:false,mode:'planned'});
     }
     return result;
   }

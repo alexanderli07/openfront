@@ -91,3 +91,48 @@ test('an absent blast-radius API does not invent peripheral relevance',()=>{
   const f=fixture();f.game.ownerID=()=>3;f.game.config=()=>({});f.add(U.City,1,80);f.nuke();
   assert.equal(f.observe().threats[0].threatensSelf,false);
 });
+
+test('public hostile silo capacity excludes allies, inactive and unfinished launchers',()=>{
+ const f=fixture();
+ f.add(U.MissileSilo,1,500,3,{level:()=>4,missileTimerQueue:()=>[90]});
+ f.add(U.MissileSilo,2,600,4,{level:()=>2,missileTimerQueue:()=>[]});
+ f.add(U.MissileSilo,3,10,2,{level:()=>20});
+ f.add(U.MissileSilo,4,10,3,{isActive:()=>false});
+ f.add(U.MissileSilo,5,10,3,{isUnderConstruction:()=>true,level:()=>5});
+ const c=f.observe().nuclearCapability;
+ assert.equal(c.hostileSilos,3);assert.equal(c.operationalSilos,2);assert.equal(c.buildingSilos,1);
+ assert.equal(c.capacity,6);assert.equal(c.readySlots,5);assert.equal(c.coolingSlots,1);
+ assert.equal(c.strongestEnemyCapacity,4);assert.equal(c.strongestEnemyReadySlots,3);
+ assert.equal(c.preparationTarget,3);assert.equal(c.confidence,'observed');
+ assert.match(c.reason,/public.*capacity/i);
+});
+
+test('unknown queue cannot establish ready capacity and unknown relationship cannot establish hostility',()=>{
+ const f=fixture();f.add(U.MissileSilo,1,500,3,{level:()=>9,missileTimerQueue:undefined});
+ let c=f.observe().nuclearCapability;
+ assert.equal(c.capacity,9);assert.equal(c.readySlots,0);assert.equal(c.unknownReadinessSilos,1);
+ assert.equal(c.preparationTarget,2);assert.equal(c.confidence,'partial');
+ f.self.isFriendly=undefined;c=f.observe().nuclearCapability;
+ assert.equal(c.preparationTarget,0);assert.equal(c.unknownSilos,1);
+});
+
+test('many distant silo owners never create runaway targets and silo inspection is bounded',()=>{
+ const f=fixture();for(let i=0;i<160;i++)f.add(U.MissileSilo,i,10000+i,3+i,{level:()=>1});
+ const c=f.observe().nuclearCapability;
+ assert.equal(c.scannedSilos,128);assert.equal(c.truncated,true);assert.equal(c.confidence,'partial');
+ assert.equal(c.preparationTarget,2);assert.equal(c.strongestEnemyReadySlots,1);
+});
+
+test('cooling and unfinished silos do not invent a ready launch volley',()=>{
+ const f=fixture();f.add(U.MissileSilo,1,500,3,{level:()=>4,missileTimerQueue:()=>[1,2,3,4]});
+ const c=f.observe().nuclearCapability;assert.equal(c.readySlots,0);assert.equal(c.preparationTarget,2);
+ const g=fixture();g.add(U.MissileSilo,1,500,3,{isUnderConstruction:()=>true});
+ assert.equal(g.observe().nuclearCapability.preparationTarget,0);
+});
+
+test('wrapper level defaults cannot turn unknown native capacity into operational evidence',()=>{
+ const f=fixture();const silo=f.add(U.MissileSilo,1,500,3,{level:undefined});
+ silo.level=()=>1;
+ const c=f.observe().nuclearCapability;
+ assert.equal(c.preparationTarget,0);assert.equal(c.capacity,0);assert.equal(c.unknownSilos,1);
+});

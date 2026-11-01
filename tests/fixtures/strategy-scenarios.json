@@ -1383,5 +1383,117 @@
       }
     ],
     "expectedAdaptiveChoice": "sequence:wilderness-only"
+  },
+  {
+    "name": "larger neutral pocket beats nearest river scrap before probe budget",
+    "phase": "early",
+    "snapshot": {
+      "domain": "naval-landing",
+      "navalLanding": {
+        "mode": "river"
+      }
+    },
+    "candidates": [
+      {
+        "id": "near",
+        "kind": "naval-landing",
+        "eligible": true,
+        "priority": 0,
+        "room": 12,
+        "crossingSteps": 2,
+        "opportunityScore": 80
+      },
+      {
+        "id": "access",
+        "kind": "naval-landing",
+        "eligible": true,
+        "priority": 1,
+        "room": 200,
+        "crossingSteps": 4,
+        "bottleneck": true,
+        "opportunityScore": 179
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true
+      }
+    ],
+    "expectedAdaptiveChoice": "access"
+  },
+  {
+    "name": "useful defensive donation beats lower fill advancing teammate",
+    "phase": "mid",
+    "snapshot": {
+      "domain": "donation-target",
+      "diplomacy": {
+        "threshold": 0.65
+      }
+    },
+    "candidates": [
+      {
+        "id": "advance",
+        "kind": "donation-target",
+        "eligible": true,
+        "priority": 0,
+        "fill": 0.15,
+        "frontline": true,
+        "donationValue": 60,
+        "donationRole": "advance",
+        "donationConfidence": "medium"
+      },
+      {
+        "id": "defense",
+        "kind": "donation-target",
+        "eligible": true,
+        "priority": 1,
+        "fill": 0.4,
+        "frontline": true,
+        "donationValue": 150,
+        "donationRole": "defense",
+        "donationConfidence": "medium"
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true
+      }
+    ],
+    "expectedAdaptiveChoice": "defense"
+  },
+  {
+    "name": "keep troops when available gift cannot usefully affect observed losing fight",
+    "phase": "late",
+    "snapshot": {
+      "domain": "donation-target",
+      "diplomacy": {
+        "threshold": 0.65
+      }
+    },
+    "candidates": [
+      {
+        "id": "losing",
+        "kind": "donation-target",
+        "eligible": true,
+        "priority": 0,
+        "fill": 0.1,
+        "frontline": true,
+        "donationValue": 0,
+        "hopeless": true
+      },
+      {
+        "id": "skip",
+        "kind": "donation-target",
+        "eligible": true,
+        "priority": 1,
+        "skipDonation": true
+      },
+      {
+        "id": "$wait",
+        "kind": "wait",
+        "eligible": true
+      }
+    ],
+    "expectedAdaptiveChoice": "skip"
   }
 ]

@@ -1331,7 +1331,9 @@ function createBrainRuntime(deps) {
       const sent=launchBoat(actor,tile,'river-1pct','🌊 Cross river into wilderness (1%)');
       if(sent)state.pending.set(tile,game.ticks());
       controller.engine.record('wilderness-crossing-result',{tick:game.ticks(),status:sent?'submitted':'held',tile,
-        crossingSteps:site.crossingSteps,room:site.room,reason:'Short neutral crossing alongside land expansion'});
+        crossingSteps:site.crossingSteps,room:site.room,roomCapped:site.roomCapped,bottleneck:site.bottleneck,
+        entranceWidth:site.entranceWidth,enemyFrontier:site.enemyFrontier,opportunityScore:site.opportunityScore,
+        reason:'Secure useful wilderness access alongside land expansion'});
       return !!sent;
     }finally{state.inFlight=false;if(!previous)navalScopes.delete(actor);}
   }

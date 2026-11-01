@@ -55,3 +55,31 @@ test('manual upgrades satisfy the target and tick rewind clears salvo memory',()
  f.sam.level=3;assert.equal(f.assess().candidates.length,0);
  f.sam.level=2;f.observation.tick=1;f.observation.threats=[];assert.equal(f.assess().candidates.length,0);
 });
+
+test('observed hostile ready capacity raises the primary SAM target before any salvo',()=>{
+ const f=fixture();f.sam.level=2;
+ f.observation.nuclearCapability={preparationTarget:3,operationalSilos:2,capacity:4,readySlots:3,confidence:'observed',reason:'public hostile silo capacity'};
+ f.observation.sams.push({...f.sam,id:2,level:1});
+ const r=f.assess();assert.equal(r.candidates.length,1);assert.equal(r.candidates[0].unitId,1);
+ assert.equal(r.candidates[0].targetLevel,3);assert.equal(r.candidates[0].reason,'observed-nuclear-capability');
+ assert.deepEqual(r.candidates[0].nuclearCapability,f.observation.nuclearCapability);
+ assert.equal(r.savings,3000000n);assert.equal(r.salvoTarget,0);
+});
+
+test('safe or unknown capability leaves economic progression and reserve gating intact',()=>{
+ const f=fixture();f.sam.level=2;
+ assert.equal(f.assess().candidates.length,0);
+ f.observation.nuclearCapability={preparationTarget:3,confidence:'unknown'};
+ assert.equal(f.assess().candidates.length,0);
+ f.observation.nuclearCapability={preparationTarget:3,confidence:'observed'};
+ f.options.economy.stage='development';assert.equal(f.assess().savings,0n);
+ f.options.economy.stage='reserve';f.options.economy.development={samTargetLevel:5};
+ assert.equal(f.assess().candidates[0].targetLevel,5);
+});
+
+test('threat preparation remains bounded while actual salvo memory retains its stronger floor',()=>{
+ const f=fixture();f.observation.nuclearCapability={preparationTarget:100,confidence:'observed'};
+ assert.equal(f.assess().candidates[0].targetLevel,3);
+ f.observation.threats=[1,2,3,4,5].map(id=>({id,threatensSelf:true}));
+ assert.equal(f.assess().candidates[0].targetLevel,5);
+});

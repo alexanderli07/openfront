@@ -82,6 +82,58 @@ test('outreach defaults original target order',()=>{
   const f=fixture();f.planner.outreach(f.actor,f.targets,f.hooks);
   assert.deepEqual(f.calls,[['outreach',2],['outreach',3]]);
 });
+
+test('donation proposals and amount facts describe known incoming pressure and useful defense',()=>{
+ const f=fixture();f.hooks.supportPosture=()=>({ready:true,conserve:false,keepFraction:.25});
+ const ally=f.targets[1];ally.troops=()=>200;ally.incomingAttacks=()=>[{troops:()=>400}];
+ f.planner.donate(f.actor,[ally],f.hooks);
+ const proposal=f.records.find(r=>r.domain==='donation-target').candidates[0];
+ assert.equal(proposal.incomingTroops,400);assert.equal(proposal.defenseGap,240);
+ assert.equal(proposal.expectedDonation,450);assert.equal(proposal.canHoldAfterDonation,true);
+ assert.equal(proposal.donationRole,'defense');assert.equal(proposal.donationConfidence,'medium');
+ const facts=f.records.find(r=>r.domain==='donation-amount').facts;
+ assert.equal(facts.incomingTroops,400);assert.equal(facts.donationValue,proposal.donationValue);
+});
+
+test('attack telemetry failure preserves legacy donation and reports uncertainty',()=>{
+ const f=fixture(),ally=f.targets[1];ally.incomingAttacks=()=>[{troops:()=>{throw Error('unavailable');}}];
+ f.planner.donate(f.actor,[ally],f.hooks);
+ const proposal=f.records[0].candidates[0];
+ assert.equal(proposal.donationConfidence,'low');assert.equal(proposal.hopeless,false);
+ assert.ok(proposal.donationValue>0);assert.deepEqual(f.calls,[['donate',3,550]]);
+});
+
+test('bounded candidates retain useful defense behind many hopeless combat recipients',()=>{
+ const f=fixture();f.hooks.supportPosture=()=>({ready:true,conserve:false,keepFraction:.25});
+ const targets=Array.from({length:100},(_,i)=>({id:()=>i+2,smallID:()=>i+2,troops:()=>i===99?200:50,
+   isAlive:()=>true,incomingAttacks:()=>[{troops:()=>i===99?400:3000}],outgoingAttacks:()=>[]}));
+ f.planner.donate(f.actor,targets,f.hooks);
+ const proposals=f.records[0].candidates;
+ assert.equal(proposals[0].targetId,2,'legacy winner stays first');
+ assert.ok(proposals.some(p=>p.targetId===101&&p.donationValue>100));
+ assert.equal(proposals[0].hopeless,true);
+});
+
+test('adaptive actual donation reaches useful defense beyond many lower-fill losing fights',()=>{
+ const adaptive=require('../src/brain/adaptive-strategy')(legacy);
+ const f=fixture((domain,candidates)=>adaptive.decide({domain,diplomacy:{threshold:.65}},candidates));
+ f.hooks.supportPosture=()=>({ready:true,conserve:false,keepFraction:.25});
+ const targets=Array.from({length:100},(_,i)=>({id:()=>i+2,smallID:()=>i+2,troops:()=>i===99?200:50,
+   isAlive:()=>true,incomingAttacks:()=>[{troops:()=>i===99?400:3000}],outgoingAttacks:()=>[]}));
+ assert.equal(f.planner.donate(f.actor,targets,f.hooks),true);
+ assert.deepEqual(f.calls,[['donate',101,450]]);
+});
+
+test('outgoing pressure uses unique target armies and bounded attack reads',()=>{
+ const f=fixture(),ally=f.targets[1],enemy={id:()=>8,troops:()=>500};
+ let reads=0;ally.incomingAttacks=()=>[];
+ ally.outgoingAttacks=()=>Array.from({length:1000},()=>({troops:()=>{reads++;return 1;},target:()=>enemy}));
+ f.planner.donate(f.actor,[ally],f.hooks);
+ const proposal=f.records[0].candidates[0];
+ assert.ok(reads<=64);assert.equal(proposal.outgoingTargetTroops,500);
+ assert.equal(proposal.outgoingKnown,false);assert.equal(proposal.donationConfidence,'low');
+ assert.ok(proposal.donationValue>0);
+});
 test('far outreach keeps original random draw and permits alternate target',()=>{
   const f=fixture((d,c)=>({selectedId:c[1].id,reason:'second'}));
   f.planner.far(f.actor,f.targets,100,{},f.hooks);assert.deepEqual(f.calls,['random',['far',3]]);

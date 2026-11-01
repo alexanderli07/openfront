@@ -30,7 +30,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.81'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.82'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -48,7 +48,7 @@ const ofhBrainRuntime = createBrainRuntime({
   attackAllocationPlanner: createAttackAllocationPlanner({settings:()=>state.settings,difficulty:currentDifficulty,
     easy:Difficulty.Easy,botType:PlayerType.Bot}),
   attackRoutingPlanner: createAttackRoutingPlanner({settings:()=>state.settings,botType:PlayerType.Bot,closestTwoTiles}),
-  diplomacyDetailsPlanner: createDiplomacyDetailsPlanner({settings:()=>state.settings,debug:ofhDebug}),
+  diplomacyDetailsPlanner: createDiplomacyDetailsPlanner({settings:()=>state.settings,debug:ofhDebug,donationValue:assessDonationValue}),
   buildingPlanner: createBuildingPlanner({ units: UNIT, settings: () => state.settings,
     difficulty: currentDifficulty, densityThreshold: UPGRADE_DENSITY_THRESHOLD, samProtectWeight }),
   turnPlanner: createTurnPlanner({ warshipAutoSpawn: () => state.settings.warshipAutoSpawn !== false }),

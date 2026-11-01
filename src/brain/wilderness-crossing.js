@@ -13,12 +13,19 @@ function createWildernessCrossing(){
     const neutral=t=>g.isLand(t)&&!g.hasOwner(t)&&!g.hasFallout(t);
     function region(tile){
       if(regions.has(tile))return regions.get(tile);
-      const seen=new Set([tile]),queue=[tile];let connected=false;
-      for(let i=0;i<queue.length&&i<64&&budget>0;i++)for(const n of neighbors(queue[i])){
+      const seen=new Set([tile]),queue=[tile],hostiles=new Set();let connected=false,roomCapped=false,processed=0;
+      for(;processed<queue.length&&processed<512&&budget>0;processed++)for(const n of neighbors(queue[processed])){
         if(g.isLand(n)&&g.hasOwner(n)&&g.ownerID(n)===self.smallID())connected=true;
-        if(seen.size<64&&neutral(n)&&!seen.has(n)){seen.add(n);queue.push(n);}
+        if(g.isLand(n)&&g.hasOwner(n)&&g.ownerID(n)!==self.smallID()){
+          const owner=g.playerBySmallID?.(g.ownerID(n));
+          if(owner?.isPlayer?.()&&owner.isAlive?.()!==false&&self.isFriendly?.(owner)===false)hostiles.add(g.ownerID(n));
+        }
+        if(neutral(n)&&!seen.has(n)){
+          if(seen.size<512){seen.add(n);queue.push(n);}else roomCapped=true;
+        }
       }
-      const result={room:seen.size,excluded:connected||seen.size<8,tile:null,crossingSteps:Infinity};
+      roomCapped ||= processed<queue.length;
+      const result={room:seen.size,roomCapped,enemyFrontier:hostiles.size,excluded:connected||seen.size<8,tile:null,crossingSteps:Infinity};
       for(const t of seen)regions.set(t,result);
       return result;
     }
@@ -33,7 +40,9 @@ function createWildernessCrossing(){
             const r=region(n),steps=depth+1;
             if(!r.excluded&&steps<r.crossingSteps){
               if(r.tile===null)found.push(r);
-              Object.assign(r,{tile:n,origin,crossingSteps:steps,dist:steps*steps});
+              const entranceWidth=neighbors(n).filter(neutral).length,bottleneck=entranceWidth<=2&&r.room>=64;
+              const opportunityScore=Math.log2(r.room+1)*24-steps*4+(bottleneck?12:0)+Math.min(2,r.enemyFrontier)*8;
+              Object.assign(r,{tile:n,origin,crossingSteps:steps,dist:steps*steps,entranceWidth,bottleneck,opportunityScore});
             }
           }else if(depth<12&&seen.size<256&&g.isWater(n)&&!seen.has(n)){
             seen.add(n);queue.push({tile:n,depth:depth+1});
@@ -42,7 +51,8 @@ function createWildernessCrossing(){
       }
     }
     return found.sort((a,b)=>a.crossingSteps-b.crossingSteps||b.room-a.room||a.tile-b.tile)
-      .slice(0,24).map(({tile,origin,crossingSteps,room,dist})=>({tile,origin,crossingSteps,room,dist}));
+      .slice(0,24).map(({tile,origin,crossingSteps,room,dist,roomCapped,enemyFrontier,entranceWidth,bottleneck,opportunityScore})=>
+        ({tile,origin,crossingSteps,room,dist,roomCapped,enemyFrontier,entranceWidth,bottleneck,opportunityScore}));
   }
   return {sites};
 }

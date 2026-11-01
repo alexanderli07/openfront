@@ -64,6 +64,21 @@ test('planned SAM upgrades wait and use a newly validated central quote when due
  assert.equal(await f.run(),false);assert.equal(f.builds.length,0);
  time=3000;assert.equal(await f.run(),true);assert.equal(f.builds.length,1);assert.ok(quotes>=2);
 });
+
+test('visible hostile launch capacity drives main SAM preparation within the existing budget and opening gates',async()=>{
+ for(const [gold,stage,shouldBuild] of [[6000000n,'reserve',true],[5000000n,'reserve',false],[6000000n,'development',false]]){
+  const f=fixture({planned:true,noThreat:true,level:2,gold,stage});
+  const before=f.game.units;
+  f.game.units=()=>[...before(),{id:()=>99,type:()=>U.MissileSilo,owner:()=>({smallID:()=>2}),
+    isActive:()=>true,isUnderConstruction:()=>false,level:()=>3,missileTimerQueue:()=>[]}];
+  assert.equal(await f.run(),shouldBuild);assert.equal(f.builds.length,shouldBuild?1:0);
+  if(shouldBuild){
+    const result=f.runtime.inspect().records.find(r=>r.kind==='reactive-sam-result'&&r.status==='selected');
+    assert.equal(result.assessments[0].reason,'observed-nuclear-capability');
+    assert.equal(result.assessments[0].targetLevel,3);assert.equal(result.assessments[0].protectedReserve,'3000000');
+  }
+ }
+});
 test('already-intercepted and too-late strikes never consume the reserve',async()=>{
  for(const options of [{covered:true},{late:true,queue:[99]}]){
    const f=fixture(options);assert.equal(await f.run(),false);assert.equal(f.builds.length,0);assert.equal(f.normal(),1);
