@@ -39,7 +39,6 @@ function simplifyConfigPanel(source) {
   if (basicEnd < 0) throw new Error('Config section boundary changed');
   let replacement = pane.slice(0, basicEnd).replace('tr("Auto-build structures")', 'tr("Allowed buildings")');
   replacement += `
-            <p class="ab-cfg-label" style="margin:8px 0 12px;opacity:.8;">\${tr("Action switches are in Controls. The bot manages its strategy rules automatically.")}</p>
             <details class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
               <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:10px 0;">\${tr("Advanced tuning")}</summary>`;
   for (const [label, keys] of [

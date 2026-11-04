@@ -564,6 +564,11 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     '<input type="range" min="0" max="65" step="5" value="${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}" data-cfg-range="donateNeedThreshold"');
   replaceOne('${Math.round((state.settings.donateNeedThreshold||.8)*100)}%',
     '${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}%');
+  replaceOne('width: 280px;\n        height: ${typeof OFH_PANEL_HEIGHT_PX==="number"?OFH_PANEL_HEIGHT_PX:420}px;',
+    'width: min(304px, calc(100vw - 24px));\n        height: min(560px, calc(100dvh - 24px));\n        max-height: calc(100dvh - 24px);\n        box-sizing: border-box;');
+  // Keep the whole enlarged panel in view, including previously saved positions.
+  source=source.replaceAll('window.innerWidth-60','Math.max(0,window.innerWidth-n.offsetWidth)')
+    .replaceAll('window.innerHeight-30','Math.max(0,window.innerHeight-n.offsetHeight)');
   replaceOne('<b data-role="s-gold">0</b><span>${tr("Gold")}</span>',
     '<b data-role="s-gold">0</b><span>${tr("Gold")}</span><span data-role="s-income" title="Gross gold received per game minute over the recent minute, including trade and conquest; spending is excluded." style="font-size:10px;opacity:.8;text-transform:none;white-space:nowrap">—/min</span>');
   replaceOne('<div class="ab-st-act" data-role="lastaction">—</div>',
@@ -603,7 +608,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.84';
+  const version='1.84.85';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
