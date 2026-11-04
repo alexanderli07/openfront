@@ -91,3 +91,49 @@
         border-bottom: 1px solid rgba(255,255,255,.08); margin: 4px 0 0;
       }
       #${PANEL_ID} .ab-tuning-body .ab-cfg-row { background: transparent; margin: 0; padding: 8px 0; }
+      @keyframes ofhBotPanelEnter {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes ofhBotTabEnter {
+        from { opacity: 0; transform: translateY(3px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      #${PANEL_ID} { animation: ofhBotPanelEnter 180ms ease-out; }
+      #${PANEL_ID} .ab-pane { animation: ofhBotTabEnter 150ms ease-out; }
+      #${PANEL_ID} .ab-feats-grid { opacity: 0; transition: max-height 180ms ease, opacity 140ms ease; }
+      #${PANEL_ID} .ab-feats-grid.open { opacity: 1; }
+      #${PANEL_ID} .ab-feat-mini,
+      #${PANEL_ID} .ab-cfg-struct,
+      #${PANEL_ID} .ab-chip,
+      #${PANEL_ID} .ab-trace-export,
+      #${PANEL_ID} .ab-tab,
+      #${PANEL_ID} .ab-mini,
+      #${PANEL_ID} summary,
+      #${PANEL_ID} .ab-adv-toggle {
+        transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, opacity 140ms ease, transform 120ms ease;
+      }
+      #${PANEL_ID} .ab-feat-mini:hover,
+      #${PANEL_ID} .ab-cfg-struct:hover,
+      #${PANEL_ID} .ab-trace-export:hover { transform: translateY(-1px); }
+      #${PANEL_ID} .ab-feat-mini:active,
+      #${PANEL_ID} .ab-cfg-struct:active,
+      #${PANEL_ID} .ab-chip:active,
+      #${PANEL_ID} .ab-trace-export:active { transform: scale(.97); }
+      #${PANEL_ID} details > summary::after { content: " ▾"; display: inline-block; transition: transform 160ms ease; }
+      #${PANEL_ID} details[open] > summary::after { content: " ▾"; transform: rotate(180deg); }
+      @supports (interpolate-size: allow-keywords) {
+        #${PANEL_ID} details { interpolate-size: allow-keywords; }
+        #${PANEL_ID} details::details-content {
+          block-size: 0; opacity: 0; overflow: clip;
+          transition: block-size 180ms ease, opacity 150ms ease, content-visibility 180ms allow-discrete;
+        }
+        #${PANEL_ID} details[open]::details-content { block-size: auto; opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #${PANEL_ID}, #${PANEL_ID} *, #${PANEL_ID} *::after, #${PANEL_ID} *::before {
+          animation: none !important; transition: none !important;
+        }
+        #${PANEL_ID} .ab-feat-mini:hover, #${PANEL_ID} .ab-cfg-struct:hover,
+        #${PANEL_ID} .ab-trace-export:hover, #${PANEL_ID} :active { transform: none !important; }
+      }

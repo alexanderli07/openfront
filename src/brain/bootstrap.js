@@ -1,6 +1,7 @@
 // Runs in the original Auto-Bot closure. No patches to the game's own event bus.
 const ofhPortWaterAccess=createPortWaterAccess();
 const ofhBotStatistics=createBotStatistics({units:UNIT});
+const ofhPanelMotion=createPanelMotion();
 const ofhEconomyStatus=createEconomyStatus();
 function ofhEconomyPanel(){
   const game=getGame(),player=game?.myPlayer?.();
@@ -39,7 +40,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'2.0.0'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'2.0.1'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

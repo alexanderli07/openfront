@@ -566,6 +566,12 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     '${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}%');
   replaceOne('width: 280px;\n        height: ${typeof OFH_PANEL_HEIGHT_PX==="number"?OFH_PANEL_HEIGHT_PX:420}px;',
     'width: min(280px, calc(100vw - 24px));\n        height: min(431px, calc(100dvh - 24px));\n        max-height: calc(100dvh - 24px);\n        box-sizing: border-box;');
+  replaceOne('c.classList.toggle("open",state.settings.statusOpen);',
+    'ofhPanelMotion.disclose(c,state.settings.statusOpen,()=>c.classList.toggle("open",state.settings.statusOpen));');
+  replaceOne('n.classList.toggle("ab-collapsed",state.settings.minimized);',
+    'ofhPanelMotion.disclose(n.querySelector(".ab-body"),!state.settings.minimized,()=>n.classList.toggle("ab-collapsed",state.settings.minimized));');
+  replaceOne('saveSettings();n.remove();try{window.dispatchEvent',
+    'saveSettings();ofhPanelMotion.disclose(n,false,()=>n.remove());try{window.dispatchEvent');
   const compactPanelCss=fs.readFileSync(path.join(root,'src/ui/compact-panel.css'),'utf8');
   replaceOne('    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=',
     compactPanelCss+'\n    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=');
@@ -586,7 +592,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   }
   replaceOne('if(i)i.textContent=a};e("status",state.status);',
     'if(i){i.textContent=a;if(t.startsWith("c-"))i.title="Bot commands submitted since this page loaded; resets per match. Builds include upgrades and warships. Server acceptance is not confirmed."}};e("status",state.status);');
-  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'bot-statistics.js', 'economy-status.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'runtime.js', 'bootstrap.js'].map(name =>
+  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'bot-statistics.js', 'economy-status.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'runtime.js', '../ui/panel-motion.js', 'bootstrap.js'].map(name =>
     fs.readFileSync(path.join(root, 'src/brain', name), 'utf8').replace(/^if \(typeof module !== 'undefined'.*$/m, '')).join('\n');
   source = simplifyConfigPanel(source);
   replaceOne('async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=mirvReserveHold(a);',
@@ -614,7 +620,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.0.0';
+  const version='2.0.1';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
