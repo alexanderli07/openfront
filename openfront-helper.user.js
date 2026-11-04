@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenFront Helper (userscript)
 // @namespace    openfront-helper
-// @version      1.84.95
+// @version      1.84.96
 // @description  Auto OpenFront
 // @author       Saxien (https://github.com/alexanderli07)
 // @license      AGPL-3.0-or-later
@@ -15,7 +15,7 @@
 // @grant        none
 // @noframes
 // ==/UserScript==
-window.__OFH_ASSETS = {"version":"1.84.95","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
+window.__OFH_ASSETS = {"version":"1.84.96","locales":{"en":{"languageCode":"en","languageName":"English","showFloatingAutoJoinPanel":"Show floating Auto-Join panel on OpenFront","hideFloatingAutoJoinPanel":"Hide floating Auto-Join panel on OpenFront"}}};
 "use strict";(()=>{function J(){let e=window.BOOTSTRAP_CONFIG;return e&&typeof e=="object"?e:null}function ke(){let e=window.ASSET_MANIFEST||J()?.assetManifest;return e&&typeof e=="object"?e:null}function Se(){return window.CDN_BASE||J()?.cdnBase||""}function M(e){let o=ke()?.[e];return o?Se()+o:null}function K(e){return M(`maps/${e}/thumbnail.webp`)}var Ae={City:"images/CityIconWhite.svg",Port:"images/PortIcon.svg",Factory:"images/FactoryIconWhite.svg","Defense Post":"images/ShieldIconWhite.svg","SAM Launcher":"images/SamLauncherIconWhite.svg","Missile Silo":"images/MissileSiloIconWhite.svg"};function V(e){let t=Ae[e];return t?M(t):null}var k=globalThis.__OFH_ASSETS??{version:"0.0.0",locales:{}};var x=null;function O(){if(!x){let e=window.AudioContext||window.webkitAudioContext;x=new e}return x}function Ee(){let e=()=>{x&&x.state==="suspended"&&x.resume()},t={capture:!0,passive:!0};window.addEventListener("pointerdown",e,t),window.addEventListener("keydown",e,t)}function X(e){let t=O(),o=t.currentTime,n=[{freq:880,start:0,dur:.16},{freq:1318.5,start:.13,dur:.22}];for(let r of n){let s=t.createOscillator(),i=t.createGain();s.type="sine",s.frequency.value=r.freq;let p=o+r.start;i.gain.setValueAtTime(0,p),i.gain.linearRampToValueAtTime(.25*e,p+.02),i.gain.exponentialRampToValueAtTime(1e-4,p+r.dur),s.connect(i).connect(t.destination),s.start(p),s.stop(p+r.dur+.02)}}function Le(e){let t=atob(e),o=new Uint8Array(t.length);for(let n=0;n<t.length;n++)o[n]=t.charCodeAt(n);return o.buffer}var Y=new Map;function Te(e){let t=Y.get(e);return t||(t=(async()=>{let o=";base64,",n=e.indexOf(o);if(!e.startsWith("data:")||n<0)return null;try{return await O().decodeAudioData(Le(e.slice(n+o.length)))}catch(r){return console.error("[ofh] custom sound decode failed:",r),null}})(),Y.set(e,t),t)}var S=class{constructor(t=""){this.preload="auto";this.currentTime=0;this.volume=1;this.loop=!1;this.src=t}async play(){let t=O();if(t.state==="suspended")try{await t.resume()}catch{}let o=this.src.startsWith("data:")?await Te(this.src):null;if(o){let n=t.createBufferSource();n.buffer=o;let r=t.createGain();r.gain.value=this.volume,n.connect(r).connect(t.destination),n.start(0)}else X(this.volume)}pause(){}};function Q(){let e=O();e.state==="suspended"&&e.resume(),X(1)}function Z(){return Ee(),S}var C=new Set,ee={id:"openfront-helper",tab:{id:1}};function te(e){return new Promise(t=>{let o=!1,n=r=>{o||(o=!0,t(r))};for(let r of C)try{let s=r(e,ee,n);s instanceof Promise&&s.then(i=>{i!==void 0&&n(i)})}catch(s){console.error("[ofh] message listener threw:",s)}queueMicrotask(()=>n(void 0))})}var oe={addListener:e=>void C.add(e),removeListener:e=>void C.delete(e),hasListener:e=>C.has(e)},ne=e=>te(e),re={async query(e){return[{id:ee.tab.id,url:location.href}]},async sendMessage(e,t){return te(t)},async reload(e){location.reload()}};var A="ofh:",R=new Set,j=e=>A+e;function B(e){let t=localStorage.getItem(j(e));if(t!==null)try{return JSON.parse(t)}catch{return}}function Me(e,t){localStorage.setItem(j(e),JSON.stringify(t))}function z(e){for(let t of R)try{t(e,"local")}catch(o){console.error("[ofh] storage listener threw:",o)}}function Oe(e){if(e==null){let t=[];for(let o=0;o<localStorage.length;o++){let n=localStorage.key(o);n&&n.startsWith(A)&&t.push(n.slice(A.length))}return{names:t,defaults:{}}}return typeof e=="string"?{names:[e],defaults:{}}:Array.isArray(e)?{names:e,defaults:{}}:{names:Object.keys(e),defaults:e}}var ae={async get(e){let{names:t,defaults:o}=Oe(e),n={};for(let r of t){let s=B(r);s!==void 0?n[r]=s:r in o&&(n[r]=o[r])}return n},async set(e){let t={};for(let[o,n]of Object.entries(e)){let r=B(o);Me(o,n),t[o]={oldValue:r,newValue:n}}z(t)},async remove(e){let t=Array.isArray(e)?e:[e],o={};for(let n of t){let r=B(n);localStorage.removeItem(j(n)),o[n]={oldValue:r,newValue:void 0}}z(o)}},se={addListener:e=>void R.add(e),removeListener:e=>void R.delete(e),hasListener:e=>R.has(e)};function ie(){window.addEventListener("storage",e=>{if(!e.key||!e.key.startsWith(A)||e.storageArea!==localStorage)return;let t=o=>{if(o!==null)try{return JSON.parse(o)}catch{return}};z({[e.key.slice(A.length)]:{oldValue:t(e.oldValue),newValue:t(e.newValue)}})})}var Ce="ofh:beep";function Re(e){return e==="assets/autojoin.mp3"?Ce:M(e)??e}var Pe={id:"openfront-helper",lastError:void 0,getURL:Re,getManifest:()=>({name:"OpenFront Helper",version:k.version,manifest_version:3}),sendMessage:ne,onMessage:oe,onInstalled:{addListener(){},removeListener(){}}},G={runtime:Pe,storage:{local:ae,onChanged:se},tabs:re,action:{setIcon(){}},windows:{create(){}}};function le(){let e=window;try{e.chrome=G}catch(t){console.warn("[ofh] could not set window.chrome:",t)}try{typeof e.browser>"u"&&(e.browser=G)}catch{}return ie(),G}function He(e){let o=window.OpenFrontHelperI18n?.DEFAULT_TRANSLATIONS||{},n=k.locales.en||{},r=k.locales[e]||{};return Promise.resolve({...o,...n,...r})}function pe(){let e=window;e.OpenFrontHelperI18n&&(e.OpenFrontHelperI18n.loadBundle=He)}var Ie="⊕ OpenFront Helper";function E(){try{"Notification"in window&&Notification.permission==="default"&&Notification.requestPermission()}catch{}}function Ne(e){try{if("Notification"in window&&Notification.permission==="granted"){let t=new Notification(Ie,{body:e,tag:"ofh-lobby-found"});return t.onclick=()=>{try{window.focus()}catch{}t.close()},!0}}catch{}return!1}function _e(e){let t="openfront-helper-join-toast";document.getElementById(t)?.remove();let o=document.createElement("div");o.id=t,o.textContent=e,o.setAttribute("style",["position:fixed","top:16px","left:50%","transform:translateX(-50%)","z-index:2147483646","background:linear-gradient(135deg,#16a34a,#0d9488)","color:#f0fdf4","font:600 14px/1.4 'Aptos','Segoe UI',system-ui,sans-serif","padding:12px 20px","border-radius:10px","border:1px solid rgba(187,247,208,.4)","box-shadow:0 10px 30px rgba(0,0,0,.5)","cursor:pointer","transition:opacity .3s"].join(";")),o.onclick=()=>o.remove(),document.body.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),350)},5e3)}function ce(e){Ne(e),_e(e)}var D="openfront-helper-popup-styles",de=`
 #openfront-helper-popup-overlay {
   position: fixed; inset: 0; z-index: 2147483647;
@@ -9409,7 +9409,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.95'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.96'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
@@ -9862,6 +9862,31 @@ class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=
       #${PANEL_ID} .ab-debug-tools { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--ab-border); }
       #${PANEL_ID} .ab-debug-tools summary { cursor: pointer; font-size: 9px; color: var(--ab-muted); }
       #${PANEL_ID} .ab-debug-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 6px; }
+      /* One surface and section-header language across all three tabs. */
+      #${PANEL_ID} .ab-adv-toggle,
+      #${PANEL_ID} .ab-cfg-sec,
+      #${PANEL_ID} .ab-section-title,
+      #${PANEL_ID} .ab-debug-tools > summary {
+        box-sizing: border-box; background: var(--ab-surface); border: 0;
+        border-radius: 7px; padding: 5px 7px; margin: 4px 0;
+        color: #cdd8d8; font-size: 10px; font-weight: 600;
+        line-height: 1.3; letter-spacing: .2px; text-transform: none;
+      }
+      #${PANEL_ID} .ab-section-title { flex: 0 0 auto; }
+      #${PANEL_ID} .ab-cfg-row {
+        box-sizing: border-box; background: var(--ab-surface); border-radius: 7px;
+        padding: 8px 6px; margin: 4px 0; column-gap: 6px;
+      }
+      #${PANEL_ID} .ab-feat-mini,
+      #${PANEL_ID} .ab-cfg-struct,
+      #${PANEL_ID} .ab-log-filters .ab-chip,
+      #${PANEL_ID} .ab-trace-export { border-radius: 8px; background: var(--ab-surface); }
+      #${PANEL_ID} .ab-log-filters .ab-chip.on { background: var(--oh-accent-soft,rgba(96,165,250,.18)); }
+      #${PANEL_ID} .ab-log-list {
+        box-sizing: border-box; padding: 5px; border-radius: 8px;
+        background: var(--ab-surface); border: 1px solid rgba(255,255,255,.05);
+      }
+      #${PANEL_ID} .ab-debug-tools { border-top: 0; padding-top: 0; }
 
     `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP={spawn:["Auto-spawn","Automatically pick a spawn tile."],expand:["Auto-expand / attack","Expand into land and attack targets."],boat:["Auto-landing (1% boat)","Send probe and landing boats overseas."],warship:["Warship automation","Build, patrol and command warships."],build:["Auto-build","Build and upgrade structures."],nuke:["Auto-launch nukes","Fire nukes at high-value targets."],alliance:["Auto-accept alliances","Send and accept alliance requests."],embargo:["Auto-embargo enemies","Stop trading with hostile nations."],donate:["Auto-donate troops (allies)","Donate troops to needy allies."],betray:["Auto-betray allies","Off = stay loyal (defensive retaliation only)."]};function cfgStructIcon(n,e){var t=typeof window.__OFH_gameIconUrl==="function"&&window.__OFH_gameIconUrl(n)||"";if(!t)return'<span class="ab-cfg-struct-emoji">'+e+"</span>";return'<img class="ab-cfg-struct-icon" src="'+t+'" alt="'+n+`" onerror="this.replaceWith(document.createTextNode('`+e+`'))" draggable="false">`}function attrEsc(n){return String(n==null?"":n).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}function featRow(n,e,t){const a=state.settings.features[n];const i=FEAT_TIP[n];const s=attrEsc(tr(i?i[0]:e));const r=i?attrEsc(tr(i[1])):"";return`
       <div class="ab-feat ab-feat-mini ${a?"on":""}" data-feat="${n}" data-tip="${s}" data-tip-desc="${r}">
@@ -9924,8 +9949,8 @@ class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=
             </div>
 
             
-            <details open class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
-              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:4px 0;">${tr("Advanced tuning")}</summary>
+            <details open class="ab-cfg-advanced" data-role="cfg-advanced">
+              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;">${tr("Advanced tuning")}</summary>
 <div class="ab-cfg-sec">${tr("Opening reserve")}</div>
 <div class="ab-cfg-row" style="flex-direction:column;align-items:stretch;gap:2px;">
               <div style="display:flex;justify-content:space-between;">
@@ -9989,7 +10014,7 @@ class NationBot{constructor(e,t){this.mg=e;this.player=e.myPlayer();this.active=
 </div>
 </div>
         <div class="ab-pane" data-pane="log">
-          <div class="ab-log-filters" data-role="log-filters">
+          <div class="ab-section-title">${tr("Filters")}</div><div class="ab-log-filters" data-role="log-filters">
             
             ${Object.entries(LOG_CATS).map(([e,t])=>`<div class="ab-chip ${state.logFilter===e?"on":""}" data-filter="${e}">${t.emoji} ${tr(t.label)}</div>`).join("")}
           </div>

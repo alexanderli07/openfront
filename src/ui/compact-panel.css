@@ -56,3 +56,28 @@
       #${PANEL_ID} .ab-debug-tools { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--ab-border); }
       #${PANEL_ID} .ab-debug-tools summary { cursor: pointer; font-size: 9px; color: var(--ab-muted); }
       #${PANEL_ID} .ab-debug-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 6px; }
+      /* One surface and section-header language across all three tabs. */
+      #${PANEL_ID} .ab-adv-toggle,
+      #${PANEL_ID} .ab-cfg-sec,
+      #${PANEL_ID} .ab-section-title,
+      #${PANEL_ID} .ab-debug-tools > summary {
+        box-sizing: border-box; background: var(--ab-surface); border: 0;
+        border-radius: 7px; padding: 5px 7px; margin: 4px 0;
+        color: #cdd8d8; font-size: 10px; font-weight: 600;
+        line-height: 1.3; letter-spacing: .2px; text-transform: none;
+      }
+      #${PANEL_ID} .ab-section-title { flex: 0 0 auto; }
+      #${PANEL_ID} .ab-cfg-row {
+        box-sizing: border-box; background: var(--ab-surface); border-radius: 7px;
+        padding: 8px 6px; margin: 4px 0; column-gap: 6px;
+      }
+      #${PANEL_ID} .ab-feat-mini,
+      #${PANEL_ID} .ab-cfg-struct,
+      #${PANEL_ID} .ab-log-filters .ab-chip,
+      #${PANEL_ID} .ab-trace-export { border-radius: 8px; background: var(--ab-surface); }
+      #${PANEL_ID} .ab-log-filters .ab-chip.on { background: var(--oh-accent-soft,rgba(96,165,250,.18)); }
+      #${PANEL_ID} .ab-log-list {
+        box-sizing: border-box; padding: 5px; border-radius: 8px;
+        background: var(--ab-surface); border: 1px solid rgba(255,255,255,.05);
+      }
+      #${PANEL_ID} .ab-debug-tools { border-top: 0; padding-top: 0; }
