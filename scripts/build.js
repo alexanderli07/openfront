@@ -602,7 +602,9 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
           </details>`);
   replaceOne('function wirePanel(n){', 'function wirePanel(n){n.querySelector(\'[data-role="brain-summary"]\')?.addEventListener("click",ofhExportMatchSummary);n.querySelector(\'[data-role="brain-export"]\')?.addEventListener("click",ofhExportBrainTrace);');
   const filterBinding = 'n.querySelectorAll(".ab-chip").forEach(f=>{f.addEventListener("click",()=>{state.logFilter=f.dataset.filter;n.querySelectorAll(".ab-chip").forEach(h=>h.classList.toggle("on",h.dataset.filter===state.logFilter));renderLog()})})';
-  replaceOne(filterBinding, filterBinding.replaceAll('.ab-chip', '.ab-chip[data-filter]'));
+  replaceOne(filterBinding, filterBinding.replaceAll('.ab-chip', '.ab-chip[data-filter]')
+    .replace('state.logFilter=f.dataset.filter;', 'state.logFilter=state.logFilter===f.dataset.filter?"all":f.dataset.filter;'));
+  replaceOne('<div class="ab-chip ${state.logFilter==="all"?"on":""}" data-filter="all">${tr("All")}</div>', '');
   replaceOne('#${PANEL_ID} .ab-chip {', '#${PANEL_ID} .ab-chip,\n      #${PANEL_ID} .ab-trace-export {');
   replaceOne('#${PANEL_ID} .ab-chip:hover { background: rgba(255,255,255,0.09); }',
     '#${PANEL_ID} .ab-chip:hover,\n      #${PANEL_ID} .ab-trace-export:hover { background: rgba(255,255,255,0.09); }\n' +
@@ -613,7 +615,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.94';
+  const version='1.84.95';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);

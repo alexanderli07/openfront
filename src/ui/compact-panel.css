@@ -51,7 +51,6 @@
         min-width: 0; box-sizing: border-box; border-radius: 7px;
         padding: 5px 3px; text-align: center; white-space: normal; overflow-wrap: anywhere;
       }
-      #${PANEL_ID} .ab-log-filters [data-filter="all"] { grid-column: 1 / -1; }
       #${PANEL_ID}.ab-tab-log .ab-pane[data-pane="log"] { display: flex; overflow: hidden; }
       #${PANEL_ID} .ab-pane[data-pane="log"] > .ab-log-list { flex: 1 1 0; min-height: 0; }
       #${PANEL_ID} .ab-debug-tools { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--ab-border); }
