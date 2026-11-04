@@ -110,6 +110,9 @@ function createBrainRuntime(deps) {
     controller.supportObserver=deps.createSupportPosture?.();
     controller.supportSpending=deps.createSpendingLedger?.();
     controller.engine = deps.createEngine({ maxRecords: 5000, retainImportant: true, onRecord: entry => {
+      if(deps.isCurrent(bot)&&(entry.kind==='dispatch'||entry.kind==='decision'&&
+          (!entry.snapshot?.domain||entry.snapshot.domain==='structure-plan')))
+        safe(()=>deps.observeEconomy?.(bot,entry,controller));
       if(deps.isCurrent(bot)&&(entry.kind==='dispatch'||entry.kind==='observation'||entry.kind==='session'||
           entry.kind==='decision'&&!entry.snapshot?.domain))safe(()=>deps.observeStatistics?.(bot,entry,controller));
       safe(()=>controller.history?.observe(entry));

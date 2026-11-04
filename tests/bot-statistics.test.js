@@ -46,12 +46,15 @@ test('shipped panel converts troops only at display and reads central submission
  const panel={querySelector:selector=>{if(!nodes.has(selector))nodes.set(selector,{});return nodes.get(selector);}};
  const state={live:{troops:1440000,gold:1400000,tiles:100},stats:{spawns:1,attacks:2,builds:3,nukes:4}};
  vm.runInNewContext(source.slice(start,end)+';renderStatus();',{
-   document:{getElementById:()=>panel},PANEL_ID:'test',state,ofhBotStatistics:create({units:{}})
+   document:{getElementById:()=>panel},PANEL_ID:'test',state,ofhBotStatistics:create({units:{}}),
+   ofhEconomyPanel:()=>({income:1200000,purchase:'Saving: SAM upgrade · 4.8M / 6.0M',detail:'Keeps 3M reserve'})
  });
  assert.equal(nodes.get('[data-role="s-troops"]').textContent,'144.0k');
  assert.equal(nodes.get('[data-role="s-gold"]').textContent,'1.4M');
  assert.equal(state.live.troops,1440000);
  assert.equal(nodes.get('[data-role="c-attacks"]').textContent,'0');
+ assert.equal(nodes.get('[data-role="s-income"]').textContent,'+1.2M/min');
+ assert.equal(nodes.get('[data-role="next-purchase"]').textContent,'Saving: SAM upgrade · 4.8M / 6.0M');
 });
 test('watcher refreshes live resources even while automation is disabled',()=>{
  const {source}=buildSource(),start=source.indexOf('function watcher(){'),end=source.indexOf('if(state.tickInFlight',start);

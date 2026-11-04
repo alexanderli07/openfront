@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (1.84.83) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (1.84.84) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (1.84.83)
+## Install and update (1.84.84)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -12,6 +12,12 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 - Script: https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
+
+## Compact income and next purchase (1.84.84)
+
+The status panel adds gross income/min beneath gold and one compact next-purchase line. Income uses native cumulative `goldEarned()` over up to600game ticks, including trade/conquest receipts and excluding expenditure. It initially shows an em dash until a usable sample is available. Resource sampling continues with the panel watcher even when the bot is paused.
+
+The purchase line observes central structure plans and actual command quotes without running a planner or changing spending. Savings goals include the protected reserve: a3M planned SAM upgrade plus3M emergency reserve displays a6M goal. Tooltips distinguish planner estimates from actual quotes and explain the reserve. Submitted purchases clear their target, stale targets expire, and paused/disabled building states are explicit. Long lines truncate with full detail on hover. No troop-fill indicator or additional settings were added.
 
 ## Correct troop display and central action counters (1.84.83)
 

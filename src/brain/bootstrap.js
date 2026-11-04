@@ -1,6 +1,12 @@
 // Runs in the original Auto-Bot closure. No patches to the game's own event bus.
 const ofhPortWaterAccess=createPortWaterAccess();
 const ofhBotStatistics=createBotStatistics({units:UNIT});
+const ofhEconomyStatus=createEconomyStatus();
+function ofhEconomyPanel(){
+  const game=getGame(),player=game?.myPlayer?.();
+  return ofhEconomyStatus.view(game,player,{enabled:state.settings.enabled,
+    buildEnabled:state.settings.features?.build!==false,format:fmt});
+}
 const ofhTeamGeography = createTeamGeography({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team});
 const ofhTeamOpening = createTwoTeamOpening({units:UNIT,botType:PlayerType.Bot,teamMode:GameMode.Team,
   portWaterAccess:ofhPortWaterAccess,
@@ -11,6 +17,7 @@ const ofhMatchArchive=createMatchArchive({createSummary:createMatchSummary,
 window.addEventListener('pagehide',()=>{ofhMatchArchive.flush().catch(()=>{});});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ofhMatchArchive.flush().catch(()=>{});});
 const ofhBrainRuntime = createBrainRuntime({
+  observeEconomy:(bot,entry,scope)=>ofhEconomyStatus.observe(bot.mg,bot.player,entry,scope),
   observeStatistics:(bot,entry,scope)=>ofhBotStatistics.observe(bot.mg,bot.player,entry,scope),
   createEngine: createDecisionEngine,
   createCommandGuard,createSpendingLedger,createBuildPacing,createReactiveSam,createSamDevelopment,
@@ -32,7 +39,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.83'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'1.84.84'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),
