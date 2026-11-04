@@ -564,7 +564,15 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     '<input type="range" min="0" max="65" step="5" value="${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}" data-cfg-range="donateNeedThreshold"');
   replaceOne('${Math.round((state.settings.donateNeedThreshold||.8)*100)}%',
     '${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}%');
-  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'runtime.js', 'bootstrap.js'].map(name =>
+  replaceOne('fmt(state.live.troops)','fmt(ofhBotStatistics.displayTroops(state.live.troops))');
+  replaceOne('function watcher(){buildPanel();refreshGateBanner();',
+    'function watcher(){buildPanel();refreshGateBanner();const ofhLiveGame=getGame(),ofhLivePlayer=ofhLiveGame?.myPlayer?.();if(ofhLivePlayer?.isPlayer?.())updateLive(ofhLiveGame,ofhLivePlayer);');
+  for(const name of ['spawns','attacks','builds','nukes']){
+    replaceOne('String(state.stats.'+name+')','String(ofhBotStatistics.snapshot().'+name+')');
+  }
+  replaceOne('if(i)i.textContent=a};e("status",state.status);',
+    'if(i){i.textContent=a;if(t.startsWith("c-"))i.title="Bot commands submitted since this page loaded; resets per match. Builds include upgrades and warships. Server acceptance is not confirmed."}};e("status",state.status);');
+  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'bot-statistics.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'runtime.js', 'bootstrap.js'].map(name =>
     fs.readFileSync(path.join(root, 'src/brain', name), 'utf8').replace(/^if \(typeof module !== 'undefined'.*$/m, '')).join('\n');
   source = simplifyConfigPanel(source);
   replaceOne('async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=mirvReserveHold(a);',
@@ -589,7 +597,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.82';
+  const version='1.84.83';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);

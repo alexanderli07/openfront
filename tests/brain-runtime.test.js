@@ -24,7 +24,7 @@ function fixture(options = {}) {
     createSpendingLedger:options.createSpendingLedger,defenseEconomy:options.defenseEconomy,units:options.units,twoTeamOpening:options.twoTeamOpening,
     createSupportPosture:options.createSupportPosture,createBuildPacing:options.createBuildPacing,
     portWaterAccess:options.portWaterAccess,
-    startHistory:options.startHistory,
+    startHistory:options.startHistory,observeStatistics:options.observeStatistics,intentName:options.intentName,
     diplomacyPlanner: createDiplomacyPlanner({ settings: () => ({ winFixes: false, features: { betray: true } }),
       neutralRelation: 0, friendlyRelation: 1, difficulty: () => 'Hard',
       difficulties: { easy: 'Easy', medium: 'Medium' }, humanType: 'Human',
@@ -60,6 +60,20 @@ function allianceActor(accepted = true) {
   };
 }
 test('runtime is provided', () => assert.equal(typeof createRuntime, 'function'));
+
+test('stats observe actual runtime submissions and skip failed or stale executions',async()=>{
+ const stats=require('../src/brain/bot-statistics')({units:{AtomBomb:'Atom Bomb'}});
+ const f=fixture({intentName:()=> 'attack',observeStatistics:(bot,entry,scope)=>stats.observe(bot.mg,bot.player,entry,scope)});
+ f.runtime.intent(f.bot,'attack',function Attack(){},'target',50);
+ f.runtime.build(f.bot,'city',{sendBuildOrUpgrade:()=>false},{type:'City',canBuild:1});
+ f.runtime.build(f.bot,'nuke',{sendBuildOrUpgrade:()=>undefined},{type:'Atom Bomb',canBuild:1});
+ let settle;
+ const pending=f.runtime.build(f.bot,'city',{sendBuildOrUpgrade:()=>new Promise(resolve=>settle=resolve)},{type:'City',canBuild:2});
+ assert.deepEqual(stats.snapshot(),{spawns:0,attacks:1,builds:0,nukes:1});
+ settle(true);await pending;await Promise.resolve();assert.equal(stats.snapshot().builds,1);
+ f.current=false;f.runtime.intent(f.bot,'attack',function Attack(){},'target',50);
+ assert.equal(stats.snapshot().attacks,1);
+});
 
 test('building delay holds fresh proposals without sending, reserving, or resampling',()=>{
  let time=0,draws=0;const builds=[];
