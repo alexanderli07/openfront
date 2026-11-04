@@ -53,14 +53,11 @@
       }
       #${PANEL_ID}.ab-tab-log .ab-pane[data-pane="log"] { display: flex; overflow: hidden; }
       #${PANEL_ID} .ab-pane[data-pane="log"] > .ab-log-list { flex: 1 1 0; min-height: 0; }
-      #${PANEL_ID} .ab-debug-tools { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--ab-border); }
-      #${PANEL_ID} .ab-debug-tools summary { cursor: pointer; font-size: 9px; color: var(--ab-muted); }
-      #${PANEL_ID} .ab-debug-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 6px; }
+      #${PANEL_ID} .ab-debug-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 5px; padding-top: 6px; }
       /* One surface and section-header language across all three tabs. */
       #${PANEL_ID} .ab-adv-toggle,
       #${PANEL_ID} .ab-cfg-sec,
-      #${PANEL_ID} .ab-section-title,
-      #${PANEL_ID} .ab-debug-tools > summary {
+      #${PANEL_ID} .ab-section-title {
         box-sizing: border-box; background: var(--ab-surface); border: 0;
         border-radius: 7px; padding: 5px 7px; margin: 4px 0;
         color: #cdd8d8; font-size: 10px; font-weight: 600;
@@ -80,4 +77,17 @@
         box-sizing: border-box; padding: 5px; border-radius: 8px;
         background: var(--ab-surface); border: 1px solid rgba(255,255,255,.05);
       }
-      #${PANEL_ID} .ab-debug-tools { border-top: 0; padding-top: 0; }
+      #${PANEL_ID} details > summary { list-style: none; cursor: pointer; user-select: none; }
+      #${PANEL_ID} details > summary::-webkit-details-marker { display: none; }
+      #${PANEL_ID} details > summary::marker { content: ""; }
+      #${PANEL_ID} details > summary::after { content: " ▾"; }
+      #${PANEL_ID} details[open] > summary::after { content: " ▴"; }
+      #${PANEL_ID} .ab-tuning-body {
+        background: var(--ab-surface); border-radius: 8px; padding: 3px 7px;
+        box-sizing: border-box; min-width: 0;
+      }
+      #${PANEL_ID} .ab-tuning-body .ab-cfg-sec {
+        background: transparent; border-radius: 0; padding: 5px 0 3px;
+        border-bottom: 1px solid rgba(255,255,255,.08); margin: 4px 0 0;
+      }
+      #${PANEL_ID} .ab-tuning-body .ab-cfg-row { background: transparent; margin: 0; padding: 8px 0; }

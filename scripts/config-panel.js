@@ -38,9 +38,12 @@ function simplifyConfigPanel(source) {
   const basicEnd = pane.indexOf(heading);
   if (basicEnd < 0) throw new Error('Config section boundary changed');
   let replacement = pane.slice(0, basicEnd).replace('tr("Auto-build structures")', 'tr("Allowed buildings")');
+  replacement = replacement.replace('<div class="ab-cfg-sec">${tr("Allowed buildings")}</div>',
+    '<details open class="ab-buildings-section" data-role="cfg-buildings"><summary class="ab-section-title">${tr("Allowed buildings")}</summary>');
+  replacement += '\n</details>';
   replacement += `
             <details open class="ab-cfg-advanced" data-role="cfg-advanced">
-              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;">\${tr("Advanced tuning")}</summary>`;
+              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;">\${tr("Advanced tuning")}</summary><div class="ab-tuning-body">`;
   for (const [label, keys] of [
     ['Opening reserve',['openingArmyFill']],
     ['Donations',['donateKeepFrac','donateNeedThreshold','donateMinDonatePct','donateThrottleMs']],
@@ -48,7 +51,7 @@ function simplifyConfigPanel(source) {
   ]) {
     replacement += '\n<div class="ab-cfg-sec">${tr("' + label + '")}</div>\n' + keys.map(k => numericRow(pane,k)).join('\n');
   }
-  replacement += '\n</details>\n</div>\n</div>\n        ';
+  replacement += '\n</div></details>\n</div>\n</div>\n        ';
   source = source.slice(0,start) + replacement + source.slice(end);
 
   // Drop removed overrides at the loader boundary. This preserves genuine

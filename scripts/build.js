@@ -593,15 +593,12 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     'async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=ofhBrainRuntime.defenseEconomyFacts(this)?0n:mirvReserveHold(a);');
   replaceOne('class NationBot{', `\n// BEGIN CENTRAL BRAIN\n${modules}\n// END CENTRAL BRAIN\nclass NationBot{`);
   replaceOne('<div class="ab-log-filters" data-role="log-filters">',
-    '<div class="ab-section-title">${tr("Filters")}</div><div class="ab-log-filters" data-role="log-filters">');
-  replaceOne('<div class="ab-log-list" data-role="log-list"></div>', `<div class="ab-log-list" data-role="log-list"></div>
-          <details class="ab-debug-tools">
-            <summary>Debug tools</summary>
+    '<details open class="ab-filter-section"><summary class="ab-section-title">${tr("Filters")}</summary><div class="ab-log-filters" data-role="log-filters">');
+  replaceOne('<div class="ab-log-list" data-role="log-list"></div>', `</details><div class="ab-log-list" data-role="log-list"></div>
             <div class="ab-debug-actions">
               <button type="button" class="ab-trace-export" data-role="brain-summary" title="Download compact full-match actions and aggregated holds; resumes saved history after refresh">Match summary</button>
               <button type="button" class="ab-trace-export" data-role="brain-export" title="Download bounded recent candidates, calculations and debug detail">Detailed trace</button>
-            </div>
-          </details>`);
+            </div>`);
   replaceOne('function wirePanel(n){', 'function wirePanel(n){n.querySelector(\'[data-role="brain-summary"]\')?.addEventListener("click",ofhExportMatchSummary);n.querySelector(\'[data-role="brain-export"]\')?.addEventListener("click",ofhExportBrainTrace);');
   const filterBinding = 'n.querySelectorAll(".ab-chip").forEach(f=>{f.addEventListener("click",()=>{state.logFilter=f.dataset.filter;n.querySelectorAll(".ab-chip").forEach(h=>h.classList.toggle("on",h.dataset.filter===state.logFilter));renderLog()})})';
   replaceOne(filterBinding, filterBinding.replaceAll('.ab-chip', '.ab-chip[data-filter]')
@@ -617,7 +614,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.96';
+  const version='1.84.97';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
