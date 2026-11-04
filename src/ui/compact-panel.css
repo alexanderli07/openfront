@@ -25,7 +25,14 @@
       #${PANEL_ID} .ab-stat b { font-size: 12px; }
       #${PANEL_ID} .ab-stat span { font-size: 9px; letter-spacing: .2px; }
       #${PANEL_ID} .ab-cfg-sec { margin: 7px 0 3px; padding-bottom: 2px; font-size: 9px; }
-      #${PANEL_ID} .ab-cfg-grid { gap: 3px; }
+      #${PANEL_ID} .ab-pane[data-pane="config"] { overflow-x: hidden; min-width: 0; }
+      #${PANEL_ID} .ab-cfg-body {
+        margin-right: 0; padding-right: 6px; box-sizing: border-box;
+        width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden;
+      }
+      #${PANEL_ID} .ab-cfg-grid { gap: 3px; grid-template-columns: repeat(3,minmax(0,1fr)); }
+      #${PANEL_ID} .ab-cfg-struct { aspect-ratio: 3 / 2; }
+      #${PANEL_ID} .ab-cfg-struct-name { overflow-wrap: anywhere; }
       #${PANEL_ID} .ab-cfg-row { display: grid; grid-template-columns: minmax(0,1fr) 88px; align-items: center; padding: 8px 0; line-height: 1.3; }
       #${PANEL_ID} .ab-cfg-row > div { min-width: 0; gap: 3px; }
       #${PANEL_ID} .ab-cfg-label { font-size: 9.5px; }
