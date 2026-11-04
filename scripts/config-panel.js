@@ -39,8 +39,8 @@ function simplifyConfigPanel(source) {
   if (basicEnd < 0) throw new Error('Config section boundary changed');
   let replacement = pane.slice(0, basicEnd).replace('tr("Auto-build structures")', 'tr("Allowed buildings")');
   replacement += `
-            <details class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
-              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:10px 0;">\${tr("Advanced tuning")}</summary>`;
+            <details open class="ab-cfg-advanced" data-role="cfg-advanced" style="border-top:1px solid var(--oh-panel-border,rgba(148,163,184,.2));">
+              <summary class="ab-cfg-sec" style="cursor:pointer;user-select:none;padding:4px 0;">\${tr("Advanced tuning")}</summary>`;
   for (const [label, keys] of [
     ['Opening reserve',['openingArmyFill']],
     ['Donations',['donateKeepFrac','donateNeedThreshold','donateMinDonatePct','donateThrottleMs']],

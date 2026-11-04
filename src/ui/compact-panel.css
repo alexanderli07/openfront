@@ -1,0 +1,25 @@
+      /* Shared compact layout for Controls, Config and Logs. */
+      #${PANEL_ID} { font-size: 10px; line-height: 1.3; }
+      #${PANEL_ID} .ab-head { flex-shrink: 0; padding: 6px 8px; gap: 6px; }
+      #${PANEL_ID} .ab-tabs { flex-shrink: 0; padding: 5px 8px 0; }
+      #${PANEL_ID} .ab-tab { padding: 5px 8px; }
+      #${PANEL_ID} .ab-body { padding: 6px 8px; }
+      #${PANEL_ID} .ab-adv-toggle { padding: 4px 7px; margin-top: 3px; font-size: 10px; }
+      #${PANEL_ID} .ab-feats-grid { gap: 3px; }
+      #${PANEL_ID} .ab-feat-mini { padding: 4px 2px; gap: 2px; }
+      #${PANEL_ID} .ab-status { padding: 7px; margin-top: 4px; font-size: 10px; }
+      #${PANEL_ID} .ab-status .ab-st-act { margin-top: 3px; font-size: 10px; }
+      #${PANEL_ID} .ab-stats { margin-top: 6px; gap: 4px; }
+      #${PANEL_ID} .ab-stat { padding: 4px 3px; border-radius: 7px; }
+      #${PANEL_ID} .ab-stat b { font-size: 12px; }
+      #${PANEL_ID} .ab-stat span { font-size: 9px; letter-spacing: .2px; }
+      #${PANEL_ID} .ab-cfg-sec { margin: 7px 0 3px; padding-bottom: 2px; font-size: 9px; }
+      #${PANEL_ID} .ab-cfg-grid { gap: 3px; }
+      #${PANEL_ID} .ab-cfg-struct { padding: 3px 2px; gap: 2px; }
+      #${PANEL_ID} .ab-cfg-row { display: grid; grid-template-columns: minmax(0,1fr) 88px; align-items: center; padding: 3px 0; line-height: 1.2; }
+      #${PANEL_ID} .ab-cfg-row > div { min-width: 0; gap: 3px; }
+      #${PANEL_ID} .ab-cfg-label { font-size: 9.5px; }
+      #${PANEL_ID} .ab-cfg-row input[type="range"] { width: 100%; min-width: 0; margin: 0; }
+      #${PANEL_ID} .ab-log-item { padding: 2px 4px; gap: 4px; line-height: 1.2; }
+      #${PANEL_ID} .ab-log-time { font-size: 9px; }
+      #${PANEL_ID} .ab-log-text { font-size: 10px; }

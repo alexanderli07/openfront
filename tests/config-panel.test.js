@@ -17,7 +17,7 @@ test('all redundant internal switches are removed, including the warship purchas
  const config=pane(source);assert.ok(!config.includes('data-cfg="'));assert.ok(!config.includes('Auto-build warships'));
  assert.ok(config.includes('data-role="cfg-structs"'));assert.ok(config.includes('Advanced tuning'));
  const opening=config.slice(config.indexOf('<details'),config.indexOf('>',config.indexOf('<details'))+1);
- assert.ok(!/\bopen(?:\s|=|>)/.test(opening));
+ assert.ok(/\bopen(?:\s|=|>)/.test(opening));
  assert.deepEqual(numeric(config),numeric(pane(vendor)));
  assert.ok(source.includes('featRow("warship","Warship automation"'));
 });

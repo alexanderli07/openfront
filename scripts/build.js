@@ -565,14 +565,11 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('${Math.round((state.settings.donateNeedThreshold||.8)*100)}%',
     '${Math.round(Math.min(state.settings.donateNeedThreshold??.65,.65)*100)}%');
   replaceOne('width: 280px;\n        height: ${typeof OFH_PANEL_HEIGHT_PX==="number"?OFH_PANEL_HEIGHT_PX:420}px;',
-    'width: min(280px, calc(100vw - 24px));\n        height: auto;\n        max-height: calc(100dvh - 24px);\n        box-sizing: border-box;');
-  replaceOne('/* Config tab controls */',
-    '#${PANEL_ID} .ab-head, #${PANEL_ID} .ab-tabs { flex-shrink: 0; }\n'+
-    '      #${PANEL_ID} .ab-body, #${PANEL_ID} .ab-pane[data-pane="control"] { flex: 0 1 auto; }\n'+
-    '      #${PANEL_ID}.ab-tab-config:not(.ab-collapsed), #${PANEL_ID}.ab-tab-log:not(.ab-collapsed) { height: min(440px, calc(100dvh - 24px)); }\n'+
-    '      #${PANEL_ID}.ab-tab-config .ab-body, #${PANEL_ID}.ab-tab-log .ab-body { flex: 1; }\n'+
-    '      /* Config tab controls */');
-  // Keep the whole enlarged panel in view, including previously saved positions.
+    'width: min(280px, calc(100vw - 24px));\n        height: min(431px, calc(100dvh - 24px));\n        max-height: calc(100dvh - 24px);\n        box-sizing: border-box;');
+  const compactPanelCss=fs.readFileSync(path.join(root,'src/ui/compact-panel.css'),'utf8');
+  replaceOne('    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=',
+    compactPanelCss+'\n    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=');
+  // Keep the whole panel in view, including previously saved positions.
   source=source.replaceAll('window.innerWidth-60','Math.max(0,window.innerWidth-n.offsetWidth)')
     .replaceAll('window.innerHeight-30','Math.max(0,window.innerHeight-n.offsetHeight)');
   replaceOne('<b data-role="s-gold">0</b><span>${tr("Gold")}</span>',
@@ -614,7 +611,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='1.84.86';
+  const version='1.84.87';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
