@@ -44,3 +44,8 @@
       #${PANEL_ID} .ab-log-item { padding: 2px 4px; gap: 4px; line-height: 1.2; }
       #${PANEL_ID} .ab-log-time { font-size: 9px; }
       #${PANEL_ID} .ab-log-text { font-size: 10px; }
+      #${PANEL_ID}.ab-tab-log .ab-pane[data-pane="log"] { display: flex; overflow: hidden; }
+      #${PANEL_ID} .ab-pane[data-pane="log"] > .ab-log-list { flex: 1 1 0; min-height: 0; }
+      #${PANEL_ID} .ab-debug-tools { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--ab-border); }
+      #${PANEL_ID} .ab-debug-tools summary { cursor: pointer; font-size: 9px; color: var(--ab-muted); }
+      #${PANEL_ID} .ab-debug-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 6px; }
