@@ -45,7 +45,7 @@ test('Helper close/open integration respects reduced motion and keeps the panel 
  const source=buildSource().source,events=[];
  const node={style:{},dataset:{visible:'true'}};
  const context=vm.createContext({window:{matchMedia:()=>({matches:true})},quickPanelEnabled:true,
-  _qpInTransition:false,_renderActiveTab:()=>events.push('render'),_themeFromSettings:()=>{},_placePanel:()=>{},
+  _qpInTransition:false,_renderActiveTab:()=>events.push('render'),_themeFromSettings:()=>{},_placePanel:()=>{},ofhRefreshConnectionDot:()=>{},
   _notifySettingChanged:(key,value)=>events.push([key,value])});
  const a=source.indexOf('function createHelperPanelMotion('),b=source.indexOf('window.addEventListener("ofh-toggle-quick-panel"',a);
  vm.runInContext(source.slice(a,b),context);

@@ -24,6 +24,7 @@ body{margin:0;background:#20272b;color:#e2e8f0;font:14px Segoe UI,sans-serif}hea
 window.onerror=(m)=>document.getElementById('errors').textContent+=m+'\\n';
 const QUICK_PANEL_ID='openfront-helper-quick-panel',QUICK_PANEL_STYLE_ID='quick-style',FLOATING_AUTOJOIN_PANEL_ID='openfront-helper-floating-autojoin-panel',FLOATING_AUTOJOIN_STYLE_ID='join-style',OFH_PANEL_HEIGHT_PX=420;
 let quickPanelActiveTab='helpers',_qpPopoverEl=null,settings={enabled:true,floatingAutoJoinFiltersCollapsed:false,floatingAutoJoinForecastCollapsed:false};
+function ofhRefreshConnectionDot(){}
 const _themePresets={orange:'#f97316',blue:'#60a5fa',green:'#4ade80',pink:'#f472b6'},_quickPanelSettingsCache={};
 const _getSetting=(k,d)=>Object.hasOwn(_quickPanelSettingsCache,k)?_quickPanelSettingsCache[k]:d;
 const _tr=x=>x,t=x=>x,tr=x=>x,_esc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;');

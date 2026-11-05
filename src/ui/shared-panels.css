@@ -1,4 +1,15 @@
 /* Auto-Bot's design language, scoped to the helper's own UI. */
+/* Grey = off, pulsing yellow = enabled/waiting, steady green = connected. */
+#openfront-helper-quick-panel .ohqp-conn[data-panel-status],
+#openfront-helper-auto-bot-panel .ab-gate-dot[data-panel-status] {
+  background: currentColor; opacity: 1; box-shadow: 0 0 6px currentColor; animation: none;
+}
+#openfront-helper-quick-panel .ohqp-conn[data-panel-status='off'],
+#openfront-helper-auto-bot-panel .ab-gate-dot[data-panel-status='off'] { color: #94a3b8; opacity: .7; box-shadow: none; }
+#openfront-helper-quick-panel .ohqp-conn[data-panel-status='waiting'],
+#openfront-helper-auto-bot-panel .ab-gate-dot[data-panel-status='waiting'] { color: #fbbf24; animation: ofhStatusPulse 1.4s ease-in-out infinite; }
+#openfront-helper-quick-panel .ohqp-conn[data-panel-status='connected'],
+#openfront-helper-auto-bot-panel .ab-gate-dot[data-panel-status='connected'] { color: #4ade80; }
 :is(#openfront-helper-quick-panel, #openfront-helper-floating-autojoin-panel,
     #openfront-helper-auto-bot-panel, #openfront-helper-popup) {
   --ofh-ui-surface: rgba(255,255,255,.05);

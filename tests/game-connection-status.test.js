@@ -29,12 +29,14 @@ test('closing an old socket does not clear a replacement connection',()=>{
 test('shipped hook observes binary game sockets without changing packets or legacy command routing',()=>{
  const source=buildSource().source,dot={dataset:{}},window={WebSocket:Socket,location:{href:'https://openfront.io/'}};
  window.top=window;
- const context=vm.createContext({window,URL,document:{getElementById:()=>dot}});
+ const context=vm.createContext({window,URL,quickPanelEnabled:true,document:{getElementById:()=>dot}});
  const a=source.indexOf('const _NativeWS=window.WebSocket;'),b=source.indexOf('function _setLastKnownTile(',a);
  vm.runInContext(source.slice(a,b),context);
  const socket=new window.WebSocket('wss://openfront.io/w3');socket.fire('open');
  assert.equal(dot.dataset.status,'connected');
  const binary=new Uint8Array([1,2,3]);socket.send(binary);assert.equal(socket.sent[0],binary);
  assert.equal(vm.runInContext('_activeSocket',context),null,'status does not activate legacy JSON command senders');
- socket.fire('close');assert.equal(dot.dataset.status,'disconnected');
+ vm.runInContext('quickPanelEnabled=false;ofhRefreshConnectionDot()',context);assert.equal(dot.dataset.status,'off');
+ vm.runInContext('quickPanelEnabled=true;ofhRefreshConnectionDot()',context);assert.equal(dot.dataset.status,'connected');
+ socket.fire('close');assert.equal(dot.dataset.status,'waiting');
 });

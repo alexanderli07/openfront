@@ -29,8 +29,8 @@ function unifyPanelTheme(source){
  const a=source.indexOf('function _animateOpen(n){'),b=source.indexOf('window.addEventListener("ofh-toggle-quick-panel"',a);
  if(a<0||b<a)throw new Error('Helper motion boundaries changed');
  once(source.slice(a,b),motion+'\nconst ofhHelperMotion=createHelperPanelMotion();'+
-  'function _animateOpen(n){_qpInTransition=false;ofhHelperMotion.disclose(n,true,()=>{n.style.display="flex";n.style.opacity="";n.style.transform="";n.dataset.visible="true";_renderActiveTab();_themeFromSettings();_placePanel(n)})}'+
-  'function _animateClose(n){_qpInTransition=false;ofhHelperMotion.disclose(n,false,()=>{n.style.display="none";n.dataset.visible="false";quickPanelEnabled=false;_notifySettingChanged("showQuickPanel",false);n.style.transform="";n.style.opacity=""})}');
+  'function _animateOpen(n){_qpInTransition=false;ofhHelperMotion.disclose(n,true,()=>{n.style.display="flex";n.style.opacity="";n.style.transform="";n.dataset.visible="true";_renderActiveTab();_themeFromSettings();_placePanel(n);ofhRefreshConnectionDot()})}'+
+  'function _animateClose(n){_qpInTransition=false;ofhHelperMotion.disclose(n,false,()=>{n.style.display="none";n.dataset.visible="false";quickPanelEnabled=false;ofhRefreshConnectionDot();_notifySettingChanged("showQuickPanel",false);n.style.transform="";n.style.opacity=""})}');
  return source;
 }
 module.exports={unifyPanelTheme};
