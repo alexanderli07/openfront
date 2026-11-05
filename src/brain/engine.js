@@ -40,10 +40,14 @@ function createDecisionEngine(options = {}) {
     seen.delete(value);
     return result;
   }
+  const frozen = new WeakSet();
+  const measured=(name,run)=>options.performance?.active()?options.performance.measure(name,run):run();
+  const sanitize=value=>options.performance?.active()?options.performance.measure('logging.copy',()=>copy(value)):copy(value);
   function freeze(value) {
-    if (value && typeof value === 'object') {
+    if (value && typeof value === 'object' && !frozen.has(value)) {
       for (const item of Object.values(value)) freeze(item);
       Object.freeze(value);
+      frozen.add(value);
     }
     return value;
   }
@@ -93,9 +97,10 @@ function createDecisionEngine(options = {}) {
     if (critical || building) protect(entry);
     return true;
   }
-  function append(kind, details) {
-    const entry = freeze({ ...details, seq: ++sequence, kind });
-    if (!retention || retain(entry)) {
+  function append(kind, details, alreadyRetained = false) {
+    const value={ ...details, seq: ++sequence, kind };
+    const entry = options.performance?.active()?measured('logging.freeze',()=>freeze(value)):freeze(value);
+    if (!retention || alreadyRetained || retain(entry)) {
       records.push(entry);
       if (records.length > recentLimit) { records.shift(); dropped++; }
     }
@@ -103,7 +108,30 @@ function createDecisionEngine(options = {}) {
     return entry.seq;
   }
   function record(kind, details = {}) {
-    try { return append(kind, copy(details)); }
+    try {
+      // Only getter chatter is safe to count without inspecting its payload. Read
+      // own data descriptors so telemetry still cannot invoke game getters.
+      if (retention && (kind === 'rule-call' || kind === 'rule-result')) {
+        const fields = ['tick', 'module', 'rule', 'reason', 'status', 'error'];
+        const header = { kind };
+        let safe = true;
+        for (const key of fields) {
+          const descriptor = Object.getOwnPropertyDescriptor(details, key);
+          if (!descriptor) continue;
+          if (!('value' in descriptor) || descriptor.value !== null &&
+              !['undefined','string','number','boolean'].includes(typeof descriptor.value)) { safe = false; break; }
+          header[key] = copy(descriptor.value);
+        }
+        if (safe && !header.error) {
+          const kept = retain(header);
+          if (kept) return append(kind, sanitize(details), true);
+          const entry = Object.freeze({ ...header, seq: ++sequence, aggregated: true });
+          try { options.onRecord?.(entry); } catch {}
+          return entry.seq;
+        }
+      }
+      return append(kind, sanitize(details));
+    }
     catch { return append('telemetry-error', { originalKind: kind, reason: 'Unable to serialize record' }); }
   }
   function register(strategy) {

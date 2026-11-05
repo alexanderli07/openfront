@@ -1,5 +1,6 @@
 // Runs in the original Auto-Bot closure. No patches to the game's own event bus.
 const ofhPortWaterAccess=createPortWaterAccess();
+const ofhTickObservations=createTickObservations();
 const ofhBotStatistics=createBotStatistics({units:UNIT});
 const ofhPanelMotion=createPanelMotion();
 const ofhEconomyStatus=createEconomyStatus();
@@ -13,11 +14,14 @@ const ofhTeamOpening = createTwoTeamOpening({units:UNIT,botType:PlayerType.Bot,t
   portWaterAccess:ofhPortWaterAccess,
   buildAllowed:type=>autoBotBuildAllowed(type)});
 const ofhMatchArchive=createMatchArchive({createSummary:createMatchSummary,
+  performance:window.__OFH_performance,
   onError:message=>pushLog('Match history storage warning: '+message,'system'),
   indexedDB:(()=>{try{return window.indexedDB;}catch{return null;}})()});
 window.addEventListener('pagehide',()=>{ofhMatchArchive.flush().catch(()=>{});});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ofhMatchArchive.flush().catch(()=>{});});
 const ofhBrainRuntime = createBrainRuntime({
+  performance:window.__OFH_performance,
+  tickObservations:ofhTickObservations,
   observeEconomy:(bot,entry,scope)=>ofhEconomyStatus.observe(bot.mg,bot.player,entry,scope),
   observeStatistics:(bot,entry,scope)=>ofhBotStatistics.observe(bot.mg,bot.player,entry,scope),
   createEngine: createDecisionEngine,
@@ -40,7 +44,7 @@ const ofhBrainRuntime = createBrainRuntime({
       try{gameId=(bot.mg.__src||bot.mg).gameID();playerId=(bot.mg.myPlayer()||bot.player)?.id();}catch{}
       return {gameId,playerId};
     };
-    return ofhMatchArchive.start({...identity(),helperVersion:'2.1.5'},identity);
+    return ofhMatchArchive.start({...identity(),helperVersion:'2.2.0'},identity);
   },
   createLegacyStrategy,
   teamGeography:ofhTeamGeography,units:UNIT,buildAllowed:type=>autoBotBuildAllowed(type),reserveGold:gold=>mirvReserveHold(gold),

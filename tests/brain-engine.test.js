@@ -147,3 +147,24 @@ test('replay compares choices without executing commands or modifying trace', ()
   assert.equal(result.length, 1); assert.equal(result[0].sameChoice, true); assert.equal(sent, 1);
   assert.equal(e.exportTrace().records.length, count);
 });
+
+test('sampled rule telemetry avoids traversing discarded payloads while preserving counters',()=>{
+  let traversals=0;const observed=[];
+  const payload=new Proxy({value:1},{ownKeys(target){traversals++;return Reflect.ownKeys(target);}});
+  const e=engine({retainImportant:true,onRecord:r=>observed.push(r)});
+  for(let tick=1;tick<=1000;tick++)e.record('rule-result',{tick,module:'a',rule:'cost',result:payload});
+  assert.equal(traversals,10);
+  assert.equal(observed.length,1000);
+  assert.equal(e.exportTrace().retention.counts['rule-result'],1000);
+  assert.equal(observed.filter(r=>r.aggregated).length,990);
+  e.record('rule-result',{tick:1000,module:'a',rule:'cost',result:payload,error:'failed'});
+  assert.equal(traversals,11);
+  assert.ok(e.exportTrace().records.some(r=>r.error==='failed'));
+});
+
+test('decision telemetry does not refreeze already immutable policy inputs',()=>{
+  const e=engine(),original=Object.freeze,seen=new WeakSet();let duplicate=0;
+  Object.freeze=value=>{if(seen.has(value))duplicate++;seen.add(value);return original(value);};
+  try{e.decide({tick:1,self:{gold:20}},[action]);}finally{Object.freeze=original;}
+  assert.equal(duplicate,0);
+});

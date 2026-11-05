@@ -25,6 +25,7 @@ function fixture(options = {}) {
     createSupportPosture:options.createSupportPosture,createBuildPacing:options.createBuildPacing,
     portWaterAccess:options.portWaterAccess,
     startHistory:options.startHistory,observeStatistics:options.observeStatistics,intentName:options.intentName,
+    tickObservations:options.tickObservations,
     diplomacyPlanner: createDiplomacyPlanner({ settings: () => ({ winFixes: false, features: { betray: true } }),
       neutralRelation: 0, friendlyRelation: 1, difficulty: () => 'Hard',
       difficulties: { easy: 'Easy', medium: 'Medium' }, humanType: 'Human',
@@ -995,4 +996,42 @@ test('after economic destruction the final gateway can rebuild below3M while pro
  f.runtime.build(f.bot,'recovery',menu,{type:'Port',canBuild:10,canUpgrade:false,cost:500000n});
  f.runtime.build(f.bot,'optional',menu,{type:'City',canBuild:20,canUpgrade:false,cost:500000n});
  assert.equal(builds,1);
+});
+
+test('shared observation counts avoid repeat scans while command resources stay fresh',async()=>{
+ const observations=require('../src/brain/tick-observations')();
+ const f=fixture({tickObservations:observations});let scans=0,level=1,gold=1000n;
+ f.player.units=()=>{scans++;return [{type:()=> 'City',level:()=>level,isUnderConstruction:()=>false}];};
+ f.player.gold=()=>gold;
+ f.tick++;f.bot.feat=()=>false;f.bot.structureBehavior={handleStructures:()=>true};f.runtime.begin(f.bot);
+ for(let i=0;i<5;i++)await f.runtime.planTurn(f.bot,{path:'build-only',tick:f.tick});
+ assert.equal(scans,1);
+ // Sending a command invalidates structural facts even before the next tick.
+ level=2;gold=250n;f.runtime.intent(f.bot,'test',function Attack(){},'enemy',1);
+ await f.runtime.planTurn(f.bot,{path:'build-only',tick:f.tick});
+ const records=f.runtime.inspect().records.filter(e=>e.kind==='decision'&&e.snapshot?.self);
+ assert.equal(records.at(-1).snapshot.self.units.City.levels,2);
+ assert.equal(records.at(-1).snapshot.self.gold,'250');
+});
+
+test('first command reads resource changes even when the game tick has not advanced',()=>{
+ const f=fixture({tickObservations:require('../src/brain/tick-observations')()});
+ f.player.gold=()=>125n;f.player.troops=()=>37;
+ f.runtime.intent(f.bot,'test',function Attack(){},'enemy',1);
+ const command=f.runtime.inspect().records.find(e=>e.kind==='decision'&&e.candidates?.some(c=>c.id.startsWith('command-')));
+ assert.equal(command.snapshot.self.gold,'125');assert.equal(command.snapshot.self.troops,37);
+});
+
+test('async command settlement invalidates a same-tick observation collected while pending',async()=>{
+ let settle,level=1;
+ const pending=new Promise(resolve=>{settle=resolve;});
+ const f=fixture({tickObservations:require('../src/brain/tick-observations')(),emitIntent:()=>pending});
+ f.player.units=()=>[{type:()=> 'City',level:()=>level,isUnderConstruction:()=>false}];f.tick++;
+ f.bot.structureBehavior={handleStructures:()=>true};f.bot.feat=()=>false;
+ f.runtime.begin(f.bot);f.runtime.intent(f.bot,'test',function Attack(){},'enemy',1);
+ await f.runtime.planTurn(f.bot,{path:'build-only',tick:f.tick});
+ level=3;settle(true);await pending;await Promise.resolve();
+ await f.runtime.planTurn(f.bot,{path:'build-only',tick:f.tick});
+ const decision=f.runtime.inspect().records.filter(e=>e.kind==='decision').at(-1);
+ assert.equal(decision.snapshot.self.units.City.levels,3);
 });

@@ -5,6 +5,8 @@ function createMatchSummary(options={}) {
   const clone=value=>JSON.parse(JSON.stringify(value));
   const segment=options.segment||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const metadata=clone(options.metadata||{}),events=[],holds=new Map(),plans=new Map(),errors=new Map(),decisions=new Map();
+  const changedEvents=new Map(),changedHolds=new Map(),changedPlans=new Map();
+  const emit=row=>{events.push(row);changedEvents.set(row.id,row);};
   const counts=Object.create(null);let tick=0,firstTick=null,firstState=null,lastState=null,structures=new Map(),restored=false,firstInfrastructure=null;
   const versions=new Set(metadata.helperVersion?[metadata.helperVersion]:[]);
   const usefulDomains=new Set(['reactive-sam-upgrade','opening-expansion','structure-plan','attack-plan','naval-action','warship-combat','donation-target','spawn-action','mirv-plan','nuke-action']);
@@ -12,7 +14,7 @@ function createMatchSummary(options={}) {
   function aggregate(map,key,details){
     let row=map.get(key);
     if(!row){row={key,...details,count:0,firstTick:tick,lastTick:tick};map.set(key,row);}
-    row.count++;row.lastTick=tick;return row;
+    row.count++;row.lastTick=tick;(map===holds?changedHolds:changedPlans).set(key,row);return row;
   }
   function observe(e){
     const observedTick=e.snapshot?.tick??e.tick;
@@ -21,13 +23,13 @@ function createMatchSummary(options={}) {
     if(e.kind==='observation'||e.kind==='decision'){
       const s=state(e.snapshot);if(s){lastState=s;if(!firstState)firstState=s;}
     }
-    const add=details=>events.push({id:`${segment}:${e.seq}`,tick,...details});
+    const add=details=>emit({id:`${segment}:${e.seq}`,tick,...details});
     if(e.kind!=='dispatch'&&(e.error||/error/.test(e.kind))){
       const reason=String(e.error||e.reason||e.kind).slice(0,400);
       const key=[e.kind,e.module,e.rule,reason].join('|');
       let row=errors.get(key);
-      if(!row){row={id:`${segment}:${e.seq}`,key,tick,kind:'error',source:e.module||e.kind,rule:e.rule,reason,count:0,lastTick:tick};errors.set(key,row);events.push(row);}
-      row.count++;row.lastTick=tick;return;
+      if(!row){row={id:`${segment}:${e.seq}`,key,tick,kind:'error',source:e.module||e.kind,rule:e.rule,reason,count:0,lastTick:tick};errors.set(key,row);emit(row);}
+      row.count++;row.lastTick=tick;changedEvents.set(row.id,row);return;
     }
     if(e.kind==='decision'){
       const c=e.candidates?.find(c=>c.id===e.selectedId),domain=e.snapshot?.domain;
@@ -81,7 +83,7 @@ function createMatchSummary(options={}) {
       aggregate(holds,[e.kind,e.status,e.purpose,e.reason].join('|'),{domain:e.kind,status:e.status,purpose:e.purpose,reason:e.reason});
     }
   }
-  function restore(saved){
+  function restore(saved, persistence={}){
     if(restored||!saved||saved.schemaVersion!==1||saved.type!=='openfront-match-summary')return;
     restored=true;
     const prior=clone(saved);
@@ -95,6 +97,9 @@ function createMatchSummary(options={}) {
       if(changed.length||removed.length)pending.unshift({id:firstInfrastructure.id,tick:firstInfrastructure.tick,
         kind:'infrastructure',changed,removed,partial:firstInfrastructure.partial||undefined});
     }
+    const pendingIds=new Set(pending.map(row=>row.id));
+    const pendingErrorKeys=new Set(pending.filter(row=>row.kind==='error').map(row=>row.key));
+    const holdKeys=new Set(changedHolds.keys()),planKeys=new Set(changedPlans.keys());
     const errorRows=new Map();
     for(const rows of [prior.events,pending])for(const row of rows){
       if(row.kind==='error'&&errorRows.has(row.key)){
@@ -109,18 +114,29 @@ function createMatchSummary(options={}) {
     tick=Math.max(tick,prior.lastTick||0);firstTick=prior.firstTick??firstTick;firstState=prior.firstState||firstState;lastState=lastState||prior.lastState;
     if(!firstInfrastructure&&prior.finalStructures)structures=new Map(prior.finalStructures.map(s=>[s.id,s]));
     for(const version of prior.helperVersions||[prior.metadata?.helperVersion])if(version)versions.add(version);
+    // The first checkpoint after restore may migrate a legacy monolithic row.
+    // Subsequent checkpoints visit only rows changed since the preceding one.
+    changedEvents.clear();for(const row of events)
+      if(!persistence.checkpointed||pendingIds.has(row.id)||row.kind==='error'&&pendingErrorKeys.has(row.key))changedEvents.set(row.id,row);
+    changedHolds.clear();for(const row of holds.values())if(!persistence.checkpointed||holdKeys.has(row.key))changedHolds.set(row.key,row);
+    changedPlans.clear();for(const row of plans.values())if(!persistence.checkpointed||planKeys.has(row.key))changedPlans.set(row.key,row);
     // Reconnect repeat-error rows to the restored event objects.
     errors.clear();for(const row of events)if(row.kind==='error')errors.set(row.key,row);
   }
-  function exportSummary(){return clone({schemaVersion:1,type:'openfront-match-summary',metadata,helperVersions:[...versions],firstTick,lastTick:tick,
-    firstState,lastState,counts,events,holds:[...holds.values()],plans:[...plans.values()],finalStructures:[...structures.values()],
-    note:'Commands report client submission, not server acceptance. Holds/plans aggregate repeated checks; detailed candidates are in the separate trace.'});}
+  function header(){return {schemaVersion:1,type:'openfront-match-summary',metadata,helperVersions:[...versions],firstTick,lastTick:tick,
+    firstState,lastState,counts,finalStructures:[...structures.values()],
+    note:'Commands report client submission, not server acceptance. Holds/plans aggregate repeated checks; detailed candidates are in the separate trace.'};}
+  function exportSummary(){return clone({...header(),events,holds:[...holds.values()],plans:[...plans.values()]});}
+  function takeChanges(){
+    const result=clone({header:header(),events:[...changedEvents.values()],holds:[...changedHolds.values()],plans:[...changedPlans.values()]});
+    changedEvents.clear();changedHolds.clear();changedPlans.clear();return result;
+  }
   function identify(identity){
     if(!identity?.gameId||!identity.playerId)throw Error('Match identity is incomplete');
     if(metadata.gameId&&metadata.gameId!==identity.gameId||metadata.playerId&&metadata.playerId!==identity.playerId)
       throw Error('Cannot merge different match/player identities');
     metadata.gameId=identity.gameId;metadata.playerId=identity.playerId;
   }
-  return {observe,restore,identify,export:exportSummary};
+  return {observe,restore,identify,takeChanges,export:exportSummary};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports=createMatchSummary;

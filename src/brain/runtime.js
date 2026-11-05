@@ -75,11 +75,16 @@ function createBrainRuntime(deps) {
     return result;
   }
   function snapshot(controller) {
+    if(deps.performance?.active())return deps.performance.measure('decision.snapshot',()=>collectSnapshot(controller));
+    return collectSnapshot(controller);
+  }
+  function collectSnapshot(controller) {
     const game = controller.bot.mg;
     const player = game.myPlayer();
     const settings = deps.settings();
-    const units = safe(() => player.units(), []);
-    const counts = {};
+    const shared=deps.tickObservations?.units(game,player);
+    const units = shared ? [] : safe(() => player.units(), []);
+    const counts = shared?.counts || {};
     for (const unit of units) {
       const type = safe(() => unit.type(), 'unknown');
       const entry = counts[type] ||= { count: 0, levels: 0, building: 0 };
@@ -109,7 +114,7 @@ function createBrainRuntime(deps) {
     controller.samDevelopment=deps.createSamDevelopment?.();
     controller.supportObserver=deps.createSupportPosture?.();
     controller.supportSpending=deps.createSpendingLedger?.();
-    controller.engine = deps.createEngine({ maxRecords: 5000, retainImportant: true, onRecord: entry => {
+    controller.engine = deps.createEngine({ maxRecords: 5000, retainImportant: true, performance:deps.performance, onRecord: entry => {
       if(deps.isCurrent(bot)&&(entry.kind==='dispatch'||entry.kind==='decision'&&
           (!entry.snapshot?.domain||entry.snapshot.domain==='structure-plan')))
         safe(()=>deps.observeEconomy?.(bot,entry,controller));
@@ -149,7 +154,7 @@ function createBrainRuntime(deps) {
         const counts=Object.fromEntries(types.map(type=>[type,controller.snapshot.self.units[type]||{count:0,levels:0,building:0}]));
         const signature=JSON.stringify(counts);
         if(signature!==controller.infrastructureSignature){
-          const units=bot.player.units().filter(unit=>types.includes(unit.type()));
+          const units=(deps.tickObservations?.units(bot.mg,bot.player).units||bot.player.units()).filter(unit=>types.includes(unit.type()));
           controller.engine.record('infrastructure-change',{tick,snapshot:controller.snapshot,
             previous:controller.infrastructureCounts||null,counts,totalStructures:units.length,
             structures:units.slice(0,80).map(unit=>({id:unit.id(),type:unit.type(),tile:safe(()=>unit.tile()),
@@ -223,6 +228,7 @@ function createBrainRuntime(deps) {
     const controller = owners.get(actor);
     if (!controller) throw new Error(`Unattached Auto-Bot command source: ${source}`);
     const game = controller.bot.mg;
+    const invalidate=()=>{safe(()=>deps.tickObservations?.invalidate(game,controller.bot.player));controller.snapshot=null;};
     if (!deps.enabled() || !deps.isCurrent(controller.bot) || deps.isPublic(game)) {
       declined.set(actor, true);
       const eventScope=allianceEventScopes.get(actor);if(eventScope)eventScope.stopped=true;
@@ -230,7 +236,9 @@ function createBrainRuntime(deps) {
       return false;
     }
     // No live game objects or executable callbacks are passed to the strategy.
-    const state = !activePlans.has(actor) && controller.snapshot?.tick === game.ticks() ? controller.snapshot : safe(() => snapshot(controller), { tick: game.ticks(), unavailable: true });
+    // Unit summaries are shared, but resources and attacks must be read after
+    // async quotes/manual actions even if the native tick has not advanced.
+    const state = safe(() => snapshot(controller), { tick: game.ticks(), unavailable: true });
     const proposal = { id: `command-${++controller.proposalSequence}`, kind, source, arguments: summarize(args),
       ...(activePlans.has(actor) ? { parentDecisionId: activePlans.get(actor) } : {}) };
     if(transport){
@@ -250,12 +258,12 @@ function createBrainRuntime(deps) {
         if(transport){capacity=transportCapacity(controller);if(!capacity.available){transportHeld.add(actor);return false;}}
         const release=()=>{if(reservation){const index=capacity.state.pending.indexOf(reservation);if(index>=0)capacity.state.pending.splice(index,1);}};
         const emit=()=>{if(transport){reservation={tile:args[0],tick:game.ticks(),inFlight:true};capacity.state.pending.push(reservation);}
-        try {executed=true;if(transport)capacity.state.emitting=true;const result=execute();if(result===false)release();
-          const settled=value=>{if(reservation){reservation.inFlight=false;reservation.tick=game.ticks();}if(value===false)release();};
-          if(result&&typeof result.then==='function')Promise.resolve(result).then(settled,release);
+        try {executed=true;invalidate();if(transport)capacity.state.emitting=true;const result=execute();if(result===false)release();
+          const settled=value=>{invalidate();if(reservation){reservation.inFlight=false;reservation.tick=game.ticks();}if(value===false)release();};
+          if(result&&typeof result.then==='function')Promise.resolve(result).then(settled,()=>{invalidate();release();});
           else settled(result);
           return result;
-        }catch(error){release();throw error;}finally{if(transport)capacity.state.emitting=false;}};
+        }catch(error){release();throw error;}finally{invalidate();if(transport)capacity.state.emitting=false;}};
         if(controller.commandGuard&&(transport||donation)){
           let result;
           const guarded=controller.commandGuard.dispatch({kind:transport?'boat':'donation',
@@ -1442,7 +1450,7 @@ function createBrainRuntime(deps) {
     return facts;
   }
   function probeThrottle(actor,fallback){const p=supportPosture(actor);return p?.ready&&!p.conserve?Math.min(fallback,p.probeThrottleMs??fallback):fallback;}
-  function defenseEconomyFacts(actor){
+  function defenseEconomyFacts(actor,freshDefenseObservation=null){
     const controller=owners.get(actor);
     if(!deps.defenseEconomy||controller?.engine.selectedStrategy?.()!=='adaptive-v1')return null;
     const game=actor.game||actor.mg||controller.bot.mg,player=actor.player||controller.bot.player;
@@ -1465,7 +1473,7 @@ function createBrainRuntime(deps) {
       }
     }
     if(!facts||!controller.samDevelopment||!deps.samDefenseObserver)return facts;
-    const observation=deps.samDefenseObserver.observe(game,player);
+    const observation=freshDefenseObservation||deps.samDefenseObserver.observe(game,player);
     const planned=samDevelopmentFacts(actor,observation,facts);
     return {...facts,samPreparation:planned,emergencyReserve:facts.reserve,plannedSamSavings:planned.savings,reserve:facts.reserve+planned.savings};
   }
@@ -1488,7 +1496,7 @@ function createBrainRuntime(deps) {
       upgradeDuration:typeof config.samUpgradeDuration==='function'?config.samUpgradeDuration():45});
     let observation=deps.samDefenseObserver.observe(game,player);
     if(observation.reason)return false;
-    let economy=defenseEconomyFacts(actor),planned=samDevelopmentFacts(actor,observation,economy);
+    let economy=defenseEconomyFacts(actor,observation),planned=samDevelopmentFacts(actor,observation,economy);
     if(emergencyOnly)planned={candidates:[],savings:0n,blocked:[]};
     if(!observation.threats.some(t=>t.threatensSelf||t.threatensSamArea)&&!planned.savings)return false;
     const previews=predictor().assess({...observation,candidates:observation.ownSams.map(s=>({unitId:s.id(),cost:0n}))});
@@ -1503,7 +1511,7 @@ function createBrainRuntime(deps) {
         if(quote&&quote.canUpgrade===unit.id())quotes.set(unit.id(),quote);
       }
       observation=deps.samDefenseObserver.observe(game,player);
-      economy=defenseEconomyFacts(actor);planned=samDevelopmentFacts(actor,observation,economy);
+      economy=defenseEconomyFacts(actor,observation);planned=samDevelopmentFacts(actor,observation,economy);
       if(emergencyOnly)planned={candidates:[],savings:0n,blocked:[]};
       const assessments=observation.reason?[]:predictor().assess({...observation,candidates:[...quotes].map(([unitId,q])=>({unitId,
         cost:q.upgradeCosts?.[0]??q.cost}))});

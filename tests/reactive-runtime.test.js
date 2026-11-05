@@ -48,6 +48,12 @@ test('a timely useful upgrade spends the emergency reserve using its actual upgr
  assert.ok(f.runtime.inspect().records.some(r=>r.kind==='reactive-sam-result'&&r.status==='selected'));
 });
 
+test('reactive assessment shares each fresh defense scan but observes again after the quote',async()=>{
+ const f=fixture(),original=f.game.units;let defenseScans=0;
+ f.game.units=(...types)=>{if(types.includes(U.SAMMissile))defenseScans++;return original(...types);};
+ await f.run();assert.equal(defenseScans,2);assert.equal(f.builds.length,1);
+});
+
 test('emergency SAM upgrades bypass a pending ordinary building delay',async()=>{
  for(const hydro of [false,true]){
  const f=fixture({hydro,gold:4000000n,createBuildPacing:()=>require('../src/brain/build-pacing')({now:()=>0,random:()=>1})});

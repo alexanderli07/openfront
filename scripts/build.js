@@ -4,6 +4,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { simplifyConfigPanel } = require('./config-panel');
 const { unifyPanelTheme } = require('./panel-theme');
+const { integrateOverlayRuntime } = require('./overlay-integration');
+const { optimizeBackgroundWork } = require('./background-work');
 const root = path.resolve(__dirname, '..');
 const baselinePath = path.join(root, 'vendor/openfront-helper-1.84.0.user.js');
 const expectedHash = '863068bc00d0e6a9610e3c1199ea2c6fe8f5ae3c6ea6cca8d051abe74ffcfad8';
@@ -69,40 +71,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     'let ofhAntiAfkUnavailableWarned=false;window.addEventListener("message",n=>{if(n.source!==window){return}const e=n.data;if(!e||e.source!==EXTENSION_SOURCE){return}');
   replaceOne('if(e.type==="SET_ANTI_AFK"){setAntiAfkEnabled(e.payload?.enabled)}',
     'if(e.type==="SET_ANTI_AFK"){if(typeof setAntiAfkEnabled==="function"){setAntiAfkEnabled(e.payload?.enabled)}else if(e.payload?.enabled&&!ofhAntiAfkUnavailableWarned){ofhAntiAfkUnavailableWarned=true;console.warn("[ofh] Anti-AFK helper unavailable in this build; setting cannot be applied.")}}');
-  const connectionStatus=fs.readFileSync(path.join(root,'src/ui/game-connection-status.js'),'utf8')
-    .replace(/^if\(typeof module.*$/m,'');
-  const panelStatus=fs.readFileSync(path.join(root,'src/ui/panel-status.js'),'utf8')
-    .replace(/^if\(typeof module.*$/m,'');
-  replaceOne('const _NativeSend=_NativeWS.prototype.send;',
-    'const _NativeSend=_NativeWS.prototype.send;'+connectionStatus+panelStatus+
-    ';const ofhGameConnection=createGameConnectionStatus({baseUrl:window.location.href,openState:_NativeWS.OPEN||1,onChange:()=>ofhRefreshConnectionDot()});'+
-    'window.__OFH_gameConnectionStatus=ofhGameConnection;window.__OFH_panelIndicatorStatus=panelIndicatorStatus;'+
-    'function ofhRefreshConnectionDot(){const dot=document.getElementById("ohqp-connection");if(dot){const status=panelIndicatorStatus(typeof quickPanelEnabled!=="undefined"&&quickPanelEnabled,ofhGameConnection.connected());dot.dataset.status=status;dot.dataset.panelStatus=status;dot.title=status==="off"?"Helper off":status==="connected"?"Helper on — connected to game server":"Helper on — waiting for game server"}}');
-  replaceOne('var t=e!==void 0?new _NativeWS(n,e):new _NativeWS(n);t.addEventListener("close",',
-    'var t=e!==void 0?new _NativeWS(n,e):new _NativeWS(n);ofhGameConnection.track(t,n);t.addEventListener("close",');
-  replaceOne('function _setWsConnectionState(n){_wsConnectionState=n;try{var e=document.getElementById("ohqp-connection");if(e)e.dataset.status=n?"connected":"disconnected"}catch(t){}}',
-    'function _setWsConnectionState(n){_wsConnectionState=n;ofhRefreshConnectionDot()}');
-  replaceOne('i=typeof isSocketConnected==="function"&&isSocketConnected()===true',
-    'i=ofhGameConnection.connected()');
-  replaceOne('a.title="Game connection — green while you are in a game, grey between games"',
-    'a.title=i?"Connected to the game server":"No game server connection (singleplayer runs locally)"');
-  replaceOne('_qpApplyStoredPos(n);_renderActiveTab();_themeFromSettings();return n}',
-    '_qpApplyStoredPos(n);_renderActiveTab();_themeFromSettings();ofhRefreshConnectionDot();return n}');
-  replaceOne('function setQuickPanelEnabled(n){quickPanelEnabled=!!n;',
-    'function setQuickPanelEnabled(n){quickPanelEnabled=!!n;ofhRefreshConnectionDot();');
-  const nukeProjection=fs.readFileSync(path.join(root,'src/ui/nuke-trajectory.js'),'utf8')
-    .replace(/^if\(typeof module.*$/m,'');
-  replaceOne('const NUKE_TRAJ_PARABOLA_TYPES=new Set(["Atom Bomb","Hydrogen Bomb"]);','');
-  replaceMethodRange('function computeNukeTrajectoryPath(', 'function drawNukeTrajectory(',
-    nukeProjection+'\nfunction collectNukeTrajectoryScan(game){let units;try{units=game.units(...NUKE_TRAJ_UNIT_TYPES)}catch{_nukeTrajScan=[];return}const scan=[];'+
-    'for(const unit of units){if(!unit?.isActive?.())continue;const relation=getNukePredictionRelation(game,unit);if(!relation)continue;'+
-    'const projection=projectNukeTrajectory(game,unit,{maxPoints:NUKE_TRAJ_MAX_POINTS});if(!projection||projection.worldPts.length<2)continue;'+
-    'scan.push({...projection,relation,color:nukeTrajColor(relation,unit.owner?.())})}_nukeTrajScan=scan}');
-  replaceOne('n.strokeStyle=r.color||nukeTrajColor(r.relation);n.stroke()',
-    'n.globalAlpha=ofhNukeOverlayAlpha*(r.confidence==="exact"?1:.45);n.setLineDash(r.confidence==="exact"?[5,6]:[2,8]);n.strokeStyle=r.color||nukeTrajColor(r.relation);n.stroke()');
-  const nukeDrawStart=source.indexOf('function drawNukeTrajectory('),nukeDrawEnd=source.indexOf('registerMapOverlayLayer(',nukeDrawStart);
-  const nukeDraw=source.slice(nukeDrawStart,nukeDrawEnd);
-  replaceOne(nukeDraw,nukeDraw.replace('n.save();','n.save();const ofhNukeOverlayAlpha=n.globalAlpha;'));
+  source=integrateOverlayRuntime(source);
   const mapCatalog=JSON.parse(fs.readFileSync(path.join(root,'src/lobby/maps.json'),'utf8')).maps;
   const mapCatalogStart=source.indexOf('(function(){const e=[{id:"achiran"');
   const mapArrayStart=source.indexOf('[',mapCatalogStart),mapArrayEnd=source.indexOf('];globalThis.OPENFRONT_MAPS',mapArrayStart);
@@ -646,7 +615,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   }
   replaceOne('if(i)i.textContent=a};e("status",state.status);',
     'if(i){i.textContent=a;if(t.startsWith("c-"))i.title="Bot commands submitted since this page loaded; resets per match. Builds include upgrades and warships. Server acceptance is not confirmed."}};e("status",state.status);');
-  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'bot-statistics.js', 'economy-status.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'runtime.js', '../ui/panel-motion.js', 'bootstrap.js'].map(name =>
+  const modules = ['sam-placement.js', 'team-geography.js', 'two-team-opening.js', 'port-water-access.js', 'game-config-compat.js', 'engine.js', 'command-guard.js', 'build-pacing.js', 'bot-statistics.js', 'economy-status.js', 'spending-ledger.js', 'defense-economy.js', 'reactive-sam.js', 'sam-defense-observer.js', 'sam-development.js', 'support-posture.js', 'wilderness-crossing.js', 'match-summary.js', 'match-archive.js', 'legacy-strategy.js', 'adaptive-strategy.js', 'turn-planner.js', 'social-planner.js', 'alliance-event-planner.js', 'warship-maintenance-planner.js', 'warship-transport-planner.js', 'warship-threat-planner.js', 'structure-planner.js', 'building-planner.js', 'structure-placement-planner.js', 'bot-target-planner.js', 'attack-geography-planner.js', 'attack-planner.js', 'attack-allocation-planner.js', 'opening-expansion.js', 'attack-routing-planner.js', 'attack-sequence-planner.js', 'diplomacy-planner.js', 'donation-value.js', 'diplomacy-details-planner.js', 'embargo-planner.js', 'spawn-planner.js', 'naval-landing-planner.js', 'naval-action-planner.js', 'boat-planner.js', 'warship-details-planner.js', 'warship-patrol-planner.js', 'warship-trade-hotspots.js', 'warship-combat-planner.js', 'warship-safety-planner.js', 'warship-deployment-planner.js', 'strike-planner.js', 'strike-target-planner.js', 'strike-ranking.js', 'tick-observations.js', 'runtime.js', '../ui/panel-motion.js', 'bootstrap.js'].map(name =>
     fs.readFileSync(path.join(root, 'src/brain', name), 'utf8').replace(/^if \(typeof module !== 'undefined'.*$/m, '')).join('\n');
   source = simplifyConfigPanel(source);
   replaceOne('async maybeSpawnStructure(e){if(!autoBotBuildAllowed(e))return false;const t=this.getPerceivedCost(e);let a=this.player.gold();const i=mirvReserveHold(a);',
@@ -674,12 +643,13 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.1.5';
+  const version='2.2.0';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
   source=source.replace(/\r\n/g,'\n');
   source=unifyPanelTheme(source);
+  source=optimizeBackgroundWork(source);
   return { source, metadata:header+'\n', counts };
 }
 module.exports = { buildSource };
