@@ -69,6 +69,20 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     'let ofhAntiAfkUnavailableWarned=false;window.addEventListener("message",n=>{if(n.source!==window){return}const e=n.data;if(!e||e.source!==EXTENSION_SOURCE){return}');
   replaceOne('if(e.type==="SET_ANTI_AFK"){setAntiAfkEnabled(e.payload?.enabled)}',
     'if(e.type==="SET_ANTI_AFK"){if(typeof setAntiAfkEnabled==="function"){setAntiAfkEnabled(e.payload?.enabled)}else if(e.payload?.enabled&&!ofhAntiAfkUnavailableWarned){ofhAntiAfkUnavailableWarned=true;console.warn("[ofh] Anti-AFK helper unavailable in this build; setting cannot be applied.")}}');
+  const connectionStatus=fs.readFileSync(path.join(root,'src/ui/game-connection-status.js'),'utf8')
+    .replace(/^if\(typeof module.*$/m,'');
+  replaceOne('const _NativeSend=_NativeWS.prototype.send;',
+    'const _NativeSend=_NativeWS.prototype.send;'+connectionStatus+
+    ';const ofhGameConnection=createGameConnectionStatus({baseUrl:window.location.href,openState:_NativeWS.OPEN||1,onChange:()=>ofhRefreshConnectionDot()});'+
+    'function ofhRefreshConnectionDot(){const dot=document.getElementById("ohqp-connection");if(dot){const connected=ofhGameConnection.connected();dot.dataset.status=connected?"connected":"disconnected";dot.title=connected?"Connected to the game server":"No game server connection (singleplayer runs locally)"}}');
+  replaceOne('var t=e!==void 0?new _NativeWS(n,e):new _NativeWS(n);t.addEventListener("close",',
+    'var t=e!==void 0?new _NativeWS(n,e):new _NativeWS(n);ofhGameConnection.track(t,n);t.addEventListener("close",');
+  replaceOne('function _setWsConnectionState(n){_wsConnectionState=n;try{var e=document.getElementById("ohqp-connection");if(e)e.dataset.status=n?"connected":"disconnected"}catch(t){}}',
+    'function _setWsConnectionState(n){_wsConnectionState=n;ofhRefreshConnectionDot()}');
+  replaceOne('i=typeof isSocketConnected==="function"&&isSocketConnected()===true',
+    'i=ofhGameConnection.connected()');
+  replaceOne('a.title="Game connection — green while you are in a game, grey between games"',
+    'a.title=i?"Connected to the game server":"No game server connection (singleplayer runs locally)"');
   const mapCatalog=JSON.parse(fs.readFileSync(path.join(root,'src/lobby/maps.json'),'utf8')).maps;
   const mapCatalogStart=source.indexOf('(function(){const e=[{id:"achiran"');
   const mapArrayStart=source.indexOf('[',mapCatalogStart),mapArrayEnd=source.indexOf('];globalThis.OPENFRONT_MAPS',mapArrayStart);
@@ -633,7 +647,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.1.2';
+  const version='2.1.3';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
