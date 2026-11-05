@@ -6,6 +6,7 @@ const { simplifyConfigPanel } = require('./config-panel');
 const { unifyPanelTheme } = require('./panel-theme');
 const { integrateOverlayRuntime } = require('./overlay-integration');
 const { optimizeBackgroundWork } = require('./background-work');
+const { renameInterfaceIdentifiers } = require('./identifier-names');
 const root = path.resolve(__dirname, '..');
 const baselinePath = path.join(root, 'vendor/openfront-helper-1.84.0.user.js');
 const expectedHash = '863068bc00d0e6a9610e3c1199ea2c6fe8f5ae3c6ea6cca8d051abe74ffcfad8';
@@ -643,13 +644,14 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.2.0';
+  const version='2.2.1';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
   source=source.replace(/\r\n/g,'\n');
   source=unifyPanelTheme(source);
   source=optimizeBackgroundWork(source);
+  source=renameInterfaceIdentifiers(source);
   return { source, metadata:header+'\n', counts };
 }
 module.exports = { buildSource };

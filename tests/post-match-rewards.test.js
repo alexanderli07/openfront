@@ -58,7 +58,7 @@ test('shipped auto-leave waits for claim coordinator then navigates',()=>{
   const start=source.indexOf('function checkAutoLeave(){');
   const end=source.indexOf('function syncAutoLeaveTimer()',start);
   let waiting=true;
-  const window={location:{href:'/game/test'},__OFH_postMatchRewards:{hold:()=>waiting}};
+  const window={location:{href:'/game/test'},__UIK_postMatchRewards:{hold:()=>waiting}};
   const context=vm.createContext({window,document:{querySelector:()=>({isVisible:true,isWin:true})},autoLeaveFired:false,autoLeaveOnTeamWin:true,autoLeaveOnLoss:false});
   vm.runInContext(source.slice(start,end),context);
   vm.runInContext('checkAutoLeave()',context);assert.equal(window.location.href,'/game/test');assert.equal(context.autoLeaveFired,false);

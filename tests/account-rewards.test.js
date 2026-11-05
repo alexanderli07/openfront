@@ -66,7 +66,7 @@ test('single native Claim works without Claim All and skips disconnected panels'
 
 test('shipped account discovery uses native rewards panels and occupancy gate',()=>{
   const source=buildSource().source,start=source.indexOf('const ofhPostMatchRewards=createPostMatchRewards(');
-  const end=source.indexOf('window.__OFH_postMatchRewards=',start);
+  const end=source.indexOf('window.__UIK_postMatchRewards=',start);
   assert.ok(start>=0&&end>start);
   let occupied=false,options;
   const panels=[{}];

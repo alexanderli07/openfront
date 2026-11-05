@@ -24,11 +24,11 @@ test('Auto-Bot disclosure arrows track the saved state without changing their la
 });
 
 test('every panel style installer ships the same shared theme, independent of opening order',()=>{
- const source=buildSource().source,css=fs.readFileSync(require.resolve('../src/ui/shared-panels.css'),'utf8');
+ const source=buildSource().source,css=require('../scripts/identifier-names').renameInterfaceIdentifiers(fs.readFileSync(require.resolve('../src/ui/shared-panels.css'),'utf8'));
  for(const [start,end,call,constants] of [
-  ['function ensureQuickPanelStyles(){','var _panelAnimTimers=','ensureQuickPanelStyles()', {QUICK_PANEL_ID:'openfront-helper-quick-panel',QUICK_PANEL_STYLE_ID:'quick-style'}],
-  ['function ensureFloatingAutoJoinStyles(){','function formatAutoJoinDuration(','ensureFloatingAutoJoinStyles()', {FLOATING_AUTOJOIN_PANEL_ID:'openfront-helper-floating-autojoin-panel',FLOATING_AUTOJOIN_STYLE_ID:'join-style'}],
-  ['function ensureStyles(){','const FEAT_TIP=','ensureStyles()', {PANEL_ID:'openfront-helper-auto-bot-panel',STYLE_ID:'bot-style'}]
+  ['function ensureQuickPanelStyles(){','var _panelAnimTimers=','ensureQuickPanelStyles()', {QUICK_PANEL_ID:'ui-kit-quick-panel',QUICK_PANEL_STYLE_ID:'quick-style'}],
+  ['function ensureFloatingAutoJoinStyles(){','function formatAutoJoinDuration(','ensureFloatingAutoJoinStyles()', {FLOATING_AUTOJOIN_PANEL_ID:'ui-kit-floating-autojoin-panel',FLOATING_AUTOJOIN_STYLE_ID:'join-style'}],
+  ['function ensureStyles(){','const FEAT_TIP=','ensureStyles()', {PANEL_ID:'ui-kit-control-panel',STYLE_ID:'bot-style'}]
  ]){
   const nodes=new Map();const document={getElementById:id=>nodes.get(id),createElement:()=>({}),head:{appendChild:n=>nodes.set(n.id,n)}};
   const context=vm.createContext({...constants,document,OFH_PANEL_HEIGHT_PX:420});

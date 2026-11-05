@@ -8,7 +8,7 @@ function shipped(){
  const maps=vm.runInNewContext(match[1]);
  const start=source.indexOf('(function e(a){const n=Array.isArray(a.OPENFRONT_MAPS)'),end=source.indexOf('})(globalThis);',start)+'})(globalThis);'.length;
  const live=require('../src/lobby/live-map-catalog').createLiveMapCatalog({seed:maps});
- const context=vm.createContext({OPENFRONT_MAPS:live.maps,__OFH_liveMaps:live});vm.runInContext(source.slice(start,end),context);
+ const context=vm.createContext({OPENFRONT_MAPS:live.maps,__UIK_liveMaps:live});vm.runInContext(source.slice(start,end),context);
  const mapStart=source.indexOf('function getLobbyMapTokens('),mapEnd=source.indexOf('function pruneCooldowns()',mapStart);
  context.MAPS=live.maps;context.settings={mapFilters:{},mapExcludeFilters:{}};
  context.normalizeComparableText=v=>String(v??'').trim().toLowerCase().replace(/\s+/g,' ');
@@ -23,14 +23,14 @@ test('picker includes all135released maps, retaining existing ids',()=>{
  for(const id of ['madagascar','newzealand','babelmandebstrait','riodejaneiro','branchingpaths','clearwaterlakes','baikal','europe'])assert.ok(f.maps.some(m=>m.id===id),id);
 });
 test('saved selections survive normalization and new maps default off',()=>{
- const f=shipped(),settings=f.context.OpenFrontHelperSettings.normalizeSettings({mapFilters:{baikal:true,madagascar:true},mapExcludeFilters:{newzealand:true}});
+ const f=shipped(),settings=f.context.InterfaceKitSettings.normalizeSettings({mapFilters:{baikal:true,madagascar:true},mapExcludeFilters:{newzealand:true}});
  assert.equal(settings.mapFilters.baikal,true);assert.equal(settings.mapFilters.madagascar,true);
  assert.equal(settings.mapExcludeFilters.newzealand,true);assert.equal(settings.mapFilters.clearwaterlakes,false);
 });
 test('discovery updates settings ids and matcher in the shipped closure without a reload',()=>{
- const f=shipped();f.context.__OFH_liveMaps.lobbies({games:{team:[{gameConfig:{gameMap:'Tomorrow Island'}}]}});
- assert.ok(f.context.OpenFrontHelperSettings.MAP_IDS.includes('tomorrowisland'));
- const settings=f.context.OpenFrontHelperSettings.normalizeSettings({mapFilters:{baikal:true}});
+ const f=shipped();f.context.__UIK_liveMaps.lobbies({games:{team:[{gameConfig:{gameMap:'Tomorrow Island'}}]}});
+ assert.ok(f.context.InterfaceKitSettings.MAP_IDS.includes('tomorrowisland'));
+ const settings=f.context.InterfaceKitSettings.normalizeSettings({mapFilters:{baikal:true}});
  assert.equal(settings.mapFilters.tomorrowisland,false);assert.equal(settings.mapFilters.baikal,true);
  f.context.settings.mapFilters={tomorrowisland:true};assert.equal(f.match({gameConfig:{gameMap:'Tomorrow Island'}}),true);
 });
@@ -71,15 +71,15 @@ test('forecast preferred teams follow current registry instead of the old three-
 });
 test('custom game include/exclude filters recognize native flags and hosted lobbies',()=>{
  const f=shipped(),c=f.context;
- c.FILTER_KEYS=c.OpenFrontHelperSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.OpenFrontHelperSettings.START_GOLD_FILTER_KEYS;
- c.settings=c.OpenFrontHelperSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,includeFilters:{customGames:true}});
+ c.FILTER_KEYS=c.InterfaceKitSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.InterfaceKitSettings.START_GOLD_FILTER_KEYS;
+ c.settings=c.InterfaceKitSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,includeFilters:{customGames:true}});
  const start=f.source.indexOf('function objectContainsFreeForAll('),end=f.source.indexOf('function hasSelectedCriteria(',start);
  vm.runInContext(f.source.slice(start,end),c);
  const lobby=custom=>({custom,gameConfig:{gameMap:'Baikal',gameMode:'Team',playerTeams:2,maxPlayers:100}});
  assert.equal(c.lobbyMatchesFilters(lobby(true),'special'),true);
  assert.equal(c.lobbyMatchesFilters(lobby(false),'team'),false);
  assert.equal(c.lobbyMatchesFilters({...lobby(undefined),publicGameType:'hosted'},'hosted'),true);
- c.settings=c.OpenFrontHelperSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,excludeFilters:{customGames:true}});
+ c.settings=c.InterfaceKitSettings.normalizeSettings({minTeamSize:null,maxTeamCount:null,excludeFilters:{customGames:true}});
  assert.equal(c.lobbyMatchesFilters(lobby(true),'special'),false);
  assert.equal(c.lobbyMatchesFilters({...lobby(false),featured:true},'special'),true);
  assert.equal(c.lobbyMatchesFilters({...lobby(undefined),publicGameType:'hosted'},'hosted'),false);
@@ -96,11 +96,11 @@ test('custom-only forecast waits for observed matches rather than claiming zero 
 });
 
 test('custom games default to excluded while explicit choices remain configurable',()=>{
- const f=shipped(),c=f.context,normalize=c.OpenFrontHelperSettings.normalizeSettings;
+ const f=shipped(),c=f.context,normalize=c.InterfaceKitSettings.normalizeSettings;
  assert.equal(normalize().excludeFilters.customGames,true);
  assert.equal(normalize({includeFilters:{customGames:true}}).excludeFilters.customGames,false);
  assert.equal(normalize({excludeFilters:{customGames:false}}).excludeFilters.customGames,false);
- c.FILTER_KEYS=c.OpenFrontHelperSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.OpenFrontHelperSettings.START_GOLD_FILTER_KEYS;
+ c.FILTER_KEYS=c.InterfaceKitSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.InterfaceKitSettings.START_GOLD_FILTER_KEYS;
  const start=f.source.indexOf('function objectContainsFreeForAll('),end=f.source.indexOf('function hasSelectedCriteria(',start);
  vm.runInContext(f.source.slice(start,end),c);
  c.settings=normalize({minTeamSize:null,maxTeamCount:null});

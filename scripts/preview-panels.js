@@ -15,14 +15,14 @@ const html=`<!doctype html><meta charset="utf-8"><title>OpenFront shared UI prev
 <style>
 :root{--oh-panel-bg:rgba(12,18,20,.97);--oh-panel-text:#e2e8f0;--oh-panel-text-dim:#94a3b8;--oh-panel-border:rgba(148,163,184,.34);--oh-panel-header-border:rgba(148,163,184,.18);--oh-accent:#f97316;--oh-accent-soft:rgba(249,115,22,.18);--oh-accent-muted:rgba(249,115,22,.6)}
 body{margin:0;background:#20272b;color:#e2e8f0;font:14px Segoe UI,sans-serif}header{padding:14px 20px}#errors{color:#fca5a5;white-space:pre-wrap}
-#openfront-helper-quick-panel{left:20px!important;top:75px!important;display:flex!important}
-#openfront-helper-floating-autojoin-panel{left:320px!important;top:75px!important}
+#ui-kit-quick-panel{left:20px!important;top:75px!important;display:flex!important}
+#ui-kit-floating-autojoin-panel{left:320px!important;top:75px!important}
 #preview-note{position:absolute;left:20px;top:530px;max-width:580px;color:#94a3b8;font-size:12px}
-@media(max-width:620px){#openfront-helper-floating-autojoin-panel{left:20px!important;top:530px!important}#preview-note{top:1000px}}
+@media(max-width:620px){#ui-kit-floating-autojoin-panel{left:20px!important;top:530px!important}#preview-note{top:1000px}}
 </style><header>Shared panel preview · <button id="helpers">Helper controls</button> <button id="config">Helper config</button> <button id="theme">Switch accent</button> <button id="long">Long labels</button></header><pre id="errors"></pre><p id="preview-note">Local fixture using the generated panel styles and native Helper/Auto Join render functions. No game connection or saved settings.</p>
 <script>
 window.onerror=(m)=>document.getElementById('errors').textContent+=m+'\\n';
-const QUICK_PANEL_ID='openfront-helper-quick-panel',QUICK_PANEL_STYLE_ID='quick-style',FLOATING_AUTOJOIN_PANEL_ID='openfront-helper-floating-autojoin-panel',FLOATING_AUTOJOIN_STYLE_ID='join-style',OFH_PANEL_HEIGHT_PX=420;
+const QUICK_PANEL_ID='ui-kit-quick-panel',QUICK_PANEL_STYLE_ID='quick-style',FLOATING_AUTOJOIN_PANEL_ID='ui-kit-floating-autojoin-panel',FLOATING_AUTOJOIN_STYLE_ID='join-style',OFH_PANEL_HEIGHT_PX=420;
 let quickPanelActiveTab='helpers',_qpPopoverEl=null,settings={enabled:true,floatingAutoJoinFiltersCollapsed:false,floatingAutoJoinForecastCollapsed:false};
 function ofhRefreshConnectionDot(){}
 const _themePresets={orange:'#f97316',blue:'#60a5fa',green:'#4ade80',pink:'#f472b6'},_quickPanelSettingsCache={};

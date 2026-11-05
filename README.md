@@ -1,8 +1,8 @@
 # OpenFront Helper: decision framework
 
-Install `openfront-helper.user.js` (2.2.0) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
+Install `openfront-helper.user.js` (2.2.1) in Violentmonkey. It is a standalone build of the original 1.84.0 bot with a central turn coordinator plus structure planning and placement, attack purposes, player/bot and geographic targets, alliance decisions, ally assistance, betrayal, opportunistic naval actions, distant landing-site selection, warship decisions and main strike planning. It provides one command decision interface and structured tracing. The active `adaptive-v1` policy adds a safe two-team opening: finish reachable wilderness before country attacks, build two physical ports and one city, then reserve for the first SAM. Factory/landlocked starts require two physical cities and one factory; disabled buildings are excluded. Later economic buildings group on owned or allied factory lines. Other decisions retain the established rules through `legacy-v1`. The previous economy experiment is archived and excluded from the build.
 
-## Install and update (2.2.0)
+## Install and update (2.2.1)
 
 [Install or update OpenFront Helper](https://raw.githubusercontent.com/alexanderli07/openfront/minimal/openfront-helper.user.js) with Violentmonkey enabled. Existing manually pasted or locally imported copies need this URL install once to acquire update metadata. Keep the same script name and namespace; the manager can replace the existing entry. Do not delete the old entry first. This migration does not change the bot's site-local settings.
 
@@ -13,6 +13,10 @@ After installation, Violentmonkey's **Check for updates** / refresh control fetc
 
 Use GitHub's raw install link, not its file-view page or a local copy. Reload an OpenFront game tab after updating to run the new script. GitHub may briefly cache recently published content. Both endpoints must show the same version before announcing a release.
 
+## Interface identifiers (2.2.1)
+
+Emitted panel IDs use `ui-kit-*`, the main controls use `ui-kit-control-panel`, and public debug APIs use `__UIK_*` (for example `__UIK_performance`). The build translates identifiers consistently across markup, selectors, themes and bridges. Existing storage keys, match history, install/update identity and visible panel names are preserved. This is an identifier change, not a claim of concealment or detection avoidance.
+
 ## Performance work (2.2.0)
 
 - Stable own-unit summaries are shared per game/player/tick. Resources, attacks and settings remain live; commands invalidate structural summaries before execution, after execution and on asynchronous settlement. Reactive SAM planning shares a fresh scan inside one assessment but takes a new scan after awaited quotes.
@@ -21,7 +25,7 @@ Use GitHub's raw install link, not its file-view page or a local copy. Reload an
 - Theme variables now update through CSS without the recurring DOM scan/style writes. Reward, join-expiry and join-resume housekeeping share one clock with their existing startup and occupancy gates. Gameplay/defense timers are unchanged.
 - Affected overlay rendering and background integration live in readable modules (`src/ui/nuke-overlay.js`, `scripts/overlay-integration.js`, `src/ui/background-work.js`, `scripts/background-work.js`); the immutable vendor baseline is unchanged.
 
-Optional live timings are disabled by default. In the page console use `__OFH_performance.start()`, let a representative part of the match run, then `__OFH_performance.stop()`. `__OFH_performance.report()` returns bounded aggregate timings for snapshots, logging, checkpoints and overlay scans/draws. Timings cover synchronous script work, not game FPS or server latency.
+Optional live timings are disabled by default. In the page console use `__UIK_performance.start()`, let a representative part of the match run, then `__UIK_performance.stop()`. `__UIK_performance.report()` returns bounded aggregate timings for snapshots, logging, checkpoints and overlay scans/draws. Timings cover synchronous script work, not game FPS or server latency.
 
 Deterministic work-count tests cover 100 summary reads using one unit scan, 1,000 repetitive records traversing 10 sampled payloads, native paths avoiding repeated full validation, and long-match checkpoints writing only changed rows. These establish reduced work in fixtures; live CPU/FPS improvements still require a real-game profile. IndexedDB transaction behavior is covered by a request/transaction fixture; native-browser visual/storage verification remains outstanding.
 

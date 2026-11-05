@@ -9,7 +9,7 @@ test('Auto-Bot indicator responds to both enablement and the actual connection',
  const source=buildSource().source,dot={dataset:{},style:{}},state={settings:{enabled:false}};
  let connected=true;
  const context=vm.createContext({state,PANEL_ID:'bot',tr:x=>x,
-  window:{__OFH_panelIndicatorStatus:status,__OFH_gameConnectionStatus:{connected:()=>connected}},
+  window:{__UIK_panelIndicatorStatus:status,__UIK_gameConnectionStatus:{connected:()=>connected}},
   document:{getElementById:()=>({querySelector:()=>dot})},getGame:()=>({}),gameType:()=> 'Public'});
  const a=source.indexOf('function refreshGateBanner(){'),b=source.indexOf('function fmt(',a);
  vm.runInContext(source.slice(a,b),context);
