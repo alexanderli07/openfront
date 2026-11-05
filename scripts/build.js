@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { simplifyConfigPanel } = require('./config-panel');
+const { unifyPanelTheme } = require('./panel-theme');
 const root = path.resolve(__dirname, '..');
 const baselinePath = path.join(root, 'vendor/openfront-helper-1.84.0.user.js');
 const expectedHash = '863068bc00d0e6a9610e3c1199ea2c6fe8f5ae3c6ea6cca8d051abe74ffcfad8';
@@ -576,6 +577,15 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('saveSettings();n.remove();try{window.dispatchEvent',
     'saveSettings();ofhPanelMotion.disclose(n,false,()=>n.remove());try{window.dispatchEvent');
   const compactPanelCss=fs.readFileSync(path.join(root,'src/ui/compact-panel.css'),'utf8');
+  for(const [role,key,label] of [['feats-toggle','featsOpen','Allowed actions'],['status-toggle','statusOpen','Status & stats']]){
+    const oldLabel=role==='feats-toggle'?'Auto toggles':label;
+    replaceOne('data-role="'+role+'">${state.settings.'+key+'?tr("'+oldLabel+' ▴"):tr("'+oldLabel+' ▾")}',
+      'data-role="'+role+'" data-open="${state.settings.'+key+'}">${tr("'+label+'")}');
+  }
+  replaceOne('e.textContent=state.settings.featsOpen?tr("Auto toggles ▴"):tr("Auto toggles ▾");',
+    'e.dataset.open=String(state.settings.featsOpen);');
+  replaceOne('u.textContent=state.settings.statusOpen?tr("Status & stats ▴"):tr("Status & stats ▾");',
+    'u.dataset.open=String(state.settings.statusOpen);');
   replaceOne('    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=',
     compactPanelCss+'\n    `;(document.head||document.documentElement).appendChild(n)}const FEAT_TIP=');
   // Keep the whole panel in view, including previously saved positions.
@@ -623,11 +633,12 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.0.2';
+  const version='2.1.2';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
   source=source.replace(/\r\n/g,'\n');
+  source=unifyPanelTheme(source);
   return { source, metadata:header+'\n', counts };
 }
 module.exports = { buildSource };
