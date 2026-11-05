@@ -90,6 +90,19 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     '_qpApplyStoredPos(n);_renderActiveTab();_themeFromSettings();ofhRefreshConnectionDot();return n}');
   replaceOne('function setQuickPanelEnabled(n){quickPanelEnabled=!!n;',
     'function setQuickPanelEnabled(n){quickPanelEnabled=!!n;ofhRefreshConnectionDot();');
+  const nukeProjection=fs.readFileSync(path.join(root,'src/ui/nuke-trajectory.js'),'utf8')
+    .replace(/^if\(typeof module.*$/m,'');
+  replaceOne('const NUKE_TRAJ_PARABOLA_TYPES=new Set(["Atom Bomb","Hydrogen Bomb"]);','');
+  replaceMethodRange('function computeNukeTrajectoryPath(', 'function drawNukeTrajectory(',
+    nukeProjection+'\nfunction collectNukeTrajectoryScan(game){let units;try{units=game.units(...NUKE_TRAJ_UNIT_TYPES)}catch{_nukeTrajScan=[];return}const scan=[];'+
+    'for(const unit of units){if(!unit?.isActive?.())continue;const relation=getNukePredictionRelation(game,unit);if(!relation)continue;'+
+    'const projection=projectNukeTrajectory(game,unit,{maxPoints:NUKE_TRAJ_MAX_POINTS});if(!projection||projection.worldPts.length<2)continue;'+
+    'scan.push({...projection,relation,color:nukeTrajColor(relation,unit.owner?.())})}_nukeTrajScan=scan}');
+  replaceOne('n.strokeStyle=r.color||nukeTrajColor(r.relation);n.stroke()',
+    'n.globalAlpha=ofhNukeOverlayAlpha*(r.confidence==="exact"?1:.45);n.setLineDash(r.confidence==="exact"?[5,6]:[2,8]);n.strokeStyle=r.color||nukeTrajColor(r.relation);n.stroke()');
+  const nukeDrawStart=source.indexOf('function drawNukeTrajectory('),nukeDrawEnd=source.indexOf('registerMapOverlayLayer(',nukeDrawStart);
+  const nukeDraw=source.slice(nukeDrawStart,nukeDrawEnd);
+  replaceOne(nukeDraw,nukeDraw.replace('n.save();','n.save();const ofhNukeOverlayAlpha=n.globalAlpha;'));
   const mapCatalog=JSON.parse(fs.readFileSync(path.join(root,'src/lobby/maps.json'),'utf8')).maps;
   const mapCatalogStart=source.indexOf('(function(){const e=[{id:"achiran"');
   const mapArrayStart=source.indexOf('[',mapCatalogStart),mapArrayEnd=source.indexOf('];globalThis.OPENFRONT_MAPS',mapArrayStart);
@@ -661,7 +674,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.1.4';
+  const version='2.1.5';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
