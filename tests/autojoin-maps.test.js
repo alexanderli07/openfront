@@ -94,3 +94,20 @@ test('custom-only forecast waits for observed matches rather than claiming zero 
  vm.runInContext(f.source.slice(start,end),c);
  assert.equal(c.buildLobbyForecastPayload().available,false);
 });
+
+test('custom games default to excluded while explicit choices remain configurable',()=>{
+ const f=shipped(),c=f.context,normalize=c.OpenFrontHelperSettings.normalizeSettings;
+ assert.equal(normalize().excludeFilters.customGames,true);
+ assert.equal(normalize({includeFilters:{customGames:true}}).excludeFilters.customGames,false);
+ assert.equal(normalize({excludeFilters:{customGames:false}}).excludeFilters.customGames,false);
+ c.FILTER_KEYS=c.OpenFrontHelperSettings.FILTER_KEYS;c.START_GOLD_FILTER_KEYS=c.OpenFrontHelperSettings.START_GOLD_FILTER_KEYS;
+ const start=f.source.indexOf('function objectContainsFreeForAll('),end=f.source.indexOf('function hasSelectedCriteria(',start);
+ vm.runInContext(f.source.slice(start,end),c);
+ c.settings=normalize({minTeamSize:null,maxTeamCount:null});
+ const regular={gameConfig:{gameMap:'Baikal',gameMode:'Team',playerTeams:2,maxPlayers:100}};
+ assert.equal(c.lobbyMatchesFilters({...regular,custom:true},'special'),false);
+ assert.equal(c.lobbyMatchesFilters({...regular,publicGameType:'hosted'},'team'),false);
+ assert.equal(c.lobbyMatchesFilters(regular,'hosted'),false);
+ assert.equal(c.lobbyMatchesFilters(regular,'team'),true);
+ assert.ok(f.source.includes('["customGames","Custom games"]'));
+});

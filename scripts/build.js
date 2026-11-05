@@ -111,6 +111,9 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
     .replace('const e=computeLast100LobbyAverages();','const e=computeLast100LobbyAverages();const ofhCustom=!!(settings.includeFilters.customGames||settings.excludeFilters.customGames);const ofhPrior=ofhCustom?0:LOBBY_FORECAST_PRIOR_STRENGTH;')
     .replace('if(!hasSelectedCriteria())','if(!hasSelectedCriteria()||(ofhCustom&&lobbyForecastMatchedNew===0&&!(e.hitRate>0)))')
     .replaceAll('a*LOBBY_FORECAST_PRIOR_STRENGTH','a*ofhPrior').replaceAll('o+l+LOBBY_FORECAST_PRIOR_STRENGTH','o+l+ofhPrior'));
+  replaceOne('excludeFilters:{...y},','excludeFilters:{...y,customGames:true},');
+  replaceOne('excludeFilters:{...g.excludeFilters,...j}',
+    'excludeFilters:{...g.excludeFilters,customGames:R.customGames===true?false:g.excludeFilters.customGames,...j}');
   const rewardsModule=fs.readFileSync(path.join(root,'src/lobby/post-match-rewards.js'),'utf8')
     .replace(/^if\(typeof module.*$/m,'');
   replaceOne('keepAutoJoinAfterMatch:true,','keepAutoJoinAfterMatch:true,autoClaimPostMatchRewards:false,');
@@ -620,7 +623,7 @@ function buildSource(baseline = fs.readFileSync(baselinePath)) {
   replaceOne('openingVetoes(e,t){','openingVetoes(e,t){const ofhVeto=ofhBrainRuntime.twoTeamOpeningVeto(this,e);if(ofhVeto!==undefined)return ofhVeto;');
   const originalHeader=source.match(/^\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==/);
   if(!originalHeader)throw new Error('Userscript header missing');
-  const version='2.0.1';
+  const version='2.0.2';
   const header=fs.readFileSync(path.join(root,'src/userscript-header.txt'),'utf8').replace(/\r\n/g,'\n').trimEnd().replace('__VERSION__',version);
   source=source.replace(originalHeader[0],header);
   replaceOne('window.__OFH_ASSETS = {"version":"1.84.0"',`window.__OFH_ASSETS = {"version":"${version}"`);
